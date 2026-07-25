@@ -1,6 +1,15 @@
+## [0.12.1] - Unreleased
+
+**Components can render nothing now — `return null` all the way (React semantics).** A component whose body ends in a top-level `return null` with no markup return is legal from 0.12.1: it renders nothing, exactly like React. The use case is effect-only components — fire a sound, register something, run a `useEffect` — without inventing an empty wrapper element. Conditional guards (`if not ready: return null`) worked before and still do; what's new is that the *whole* component may return null. Totality is still enforced: a body whose only `return null` hides inside a conditional (so some path falls through) still errors, as does a top-level non-markup value return. The formatter, the live editor squiggles, and the unreachable-code dimmer all understand the new shape.
+
+**Also fixed:** two files whose first export is a same-named *value* (say, two style companions both starting `export accent := ...`) no longer false-collide — the duplicate-class guard (GUITKX2106) now knows a value binding emits no `class_name` and has nothing to collide on. Component-name duplicates still arbitrate exactly as before.
+
+Update to **Reactive UI 0.12.1** + **Reactive UI Editor 0.10.1** (Godot), and **GUITKX 0.12.1** (VS Code + VS 2022).
+
+---
 ## [0.12.0] - 2026-07-18
 
-**ReactiveUI is staying free — here's the plan that keeps it alive.** From 0.12.0 the library ships under the **ReactiveUI Community License 1.0** (previously PolyForm Shield): free to use, modify, and ship commercially for any team earning under **$250k/year**. Above that, shipping a game takes a commercial license — **$2,000 per title** (one-time, perpetual) or **$2,500/studio/year** — same terms and prices on every engine we support (Godot, Unity, Unreal). Development, evaluation, jams, and learning stay free at ANY company size; the threshold only applies when you *ship*.
+**ReactiveUI is staying free — here's the plan that keeps it alive.** From 0.12.0 the library ships under the **ReactiveUI Community License 1.0** (previously PolyForm Shield): free to use, modify, and ship commercially for any team earning under **$250k/year**. Above that, shipping a game takes a commercial license — **$2,000 per title** (one-time, perpetual) or **$2,500/studio/year**. Development, evaluation, jams, and learning stay free at ANY company size; the threshold only applies when you *ship*.
 
 **What stays exactly the same:** the full library, all features, all updates — no feature-gated "pro version", no telemetry, no code gate. Everything you've already downloaded keeps the license it shipped with, forever.
 
@@ -38,7 +47,7 @@ Update to **Reactive UI 0.10.2** (copy `addons/reactive_ui/` into your project, 
 
 ## [Tooling 0.10.1] - 2026-07-16
 
-**Marketplace listing refresh — GUITKX extensions only, no runtime changes.** The VS Code and Visual Studio 2022 extensions were both listed as a bare "GUITKX" on their marketplace publisher pages — indistinguishable from the sibling Unreal/Unity tooling. Both are now `GUITKX (Godot - VS Code)` / `GUITKX (Godot - VS2022)`, and both extension pages get a proper structured body: Title → Description → Features → Requirements → Changelog. The VS Code page in particular finally has real content — its README is now generated straight from the same centralized changelog that drives the CHANGELOG tab, so the two can never drift.
+**Marketplace listing refresh — GUITKX extensions only, no runtime changes.** The VS Code and Visual Studio 2022 extensions were both listed as a bare "GUITKX" on their marketplace publisher pages — nothing marked them as Godot tooling. Both are now `GUITKX (Godot - VS Code)` / `GUITKX (Godot - VS2022)`, and both extension pages get a proper structured body: Title → Description → Features → Requirements → Changelog. The VS Code page in particular finally has real content — its README is now generated straight from the same centralized changelog that drives the CHANGELOG tab, so the two can never drift.
 
 **Tooling:** GUITKX **0.10.1** (VS Code + VS 2022). `reactive_ui` and the Reactive UI Editor addon are unaffected — still at their last-published versions.
 
@@ -196,7 +205,7 @@ Update to **Reactive UI 0.7.1**.
 
 ## [0.7.0] - 2026-07-04
 
-**Directive bodies are code blocks now — full Unity convergence (BREAKING).** A directive body (`@if`/`@elif`/`@else`, `@for`, `@while`, `@match`/`@case`/`@default`) is no longer bare markup — it's GDScript prep code plus `return ( <markup> )`, exactly like ReactiveUIToolKit for Unity, nesting recursively:
+**Directive bodies are code blocks now (BREAKING).** A directive body (`@if`/`@elif`/`@else`, `@for`, `@while`, `@match`/`@case`/`@default`) is no longer bare markup — it's GDScript prep code plus `return ( <markup> )`, nesting recursively:
 
 ```
 @for (it in items) {
@@ -206,11 +215,11 @@ Update to **Reactive UI 0.7.1**.
 }
 ```
 
-Pre-0.7 bare-markup bodies now error with **`GUITKX2103`**, live in the editor and at compile. Migrate a whole project in one shot: `godot --headless --path . --script res://addons/reactive_ui/dev/migrate_directive_bodies.gd -- res://<your-ui-dir>`. A hook call inside a directive body is now `GUITKX2104` (hooks must stay unconditional in setup). Canonical formatting also changes to **spaces at width 2** (Unity-exact) — run `dev/reformat_all.gd` to reformat a project.
+Pre-0.7 bare-markup bodies now error with **`GUITKX2103`**, live in the editor and at compile. Migrate a whole project in one shot: `godot --headless --path . --script res://addons/reactive_ui/dev/migrate_directive_bodies.gd -- res://<your-ui-dir>`. A hook call inside a directive body is now `GUITKX2104` (hooks must stay unconditional in setup). Canonical formatting also changes to **spaces at width 2** — run `dev/reformat_all.gd` to reformat a project.
 
 Update to **Reactive UI 0.7.0** and migrate.
 
-**Tooling:** GUITKX **0.8.0** (VS Code + VS 2022) speaks the new directive-body grammar live — prep GDScript + `return ( <markup> )` fully understood, old bare-markup flags `GUITKX2103`, a hook in a body flags `GUITKX2104`. Format-on-save ships **enabled by default**, emitting the Unity-exact spaces-2 style.
+**Tooling:** GUITKX **0.8.0** (VS Code + VS 2022) speaks the new directive-body grammar live — prep GDScript + `return ( <markup> )` fully understood, old bare-markup flags `GUITKX2103`, a hook in a body flags `GUITKX2104`. Format-on-save ships **enabled by default**, emitting the canonical spaces-2 style.
 
 ---
 
@@ -236,7 +245,7 @@ Update to **Reactive UI 0.6.1**.
 
 ## [0.6.0] - 2026-07-03
 
-**Early markup returns — the Unity way.** A component can now `return ( <markup> )` anywhere, not only as its final statement:
+**Early markup returns.** A component can now `return ( <markup> )` anywhere, not only as its final statement:
 
 ```
 component Panel(ready: bool = false) {
@@ -268,11 +277,11 @@ Update to **Reactive UI 0.5.1**.
 
 ## [0.5.0] - 2026-07-03
 
-**The `.guitkx` syntax & diagnostics parity release.** `.guitkx` now matches Unity ReactiveUIToolKit's grammar feature-for-feature — markup comments (`//`, `/* */`, `<!-- -->`, `{/* */}`), `<Fragment key={...}>`, rules-of-hooks as errors, a working `@uss`/`@theme` directive — and every diagnostic code is renumbered onto Unity's shared numbering scheme (breaking for anything matching on code strings; see the concordance table in the full changelog). The compiler is also fail-loud now: an error can never coexist with a successful compile, and the **last** top-level markup return is the component's real output (Unity `useLastReturn` parity).
+**The `.guitkx` syntax & diagnostics overhaul.** `.guitkx` gains markup comments (`//`, `/* */`, `<!-- -->`, `{/* */}`), `<Fragment key={...}>`, rules-of-hooks as errors, and a working `@uss`/`@theme` directive — and every diagnostic code is renumbered onto a new numbering scheme (breaking for anything matching on code strings; see the concordance table in the full changelog). The compiler is also fail-loud now: an error can never coexist with a successful compile, and the **last** top-level markup return is the component's real output.
 
 Update to **Reactive UI 0.5.0** and re-check anything that matched on old `GUITKX01xx` codes.
 
-**Tooling:** GUITKX **0.6.0** (VS Code + VS 2022) renumbers diagnostics onto the Unity-shared table and bundles gdscript-analyzer 0.6.0 — Godot's verbatim messages, wrong-arity as errors, cross-file names from sibling `.guitkx` resolving on a fresh clone, unknown PascalCase tags squiggled with a did-you-mean.
+**Tooling:** GUITKX **0.6.0** (VS Code + VS 2022) renumbers diagnostics onto the new table and bundles gdscript-analyzer 0.6.0 — Godot's verbatim messages, wrong-arity as errors, cross-file names from sibling `.guitkx` resolving on a fresh clone, unknown PascalCase tags squiggled with a did-you-mean.
 
 ---
 
@@ -362,7 +371,7 @@ Update to **Reactive UI 0.3.0** (copy `addons/reactive_ui/` into your project).
 
 ### Custom drawing, a real README, and an IDE that now speaks plain GDScript
 
-**Draw anything, anywhere.** Any host element now takes a `draw_fn` -- a `Callable(canvas_item)` that runs during the node's `draw` and issues its `draw_*` calls (lines, rects, polygons, text, whatever you like). Pair it with an optional `redraw_key` to force a repaint without changing the callback. It is the Godot analogue of ReactiveUIToolKit's `OnGenerateVisualContent` / `RedrawKey`, and a register-once trampoline means a fresh closure each render never re-subscribes -- so it stays cheap.
+**Draw anything, anywhere.** Any host element now takes a `draw_fn` -- a `Callable(canvas_item)` that runs during the node's `draw` and issues its `draw_*` calls (lines, rects, polygons, text, whatever you like). Pair it with an optional `redraw_key` to force a repaint without changing the callback. A register-once trampoline means a fresh closure each render never re-subscribes -- so it stays cheap.
 
 **The README finally tells the truth.** It used to claim a "10 host element MVP." It is rewritten to match what is actually here: 21 hooks, ~14 router hooks, 63 `V.*` factories, the router, signals, Suspense, item-model adapters, custom drawing, and the IDE tooling.
 
@@ -376,7 +385,7 @@ Update to **Reactive UI 0.3.0** (copy `addons/reactive_ui/` into your project).
 
 ### The demo gallery, now in .guitkx
 
-**Every demo is now markup.** The whole `examples/` gallery — counter, todo, router, the stress tests, all 24 — is rewritten in `.guitkx` instead of hand-written `V.*` calls, so the demos double as a reference for the markup language. They follow the ReactiveUIToolKit layout: one `component` per file, sub-components as sibling files, `module` reserved for hook/registry files. Generated `.gd` are git-ignored (regenerated on save).
+**Every demo is now markup.** The whole `examples/` gallery — counter, todo, router, the stress tests, all 24 — is rewritten in `.guitkx` instead of hand-written `V.*` calls, so the demos double as a reference for the markup language. They follow the recommended layout: one `component` per file, sub-components as sibling files, `module` reserved for hook/registry files. Generated `.gd` are git-ignored (regenerated on save).
 
 **Compiler fix.** A `hook` that declares a return type (`-> Array`, `-> Dictionary`) now keeps it in the generated GDScript, so `var xs := use_thing()` infers its type.
 
@@ -392,7 +401,7 @@ Update to **Reactive UI 0.2.1** (copy `addons/reactive_ui/`).
 
 ### A real router, and much more runtime breadth
 
-**The router grew up.** ReactiveUI for Godot now ships the full React-Router-style component-tree router — a faithful port of ReactiveUIToolKit's. Declare routes as markup and the library renders the single best match; nested/layout routes render through `V.outlet()`, `:params` merge down the chain, and matching is React-Router-correct (a leaf consumes the whole path, a layout matches a prefix). You also get `basename`, query strings, navigation blockers, `V.navigate`, `V.nav_link` with active styling, and 11 new router hooks (`use_navigate`, `use_location`, `use_params`, `use_blocker`, …).
+**The router grew up.** ReactiveUI for Godot now ships the full React-Router-style component-tree router. Declare routes as markup and the library renders the single best match; nested/layout routes render through `V.outlet()`, `:params` merge down the chain, and matching is React-Router-correct (a leaf consumes the whole path, a layout matches a prefix). You also get `basename`, query strings, navigation blockers, `V.navigate`, `V.nav_link` with active styling, and 11 new router hooks (`use_navigate`, `use_location`, `use_params`, `use_blocker`, …).
 
 **More runtime landed.** `V.suspense`; a process-wide signal registry (`RUISignals` + `use_signal_key`); `V.memo`; per-state StyleBox slots; a userland `classes: [...]` layer (`RUIStyleSheet`); declarative `items` across `ItemList`/`Tree`/`TabBar`/`OptionButton`/`PopupMenu`; `use_deferred_value`; plus `use_animate`, `use_sfx`, and `V.audio`/`V.video`. Raw String children auto-wrap to Labels.
 
