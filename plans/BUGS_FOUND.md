@@ -27,7 +27,16 @@ completion defects reported on the Unity leg. Investigation only — nothing fix
   `import Def, { a as b }`; aliased-const lowering; rename-refactor traverses import
   clauses. Tested.
 
-## BUG-ISO-1 — false GUITKX2106 collision between value-first files (CONFIRMED)
+## BUG-ISO-1 — false GUITKX2106 collision between value-first files (FIXED — staged for 0.12.1)
+
+> **Status: FIXED (2026-07-25).** `project_bindings` now computes the binding's KIND in the
+> same pass as its name (`_binding_info`) and exempts value-kind bindings from the dupe
+> arbitration + class→path table. Regression pinned in `tests/guitkx_test.gd` (twin value
+> files both compile, no class_name emitted, importer preloads its resolved path; the
+> component-dupe incumbent-wins test stays green). Full battery green: guitkx_test ALL,
+> build 49/0, hmr 55, editor 402/0, demos 31/0. Changelog staged under `[0.12.1] — Unreleased`.
+> **Family check still open:** verify the Unity/Unreal arbitration mirrors for the same
+> over-fire (their value-binding legs) — not yet audited.
 
 **Repro (live-probed):** two files whose FIRST exported declaration is a value with the
 same name —

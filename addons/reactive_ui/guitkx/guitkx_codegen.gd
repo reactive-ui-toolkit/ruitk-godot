@@ -336,6 +336,13 @@ static func known_component_names(guitkx_paths: Array) -> Array:
 ## table, the workspace index — keys on this, so the fix lands here first). A naive whole-file find()
 ## would also let a COMMENT mentioning @class_name shadow the real binding.
 static func _binding_name(src: String) -> String:
+	return str(_binding_info(src)["name"])
+
+## Binding name + the KIND of the declaration it binds to ("" when the binding is an
+## unmatched `@class_name` override — the emitter then emits `class_name` unconditionally).
+## One `analyzed_decls` pass serves both, so `project_bindings` pays no extra parse for the
+## kind it needs (BUG-ISO-1: the dupe arbitration must know when a binding is a VALUE).
+static func _binding_info(src: String) -> Dictionary:
 	var n := src.length()
 	var i := 0
 	var override := ""
@@ -365,20 +372,31 @@ static func _binding_name(src: String) -> String:
 			i = n if le2 == -1 else le2
 			continue
 		break
-	if override != "":
-		return override
 	# Binding (no override) = first EXPORTED declaration, else the first declaration (mixed-decl §6.2;
 	# the export-first preference is what keeps a mixed file's public binding stable). analyzed_decls
 	# applies the E-07/E-09 export markers (`export { ... }` / `export default X`) so a list-exported
 	# or default-marked decl counts as exported here exactly as the emitter sees it (M1.3 -- every
 	# identity table keys on this scan).
 	var decls: Array = Compiler.analyzed_decls(src, 0)["decls"]
-	if decls.is_empty():
-		return ""
-	for dm in decls:
-		if bool(dm["export"]):
-			return str(dm["name"])
-	return str(decls[0]["name"])
+	var binding := override
+	if binding == "":
+		if decls.is_empty():
+			return { "name": "", "kind": "" }
+		binding = ""
+		for dm in decls:
+			if bool(dm["export"]):
+				binding = str(dm["name"])
+				break
+		if binding == "":
+			binding = str(decls[0]["name"])
+	# Kind lookup mirrors the emitter's binding_kind scan exactly: the decl whose name equals the
+	# binding; "" when none matches (an override naming no decl -> the emitter emits class_name).
+	var kind := ""
+	for dm2 in decls:
+		if str(dm2["name"]) == binding:
+			kind = str(dm2["kind"])
+			break
+	return { "name": binding, "kind": kind }
 
 ## Advance past an `import` statement starting at `i` (the `import` keyword). Delegates to the
 ## canonical Compiler.import_end walk so every form — named (multi-line braces included), `* as`,
@@ -401,8 +419,16 @@ static func project_bindings(paths: Array) -> Dictionary:
 	for p in paths:
 		var src := FileAccess.get_file_as_string(str(p))
 		sources[str(p)] = src
-		var b := _binding_name(src)
+		var info := _binding_info(src)
+		var b := str(info["name"])
 		if b == "":
+			continue
+		# BUG-ISO-1 (0.12.1): a VALUE binding emits no `class_name` (the emitter's value/class rule),
+		# so two value-bound files sharing a first-export name have nothing to collide on globally —
+		# exempt them from the dupe arbitration and the class->path table entirely. Their identity
+		# stays path-keyed: sidecars sit beside the file, and importers preload by RESOLVED PATH,
+		# never by class (a value is never a tag and never V.comp'd).
+		if str(info["kind"]) == "value":
 			continue
 		if not by_class.has(b):
 			by_class[b] = []

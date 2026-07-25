@@ -4,6 +4,22 @@ All notable changes to **Reactive UI for Godot** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.12.1] — Unreleased
+
+### Fixed
+
+- **Two files whose first export is a same-named VALUE no longer false-collide
+  (GUITKX2106).** The duplicate-binding arbitration guards the global `class_name`
+  namespace, but a value-bound file emits no `class_name` at all (the 0.12.0 value/class
+  rule) — so two files both starting with e.g. `export accent := …` had nothing to collide
+  on, yet the alphabetically-later one was refused compilation with GUITKX2106 and its
+  `.gd` never written, silently breaking any importer. Value-kind bindings are now exempt
+  from the dupe arbitration and the class→path table (their identity stays path-keyed:
+  sidecars sit beside the file, and importers preload by resolved path — a value is never
+  a tag and never lowered through `V.comp`). Component-name duplicates still arbitrate
+  exactly as before (incumbent wins, GUITKX2106 on the copy), pinned by the existing test;
+  the new regression pins the twin-value case end to end, importer included.
+
 ## [0.12.0] — 2026-07-18
 
 ### Changed — License: PolyForm Shield 1.0.0 → ReactiveUI Community License 1.0

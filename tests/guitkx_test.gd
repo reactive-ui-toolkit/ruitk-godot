@@ -1845,6 +1845,34 @@ func _test_codegen() -> void:
 	for lf in [d_orig, Codegen.gd_path_for(d_orig), d_orig + ".diags.json", d_new, Codegen.gd_path_for(d_new), d_new + ".diags.json"]:
 		if FileAccess.file_exists(str(lf)):
 			DirAccess.remove_absolute(str(lf))
+	# BUG-ISO-1 (0.12.1): two files whose FIRST EXPORT is a same-named VALUE must NOT collide --
+	# a value binding emits no `class_name` (the emitter's value/class rule), so there is nothing
+	# to arbitrate: both compile, no GUITKX2106, and an importer preloads its target by path.
+	var v_a := dd + "/a_vals.guitkx"
+	var v_z := dd + "/z_vals.guitkx"
+	var v_c := dd + "/c_imp.guitkx"
+	var vf1 := FileAccess.open(v_a, FileAccess.WRITE)
+	vf1.store_string("export speed := 10\n")
+	vf1.close()
+	var vf2 := FileAccess.open(v_z, FileAccess.WRITE)
+	vf2.store_string("export speed := 99\n")
+	vf2.close()
+	var vf3 := FileAccess.open(v_c, FileAccess.WRITE)
+	vf3.store_string("import { speed } from \"./z_vals\"\n\nexport CImp() -> RUIVNode {\n\treturn ( <Label text={str(speed)} /> )\n}\n")
+	vf3.close()
+	var v_sweep := Codegen.compile_all(dd)
+	_check_true((v_sweep["errors"] as Array).is_empty(), "value-binding twins: no 2106, sweep clean: " + str(v_sweep["errors"]))
+	_check_true(FileAccess.file_exists(Codegen.gd_path_for(v_a)) and FileAccess.file_exists(Codegen.gd_path_for(v_z)),
+		"value-binding twins: BOTH .gd written")
+	_check_true(not FileAccess.get_file_as_string(Codegen.gd_path_for(v_a)).contains("class_name")
+		and not FileAccess.get_file_as_string(Codegen.gd_path_for(v_z)).contains("class_name"),
+		"value-binding twins: neither emits class_name (nothing to collide)")
+	_check_true(FileAccess.get_file_as_string(Codegen.gd_path_for(v_c)).contains(Codegen.gd_path_for(v_z)),
+		"value import preloads the RESOLVED PATH of its own target (z_vals), untouched by the twin")
+	for vlf in [v_a, v_z, v_c]:
+		for vp in [str(vlf), Codegen.gd_path_for(str(vlf)), str(vlf) + ".diags.json"]:
+			if FileAccess.file_exists(vp):
+				DirAccess.remove_absolute(vp)
 	# GUITKX2107: deleting a referenced component flags the DEPENDENT -- which is not mtime-stale
 	# -- at the dangling tag, in the SAME sweep that removes the orphan; restoring the component
 	# heals the dependent on the next sweep (recompile clears the sidecar).
