@@ -163,6 +163,12 @@ function fmtComponent(name: string, params: string, setup: string, nodes: Markup
     out += fs;
     if (hasTrailingBlank(setup)) out += "\n"; // keep an authored blank line before `return (`
   }
+  if (nodes.length === 0) {
+    // Null-only component (mirrors guitkx_formatter.gd): the whole body is plain GDScript
+    // (its own `return null` included) -- there is no markup window to re-emit.
+    out += "}\n";
+    return out;
+  }
   out += pad(1, o) + "return (\n";
   // T2.1: every window node in order -- the render root plus any sibling comments.
   for (const nd of nodes) {
@@ -196,6 +202,11 @@ function fmtPlainComponent(name: string, params: string, setup: string, nodes: M
     if (hasLeadingBlank(setup)) out += "\n";
     out += fs2;
     if (hasTrailingBlank(setup)) out += "\n";
+  }
+  if (nodes.length === 0) {
+    // Null-only component (mirrors guitkx_formatter.gd): no markup window to re-emit.
+    out += "}\n";
+    return out;
   }
   out += pad(1, o) + "return (\n";
   for (const nd of nodes) {
@@ -905,7 +916,13 @@ function parseComponentBody(src: string, name: string, params: string, bodyOpen:
   const bclose = findMatchingMarkup(src, bodyOpen);
   if (bclose === -1) return fail;
   const bodyStart = bodyOpen + 1;
-  const split = splitReturn(src, bodyStart, bclose);
+  const splitEx = splitReturnEx(src, bodyStart, bclose);
+  const split = splitEx.split;
+  if (split === null && splitEx.hasTopNull) {
+    // Null-only component (mirrors guitkx.gd null_only): the whole body is plain GDScript --
+    // setup spans it all, and there is no markup window (nodes = []).
+    return { ok: true, name, params, setup: src.slice(bodyStart, bclose), setupStart: bodyStart, setupEnd: bclose, markupStart: bclose, markupEnd: bclose, nodes: [], next: bclose + 1 };
+  }
   if (!split || split === "unclosed") return fail;
   const setup = src.slice(bodyStart, split.setupEnd);
   const mr = parseMarkup(src, split.markupStart, split.markupEnd);
@@ -1094,7 +1111,10 @@ export function missingReturnComponents(src: string): { start: number; end: numb
       if (d.kind === "component") {
         const b = declBodyOf(src, d, findMatchingMarkup);
         if (b) {
-          if (splitReturn(src, b.start, b.close) === null) out.push(declHead(src, d.at));
+          // A component with no markup return is only MISSING one when it also lacks a top-level
+          // `return null` -- that shape is the legal null-only ("renders nothing") component.
+          const rEx = splitReturnEx(src, b.start, b.close);
+          if (rEx.split === null && !rEx.hasTopNull) out.push(declHead(src, d.at));
           i = b.close + 1;
         } else i = d.at + 1;
       } else if (d.kind === "hook" || d.kind === "util") {
@@ -1283,7 +1303,8 @@ function splitReturn(src: string, start: number, end: number): ReturnSplit | "un
 // gives it full markup intelligence, and `top`/`stop` let unreachableRegions dim after an
 // UNCONDITIONAL early return (Unity's Site-B dim). Value returns (`return (x + 1)`) and `return
 // null` guards are plain GDScript and produce nothing.
-function splitReturnEx(src: string, start: number, end: number): { split: ReturnSplit | "unclosed" | null; early: { start: number; end: number; at: number; stop: number; top: boolean }[] } {
+function splitReturnEx(src: string, start: number, end: number): { split: ReturnSplit | "unclosed" | null; early: { start: number; end: number; at: number; stop: number; top: boolean }[]; hasTopNull: boolean } {
+  let hasTopNull = false;
   const lines = src.slice(start, end).split("\n");
   const unit = indentUnit(lines);
   let anchor = -1;
@@ -1325,7 +1346,7 @@ function splitReturnEx(src: string, start: number, end: number): { split: Return
         const close = findMatchingMarkup(src, p);
         // close >= end: the `)` lives beyond the body -- inside the sliced body the compiler sees
         // no close at all, so mirror its GUITKX0304 verdict.
-        if (close === -1 || close >= end) return { split: "unclosed", early: [] };
+        if (close === -1 || close >= end) return { split: "unclosed", early: [], hasTopNull };
         if (topLevel || parenHoldsMarkup(src, p + 1, close)) {
           rets.push({ at: i, mStart: p + 1, mEnd: close, stop: close + 1, shape: "paren", top: topLevel });
         }
@@ -1339,8 +1360,10 @@ function splitReturnEx(src: string, start: number, end: number): { split: Return
         continue;
       }
       // `return null` may be a CONDITIONAL guard (e.g. `if not ready: return null`); keep scanning
-      // for a later markup return rather than bailing to verbatim. Mirrors guitkx.gd _split_return. [audit]
+      // for a later markup return rather than bailing to verbatim. A TOP-LEVEL one is recorded:
+      // it sanctions the null-only component (React "renders nothing"). Mirrors guitkx.gd. [audit]
       if (keywordAt(src, p, "null")) {
+        if (topLevel) hasTopNull = true;
         i = p + 4;
         continue;
       }
@@ -1351,7 +1374,7 @@ function splitReturnEx(src: string, start: number, end: number): { split: Return
   }
   let chosen: (typeof rets)[number] | null = null;
   for (const r of rets) if (r.top) chosen = r;
-  if (chosen === null) return { split: null, early: [] };
+  if (chosen === null) return { split: null, early: [], hasTopNull };
   const early: { start: number; end: number; at: number; stop: number; top: boolean }[] = [];
   for (const r of rets) {
     if (r.at >= chosen.at) break;
@@ -1371,7 +1394,13 @@ function splitReturnEx(src: string, start: number, end: number): { split: Return
     chosen.shape === "paren"
       ? { setupEnd: chosen.at, markupStart: chosen.mStart, markupEnd: chosen.mEnd }
       : { setupEnd: chosen.at, markupStart: chosen.mStart, markupEnd: end };
-  return { split, early };
+  return { split, early, hasTopNull };
+}
+
+// True when [start,end) contains a TOP-LEVEL `return null` -- the shape that sanctions a
+// null-only ("renders nothing") component. Mirrors guitkx.gd _split_return's has_top_null.
+export function hasTopLevelReturnNull(src: string, start: number, end: number): boolean {
+  return splitReturnEx(src, start, end).hasTopNull;
 }
 
 // Mirrors guitkx.gd _paren_holds_markup: a nested `return ( ... )` is markup-shaped when its first

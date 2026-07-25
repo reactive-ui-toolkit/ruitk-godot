@@ -19,6 +19,7 @@ func _run() -> void:
 	_test_hook()
 	_test_hook_alias()
 	_test_hook_member_not_mangled()
+	_test_null_only_component()
 	_test_ctrl_flow_in_lambda()
 	_test_module()
 	_test_module_dup_across_kinds()
@@ -194,6 +195,33 @@ func _test_hook_member_not_mangled() -> void:
 	var gd: String = res["gd"]
 	_check(gd, "obj.useState(0)", "member .useState NOT prefixed")
 	_check_true(not ("obj.Hooks." in gd), "no spurious Hooks. after member access")
+
+func _test_null_only_component() -> void:
+	# React semantics: a component whose body has a TOP-LEVEL `return null` and no markup return
+	# is a legal "renders nothing" component -- 2101 no longer fires on it (all layers).
+	var w := RUIGuitkx.compile("component Gone() {\n\treturn null\n}\n", "Gone")
+	_check_true(bool(w["ok"]), "null-only wrapper component compiles (got %s)" % str(w.get("diagnostics", [])))
+	_check(str(w["gd"]), "return null", "emitted render carries the body's own return null")
+	_check_true(not str(w["gd"]).contains("V."), "no markup lowering emitted for a null-only body")
+	var p := RUIGuitkx.compile("export Gone2(active: bool = false) -> RUIVNode {\n\tif active:\n\t\treturn null\n\treturn null\n}\n", "Gone2")
+	_check_true(bool(p["ok"]), "null-only PLAIN component (guard + final null) compiles (got %s)" % str(p.get("diagnostics", [])))
+	_check(str(p["gd"]), "static func render(props: Dictionary, children: Array) -> RUIVNode:", "plain null-only emits the render func")
+	# hooks in a null-only body still alias (effect-only components are the use case)
+	var h := RUIGuitkx.compile("component Fx() {\n\tuseEffect(func():\n\t\tprint(\"x\")\n\t, [])\n\treturn null\n}\n", "Fx")
+	_check_true(bool(h["ok"]), "effect-only null component compiles (got %s)" % str(h.get("diagnostics", [])))
+	_check(str(h["gd"]), "Hooks.useEffect", "hook aliasing runs over the null-only body")
+	# totality still enforced: a nested-only `return null` (fall-through body) stays GUITKX2101
+	var bad := RUIGuitkx.compile("component Bad(a: bool) {\n\tif a:\n\t\treturn null\n\tvar x = 1\n}\n", "Bad")
+	_check_true(not bool(bad["ok"]) and _has_code(bad, "GUITKX2101"), "fall-through body still 2101 (got %s)" % str(bad.get("diagnostics", [])))
+	# and a top-level non-markup value return stays GUITKX2102
+	var v := RUIGuitkx.compile("component Val() {\n\treturn 5\n}\n", "Val")
+	_check_true(not bool(v["ok"]) and _has_code(v, "GUITKX2102"), "top-level value return stays 2102 (got %s)" % str(v.get("diagnostics", [])))
+	# formatter: no invented markup window, idempotent (tabs are the repo default options)
+	var fsrc := "export Gone3(active: bool = false) -> RUIVNode {\n\tif active:\n\t\treturn null\n\treturn null\n}\n"
+	var f1: Dictionary = RUIGuitkxFormatter.format(fsrc, { "indentStyle": "tab" })
+	_check_true(not str(f1.get("text", "")).contains("return (\n"), "formatter invents no empty markup window")
+	var f2: Dictionary = RUIGuitkxFormatter.format(str(f1.get("text", "")), { "indentStyle": "tab" })
+	_check_true(str(f2.get("text", "")) == str(f1.get("text", "")), "null-only formatting is idempotent")
 
 func _test_ctrl_flow_in_lambda() -> void:
 	# [audit #17] control-flow inside a JSX-value lambda must lower INLINE (ternary / .map), not hoist

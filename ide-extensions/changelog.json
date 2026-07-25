@@ -1,6 +1,25 @@
 {
   "entries": [
     {
+      "date": "2026-07-25",
+      "versions": {
+        "editor": "0.10.1"
+      },
+      "editor": [
+        "Null-only components (library 0.12.1, React semantics) ride the compiler into the in-editor tier: a component whose body has a top-level `return null` and no markup return compiles on save, renders nothing at runtime, and the unreachable-code dimmer skips it. A nested-only `return null` (conditional guard with a fall-through path) is still GUITKX2101, unchanged."
+      ]
+    },
+    {
+      "date": "2026-07-25",
+      "versions": {
+        "vscode": "0.12.1",
+        "vs2022": "0.12.1"
+      },
+      "shared": [
+        "Null-only components (library 0.12.1, React semantics): a component whose body has a top-level `return null` and no markup return is now legal — it renders nothing. The live GUITKX2101 missing-return check exempts the shape (a nested-only guard with a fall-through path is still flagged), and Format Document re-emits such a body verbatim instead of falling back unformatted (it previously bailed; it never corrupted). Embedded-GDScript intelligence inside null-only bodies already worked and is unchanged."
+      ]
+    },
+    {
       "date": "2026-07-18",
       "versions": {
         "editor": "0.10.0"

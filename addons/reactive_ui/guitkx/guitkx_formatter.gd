@@ -168,6 +168,11 @@ static func _fmt_component(comp_name: String, params: String, setup: String, nod
 		if _has_leading_blank(setup): out += "\n"   # keep an authored blank line after `{`
 		out += fs
 		if _has_trailing_blank(setup): out += "\n"   # keep an authored blank line before `return (`
+	if nodes.is_empty():
+		# Null-only component: the whole body is plain GDScript (its own `return null` included) --
+		# there is no markup window to re-emit.
+		out += "}\n"
+		return out
 	out += _pad(1, o) + "return (\n"
 	# T2.1: every window node in order -- the render root plus any sibling comments.
 	for nd in nodes:
@@ -187,6 +192,11 @@ static func _fmt_plain_component(comp_name: String, params: String, setup: Strin
 		if _has_leading_blank(setup): out += "\n"
 		out += fs
 		if _has_trailing_blank(setup): out += "\n"
+	if nodes.is_empty():
+		# Null-only component: the whole body is plain GDScript (its own `return null` included) --
+		# there is no markup window to re-emit.
+		out += "}\n"
+		return out
 	out += _pad(1, o) + "return (\n"
 	for nd in nodes:
 		if nd == null:

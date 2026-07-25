@@ -7,6 +7,9 @@ shared with the GUITKX IDE extensions) — add entries via `changelog.mjs add --
 editor`, then regenerate this file with `extract`; never edit it by hand. The history
 below the marker line predates the cutover and is preserved verbatim.
 
+## [0.10.1] - 2026-07-25
+- Null-only components (library 0.12.1, React semantics) ride the compiler into the in-editor tier: a component whose body has a top-level `return null` and no markup return compiles on save, renders nothing at runtime, and the unreachable-code dimmer skips it. A nested-only `return null` (conditional guard with a fall-through path) is still GUITKX2101, unchanged.
+
 ## [0.10.0] - 2026-07-18
 - ES combined import forms (library 0.12.0) ride the compiler into the in-editor tier: `import Def, { a, b as c } from` / `import Def, * as X from` parse, compile, highlight, and resolve like every other form.
 - Import-brace completion: Ctrl+Space inside `import { | } from "./file"` offers the target's exported declarations (kind-tagged), excluding names already listed — including inside the combined `import Def, { | }` form, where the default binding and the export it already binds are excluded as noise.

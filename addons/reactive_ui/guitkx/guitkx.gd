@@ -1244,6 +1244,11 @@ static func _parse_component_at(source: String, ci: int, diags: Array) -> Dictio
 	if split.has("error"):
 		diags.append(D.rebase(split["error"], body_at))
 		return { "ok": false }
+	if bool(split.get("null_only", false)):
+		# Null-only component (React "renders nothing"): the whole body is plain GDScript -- no
+		# markup window, no early parts, no render root. `root` = {} tells the emitter to skip the
+		# final markup return; the body's own top-level `return null` carries the func.
+		return { "ok": true, "name": comp_name, "name_at": ns, "params": params, "params_at": params_at, "setup": body, "vsetup": body, "body": body, "parts": [], "unit": int(split.get("unit", 1)), "anchor": int(split.get("anchor", 0)), "root": {}, "window_nodes": [], "body_at": body_at, "next": bclose + 1 }
 	# Phase C (Unity SpliceSetupCodeMarkup parity): EARLY markup returns are LEGAL. Each `ret` part
 	# is parsed and validated here (own parse errors, single-root rule, full node checks) and then
 	# lowered IN PLACE by _emit_func. `vsetup` blanks their spans out of the text handed to the
@@ -1327,6 +1332,10 @@ static func _parse_plain_component_body(source: String, comp_name: String, ns: i
 	if split.has("error"):
 		diags.append(D.rebase(split["error"], body_at))
 		return { "ok": false }
+	if bool(split.get("null_only", false)):
+		# Null-only component (React "renders nothing") -- same contract as _parse_component_at's
+		# null_only branch: verbatim GDScript body, no markup window, empty root.
+		return { "ok": true, "name": comp_name, "name_at": ns, "params": params, "params_at": params_at, "setup": body, "vsetup": body, "body": body, "parts": [], "unit": int(split.get("unit", 1)), "anchor": int(split.get("anchor", 0)), "root": {}, "window_nodes": [], "body_at": body_at, "next": bclose + 1 }
 	var early: Array = []
 	var vsetup: String = split["setup"]
 	for part in split.get("parts", []):
@@ -1389,7 +1398,8 @@ static func _parse_plain_gd_body(source: String, body_open: int, diags: Array) -
 static func _validate(setup: String, root: Dictionary, diags: Array, base: int = -1) -> void:
 	_validate_hooks(setup, diags, base)
 	_validate_effect_deps(setup, diags, base)
-	_validate_node(root, diags, base)
+	if not root.is_empty():   # null-only component: no render root to walk; setup rules still ran
+		_validate_node(root, diags, base)
 
 ## Compose a child base: rebase `rel` (an offset within the current string) onto `base`.
 static func _cbase(base: int, rel: int) -> int:
@@ -2352,6 +2362,7 @@ static func _split_return(body: String) -> Dictionary:
 		anchor = anchor_any
 	var rets: Array = []       # every markup-shaped return, in scan order; the last TOP-LEVEL one is chosen
 	var malformed_at := -1     # first top-level `return <other>` (not (, <, null) -- Unity 2102 fallback
+	var has_top_null := false  # a TOP-LEVEL `return null` seen -- sanctions the null-only component (React semantics)
 	var i := 0
 	while i < n:
 		var k := L.skip_noncode(body, i)
@@ -2393,6 +2404,9 @@ static func _split_return(body: String) -> Dictionary:
 				continue
 			elif L.keyword_at(body, p, "null"):
 				# `return null` is the sanctioned CONDITIONAL guard (top-level or nested); skip it.
+				# A TOP-LEVEL one is recorded: it also sanctions the null-only component below.
+				if top_level:
+					has_top_null = true
 				i = p + 4
 				continue
 			elif top_level and malformed_at == -1:
@@ -2410,6 +2424,13 @@ static func _split_return(body: String) -> Dictionary:
 			if meol == -1:
 				meol = n
 			return { "error": D.make("GUITKX2102", D.ERROR, "`return` must return markup using `return ( <...> )`", malformed_at, maxi(1, meol - malformed_at)) }
+		# React semantics: a component whose body has NO markup return but an explicit TOP-LEVEL
+		# `return null` is a legal "renders nothing" component -- the runtime maps a null render to
+		# an empty child list (_to_vnode_array), so nothing else is needed. The body is plain
+		# GDScript and emits verbatim (no markup window, no parts). GDScript's own typed-return
+		# check still rejects a fall-through path at the parse gate, so totality stays enforced.
+		if has_top_null:
+			return { "null_only": true, "unit": unit, "anchor": anchor }
 		# Conditional markup returns alone don't make a component: without a FINAL top-level markup
 		# return, some render() paths would return nothing (invalid for `-> RUIVNode`), so 2101 stands.
 		return { "error": D.make("GUITKX2101", D.ERROR, "component has no `return ( ... )` (only `return null`?)") }
@@ -2784,7 +2805,7 @@ static func unreachable_line_ranges(source: String) -> Array:
 				break
 			var body := source.substr(j + 1, bclose - j - 1)
 			var split := _split_return(body)
-			if not split.has("error"):
+			if not split.has("error") and not bool(split.get("null_only", false)):
 				var f := _first_real(body, split["m_end"] + 1, body.length())
 				if f != -1:
 					var lst := _last_real(body, split["m_end"] + 1, body.length())
@@ -2946,6 +2967,10 @@ static func _emit_func(func_name: String, params: String, setup: String, root: D
 			out += "%sreturn %s\n" % ["\t".repeat(lvl), rexpr]
 			ctx["lines"] = saved_lines
 			ctx["indent"] = saved_indent
+	if root.is_empty():
+		# Null-only component: the body (emitted verbatim above) carries its own top-level
+		# `return null` -- there is no render root and no final markup return to emit.
+		return out
 	var root_expr := _emit_expr(root, ctx)
 	if root["t"] == "for" or root["t"] == "while":
 		root_expr = "V.fragment(%s)" % root_expr   # a root-level loop yields an Array -> wrap

@@ -6,6 +6,20 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.12.1] — Unreleased
 
+### Added
+
+- **Null-only components (React semantics).** A component whose body contains a top-level
+  `return null` and no markup return is now legal — it renders nothing, exactly as in
+  React (the runtime always supported this: a null render maps to an empty child list).
+  The body compiles verbatim (hooks still alias — effect-only components are the use
+  case), the formatter re-emits it without inventing a markup window, the editor's
+  unreachable-code dimmer skips it, and the extensions' live GUITKX2101 check exempts it
+  (embedded-GDScript intelligence inside such bodies already worked). Totality is still
+  enforced: a body whose only `return null` is nested (a conditional guard with a
+  fall-through path) keeps GUITKX2101, and a top-level non-markup value return keeps
+  GUITKX2102. Family alignment: the other engines' legs already accept this shape; the
+  shared contract-corpus case lands with the pending family corpus re-pin.
+
 ### Fixed
 
 - **Two files whose first export is a same-named VALUE no longer false-collide

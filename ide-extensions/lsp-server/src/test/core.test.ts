@@ -300,6 +300,23 @@ test("missingReturnComponents: a lone `return null` guard still counts as missin
   assert.equal(missingReturnComponents("component G(show: bool) {\n\tif not show:\n\t\treturn null\n}\n").length, 1);
 });
 
+test("missingReturnComponents: a TOP-LEVEL `return null` is the legal null-only component (React semantics)", () => {
+  // plain E-01 form
+  assert.equal(missingReturnComponents("Gone() -> RUIVNode {\n\treturn null\n}\n").length, 0, "null-only plain component");
+  // wrapper form, with a conditional guard above the final top-level null
+  assert.equal(missingReturnComponents("component Gone(a: bool) {\n\tif a:\n\t\treturn null\n\treturn null\n}\n").length, 0, "null-only wrapper component");
+  // the guard-only shape (nested null, fall-through) stays MISSING — totality still enforced
+  assert.equal(missingReturnComponents("component Bad(a: bool) {\n\tif a:\n\t\treturn null\n\tvar x = 1\n}\n").length, 1, "fall-through body still flagged");
+});
+
+test("formatter: a null-only component formats without inventing a markup return, idempotently", () => {
+  const src = "export Gone(active: bool) -> RUIVNode {\n\tif active:\n\t\treturn null\n\treturn null\n}\n";
+  const once = formatGuitkx(src).text;
+  assert.ok(!once.includes("return (\n"), `no empty markup window invented:\n${once}`);
+  assert.ok(once.includes("return null"), "body's own returns preserved");
+  assert.equal(formatGuitkx(once).text, once, "idempotent");
+});
+
 test("missingReturnComponents stays silent on valid components, hooks, and in-progress typing", () => {
   assert.equal(missingReturnComponents("component Ok() {\n\treturn ( <Label /> )\n}\n").length, 0, "valid component");
   assert.equal(missingReturnComponents("hook use_x() {\n\tvar s = useState(0)\n\treturn s\n}\n").length, 0, "hooks never have markup returns");

@@ -45,6 +45,9 @@ no TCP connection, works fully offline.
 
 ## Changelog
 
+### [0.12.1] - 2026-07-25
+- Null-only components (library 0.12.1, React semantics): a component whose body has a top-level `return null` and no markup return is now legal — it renders nothing. The live GUITKX2101 missing-return check exempts the shape (a nested-only guard with a fall-through path is still flagged), and Format Document re-emits such a body verbatim instead of falling back unformatted (it previously bailed; it never corrupted). Embedded-GDScript intelligence inside null-only bodies already worked and is unchanged.
+
 ### [0.12.0] - 2026-07-18
 - ES combined import forms (library 0.12.0): `import Def, { a, b as c } from "./file"` and `import Def, * as X from "./file"` — one declaration carrying the default binding plus the named/namespace surface. Every formerly-exclusive consumer now sees every part: click-through navigation, rename through import clauses, the virtual-doc import stubs (a combined form's bindings had no declaration in the embedded analysis), the TextMate grammar, and semantic tokens.
 - Import-brace completion: Ctrl+Space inside `import { | } from "./file"` offers the target's exported declarations (kind-tagged), excluding names already listed. Works inside the combined `import Def, { | }` form too, where the default binding and the export it already binds are excluded as noise.
