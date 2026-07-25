@@ -1,4 +1,4 @@
-## [0.12.1] - Unreleased
+## [0.12.1] - 2026-07-25
 
 **Components can render nothing now — `return null` all the way (React semantics).** A component whose body ends in a top-level `return null` with no markup return is legal from 0.12.1: it renders nothing, exactly like React. The use case is effect-only components — fire a sound, register something, run a `useEffect` — without inventing an empty wrapper element. Conditional guards (`if not ready: return null`) worked before and still do; what's new is that the *whole* component may return null. Totality is still enforced: a body whose only `return null` hides inside a conditional (so some path falls through) still errors, as does a top-level non-markup value return. The formatter, the live editor squiggles, and the unreachable-code dimmer all understand the new shape.
 
