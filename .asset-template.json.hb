@@ -4,7 +4,7 @@
   "category_id": "5",
   "godot_version": "4.7",
   "version_string": "{{ version }}",
-  "cost": "MIT",
+  "cost": "Proprietary",
   "download_provider": "GitHub",
   "download_commit": "{{ commit }}",
   "browse_url": "https://github.com/yanivkalfa/ReactiveUI-Godot",
