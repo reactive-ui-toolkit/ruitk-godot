@@ -1,12 +1,13 @@
 # Reactive UI Toolkit — Godot (C#) — design + execution plan
 
-**Status: PLAN, not scheduled.** D2 (go/timing) is owner-triggered; the plan is expected to
-evolve until then (including possibly its residency — §3/D12). Umbrella branding (owner,
-2026-07-27): everything in the family rebrands under **Reactive UI Toolkit** (GitHub org
-`reactive-ui-toolkit`); this deliverable's display name is **"Reactive UI Toolkit — Godot (C#)"**.
-Governing technical directive (owner, 2026-07-27): **as close as possible to Unity parity** —
-every design choice below defaults to the Unity leg's answer unless Godot physically forbids it;
-the two load-bearing parity facts were verified in Unity source, not assumed (§17 D5/D7).
+**Status: PLAN, not scheduled.** D2 (go/timing) is owner-triggered; only D2 remains open.
+Umbrella branding (owner, 2026-07-27): everything in the family rebrands under **Reactive UI
+Toolkit** (GitHub org `reactive-ui-toolkit`); this deliverable's display name is
+**"Reactive UI Toolkit — Godot (C#)"**, and it lives in its **own repo under the org**
+(D12 RESOLVED — §3). Governing technical directive (owner, 2026-07-27): **as close as possible
+to Unity parity** — every design choice below defaults to the Unity leg's answer unless Godot
+physically forbids it; the two load-bearing parity facts were verified in Unity source, not
+assumed (§17 D5/D7). When the repo is born, THIS plan file moves there with it.
 
 **One-line pitch:** the same `.guitkx` markup and the same React model, with **embedded C#**
 instead of embedded GDScript — the Unity leg's proven C# toolchain retargeted onto Godot.
@@ -88,40 +89,32 @@ typed adapter per element. Godot's reflective `ClassDB` surface does the same jo
 an OPEN vocabulary — our GDScript leg proves it in 543+346 lines. That collapse is why this leg
 is feasible at quarter scale.
 
-## 3. Residency — OPEN (D12), two viable shapes
+## 3. Residency — RESOLVED (D12): dedicated repo under the org
 
-The owner may prefer a dedicated repo under the new org to keep this repo lean. Both shapes are
-planned for; the INTERNAL layout of the C# subtree is identical either way.
+**Decision (owner, 2026-07-27): a new repo** — e.g. `reactive-ui-toolkit/godot-csharp` (owner
+names it). Rationale, re-examined and confirmed: the C# leg shares **zero code files** with the
+GDScript repo (runtime = Unity-Core port, compiler = Unity's generator, LSP = Unity's server,
+addon = new) — it shares *contracts* (grammar, vocabulary, dump, corpus, numbering), and those
+already sync across three repos via pins; a fourth consumer is incremental. The GDScript repo's
+"pure GDScript, no .NET" identity stays clean; repo-per-product matches the org umbrella; fresh
+history under the org. The one real coupling — the VS Code/VS2022 extensions serve BOTH Godot
+legs — is solved by the family's existing artifact-bundling pattern (§9).
 
-**Option A — same repo** (`csharp/` subtree, as detailed below):
-- Grammar/vocabulary/corpus/dump changes land ATOMICALLY for both Godot legs (no pins between
-  them); one docs site, one tracker, one release train; `ide-extensions/` (which serves BOTH
-  legs via mode routing, §9) lives beside both consumers.
-- Cost: repo carries .NET projects + a second demo project; CI matrix grows (path-filtered).
-
-**Option B — dedicated repo** (e.g. `reactive-ui-toolkit/godot-csharp`):
-- Leaner repos, cleaner "one product per repo" story under the org umbrella; own issues/CI.
-- Cost: the C# leg becomes a FOURTH pin-synced repo — vocabulary.json, ClassDB dump, corpus,
-  and grammar changes sync via pinned hashes (the existing Unity/Unreal mechanism, one more
-  consumer); the VS Code/VS2022 extensions live in ONE repo and serve both legs →
-  cross-repo coordination for every C#-mode tooling change; docs either split or cross-link.
-
-Everything below uses Option-A paths for concreteness; under Option B, `csharp/*` becomes the
-repo root and the "shared" rows in §12 flip from byte-sync tripwires to pinned-hash syncs.
+**What stays in the GDScript repo:** the GUITKX extensions (gaining C#-mode routing, §9);
+`vocabulary.json` + the ClassDB dump as **source of truth** (the C# repo pins them by hash);
+the parity-scenario JSON source (§10); the "which leg?" docs page. Future option once the org
+exists: a `family-contract` repo holding corpus + vocabulary sources that all four product
+repos pin — natural end-state, not needed for v1.
 
 ```
-(Option A layout)
-ReactiveUI-Godot/
-├─ addons/reactive_ui/              # GDScript runtime — UNTOUCHED
-├─ addons/reactive_ui_editor/       # GDScript editor addon — UNTOUCHED
-├─ addons/reactive_ui_csharp/       # NEW: thin GDScript editor addon — HMR wire only (§8)
-│   ├─ plugin.cfg                   #   version source for the addon piece
+(dedicated-repo layout — reactive-ui-toolkit/godot-csharp)
+godot-csharp/
+├─ addons/reactive_ui_csharp/       # thin GDScript editor addon — HMR wire only (§8);
+│   ├─ plugin.cfg                   #   AssetLib/Store listing zips THIS folder from THIS repo
 │   └─ hmr/…                        #   watcher + dotnet driver + debugger-wire push
-├─ csharp/                          # NEW — `.gdignore` inside so the ROOT (standard-build)
-│   │                               #   project never imports any of it
-│   ├─ .editorconfig
-│   ├─ ReactiveUIToolkit.Godot/     #   the runtime library → NuGet
-│   │   ├─ ReactiveUIToolkit.Godot.csproj  # net8.0; GodotSharp 4.4.x reference (D11)
+├─ src/
+│   ├─ ReactiveUIToolkit.Godot/     #   runtime library → NuGet
+│   │   ├─ ReactiveUIToolkit.Godot.csproj  # net8.0; GodotSharp 4.4.x (D11)
 │   │   ├─ Core/                    #   VirtualNode, V, Fiber/, Hooks, Config, Diagnostics,
 │   │   │                           #   FiberHostConfig seam, ReactiveRoot
 │   │   ├─ Host/                    #   GodotHostConfig, VariantConvert, StyleApplier,
@@ -130,7 +123,8 @@ ReactiveUI-Godot/
 │   │   └─ ReactiveRootNode.cs      #   [GlobalClass] Node mount surface
 │   ├─ ReactiveUIToolkit.Godot.Generator/  # netstandard2.0 Roslyn generator → NuGet (analyzer)
 │   │   ├─ …fork of Unity SourceGenerator~ pipeline…
-│   │   ├─ Vocabulary/              #   baked vocabulary.json + ClassDB dump (byte-sync tripwired)
+│   │   ├─ Vocabulary/              #   baked vocabulary.json + ClassDB dump (PIN-synced from
+│   │   │                           #   the GDScript repo — hash recorded, CI-checked)
 │   │   └─ build/ReactiveUIToolkit.Godot.Generator.props
 │   │        # NuGet-injected MSBuild:
 │   │        #   <AdditionalFiles Include="**/*.guitkx" Exclude=".godot/**;bin/**;obj/**;addons/**"/>
@@ -138,22 +132,28 @@ ReactiveUI-Godot/
 │   │        #   user csproj needs ZERO edits (replaces Unity's csproj-postprocessor hack)
 │   ├─ ReactiveUIToolkit.Godot.Language/   # vendored Unity language-lib fork + PINNED-COMMIT
 │   │                                      #   drift check (§12)
-│   ├─ Tests.Generator/             #   xUnit: pipeline + emitter + formatter snapshots (no engine)
-│   ├─ Tests.Runtime/               #   runs INSIDE headless .NET-build Godot (§10)
-│   └─ demo/                        #   own project.godot (.NET build) + gallery subset (§14)
-│       ├─ project.godot
-│       ├─ Demo.csproj              #   Sdk="Godot.NET.Sdk/4.x" + PackageReferences
-│       └─ examples/…
-├─ ide-extensions/
-│   ├─ lsp-server/                  # TS server (GDScript-embedded tier) — untouched
-│   └─ csharp-lsp/                  # NEW (M6): fork of Unity's C# LSP, vocabulary-swapped
-├─ tests/  plans/  ReactiveUIGodotDocs~/  ide-extensions/grammar  …shared
+│   └─ csharp-lsp/                  #   fork of Unity's C# LSP server (§9) — released as a
+│                                   #   binary artifact the GDScript repo's extensions bundle
+├─ tests/
+│   ├─ Tests.Generator/             #   xUnit (no engine)
+│   └─ Tests.Runtime/               #   headless .NET-build Godot (§10)
+├─ demo/                            #   own project.godot (.NET build) + gallery subset (§14)
+│   ├─ project.godot
+│   ├─ Demo.csproj                  #   Sdk="Godot.NET.Sdk/4.x" + PackageReferences
+│   └─ examples/…
+├─ Docs~/                           #   own docs site (family pattern — every repo has one)
+├─ plans/  scripts/  .github/workflows/  .editorconfig  CHANGELOG.md  DISCORD lane  …
 ```
 
-Mechanics: `csharp/.gdignore` hides the subtree from the root project; the demo is its own
-nested Godot project (supported pattern). `.gitignore` gains `csharp/**/bin|obj`,
-`csharp/demo/.godot/`. Version sources: the two csprojs' `<Version>` (runtime+generator
-lockstep) and `addons/reactive_ui_csharp/plugin.cfg`.
+**Born-repo checklist** (things a NEW repo needs that same-repo would have inherited — all M0):
+instantiated LICENSE ("Reactive UI Toolkit — Godot (C#)" product name) + LICENSE-COMMERCIAL.md
++ CLA.md + CONTRIBUTING.md; README; `dev`/`master` branch model + protect rulesets (admin
+bypass, same as siblings); issue templates; changelog machinery (fork `scripts/changelog.mjs`
+per the Unreal precedent) + `plans/DISCORD_CHANGELOG.md` lane; publish.yml + test.yml; the
+pin files (`family-corpus.hash`, vocabulary/dump pins, language-lib commit pin, parity-JSON
+pin); `.gdignore` is NOT needed (no standard-build project here — the demo IS the only Godot
+project). `.gitignore`: `**/bin|obj`, `demo/.godot/`, HMR scratch. Version sources: the
+csprojs' `<Version>` (runtime+generator lockstep) and `addons/reactive_ui_csharp/plugin.cfg`.
 
 ## 4. The markup language: same `.guitkx`, embedded language = C# (Unity grammar, byte-compatible)
 
@@ -303,13 +303,20 @@ NO compile-on-save watcher outside HMR on this leg); HMR compile errors ⇒ one 
 toast/log with Roslyn output (TB-26); multi-session push; value edits propagate via
 function-lowering + importer-cascade recompiles.
 
-## 9. IDE tooling
+## 9. IDE tooling (cross-repo by design)
 
-- **No new marketplace listings**: the existing GUITKX VS Code/VS2022 extensions gain the C#
-  MODE — grammar injection variant (C#-embedded scopes; Unity grammar is the donor) + server
-  routing by `lang` (TS server for gdscript-mode, forked C# server for csharp-mode). Extension
-  listing copy updates to say both languages. (Under residency Option B this is the main
-  cross-repo coordination point — the extensions live in one repo, serve both legs.)
+- **No new marketplace listings**: the existing GUITKX VS Code/VS2022 extensions (GDScript
+  repo) gain the C# MODE — grammar injection variant (C#-embedded scopes; Unity grammar is the
+  donor) + server routing by `lang` (TS server for gdscript-mode, C# server for csharp-mode).
+  Listing copy updates to say both languages.
+- **The bundling mechanism** (the one real cross-repo seam, precedented): the `csharp-lsp`
+  server lives in the C# repo and is released as a versioned binary artifact; the GDScript
+  repo's extension packaging FETCHES it at build time — exactly how the Unreal extension
+  bundles clangd (`fetch-clangd.mjs`) and our VS Code extension bundles the napi analyzer. A
+  pinned server version in the extension repo makes the dependency explicit.
+- **Release choreography** (recorded so it can't surprise anyone): a C#-mode tooling change =
+  (1) csharp-lsp release in the C# repo → (2) extension re-bundle + patch bump + Lane B entry
+  in the GDScript repo. Two PRs, two repos, one user-visible update.
 - **csharp-lsp** (D3 RESOLVED): fork of Unity's server (OmniSharp + Roslyn workspaces),
   vocabulary + specifier rules + ClassDB dump swapped. Specifier path completion ships with the
   family spec (nearest-first, replace-not-append — GAP-ISO-2) from day 1.
@@ -343,8 +350,18 @@ function-lowering + importer-cascade recompiles.
 - **Engine floor (D11 RESOLVED)**: build against GodotSharp **4.4**; above-floor features
   runtime-probed; CI tests floor AND latest (§12). Multi-targeting only if an engine minor ever
   breaks binary compat.
-- **AssetLib / Godot Asset Store**: one listing for `addons/reactive_ui_csharp` ("requires the
-  .NET build; the library installs via NuGet"); demo zip on GitHub releases.
+- **AssetLib / Godot Asset Store — how the stores handle C# (researched 2026-07-27)**: the
+  stores are FILE DELIVERY only — a zip of repo files, no compilation, no dependency
+  resolution. Loose `.cs` addons do work (the user's next `dotnet build` compiles them), BUT
+  (a) an addon **cannot declare NuGet dependencies** (open godot-proposals #9074), and (b) a
+  Roslyn **analyzer cannot ship as loose source** — the generator must be an analyzer
+  reference, which via the store would mean DLLs in the zip + hand-edited csproj lines: the
+  exact hack our NuGet `build/*.props` design eliminates. The C# ecosystem norm (Chickensoft
+  et al.) is NuGet-first. Therefore: **NuGet = the library + generator (primary channel);
+  store = the thin GDScript HMR addon only** (its listing: ".NET build required; install the
+  library via NuGet" + link), zipped from the C# repo. Demo zip on GitHub releases. Optional
+  post-v1 fallback for NuGet-averse users (runtime-as-source addon + generator DLLs + three
+  documented csproj lines) is possible but is a support-burden channel — not in v1.
 - **Release lanes**: `csharp-v*` tag lane in publish.yml → `dotnet pack` + `nuget push` (new
   `NUGET_API_KEY` secret) + addon zip. Changelog: `csharp` lane in changelog.json extracting to
   `csharp/CHANGELOG.md` (verify-gated).
@@ -356,16 +373,17 @@ function-lowering + importer-cascade recompiles.
 
 ## 12. CI + sync discipline
 
-- `test.yml`: `csharp` job, path-filtered (`csharp/**`, `addons/reactive_ui_csharp/**`, shared
-  vocabulary/corpus/grammar paths). Steps: setup-dotnet → `dotnet test Tests.Generator` →
-  `_mono_` Godot FLOOR (4.4) → Tests.Runtime + parity + demo battery → repeat runtime tier on
-  LATEST engine (matrix).
-- **Sync tripwires** (byte-compare, house pattern): vocabulary.json ↔ generator copy; ClassDB
-  dump ↔ generator copy; parity-scenario JSON single-sourced; **vendored language-lib pinned
-  to a recorded Unity-repo commit** with a drift-check script — family fixes sync by bumping
-  the pin deliberately (same spirit as `family-corpus.hash`). Under residency Option B, the
-  first two flip to pinned-hash syncs as well.
-- `.editorconfig` under `csharp/` from M0.
+- The C# repo's `test.yml`: setup-dotnet → `dotnet test Tests.Generator` → `_mono_` Godot
+  FLOOR (4.4) → Tests.Runtime + parity + demo battery → repeat the runtime tier on the LATEST
+  engine (matrix). Plus addon GDScript tests. The GDScript repo's CI is UNCHANGED except the
+  extension-packaging step that fetches the pinned csharp-lsp artifact (§9).
+- **Pin discipline** (all recorded hashes, all CI-checked — the 4-repo family mechanism):
+  `family-corpus.hash` (scanner behavior); vocabulary.json + ClassDB dump pinned FROM the
+  GDScript repo (source of truth) with a sync script; **vendored language-lib pinned to a
+  recorded Unity-repo commit** with a drift-check — family fixes sync by bumping pins
+  deliberately, never by silent divergence; parity-scenario JSON pinned from the GDScript repo
+  (§10). Inside the C# repo, generator-baked copies byte-sync against its pinned inputs.
+- `.editorconfig` from M0.
 
 ## 13. Versioning
 
@@ -375,11 +393,14 @@ verified-engine list ride the `add-godot-version` runbook.
 
 ## 14. Docs + positioning
 
-- Docs site: "C#" section — .NET-build getting started, csproj + NuGet setup, teaching pages
-  with C# holes, HMR page, **"GDScript leg vs C# leg — which?"** page (web export, hot-reload
-  nuance, team language, platform matrix), and the **documented-divergences table** (error
-  boundaries: GDScript leg = structural, engine-imposed; C# leg = auto-catch like Unity).
-- README: reposition to "GDScript-native AND C#-native; the standard build needs no .NET".
+- The C# repo gets its **own docs site** (`Docs~/` — the family pattern; every product repo
+  has one): .NET-build getting started, csproj + NuGet setup, teaching pages with C# holes,
+  HMR page, and the **documented-divergences table** (error boundaries: GDScript leg =
+  structural, engine-imposed; C# leg = auto-catch like Unity).
+- The GDScript repo's docs gain one page: **"GDScript leg vs C# leg — which?"** (web export,
+  hot-reload nuance, team language, platform matrix), cross-linked from both sites; its README
+  gains a pointer ("prefer C#? → Reactive UI Toolkit — Godot (C#)"). Its own positioning
+  ("pure GDScript, standard build, no .NET") is UNCHANGED — that's half the point of D12.
 - v1 demo scope (bounded): counter, todo, keyed, styling, context, router, signals,
   effect-order, portal, suspense. Full 45-demo gallery + Doom port = post-v1 stretch (Doom is
   the marketing piece for the C# audience later).
@@ -388,7 +409,7 @@ verified-engine list ride the `add-godot-version` runbook.
 
 | M | Deliverable | Est. |
 |---|---|---|
-| M0 | Scaffold: tree + `.gdignore` + `.editorconfig` + gitignore, csprojs, CI job, ALL sync tripwires (vocab/dump/language-lib pin), demo boots empty, **NuGet id + org-name reservations** | ~500 + config |
+| M0 | **Repo birth + scaffold**: the born-repo checklist (§3 — license set, CLA, branch model + rulesets, changelog machinery, workflows, pins) + tree + `.editorconfig`/gitignore + csprojs + CI + demo boots empty + **NuGet id/prefix + org-name reservations** | ~500 + config |
 | M1 | Core port: VirtualNode/V/Fiber(Alternate)/Hooks/Config/Diagnostics + Tests.Runtime bootstrap green | ~4k |
 | M2 | Host layer: GodotHostConfig/VariantConvert/Style/Theme/Events(arity)/items/draw; counter demo interacts | ~2k |
 | M3 | Generator retarget end-to-end: `.guitkx`→C#→running demo; namespaces; HMR-safe emission; Tests.Generator ported | ~3k delta |
@@ -406,7 +427,8 @@ quarter-scale campaign (Unreal Phase-0→2 shaped).
 | Risk | Mitigation |
 |---|---|
 | Runtime parity rot between the Godot legs | Data-driven parity suite from M4; divergences must be table-listed or the gate fails |
-| Family lockstep cost (4th toolchain) | Shared corpus/vocabulary (atomic under Option A, pinned under B); C# scanner already family-gated; language-lib pin makes sync deliberate |
+| Family lockstep cost (4th toolchain, 4th repo) | The pin mechanism already syncs 3 repos; this adds one consumer; C# scanner already family-gated; language-lib pin makes sync deliberate |
+| Cross-repo extension choreography (csharp-lsp release → extension re-bundle) | Precedented artifact-bundling (clangd pattern) + pinned server version + the two-PR choreography written down in §9 |
 | Vendored language-lib silent divergence | Pinned-commit drift check in CI |
 | HMR ALC leaks / swap edges | Accepted-by-design leak (family posture); proven trampoline emission; stale-build gate; hook-shape reset rule |
 | GodotSharp binary compat across minors | Floor-build (4.4) + floor/latest CI matrix; runtime probes for newer features |
@@ -436,4 +458,4 @@ API/toolchain/semantics; element vocabulary stays Godot-native.
 | D9 | Namespaces | **RESOLVED**: file-keyed csproj-relative + `@namespace` (Unity model) |
 | D10 | Rider | **RESOLVED**: always after v1 |
 | D11 | Engine floor | **RESOLVED**: 4.4, same as the GDScript leg; floor-built package + runtime probes |
-| D12 | **Residency** | **OPEN** (new): same repo (`csharp/` subtree — atomic grammar lockstep) vs dedicated repo under the org (leaner repos, pin-synced like Unity/Unreal, cross-repo extension coordination). §3 details both; decide with D2 |
+| D12 | Residency | **RESOLVED**: dedicated repo under the org (e.g. `reactive-ui-toolkit/godot-csharp`) — zero shared code files with the GDScript repo, contracts sync via the proven 3-repo pin mechanism, extension coupling solved by artifact bundling (clangd precedent), GDScript repo's no-.NET identity preserved. §3 has the layout + born-repo checklist |
