@@ -218,7 +218,7 @@ Source of truth = **our GDScript runtime** (Godot-faithful semantics), idioms = 
 | `vnode.gd` (immutable RUIVNode) | `VNode.cs` | Match Unity's `VirtualNode` field shape where identical |
 | `v.gd` (71 factories, 252) | `V.cs` | `V.Func`, `V.Fragment`, `V.Text`, `V.H(string, props)` open-vocabulary factory + curated named factories GENERATED from `vocabulary.json` (a build step, not hand-written) |
 | `reconciler.gd` (1146) | `Fiber/Reconciler.cs` | Same begin/complete/commit phases, bailout, keyed reconciliation, effect ordering, coalesced one-re-render-per-frame. Optional time-sliced render phase (`Config.TimeSlicing`) ports too; commit stays atomic. **Props equality for bailout defined explicitly** (Unity's helpers as reference — reference-equality fast path + shallow structural compare; document it, don't leave it to `Equals` accidents) |
-| `fiber.gd` | `Fiber/FiberNode.cs` | D5: keep fresh-fiber semantics for cross-leg behavioral parity in v1; revisit alternates later |
+| `fiber.gd` | `Fiber/FiberNode.cs` | D5 RESOLVED: Unity's double-buffer alternates (`FiberNode.Alternate`) — the C#-natural design; GDScript's fresh-fibers was a GC/cycles workaround, not family semantics. Observable behavior identical (parity-suite scope) |
 | `hooks.gd` (596, 23 hooks) | `Hooks.cs` | Positional slots, same validation config |
 | `config.gd` (RUIConfig) + `diagnostics.gd` | `Core/Config.cs`, `Core/Diagnostics.cs` | Hook-validation / strict-diagnostics / time-slicing toggles — was missing from the v1 table |
 | `host_config.gd` (543) | `Host/GodotHostConfig.cs` | Seam = Unity's abstract `FiberHostConfig` (object handles). Implementation = ClassDB port: `ClassDB.Instantiate(type)`, recycle-with-default-reset via cached `ClassDB.ClassGetPropertyDefaultValue`, `obj.Set(StringName, Variant)`, `IsInstanceValid` guards throughout |
@@ -233,13 +233,13 @@ Source of truth = **our GDScript runtime** (Godot-faithful semantics), idioms = 
 | `reactive_root.gd`/`_node.gd` | `ReactiveRoot.cs` + `[GlobalClass] ReactiveRootNode` | `ReactiveRoot.Create(Control container, VNode root)`; the root owns the **frame pump** (`_Process`/`CallDeferred` scheduling of the coalesced re-render — the GDScript leg's request_update loop, spelled in C#) |
 | — (new) | `Refresh/` | Unity's `Refresh.Family` + `RefreshRuntime` identity model, needed for HMR swap (§8); compiled into game builds under `#if DEBUG`, no-op in release |
 
-**Documented divergence candidate — error boundaries (D7):** the GDScript leg's error
-boundaries are STRUCTURAL because GDScript has no exceptions. C# does. The C# leg can implement
-true React error boundaries (auto-catch a child render crash → fallback). Recommended: DO it —
-it's strictly better product and the family docs already frame the GDScript limitation as
-engine-imposed, not semantic. Requires an explicit "documented divergences between the Godot
-legs" table in the docs (the parity suite excludes it by design). `useTransition`/
-`useDeferredValue` stay synchronous (family rule) either way.
+**Error boundaries (D7 RESOLVED — auto-catch):** the C# leg implements TRUE React error
+boundaries, exactly as the Unity leg does (verified: `FiberReconciler` catches render
+exceptions → `FindNearestErrorBoundary` → fallback activation, including the HMR
+old-body-also-failed path — port that whole mechanism). The GDScript leg's STRUCTURAL
+boundaries are the engine-imposed divergence (no exceptions in GDScript) and are recorded as
+such in the documented-divergences table; the parity suite excludes this scenario by design.
+`useTransition`/`useDeferredValue` stay synchronous (family rule).
 
 Estimate: 4.8k GDScript → **~8–10k C#** (types + docs headers inflate; Refresh/ and
 VariantConvert are additive).
@@ -457,18 +457,26 @@ Rough shape: comparable to the Unreal Phase-0→2 arc, i.e. a quarter-scale camp
 | NuGet name/brand collision with ReactiveUI (MVVM) | `ReactiveUITK.*` ids; never bare `ReactiveUI` |
 | Demand uncertainty (~16% × Godot) | Plan parked until licensing signal (§0); M0–M3 doubles as a cheap validating spike |
 
-## 17. Owner decisions (the complete list)
+## 17. Owner decisions
 
-| # | Decision | Options | Recommendation |
-|---|---|---|---|
-| D1 | Package naming | `ReactiveUITK.*` vs new name | `ReactiveUITK.Godot` / `.Generator` (bare `ReactiveUI` is taken on NuGet) — owner: naming not a concern, take recommendation |
-| D2 | Go / timing | now vs post-monetization-signal | Parked; M0–M3 as validating spike if a paying customer asks |
-| D3 | LSP base | fork Unity C# server vs Roslyn sidecar for TS server | Fork Unity's server |
-| D4 | language-lib consumption | vendored fork in `csharp/` + pinned-commit drift check vs cross-repo reference | Vendored + pin (repo self-contained, sync deliberate) |
-| D5 | Fiber allocation | fresh fibers (GDScript-leg parity) vs Unity's double-buffer reuse | Fresh for v1 |
-| D6 | Hooks casing | `useState` (Unity C# spelling) vs `UseState` (.NET/Unreal spelling) | `useState` — maximizes Unity-leg API/doc reuse; pin in corpus |
-| D7 | Error boundaries | structural parity with GDScript leg vs TRUE auto-catch (C# has exceptions) | Auto-catch — strictly better product; listed in the documented-divergences table |
-| D8 | C#-mode canonical formatting | spaces-2 (Unity-exact) vs tabs (GDScript-leg style) | Spaces-2 per mode; config-overridable as today |
-| D9 | Namespace derivation | file-keyed from csproj-relative folders + `@namespace` override (Unity parity) vs single flat RootNamespace | File-keyed (family parity; identity semantics match Unity) |
-| D10 | Rider plugin | v1 scope vs post-v1 | Post-v1 (retarget Unity's Rider lane when demanded) |
-| D11 | GodotSharp reference policy | build vs floor (4.4) + runtime probes vs multi-target per engine minor | Floor + probes + floor/latest CI matrix |
+**Governing directive (owner, 2026-07-27): "as close as it can be to Unity parity."** That
+resolves D1, D3–D9 to the Unity-parity option; parity claims verified in Unity source where
+they were assumptions (error boundaries DO auto-catch — `FiberReconciler.cs` catch→
+`FindNearestErrorBoundary`; fibers DO double-buffer — `FiberNode.Alternate`). Scope note:
+parity means API/toolchain/semantics — the ELEMENT vocabulary stays Godot-native (tags are
+Godot class names; it renders Controls, not VisualElements), exactly as `.uetkx` tags are
+Slate-native.
+
+| # | Decision | Resolution |
+|---|---|---|
+| D1 | Package naming | **RESOLVED**: `ReactiveUITK.Godot` / `.Generator` (family name; bare `ReactiveUI` is taken on NuGet) |
+| D2 | Go / timing | **OPEN** — parked vs scheduled (not a parity question) |
+| D3 | LSP base | **RESOLVED**: fork Unity's C# server |
+| D4 | language-lib consumption | **RESOLVED**: vendored Unity fork + pinned-commit drift check |
+| D5 | Fiber allocation | **RESOLVED**: Unity's double-buffer alternates (verified: `FiberNode.Alternate`). The GDScript leg's fresh-fibers is a GDScript-imposed divergence, not family design; observable behavior identical, parity suite unaffected. §5 table updated |
+| D6 | Hooks casing | **RESOLVED**: `useState` (Unity C# spelling); pinned in corpus at the next family wave |
+| D7 | Error boundaries | **RESOLVED**: TRUE auto-catch (verified: Unity does exactly this, incl. the HMR old-body-failed path). The documented-divergences table now describes the GDScript leg as the diverging one (engine-imposed) |
+| D8 | C#-mode canonical formatting | **RESOLVED**: spaces-2 (Unity-exact), config-overridable |
+| D9 | Namespace derivation | **RESOLVED**: file-keyed from csproj-relative folders + `@namespace` override (Unity model) |
+| D10 | Rider plugin | **OPEN** — Unity parity implies Rider *eventually* (the family lane exists at 1.3.0); question is v1 scope vs post-v1 |
+| D11 | GodotSharp reference policy | **OPEN** — Godot-specific, no Unity analog: floor (4.4) + runtime probes + floor/latest CI matrix (recommended) vs multi-targeting per engine minor |
