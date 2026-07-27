@@ -50,7 +50,7 @@ export const TopBar: FC<TopBarProps> = ({ onOpenSearch }) => {
               </MenuItem>
             ))}
           </Select>
-          <IconButton component={Link} href="https://github.com/yanivkalfa/ReactiveUI-Godot" target="_blank" rel="noreferrer">
+          <IconButton component={Link} href="https://github.com/reactive-ui-toolkit/ruitk-godot" target="_blank" rel="noreferrer">
             <GitHubIcon />
           </IconButton>
           <IconButton component={Link} href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer" aria-label="Join our Discord">

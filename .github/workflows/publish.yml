@@ -241,7 +241,7 @@ jobs:
           ANALYZER_VERSION: "0.6.1"
         run: |
           curl -fsSL -o analyzer.zip \
-            "https://github.com/yanivkalfa/gdscript-analyzer/releases/download/v${ANALYZER_VERSION}/reactive-ui-analyzer-${ANALYZER_VERSION}.zip"
+            "https://github.com/reactive-ui-toolkit/gdscript-analyzer/releases/download/v${ANALYZER_VERSION}/reactive-ui-analyzer-${ANALYZER_VERSION}.zip"
           rm -rf addons/reactive_ui_analyzer
           unzip -o analyzer.zip -d .
           # Refuse to ship a partial bundle: the descriptor and EVERY platform binary must exist.
@@ -285,7 +285,7 @@ jobs:
         run: |
           awk '/^## \[/{n++} n==1' addons/reactive_ui_editor/CHANGELOG.md > dist/release-body.md
           echo "" >> dist/release-body.md
-          echo "_Requires the [Reactive UI](https://github.com/yanivkalfa/ReactiveUI-Godot) addon (see the release notes for the minimum version)._" >> dist/release-body.md
+          echo "_Requires the [Reactive UI](https://github.com/reactive-ui-toolkit/ruitk-godot) addon (see the release notes for the minimum version)._" >> dist/release-body.md
           echo "" >> dist/release-body.md
           echo "_Bundles the native analyzer (\`addons/reactive_ui_analyzer\`) ${{ steps.analyzer.outputs.version }} — Windows x86_64, Linux x86_64/arm64, macOS universal. Exclude that folder from game export presets; macOS users see its README for the one-line de-quarantine._" >> dist/release-body.md
 

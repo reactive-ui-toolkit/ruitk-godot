@@ -7,8 +7,8 @@ bailouts, a router, typed styling — and the **`.guitkx`** JSX-like markup lang
 that compiles to plain `.gd` at save time and hot-reloads running games (Fast Refresh with
 hook-state preservation).
 
-- **Repository / full documentation:** https://github.com/yanivkalfa/ReactiveUI-Godot
-- **Issues:** https://github.com/yanivkalfa/ReactiveUI-Godot/issues
+- **Repository / full documentation:** https://github.com/reactive-ui-toolkit/ruitk-godot
+- **Issues:** https://github.com/reactive-ui-toolkit/ruitk-godot/issues
 - **Changelog:** `CHANGELOG.md` (in this folder)
 - **License:** ReactiveUI Community License 1.0 (`LICENSE`, in this folder) — free to use and to ship in your games if your company earned under US $250k in the last 12 months; above that, shipping needs a commercial license ($2,000/title or $2,500/studio/year — see the repo's `LICENSE-COMMERCIAL.md`). Credit "Made with ReactiveUI"; not to be redistributed or sold as a competing product
 

@@ -20,7 +20,7 @@
 - First upload since 0.10.0 (the 0.10.2 upload was rejected on the VS Marketplace's 280-character description cap): carries the full listing overhaul — the distinguishable display name, the structured page body, and the repo + Discord links in a description that now fits the cap.
 
 ## [0.10.2] - 2026-07-16
-- Extension descriptions now link the repo (github.com/yanivkalfa/ReactiveUI-Godot) and the community Discord (discord.gg/Knedqu4Wyv), so both marketplace listing pages point back to the project and its community from the very top.
+- Extension descriptions now link the repo (github.com/reactive-ui-toolkit/ruitk-godot) and the community Discord (discord.gg/Knedqu4Wyv), so both marketplace listing pages point back to the project and its community from the very top.
 
 ## [0.10.1] - 2026-07-16
 - Marketplace listing overhaul: distinguishable display names — `GUITKX (Godot - VS Code)` / `GUITKX (Godot - VS2022)` — and a structured page body (Title / Description / Features / Requirements / Changelog) on both marketplaces + Open VSX.

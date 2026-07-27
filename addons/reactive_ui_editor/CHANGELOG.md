@@ -69,7 +69,7 @@ optional download from the analyzer's releases.)
 **Embedded-GDScript intelligence (plan M3).** The editor's last frontier: the GDScript *inside*
 your markup — `{expr}` values, setup lines, hook bodies — now gets **type-aware** completion,
 hover, diagnostics, go-to-definition, find-references, rename, and signature help, powered by a
-native in-process binding of [gdscript-analyzer](https://github.com/yanivkalfa/gdscript-analyzer).
+native in-process binding of [gdscript-analyzer](https://github.com/reactive-ui-toolkit/gdscript-analyzer).
 No server, no Node, no configuration.
 
 ### Added

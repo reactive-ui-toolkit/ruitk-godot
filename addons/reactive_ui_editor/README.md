@@ -122,7 +122,7 @@ Two operational notes: **exclude `addons/reactive_ui_analyzer/` from game export
 is editor-only tooling — keep the native libraries out of shipped builds), and on **macOS** the
 bundled dylib is unsigned — the analyzer folder's README has the one-line de-quarantine command.
 A newer analyzer can be dropped in at any time by unzipping a `reactive-ui-analyzer-*.zip` from
-[gdscript-analyzer releases](https://github.com/yanivkalfa/gdscript-analyzer/releases) over the
+[gdscript-analyzer releases](https://github.com/reactive-ui-toolkit/gdscript-analyzer/releases) over the
 same folder.
 
 ## Known limits (vs. the VS Code / VS 2022 extensions)

@@ -19,7 +19,7 @@
 - Requirements corrected on both marketplace pages: there is nothing to install — VS Code runs the language server on its own built-in Node runtime, and the VS2022 VSIX bundles a Node runtime of its own. The "Node.js on your PATH" requirement was a stale pre-bundling claim.
 
 ## [0.10.2] - 2026-07-16
-- Extension descriptions now link the repo (github.com/yanivkalfa/ReactiveUI-Godot) and the community Discord (discord.gg/Knedqu4Wyv), so both marketplace listing pages point back to the project and its community from the very top.
+- Extension descriptions now link the repo (github.com/reactive-ui-toolkit/ruitk-godot) and the community Discord (discord.gg/Knedqu4Wyv), so both marketplace listing pages point back to the project and its community from the very top.
 
 ## [0.10.1] - 2026-07-16
 - Marketplace listing overhaul: distinguishable display names — `GUITKX (Godot - VS Code)` / `GUITKX (Godot - VS2022)` — and a structured page body (Title / Description / Features / Requirements / Changelog) on both marketplaces + Open VSX.

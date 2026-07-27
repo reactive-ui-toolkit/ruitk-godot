@@ -1,10 +1,10 @@
 # Reactive UI - Godot - VS Code (GUITKX)
 
 Language support for **`.guitkx`**, the JSX-like markup of
-[ReactiveUI for Godot](https://github.com/yanivkalfa/ReactiveUI-Godot) — a React-style reactive
+[ReactiveUI for Godot](https://github.com/reactive-ui-toolkit/ruitk-godot) — a React-style reactive
 UI library for Godot 4.x — plus a full, headless GDScript language service for your plain `.gd`
 files. Everything runs **in-process via
-[gdscript-analyzer](https://github.com/yanivkalfa/gdscript-analyzer)**: no running Godot editor,
+[gdscript-analyzer](https://github.com/reactive-ui-toolkit/gdscript-analyzer)**: no running Godot editor,
 no TCP connection, works fully offline.
 
 ## Features
@@ -64,7 +64,7 @@ no TCP connection, works fully offline.
 - Requirements corrected on both marketplace pages: there is nothing to install — VS Code runs the language server on its own built-in Node runtime, and the VS2022 VSIX bundles a Node runtime of its own. The "Node.js on your PATH" requirement was a stale pre-bundling claim.
 
 ### [0.10.2] - 2026-07-16
-- Extension descriptions now link the repo (github.com/yanivkalfa/ReactiveUI-Godot) and the community Discord (discord.gg/Knedqu4Wyv), so both marketplace listing pages point back to the project and its community from the very top.
+- Extension descriptions now link the repo (github.com/reactive-ui-toolkit/ruitk-godot) and the community Discord (discord.gg/Knedqu4Wyv), so both marketplace listing pages point back to the project and its community from the very top.
 
 ### [0.10.1] - 2026-07-16
 - Marketplace listing overhaul: distinguishable display names — `GUITKX (Godot - VS Code)` / `GUITKX (Godot - VS2022)` — and a structured page body (Title / Description / Features / Requirements / Changelog) on both marketplaces + Open VSX.

@@ -868,7 +868,7 @@ function publishDiagnosticsFor(doc: TextDocument): void {
 // The generated Warning Reference for the analyzer's codes — one table page; linked from every
 // warning-code diagnostic via LSP codeDescription (T4.6: the code is a real Diagnostic.code now,
 // not a prefix folded into the message).
-const GD_WARNING_DOCS = "https://yanivkalfa.github.io/gdscript-analyzer/reference/warnings.html";
+const GD_WARNING_DOCS = "https://reactive-ui-toolkit.github.io/gdscript-analyzer/reference/warnings.html";
 
 // The LSP `code`/`codeDescription`/`tags` fields for an analyzer diagnostic (T4.4/T4.6). Syntax
 // errors get the bare code (no reference entry); `tags` carries the analyzer's LSP numbers

@@ -79,7 +79,7 @@
         "vs2022": "0.10.2"
       },
       "shared": [
-        "Extension descriptions now link the repo (github.com/yanivkalfa/ReactiveUI-Godot) and the community Discord (discord.gg/Knedqu4Wyv), so both marketplace listing pages point back to the project and its community from the very top."
+        "Extension descriptions now link the repo (github.com/reactive-ui-toolkit/ruitk-godot) and the community Discord (discord.gg/Knedqu4Wyv), so both marketplace listing pages point back to the project and its community from the very top."
       ]
     },
     {
@@ -518,6 +518,6 @@
     }
   ],
   "legacyTailHashes": {
-    "editor": "7157c34ca090c550c3a71e186d2fe92e3d0eb5860a39984d09914a23517cb8bb"
+    "editor": "df865890ad7367815b124509a257b768f271a72eb96c55cd41e76bbe9438d42c"
   }
 }

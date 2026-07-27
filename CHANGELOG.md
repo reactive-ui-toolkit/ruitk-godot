@@ -350,7 +350,7 @@ Library install ships only the addon.
   the user's project. It is now an allowlist — only `addons/reactive_ui` ships — so new
   top-level files can never silently leak into an install again. ([#67])
 
-[#67]: https://github.com/yanivkalfa/ReactiveUI-Godot/issues/67
+[#67]: https://github.com/reactive-ui-toolkit/ruitk-godot/issues/67
 
 ## [0.8.5] — 2026-07-06
 

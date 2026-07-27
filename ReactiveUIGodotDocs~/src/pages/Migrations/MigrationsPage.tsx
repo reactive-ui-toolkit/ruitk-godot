@@ -11,7 +11,7 @@ import {
   MIGRATE_0_9_EXAMPLES,
 } from './MigrationsPage.example'
 
-const REPO = 'https://github.com/yanivkalfa/ReactiveUI-Godot/blob/master'
+const REPO = 'https://github.com/reactive-ui-toolkit/ruitk-godot/blob/master'
 
 export const MigrationsPage: FC = () => (
   <Box sx={Styles.root}>

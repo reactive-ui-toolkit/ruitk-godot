@@ -7,7 +7,7 @@
   "cost": "Proprietary",
   "download_provider": "GitHub",
   "download_commit": "{{ commit }}",
-  "browse_url": "https://github.com/yanivkalfa/ReactiveUI-Godot",
-  "issues_url": "https://github.com/yanivkalfa/ReactiveUI-Godot/issues",
-  "icon_url": "https://raw.githubusercontent.com/yanivkalfa/ReactiveUI-Godot/master/icon.png"
+  "browse_url": "https://github.com/reactive-ui-toolkit/ruitk-godot",
+  "issues_url": "https://github.com/reactive-ui-toolkit/ruitk-godot/issues",
+  "icon_url": "https://raw.githubusercontent.com/reactive-ui-toolkit/ruitk-godot/master/icon.png"
 }

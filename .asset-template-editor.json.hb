@@ -6,8 +6,8 @@
   "version_string": "{{ version }}",
   "cost": "Proprietary",
   "download_provider": "Custom",
-  "download_commit": "https://github.com/yanivkalfa/ReactiveUI-Godot/releases/download/editor-v{{ version }}/reactive_ui_editor-{{ version }}.zip",
-  "browse_url": "https://github.com/yanivkalfa/ReactiveUI-Godot",
-  "issues_url": "https://github.com/yanivkalfa/ReactiveUI-Godot/issues",
-  "icon_url": "https://raw.githubusercontent.com/yanivkalfa/ReactiveUI-Godot/master/icon.png"
+  "download_commit": "https://github.com/reactive-ui-toolkit/ruitk-godot/releases/download/editor-v{{ version }}/reactive_ui_editor-{{ version }}.zip",
+  "browse_url": "https://github.com/reactive-ui-toolkit/ruitk-godot",
+  "issues_url": "https://github.com/reactive-ui-toolkit/ruitk-godot/issues",
+  "icon_url": "https://raw.githubusercontent.com/reactive-ui-toolkit/ruitk-godot/master/icon.png"
 }

@@ -1,10 +1,10 @@
 # Reactive UI - Godot - VS Code (GUITKX)
 
 Language support for **`.guitkx`**, the JSX-like markup of
-[ReactiveUI for Godot](https://github.com/yanivkalfa/ReactiveUI-Godot) — a React-style reactive
+[ReactiveUI for Godot](https://github.com/reactive-ui-toolkit/ruitk-godot) — a React-style reactive
 UI library for Godot 4.x — plus a full, headless GDScript language service for your plain `.gd`
 files. Everything runs **in-process via
-[gdscript-analyzer](https://github.com/yanivkalfa/gdscript-analyzer)**: no running Godot editor,
+[gdscript-analyzer](https://github.com/reactive-ui-toolkit/gdscript-analyzer)**: no running Godot editor,
 no TCP connection, works fully offline.
 
 ## Features

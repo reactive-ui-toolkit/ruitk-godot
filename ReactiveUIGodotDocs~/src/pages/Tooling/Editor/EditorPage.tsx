@@ -224,7 +224,7 @@ export const EditorPage: FC = () => (
                 Still feature-detected — remove the folder (or run a platform without a prebuilt
                 binary) and the static tier (builtin constants, hook names) keeps working. Newer
                 analyzer builds from the{' '}
-                <a href="https://github.com/yanivkalfa/gdscript-analyzer/releases">
+                <a href="https://github.com/reactive-ui-toolkit/gdscript-analyzer/releases">
                   gdscript-analyzer releases
                 </a>{' '}
                 can be dropped over the same folder anytime. Exclude the folder from game export
