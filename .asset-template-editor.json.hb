@@ -4,7 +4,7 @@
   "category_id": "5",
   "godot_version": "4.4",
   "version_string": "{{ version }}",
-  "cost": "MIT",
+  "cost": "Proprietary",
   "download_provider": "Custom",
   "download_commit": "https://github.com/yanivkalfa/ReactiveUI-Godot/releases/download/editor-v{{ version }}/reactive_ui_editor-{{ version }}.zip",
   "browse_url": "https://github.com/yanivkalfa/ReactiveUI-Godot",
