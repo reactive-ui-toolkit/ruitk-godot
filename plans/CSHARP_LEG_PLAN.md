@@ -91,7 +91,7 @@ is feasible at quarter scale.
 
 ## 3. Residency — RESOLVED (D12): dedicated repo under the org
 
-**Decision (owner, 2026-07-27): a new repo** — e.g. `reactive-ui-toolkit/godot-csharp` (owner
+**Decision (owner, 2026-07-27): a new repo** — e.g. `reactive-ui-toolkit/ruitk-godot-csharp` (owner
 names it). Rationale, re-examined and confirmed: the C# leg shares **zero code files** with the
 GDScript repo (runtime = Unity-Core port, compiler = Unity's generator, LSP = Unity's server,
 addon = new) — it shares *contracts* (grammar, vocabulary, dump, corpus, numbering), and those
@@ -107,7 +107,7 @@ exists: a `family-contract` repo holding corpus + vocabulary sources that all fo
 repos pin — natural end-state, not needed for v1.
 
 ```
-(dedicated-repo layout — reactive-ui-toolkit/godot-csharp)
+(dedicated-repo layout — reactive-ui-toolkit/ruitk-godot-csharp)
 godot-csharp/
 ├─ addons/reactive_ui_csharp/       # thin GDScript editor addon — HMR wire only (§8);
 │   ├─ plugin.cfg                   #   AssetLib/Store listing zips THIS folder from THIS repo
@@ -458,4 +458,4 @@ API/toolchain/semantics; element vocabulary stays Godot-native.
 | D9 | Namespaces | **RESOLVED**: file-keyed csproj-relative + `@namespace` (Unity model) |
 | D10 | Rider | **RESOLVED**: always after v1 |
 | D11 | Engine floor | **RESOLVED**: 4.4, same as the GDScript leg; floor-built package + runtime probes |
-| D12 | Residency | **RESOLVED**: dedicated repo under the org (e.g. `reactive-ui-toolkit/godot-csharp`) — zero shared code files with the GDScript repo, contracts sync via the proven 3-repo pin mechanism, extension coupling solved by artifact bundling (clangd precedent), GDScript repo's no-.NET identity preserved. §3 has the layout + born-repo checklist |
+| D12 | Residency | **RESOLVED**: dedicated repo under the org (e.g. `reactive-ui-toolkit/ruitk-godot-csharp`) — zero shared code files with the GDScript repo, contracts sync via the proven 3-repo pin mechanism, extension coupling solved by artifact bundling (clangd precedent), GDScript repo's no-.NET identity preserved. §3 has the layout + born-repo checklist |
