@@ -67,11 +67,12 @@ Discord invite URL.
 | R2 | Product display names | Ratify N5/N6 exact strings |
 | R3 | License product name | Ratify N7. NOTE: changing LICENSE text = the change ships with the NEXT RELEASE (per-copy license semantics, same rule as the relicense); the legal terms are unchanged — only the product-name label and copyright line. Low risk, but it IS a license-file edit |
 | R4 | Credit line | `Made with ReactiveUI` — keep (rec: it's short, brand-adjacent, and changing it alters an obligation wording in every LICENSE + the commercial agreement + docs/FAQ) vs update to `Made with Reactive UI Toolkit` |
-| R5 | Extension display names | Ratify N9/N10. CONSTRAINT (researched): marketplace **identifiers and publisher IDs cannot be renamed** — `ReactiveUITK` publisher and `guitkx` / `GuitkxVsix.ReactiveUITK` ids stay forever or the extensions must be republished as NEW listings (losing installs/ratings). Display names are freely editable and ship with the next extension publish |
+| R5 | Extension identity strategy | RE-VERIFIED (2026-07-27, microsoft/vscode #92996 + #59918 + publisher-migration writeups): `displayName` = freely mutable, ships with next publish, zero loss. Extension **identifier** (`publisher.name`) and **publisher ID** = HARD immutable — confirmed. Publisher **display name** is editable in the Marketplace manage portal (ID stays in URLs) — verify on login **[OWNER]**. Owner direction: republish if hard-capped → it is, so choose: **(a) display-name-only** (keep `ReactiveUITK`/`guitkx` ids; zero loss; brand carried by display strings) vs **(b) full republish** under a new publisher id (e.g. `reactive-ui-toolkit`): new listings on VS Code Marketplace + Open VSX + VS Marketplace (2 extensions × 3 stores), install counts/ratings reset to zero, old listings manually deprecated (displayName → `[DEPRECATED — use <new>] …` + README pointer; optionally request VS Code's official deprecation-with-migration flagging via a microsoft/vscode issue so the IDE auto-suggests the replacement). Rec: (a) now, (b) only if the owner wants the ids themselves clean — decide here |
 | R6 | Author-field string | Ratify N13 |
 | R7 | AssetLib listing titles | Ratify N14/N15 |
-| R8 | `gdscript-analyzer` repo | Move `yanivkalfa/gdscript-analyzer` into the org too (rec — it's a family component; publish.yml + vscode packaging download from it) vs leave personal (redirects make both work; moving keeps the umbrella coherent) |
+| R8 | `gdscript-analyzer` repo | **RESOLVED (owner, 2026-07-27): move to the org as-is, no rename.** B15 becomes mandatory: update the download URLs in publish.yml + vscode packaging to the org path (redirects would cover it, but explicit is house style) |
 | R9 | Logo/icon refresh | `icon.png` (repo + AssetLib + extension icons) — rebrand now or keep art (rec: keep art, defer visual identity; it's orthogonal and blocks nothing) |
+| R10 | Identifier-conversion scope | Owner challenged the Tier-2 freeze ("everything should be converted"). Full analysis in §3a + the complete conversion procedure priced in **Annex B**. Rec: KEEP identifiers — `reactive_ui`/`RUI` literally abbreviate "Reactive UI", which the umbrella retains, so they are ON-brand; converting them is a breaking API + language-grammar change (user components' `-> RUIVNode` is the component-classification token) for zero brand gain. Ratify: keep (rec) vs full conversion (execute Annex B as its own campaign) |
 
 ## 3. Inventory census (measured 2026-07-27) + the tier model
 
@@ -89,17 +90,44 @@ Discord invite URL.
 **Tier definitions:**
 - **Tier 1 — brand surfaces (CHANGE):** display names, descriptions, URLs, titles, license
   product labels, listing metadata, workflow release names.
-- **Tier 2 — identifiers (NEVER CHANGE):** addon folder names (`addons/reactive_ui`,
-  `addons/reactive_ui_editor`, `addons/reactive_ui_analyzer`) and every `res://` path —
-  renaming breaks every existing user project on update; `RUI*` global class names — public
-  API; `.guitkx` extension + `GUITKX####` codes — the language contract; marketplace
-  publisher/extension IDs — technically unrenameable (R5); npm-internal names — unpublished,
-  zero user value in churn; `@gdscript-analyzer/core` — package identity; Discord invite.
+- **Tier 2 — identifiers (KEEP, pending R10):** addon folder names (`addons/reactive_ui`,
+  `addons/reactive_ui_editor`, `addons/reactive_ui_analyzer`) and every `res://` path;
+  `RUI*` global class names; `.guitkx` extension + `GUITKX####` codes; marketplace
+  publisher/extension IDs (hard-immutable, R5); npm-internal names; `@gdscript-analyzer/core`;
+  Discord invite. Rationale in §3a; the full-conversion procedure is priced in Annex B.
 - **Tier 3 — historical record (NEVER CHANGE except URLs):** CHANGELOG **entry bodies**
   (they describe releases as they shipped — e.g. "Update to **Reactive UI 0.12.1**" stays),
   Discord changelog past entries, MIGRATION-0.10/0.11 doc bodies, plans/archive/**. LIVE
   URLs inside them ARE updated (a link is a functional reference, not history) — §6.A covers
   this explicitly.
+
+### 3a. Why Tier-2 identifiers should NOT convert (the R10 analysis)
+
+The owner asked: "everything should be converted — what am I missing?" Three things, in
+descending order of weight:
+
+1. **They already spell the new brand.** `reactive_ui` and the `RUI` prefix are literal
+   abbreviations of "Reactive UI" — the exact words the umbrella KEEPS. There is no stale
+   brand to scrub; converting trades `reactive_ui` for something like `reactive_ui_toolkit`
+   — longer, same meaning. The family already treats short prefixes as native spelling, not
+   brand surfaces: Unity's namespaces are `ReactiveUITK.*`, Unreal's are `RUI::`/`FRui`,
+   and none of those change in the umbrella rebrand either.
+2. **`-> RUIVNode` is grammar, not just a name.** Since ES-modules (E-01), a declaration IS
+   a component *because* its return annotation reads `-> RUIVNode`. That token lives in
+   EVERY user component file, in the compiler's classifier, in the TS mirrors' classifier,
+   in the editor tooling, and in the 66 family contract goldens. Renaming it is a breaking
+   language-grammar change: a codemod for every user project, a four-repo corpus re-pin,
+   and a docs/teaching-example sweep — a full campaign by itself.
+3. **Folder renames break updates in place.** AssetLib/store updates ADD files, they don't
+   delete: a user updating past a folder rename ends up with BOTH `addons/reactive_ui` and
+   the new folder side by side → duplicate global `class_name` registrations → parse errors
+   until they hand-delete the old folder. Every existing project needs a manual migration
+   step, for zero functional gain.
+
+None of this is impossible — Annex B holds the complete conversion procedure with costs —
+it is simply a poor trade. The brand lives in display names, listings, URLs, docs, and
+licenses (Tier 1, ALL converted by this plan); the identifiers are the API, and the API
+already says Reactive UI.
 
 ## 4. Phase 1 — org creation + reservations **[OWNER]**
 
@@ -238,11 +266,11 @@ NOT TOUCH.
 **B11 `ide-extensions/visual-studio/GuitkxVsix/source.extension.vsixmanifest`:**
 `<DisplayName>GUITKX (Godot - VS2022)</DisplayName>` → `<N10>`; Description's
 `(ReactiveUI for Godot)` → `(<N5>)`. `Identity Id` and `Publisher` — **DO NOT TOUCH**.
-**B12 Asset templates (+ THE MIT BUGFIX):** in BOTH `.asset-template.json.hb` and
+**B12 Asset templates:** the MIT-cost bugfix was **HOTFIXED AHEAD of this wave** (branch
+`fix/assetlib-cost-proprietary`, 2026-07-27): `"cost": "Proprietary"` — the exact API value
+per godot-asset-library `src/constants.php` (the UI renders it "Proprietary (see LICENSE
+file)"). Remaining rename work in BOTH `.asset-template.json.hb` and
 `.asset-template-editor.json.hb`:
-   - `"cost": "MIT"` → `"cost": "Proprietary (see LICENSE file)"` ← **relicense bugfix;
-     verify the AssetLib API accepts this exact cost string [OWNER may need to check the
-     dropdown value spelling in the AssetLib edit UI]**
    - `"title": "Reactive UI (React for Godot)"` → `"<N14>"`; editor template
      `"title": "Reactive UI Editor"` → `"<N15>"`
    - descriptions: `the Reactive UI (React for Godot) addon` → `the <N5> addon` (2 spots in
@@ -260,10 +288,13 @@ samples referencing `RUI*` classes or `res://addons/reactive_ui` stay).
 → `name: <N5> ${{ … }}` and `name: Reactive UI Editor ${{ … }}` → `name: <N6> ${{ … }}`;
 the release-body line `_Requires the [Reactive UI](…) addon` → `_Requires the [<N5>](<N4>)
 addon`.
-**B15 analyzer URL (per R8):** if the analyzer repo moves:
-`https://github.com/yanivkalfa/gdscript-analyzer/releases/download/…` → org URL, in
-`publish.yml` (line ~244) AND wherever vscode packaging fetches it (grep
-`gdscript-analyzer` in `ide-extensions/` scripts). If R8 = stay personal: no change.
+**B15 analyzer URLs (R8 RESOLVED — repo moves as-is, no rename):**
+`https://github.com/yanivkalfa/gdscript-analyzer/…` →
+`https://github.com/reactive-ui-toolkit/gdscript-analyzer/…` in `publish.yml` (line ~244:
+the release-download URL) AND wherever vscode packaging fetches it — locate every spot
+first: `git grep -n "yanivkalfa/gdscript-analyzer"` and update each. (Redirects would
+cover the old URLs; explicit update is house style.) Prereq: the **[OWNER]** transfer of
+`gdscript-analyzer` to the org in Phase 2.
 **B16 `ide-extensions/lsp-server/package.json`:** description `(ReactiveUI for Godot
 markup)` → `(<N5> markup)`. `"name"` — DO NOT TOUCH.
 **B17 `CLAUDE.md`:** update the repo-description phrasing (`the Godot sibling of the C#/Unity
@@ -352,7 +383,7 @@ After A–E, these greps define DONE:
 |---|---|---|
 | `yanivkalfa/ReactiveUIToolKit` (Unity) | UPM name `com.reactiveuitoolkit` (ALREADY umbrella-aligned — keep), repo name → org/<unity>, domain `reactiveuitoolkit.info` (candidate umbrella docs domain), extension ids `UitkxVsix.ReactiveUITK` + publisher (unrenameable), Rider plugin id, Discord changelog, LICENSE.md product label | sibling plan TBD |
 | `yanivkalfa/ReactiveUI-Unreal` | repo name → org/<unreal>, `Plugins/ReactiveUI/` folder = Tier 2 (uplugin identity — DO NOT rename), fab-listing template, VERSIONING.md, LICENSE product label, extension ids | sibling plan TBD |
-| `yanivkalfa/gdscript-analyzer` | R8 decision; download URLs in THIS repo's publish.yml + packaging | rides R8 |
+| `yanivkalfa/gdscript-analyzer` | R8 RESOLVED: transfer to the org as-is (no rename, no content changes); URL updates here via B15 | Phase-2 transfer **[OWNER]** |
 | Private: `licensing-internal/`, `blackout-backups/` | references to old URLs are archival — leave | none |
 
 Ordering: Godot leg first (this plan), then Unity + Unreal sibling plans generated the same
@@ -375,6 +406,34 @@ way (census → registry → per-file steps), then org profile/domain decisions.
 - Phase 4 store edits are individually re-editable.
 - The ONE irreversible-ish surface: publishing marketplace versions with new display names —
   and display names remain freely editable afterward, so even that is soft.
+
+## Annex B (OPTIONAL — executes ONLY if R10 = full conversion; a separate campaign, not part of the rebrand wave)
+
+The complete identifier-conversion procedure, priced honestly. Do NOT attempt inside the
+rename wave — it is a breaking release with its own migration.
+
+**B-1 Folder renames** (`addons/reactive_ui` → new, `addons/reactive_ui_editor` → new;
+`addons/reactive_ui_analyzer` implicates the analyzer repo's packaging too):
+`git mv` + rewrite all ~612 `res://addons/reactive_ui…` occurrences (mechanical, per-file) +
+`plugin.cfg` dependency description + publish.yml packaging paths + AssetLib templates +
+docs. **User migration:** store updates do not delete old folders → shipped migration note +
+a `dev/` cleanup script ("delete addons/reactive_ui after enabling the new plugin");
+duplicate-class parse errors are the failure mode if skipped. Version: MAJOR-feeling minor;
+release notes must lead with it.
+
+**B-2 `RUI*` class-prefix rename** (the expensive one): pick new prefix; rename ~118 files'
+`class_name` declarations + every reference; **grammar impact:** `-> RUIVNode` is the E-01
+component classifier — compiler (`guitkx.gd`), TS mirrors (`declScan.ts`, `virtualDoc.ts`),
+editor addon, and the 66 contract goldens all encode it → four-repo family corpus re-pin
+required; **user impact:** every component signature in every user project → ship a codemod
+(extend `guitkx_migrate.gd` patterns) + compatibility shims for one minor
+(`class_name RUIVNode extends <NewName>` stub scripts keep old spellings compiling, with a
+deprecation warning); docs/teaching examples sweep (~30 docs pages); vocabulary.json +
+schema references. Estimated: a HALF-CAMPAIGN (comparable to the ES-modules deprecation
+window mechanics) for zero functional gain. This is why §3a recommends keeping identifiers.
+
+**B-3 npm-internal names** (`guitkx`, `guitkx-language-server`, `reactiveui-godot-docs`):
+safe to rename anytime (unpublished) — pure churn; bundle into B-1 if executed.
 
 ## Annex A (OPTIONAL, owner opt-in) — renaming the `ReactiveUIGodotDocs~` folder
 
