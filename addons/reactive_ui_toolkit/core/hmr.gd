@@ -1,4 +1,4 @@
-class_name RUIHmr
+class_name RuitkHmr
 extends RefCounted
 ## Runtime Fast Refresh (Phase H): applies editor-pushed script reloads to the RUNNING game.
 ##
@@ -8,7 +8,7 @@ extends RefCounted
 ## the SAME GDScript resource -- so method-reference Callables (`DemoBox.render`) keep their
 ## identity AND dispatch the new code (H0 spike + godot#85704). Fiber matching is Callable
 ## equality, so hook state survives for free; the only thing a reload cannot do by itself is
-## defeat the reconciler's bailout cache -- RUIReconciler.hmr_refresh_all does that.
+## defeat the reconciler's bailout cache -- RuitkReconciler.hmr_refresh_all does that.
 ##
 ## Semantics (Unity RefreshRuntime parity):
 ##   - component script changed        -> targeted: only its fibers re-render (state preserved)
@@ -23,12 +23,12 @@ extends RefCounted
 
 static var _registered := false
 
-## Called from RUIReconciler._init (the first mounted root arms HMR). Safe to call repeatedly.
+## Called from RuitkReconciler._init (the first mounted root arms HMR). Safe to call repeatedly.
 static func ensure_registered() -> void:
 	if _registered or not EngineDebugger.is_active():
 		return
 	_registered = true
-	EngineDebugger.register_message_capture("rui_hmr", Callable(RUIHmr, "_on_message"))
+	EngineDebugger.register_message_capture("rui_hmr", Callable(RuitkHmr, "_on_message"))
 
 ## Debugger-channel entry. Messages arrive WITHOUT the "rui_hmr:" prefix. Returning true marks
 ## the message as handled. The whole reload+re-render pass runs synchronously INSIDE this
@@ -130,7 +130,7 @@ static func apply(paths: Array, bindings: Dictionary = {}, refresh_roots: Array 
 	var refreshed := 0
 	if not changed.is_empty():
 		# `targeted` roots re-render alongside the directly-changed component scripts.
-		refreshed = RUIReconciler.hmr_refresh_all(changed + targeted, resets, global_rerender)
+		refreshed = RuitkReconciler.hmr_refresh_all(changed + targeted, resets, global_rerender)
 	return {
 		"reloaded": changed.size(), "reset": resets.size(), "refreshed": refreshed,
 		"linked": linked, "global": global_rerender, "targeted": targeted.size(), "errors": errors, "outcomes": outcomes,

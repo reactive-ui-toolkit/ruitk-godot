@@ -1,7 +1,7 @@
 extends SceneTree
 ## Generates the SHARED markup-AST golden corpus (the parser parity enforcer — analogous to
 ## scanner-cases.json for the lexer and formatter-cases.json for the formatter). Runs the GDScript
-## parser of record (RUIGuitkxMarkup.parse) on each input and records the JSON-serialized node tree +
+## parser of record (RuitkGuitkxMarkup.parse) on each input and records the JSON-serialized node tree +
 ## error code. BOTH tests/guitkx_test.gd and the TS core.test.ts assert parse(input) reproduces it, so
 ## guitkx_markup.gd and markup.ts can never silently diverge. Many cases deliberately embed `<`/`>`
 ## comparisons inside {expr}/attrs — the exact bug class the structural fix kills.

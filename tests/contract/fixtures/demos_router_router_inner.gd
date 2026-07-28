@@ -6,8 +6,8 @@ const __RUI_HOOK_SIG := ""
 
 const __RUI_KIND := "component"
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
-	var loc = RUIRouter.useLocation()
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
+	var loc = RuitkRouter.useLocation()
 	var ACTIVE := { "font_color": Color(1.0, 0.85, 0.3) }
 	var IDLE := { "font_color": Color(0.7, 0.7, 0.8) }
 	var user = func(m): return V.Label({ "text": "👤  User #%s  (from the :id route param)" % str(m.params.get("id")) })

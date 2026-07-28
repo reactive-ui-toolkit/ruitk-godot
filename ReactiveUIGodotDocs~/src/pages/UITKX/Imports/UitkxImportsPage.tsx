@@ -137,7 +137,7 @@ export const UitkxImportsPage: FC = () => (
     <Typography variant="body1" paragraph>
       A one-command codemod modernizes a whole project to the 0.11.0 surface: it removes the
       deprecated <code>component</code> / <code>hook</code> / <code>module</code> wrapper keywords
-      (adding <code>{'-> RUIVNode'}</code> to components and hoisting module members under{' '}
+      (adding <code>{'-> RuitkVNode'}</code> to components and hoisting module members under{' '}
       <code>@class_name</code>), and flips importers of former modules to{' '}
       <code>import * as</code>. It is idempotent and re-runnable, and it leaves hand-written{' '}
       <code>class_name</code> scripts alone (they are ambient). See the Migrations page.
@@ -172,7 +172,7 @@ export const UitkxImportsPage: FC = () => (
             ['GUITKX2308', 'Import crosses a module/root boundary'],
             ['GUITKX2309', 'Import must appear before the first declaration'],
             ['GUITKX2320', 'Deprecated wrapper keyword (warning; one per decl) — run the 0.11.0 codemod'],
-            ['GUITKX2321', 'use_-prefixed callable returns RUIVNode — did you mean a component?'],
+            ['GUITKX2321', 'use_-prefixed callable returns RuitkVNode — did you mean a component?'],
             ['GUITKX2322', 'Reserved — not emitted by the Godot leg (family code for value-export type-inference failure)'],
             ['GUITKX2323', 'export default / export { … } names something that is not a top-level decl in this file'],
             ['GUITKX2324', 'Name already exported (duplicate export)'],

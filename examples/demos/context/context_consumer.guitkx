@@ -1,4 +1,4 @@
-export DemoContextConsumer() -> RUIVNode {
+export DemoContextConsumer() -> RuitkVNode {
   var accent = useContext("accent")
   return (
     <PanelContainer style={ {"bg_color": accent, "corner_radius_all": 6, "content_margin_all": 12} }>

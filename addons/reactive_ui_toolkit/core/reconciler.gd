@@ -1,4 +1,4 @@
-class_name RUIReconciler
+class_name RuitkReconciler
 extends RefCounted
 ## The fiber reconciler. Ports ReactiveUIToolKit's FiberReconciler to a synchronous
 ## (non-time-sliced) work loop:
@@ -33,21 +33,21 @@ const Hmr = preload("res://addons/reactive_ui_toolkit/core/hmr.gd")
 static var _hmr_live: Array = []
 
 var _container: Node
-var _root_vnode: RUIVNode = null
-var _root_current: RUIFiber = null
+var _root_vnode: RuitkVNode = null
+var _root_current: RuitkFiber = null
 
-var _wip_root: RUIFiber = null
-var _next_unit: RUIFiber = null
+var _wip_root: RuitkFiber = null
+var _next_unit: RuitkFiber = null
 
-var _first_effect: RUIFiber = null
-var _last_effect: RUIFiber = null
+var _first_effect: RuitkFiber = null
+var _last_effect: RuitkFiber = null
 var _deletions: Array = []
 var _reorder_set: Dictionary = {}        ## host/portal fibers whose child order may have changed
 var _pending_passive: Array = []
 ## Reused across full-keyed reconcile passes (GO-08): cleared+refilled per call instead of a
 ## fresh Dictionary each frame. Safe because _reconcile_children never re-enters before it
 ## finishes (_reconcile creates a fiber but does not recurse into _reconcile_children), and
-## this member is per-reconciler so concurrent ReactiveRoots don't share it.
+## this member is per-reconciler so concurrent RuitkRoots don't share it.
 var _key_map: Dictionary = {}
 
 ## GO-05 host-node pool: class-name -> Array[Node] of reset, orphaned Controls available for
@@ -80,7 +80,7 @@ func _init(container: Node) -> void:
 # Scheduling
 # --------------------------------------------------------------------------
 
-func render(vnode: RUIVNode) -> void:
+func render(vnode: RuitkVNode) -> void:
 	# Initial / top-level mount is always synchronous (no time-slicing) to avoid an empty
 	# first frame. Cancel any parked sliced render first so its process_frame tick can't fire
 	# after us, and mark `_work_active` so a setState during render restarts coherently. [M7/M8]
@@ -98,7 +98,7 @@ func render(vnode: RUIVNode) -> void:
 	_commit_root()
 
 ## Mark a fiber dirty and (unless we're mid-commit) schedule a coalesced render.
-func schedule_update_on_fiber(fiber: RUIFiber, vnode) -> void:
+func schedule_update_on_fiber(fiber: RuitkFiber, vnode) -> void:
 	if _root_current == null:
 		return   # torn down by unmount() — ignore late setState/effect callbacks [audit]
 	if vnode != null:
@@ -150,8 +150,8 @@ func _tick() -> void:
 		_work_active = true
 
 	var start := Time.get_ticks_msec()
-	var sliced: bool = RUIConfig.time_slicing
-	var budget: float = RUIConfig.frame_budget_ms
+	var sliced: bool = RuitkConfig.time_slicing
+	var budget: float = RuitkConfig.frame_budget_ms
 	while _next_unit != null:
 		_next_unit = _perform_unit(_next_unit)
 		if _restart:
@@ -207,7 +207,7 @@ func _begin_render() -> void:
 	_pending_passive = []
 
 	# Reuse the root's ping-pong buddy (double-buffer) instead of allocating. [perf #1]
-	var wip: RUIFiber = _root_current.alternate
+	var wip: RuitkFiber = _root_current.alternate
 	if wip == null:
 		wip = F.new()
 		_root_current.alternate = wip
@@ -228,9 +228,9 @@ func _begin_render() -> void:
 	_wip_root = wip
 	_next_unit = wip
 
-func _perform_unit(fiber: RUIFiber) -> RUIFiber:
+func _perform_unit(fiber: RuitkFiber) -> RuitkFiber:
 	# begin-work (inlined — one fewer call per fiber per frame) [perf]
-	var next: RUIFiber
+	var next: RuitkFiber
 	match fiber.tag:
 		F.Tag.FUNCTION:
 			next = _begin_function(fiber)
@@ -261,7 +261,7 @@ func _perform_unit(fiber: RUIFiber) -> RUIFiber:
 		f = f.parent
 	return null
 
-func _begin_function(fiber: RUIFiber) -> RUIFiber:
+func _begin_function(fiber: RuitkFiber) -> RuitkFiber:
 	if fiber.state != null:
 		fiber.state.fiber = fiber
 	var alt := fiber.alternate
@@ -291,12 +291,12 @@ func _begin_function(fiber: RUIFiber) -> RUIFiber:
 		return null   # fast-list path handled the children
 	return fiber.child
 
-func _render_component(fiber: RUIFiber) -> Array:
-	var state: RUIComponentState = fiber.state
+func _render_component(fiber: RuitkFiber) -> Array:
+	var state: RuitkComponentState = fiber.state
 	Hooks._begin(state)
 	var result = fiber.component.call(fiber.pending_props, fiber.input_children)
 	Hooks._end()
-	RUIDiagnostics.on_render()
+	RuitkDiagnostics.on_render()
 	state.last_output = _to_vnode_array(result)
 	if not state.effects.is_empty():
 		fiber.effect_tag |= F.EFFECT_PASSIVE
@@ -304,7 +304,7 @@ func _render_component(fiber: RUIFiber) -> Array:
 		fiber.effect_tag |= F.EFFECT_LAYOUT
 	return state.last_output
 
-func _begin_error_boundary(fiber: RUIFiber) -> RUIFiber:
+func _begin_error_boundary(fiber: RuitkFiber) -> RuitkFiber:
 	# NOTE: GDScript has no try/catch, so this cannot auto-catch a child render crash.
 	# It renders the fallback when `eb_active` is set (toggled imperatively) and clears it
 	# when `reset_key` changes. Structural parity; auto-catch is a documented limitation.
@@ -332,9 +332,9 @@ func _begin_error_boundary(fiber: RUIFiber) -> RUIFiber:
 ## when the type matches we reuse `old_fiber`'s ping-pong buddy (its alternate) instead of
 ## allocating — so a stable tree position costs ZERO fiber allocations after first mount.
 ## Only a true placement / type-change allocates. [perf #1]
-func _reconcile(parent_fiber: RUIFiber, old_fiber: RUIFiber, vnode: RUIVNode, idx: int) -> RUIFiber:
+func _reconcile(parent_fiber: RuitkFiber, old_fiber: RuitkFiber, vnode: RuitkVNode, idx: int) -> RuitkFiber:
 	var reuse: bool = old_fiber != null and old_fiber.matches(vnode)
-	var fiber: RUIFiber
+	var fiber: RuitkFiber
 	if reuse:
 		fiber = old_fiber.alternate
 		if fiber == null:
@@ -362,7 +362,7 @@ func _reconcile(parent_fiber: RUIFiber, old_fiber: RUIFiber, vnode: RUIVNode, id
 	# Read vnode.kind once and inline the HOST case (the hot path) — avoids the tag_for_vnode
 	# call and four repeated kind comparisons per element. [perf]
 	var vk: int = vnode.kind
-	if vk == RUIVNode.Kind.HOST:
+	if vk == RuitkVNode.Kind.HOST:
 		fiber.tag = F.Tag.HOST
 		fiber.type = vnode.type
 		fiber.component = Callable()
@@ -370,9 +370,9 @@ func _reconcile(parent_fiber: RUIFiber, old_fiber: RUIFiber, vnode: RUIVNode, id
 	else:
 		fiber.tag = F.tag_for_vnode(vnode)
 		fiber.type = ""
-		fiber.component = vnode.component if vk == RUIVNode.Kind.FUNCTION else Callable()
-		fiber.portal_target = vnode.portal_target if vk == RUIVNode.Kind.PORTAL else null
-	if vk == RUIVNode.Kind.ERROR_BOUNDARY:
+		fiber.component = vnode.component if vk == RuitkVNode.Kind.FUNCTION else Callable()
+		fiber.portal_target = vnode.portal_target if vk == RuitkVNode.Kind.PORTAL else null
+	if vk == RuitkVNode.Kind.ERROR_BOUNDARY:
 		fiber.eb_fallback = vnode.props.get("fallback")
 		fiber.eb_handler = vnode.props.get("on_error", Callable())
 		fiber.eb_reset_key = vnode.props.get("reset_key")
@@ -411,13 +411,13 @@ func _reconcile(parent_fiber: RUIFiber, old_fiber: RUIFiber, vnode: RUIVNode, id
 		fiber.apply_plain = []
 
 	if fiber.tag == F.Tag.FUNCTION and fiber.state == null:   # inlined tag check (hot) [perf P4]
-		var st := RUIComponentState.new()
+		var st := RuitkComponentState.new()
 		st.fiber = fiber
 		st.on_state_updated = _make_on_state_updated(st)
 		fiber.state = st
 	return fiber
 
-func _make_on_state_updated(state: RUIComponentState) -> Callable:
+func _make_on_state_updated(state: RuitkComponentState) -> Callable:
 	return func(): schedule_update_on_fiber(state.fiber, null)
 
 ## Reconcile `child_vnodes` against the OLD child linked-list (starting at `old_first`).
@@ -425,7 +425,7 @@ func _make_on_state_updated(state: RUIComponentState) -> Callable:
 ## Returns TRUE if it took the fast-list path and fully handled the children in place — the
 ## caller must then NOT descend (the children are not on the work queue). Returns FALSE for the
 ## normal path (caller descends into parent_fiber.child as usual).
-func _reconcile_children(parent_fiber: RUIFiber, old_first: RUIFiber, child_vnodes: Array) -> bool:
+func _reconcile_children(parent_fiber: RuitkFiber, old_first: RuitkFiber, child_vnodes: Array) -> bool:
 	var vnodes := _normalize_children(child_vnodes)
 	# FAST-LIST PATH: a stable list of host LEAVES (same count/keys/order, every child a
 	# childless host element) — diff each child's props and effect-list only the CHANGED ones,
@@ -451,7 +451,7 @@ func _reconcile_children(parent_fiber: RUIFiber, old_first: RUIFiber, child_vnod
 			oc0 = nxt0
 		return false
 
-	var prev: RUIFiber = null
+	var prev: RuitkFiber = null
 	var structural := false   # a child was newly placed or MOVED -> needs reorder [perf #2]
 	if _any_keyed(vnodes):
 		# FAST PATH: a positionally-stable keyed list (same count, keys, order) — the common
@@ -478,8 +478,8 @@ func _reconcile_children(parent_fiber: RUIFiber, old_first: RUIFiber, child_vnod
 			ock.matched_pass = false
 			ock = ock.sibling
 		for i in vnodes.size():
-			var vn: RUIVNode = vnodes[i]
-			var old_match: RUIFiber = _key_map.get(_vnode_key(vn, i))
+			var vn: RuitkVNode = vnodes[i]
+			var old_match: RuitkFiber = _key_map.get(_vnode_key(vn, i))
 			if old_match != null and (old_match.matched_pass or not old_match.matches(vn)):
 				old_match = null
 			if old_match != null:
@@ -503,7 +503,7 @@ func _reconcile_children(parent_fiber: RUIFiber, old_first: RUIFiber, child_vnod
 		# index (positional) path
 		var oci := old_first
 		for i in vnodes.size():
-			var old_match: RUIFiber = oci
+			var old_match: RuitkFiber = oci
 			if old_match == null or not old_match.matches(vnodes[i]):
 				structural = true       # new placement / type change
 			var cf := _reconcile(parent_fiber, old_match, vnodes[i], i)
@@ -536,7 +536,7 @@ func _props_changed(pending, props) -> bool:
 ## adding only the CHANGED rows to the effect list (per-row bail-out). The host nodes persist;
 ## changed props are applied in the normal commit pass (two-phase preserved). Returns true iff
 ## it handled the whole list; falls back (false) for any non-host/non-leaf/reordered list.
-func _try_fast_leaf_list(parent_fiber: RUIFiber, old_first: RUIFiber, vnodes: Array, ignore_keys: bool = false) -> bool:
+func _try_fast_leaf_list(parent_fiber: RuitkFiber, old_first: RuitkFiber, vnodes: Array, ignore_keys: bool = false) -> bool:
 	var n := vnodes.size()
 	# 1. Eligibility scan (read-only): every position must be a childless HOST with matching
 	#    type + key, and the same count. With `ignore_keys` (GO-09 reuse_by_slot) the per-slot
@@ -546,9 +546,9 @@ func _try_fast_leaf_list(parent_fiber: RUIFiber, old_first: RUIFiber, vnodes: Ar
 	for i in n:
 		if oc == null:
 			return false
-		var vn: RUIVNode = vnodes[i]
+		var vn: RuitkVNode = vnodes[i]
 		# (oc.tag == HOST is implied by oc.type == vn.type, since only host fibers carry a type.)
-		if vn.kind != RUIVNode.Kind.HOST or oc.type != vn.type or (not ignore_keys and oc.key != vn.key):
+		if vn.kind != RuitkVNode.Kind.HOST or oc.type != vn.type or (not ignore_keys and oc.key != vn.key):
 			return false
 		if oc.child != null or not vn.children.is_empty():
 			return false   # must be leaves on both sides
@@ -559,7 +559,7 @@ func _try_fast_leaf_list(parent_fiber: RUIFiber, old_first: RUIFiber, vnodes: Ar
 	parent_fiber.child = old_first
 	oc = old_first
 	for i in n:
-		var vn: RUIVNode = vnodes[i]
+		var vn: RuitkVNode = vnodes[i]
 		if ignore_keys:
 			oc.key = vn.key   # adopt the new key so the slot stays on the fast path next frame
 		oc.parent = parent_fiber
@@ -581,12 +581,12 @@ func _try_fast_leaf_list(parent_fiber: RUIFiber, old_first: RUIFiber, vnodes: Ar
 
 ## True if the old child chain matches `vnodes` positionally: same count, same key + type
 ## at every position. When true, the keyed reconcile can skip the key_map entirely. [perf P2]
-func _keys_stable(old_first: RUIFiber, vnodes: Array) -> bool:
+func _keys_stable(old_first: RuitkFiber, vnodes: Array) -> bool:
 	var oc := old_first
 	for i in vnodes.size():
 		if oc == null:
 			return false
-		var vn: RUIVNode = vnodes[i]
+		var vn: RuitkVNode = vnodes[i]
 		# Inlined key compare + HOST matches() — this scan runs once per element every frame,
 		# so the elided _fiber_key/_vnode_key/matches calls are thousands/frame saved. [perf]
 		var ok = oc.key
@@ -596,7 +596,7 @@ func _keys_stable(old_first: RUIFiber, vnodes: Array) -> bool:
 				return false
 		elif oc.index != i:        # both unkeyed -> must be the same position
 			return false
-		if vn.kind == RUIVNode.Kind.HOST:
+		if vn.kind == RuitkVNode.Kind.HOST:
 			if oc.tag != F.Tag.HOST or oc.type != vn.type:
 				return false
 		elif not oc.matches(vn):
@@ -604,14 +604,14 @@ func _keys_stable(old_first: RUIFiber, vnodes: Array) -> bool:
 		oc = oc.sibling
 	return oc == null   # old list must be exactly the same length
 
-func _delete_fiber(parent_fiber: RUIFiber, old_fiber: RUIFiber) -> void:
+func _delete_fiber(parent_fiber: RuitkFiber, old_fiber: RuitkFiber) -> void:
 	old_fiber.effect_tag |= F.EFFECT_DELETION
 	parent_fiber.deletions.append(old_fiber)
 	_deletions.append(old_fiber)
 	_mark_reorder(parent_fiber)
 
 ## Mark the nearest host (or portal) ancestor so its child order is re-asserted at commit.
-func _mark_reorder(parent_fiber: RUIFiber) -> void:
+func _mark_reorder(parent_fiber: RuitkFiber) -> void:
 	var f := parent_fiber
 	while f != null:
 		if f.tag == F.Tag.PORTAL or f.node != null:   # inlined tag check (hot) [perf P4]
@@ -623,7 +623,7 @@ func _mark_reorder(parent_fiber: RUIFiber) -> void:
 # Complete phase — create/diff host nodes, build the effect list (post-order)
 # --------------------------------------------------------------------------
 
-func _complete_work(fiber: RUIFiber) -> void:
+func _complete_work(fiber: RuitkFiber) -> void:
 	match fiber.tag:
 		F.Tag.HOST:
 			if fiber.node == null:
@@ -636,8 +636,8 @@ func _complete_work(fiber: RUIFiber) -> void:
 				if fiber.node.has_meta("__rui_pool_old"):
 					old_props = fiber.node.get_meta("__rui_pool_old")
 					fiber.node.remove_meta("__rui_pool_old")
-					RUIHost.reset_removed_plain(fiber.node, old_props, fiber.pending_props)
-				RUIHost.apply_props(fiber.node, old_props, fiber.pending_props)
+					RuitkHost.reset_removed_plain(fiber.node, old_props, fiber.pending_props)
+				RuitkHost.apply_props(fiber.node, old_props, fiber.pending_props)
 				fiber.props = fiber.pending_props
 				fiber.effect_tag |= F.EFFECT_PLACEMENT
 			elif not is_same(fiber.pending_props, fiber.props) and fiber.pending_props != fiber.props:
@@ -664,7 +664,7 @@ func _complete_work(fiber: RUIFiber) -> void:
 
 func _commit_root() -> void:
 	_is_committing = true
-	RUIDiagnostics.on_commit()
+	RuitkDiagnostics.on_commit()
 
 	for d in _deletions:
 		_commit_deletion(d)
@@ -698,15 +698,15 @@ func _commit_root() -> void:
 		for entry in deferred:
 			schedule_update_on_fiber(entry[0], entry[1])
 
-func _commit_placement(fiber: RUIFiber) -> void:
+func _commit_placement(fiber: RuitkFiber) -> void:
 	if fiber.node == null or not is_instance_valid(fiber.node):
 		return
 	var parent_node := _host_parent_node(fiber)
 	if parent_node != null and is_instance_valid(parent_node) and fiber.node.get_parent() != parent_node:
 		parent_node.add_child(fiber.node)
-		RUIDiagnostics.on_placement()
+		RuitkDiagnostics.on_placement()
 
-func _commit_update(fiber: RUIFiber) -> void:
+func _commit_update(fiber: RuitkFiber) -> void:
 	if fiber.node == null or not is_instance_valid(fiber.node):
 		return
 	var new_props: Dictionary = fiber.pending_props
@@ -715,7 +715,7 @@ func _commit_update(fiber: RUIFiber) -> void:
 		_build_apply_plan(fiber, new_props)
 	if fiber.apply_special:
 		# Element has (or ever had) events / ref / style / item-model -> full generic apply.
-		RUIHost.apply_props(fiber.node, fiber.props, new_props)
+		RuitkHost.apply_props(fiber.node, fiber.props, new_props)
 	else:
 		# LEAN apply: a plain element — just diff + write the known plain keys. No per-frame
 		# re-classification (event/reserved), no unused-feature checks (has_meta/ref/style/item).
@@ -728,19 +728,19 @@ func _commit_update(fiber: RUIFiber) -> void:
 				# a key was swapped without changing the count -> shape changed; rebuild and
 				# apply generically this one frame (the rebuild picks up the new shape).
 				_build_apply_plan(fiber, new_props)
-				RUIHost.apply_props(node, old_props, new_props)
+				RuitkHost.apply_props(node, old_props, new_props)
 				break
 			var val = new_props[k]
 			if not old_props.has(k) or old_props[k] != val:
-				RUIHost._set_prop(node, k, val)
+				RuitkHost._set_prop(node, k, val)
 	fiber.props = new_props
-	if RUIDiagnostics.enabled: RUIDiagnostics.on_update()
+	if RuitkDiagnostics.enabled: RuitkDiagnostics.on_update()
 
 ## Classify a host element's props ONCE: plain prop keys (diffed+written each frame) vs
 ## "special" (events / ref / style / item-model -> needs the generic apply). apply_special is
 ## STICKY so an element that ever had events/ref/style keeps using the generic path (which
 ## correctly disconnects/resets them). [perf: inline-cache apply]
-func _build_apply_plan(fiber: RUIFiber, props: Dictionary) -> void:
+func _build_apply_plan(fiber: RuitkFiber, props: Dictionary) -> void:
 	fiber.apply_size = props.size()
 	var plain: Array = []
 	for k in props:
@@ -748,14 +748,14 @@ func _build_apply_plan(fiber: RUIFiber, props: Dictionary) -> void:
 			fiber.apply_special = true
 		elif k == "key" or k == "children":
 			pass
-		elif RUIHost._is_event(k):
+		elif RuitkHost._is_event(k):
 			fiber.apply_special = true
 		else:
 			plain.append(k)
 	fiber.apply_plain = plain   # skip the call when off [perf]
 
-func _commit_deletion(old_fiber: RUIFiber) -> void:
-	RUIDiagnostics.on_deletion()
+func _commit_deletion(old_fiber: RuitkFiber) -> void:
+	RuitkDiagnostics.on_deletion()
 	_null_refs_recursive(old_fiber)
 	_run_cleanups_recursive(old_fiber)
 	_free_host_nodes(old_fiber)
@@ -763,7 +763,7 @@ func _commit_deletion(old_fiber: RUIFiber) -> void:
 
 ## Reset any `ref` prop to null for deleted host fibers, so a useRef box / callback ref
 ## doesn't dangle to a freed node (React nulls refs on unmount). [audit C2]
-func _null_refs_recursive(fiber: RUIFiber) -> void:
+func _null_refs_recursive(fiber: RuitkFiber) -> void:
 	if fiber.props is Dictionary and fiber.props.has("ref"):
 		var r = fiber.props["ref"]
 		if r is Callable and r.is_valid():
@@ -775,7 +775,7 @@ func _null_refs_recursive(fiber: RUIFiber) -> void:
 		_null_refs_recursive(c)
 		c = c.sibling
 
-func _commit_portal_retarget(fiber: RUIFiber) -> void:
+func _commit_portal_retarget(fiber: RuitkFiber) -> void:
 	if fiber.portal_target == null or not is_instance_valid(fiber.portal_target):
 		return
 	var ordered: Array = []
@@ -790,7 +790,7 @@ func _commit_portal_retarget(fiber: RUIFiber) -> void:
 # Effects
 # --------------------------------------------------------------------------
 
-func _commit_layout_effects(fiber: RUIFiber) -> void:
+func _commit_layout_effects(fiber: RuitkFiber) -> void:
 	if fiber.state == null:
 		return
 	for e in fiber.state.layout_effects:
@@ -819,7 +819,7 @@ func _flush_passive() -> void:
 				e["last_deps"] = e["deps"].duplicate() if e["deps"] is Array else e["deps"]
 	_pending_passive = []
 
-func _run_cleanups(fiber: RUIFiber) -> void:
+func _run_cleanups(fiber: RuitkFiber) -> void:
 	if fiber.state == null:
 		return
 	for arr in [fiber.state.effects, fiber.state.layout_effects]:
@@ -828,7 +828,7 @@ func _run_cleanups(fiber: RUIFiber) -> void:
 				e["cleanup"].call()
 				e["cleanup"] = null
 
-func _run_cleanups_recursive(fiber: RUIFiber) -> void:
+func _run_cleanups_recursive(fiber: RuitkFiber) -> void:
 	_run_cleanups(fiber)
 	var c := fiber.child
 	while c != null:
@@ -839,10 +839,10 @@ func _run_cleanups_recursive(fiber: RUIFiber) -> void:
 ## Break a (deleted/unmounted) component's state cycles. The state setter/dispatch/
 ## on_state_updated lambdas capture `state`, and `state` stores them back → a RefCounted
 ## cycle that won't free. Only called on teardown, so the state is no longer shared.
-func _dispose_fiber_state(fiber: RUIFiber) -> void:
+func _dispose_fiber_state(fiber: RuitkFiber) -> void:
 	if fiber.state == null:
 		return
-	var st: RUIComponentState = fiber.state
+	var st: RuitkComponentState = fiber.state
 	for slot in st.hooks:   # release external subscriptions (useSignal) before dropping slots
 		if slot is Dictionary and slot.get("unsub") is Callable and slot["unsub"].is_valid():
 			slot["unsub"].call()
@@ -859,7 +859,7 @@ func _dispose_fiber_state(fiber: RUIFiber) -> void:
 # Context
 # --------------------------------------------------------------------------
 
-func _has_context_changed(fiber: RUIFiber) -> bool:
+func _has_context_changed(fiber: RuitkFiber) -> bool:
 	if fiber.state == null:
 		return false
 	for dep in fiber.state.context_deps:
@@ -873,33 +873,33 @@ func _has_context_changed(fiber: RUIFiber) -> bool:
 
 ## Nearest ancestor host node into which `fiber`'s node should be parented (honoring
 ## portals and a container's resolved child host).
-func _host_parent_node(fiber: RUIFiber) -> Node:
+func _host_parent_node(fiber: RuitkFiber) -> Node:
 	var p := fiber.parent
 	while p != null:
 		if p.is_portal() and p.portal_target != null:
 			return p.portal_target
 		if p.node != null:
-			return RUIHost.resolve_child_host(p.node)
+			return RuitkHost.resolve_child_host(p.node)
 		p = p.parent
 	return null
 
-func _enforce_child_order(parent_fiber: RUIFiber) -> void:
+func _enforce_child_order(parent_fiber: RuitkFiber) -> void:
 	var pnode: Node = null
 	if parent_fiber.is_portal():
 		pnode = parent_fiber.portal_target
 	elif parent_fiber.node != null:
-		pnode = RUIHost.resolve_child_host(parent_fiber.node)
+		pnode = RuitkHost.resolve_child_host(parent_fiber.node)
 	if pnode == null or not is_instance_valid(pnode):
 		return
 	var ordered: Array = []
 	_collect_host_children(parent_fiber, ordered)
-	RUIHost.warn_capacity(pnode, ordered.size())
+	RuitkHost.warn_capacity(pnode, ordered.size())
 	for i in ordered.size():
 		var nd: Node = ordered[i]
 		if is_instance_valid(nd) and nd.get_parent() == pnode and pnode.get_child(i) != nd:
 			pnode.move_child(nd, i)
 
-func _collect_host_children(fiber: RUIFiber, out: Array) -> void:
+func _collect_host_children(fiber: RuitkFiber, out: Array) -> void:
 	var c := fiber.child
 	while c != null:
 		if c.tag == F.Tag.PORTAL:   # inlined tag check [perf P4]
@@ -910,14 +910,14 @@ func _collect_host_children(fiber: RUIFiber, out: Array) -> void:
 			_collect_host_children(c, out)
 		c = c.sibling
 
-func _free_host_nodes(fiber: RUIFiber) -> void:
+func _free_host_nodes(fiber: RuitkFiber) -> void:
 	if fiber.node != null and not fiber.is_root():
 		if is_instance_valid(fiber.node):
 			# GO-05: recycle a CHILDLESS leaf (the churn-heavy case — Doom bands, list rows) into
 			# the pool for reuse; a node WITH children keeps the queue_free cascade (freeing the
 			# whole subtree at once, and never pooling a non-childless node). get_child_count()==0
 			# also excludes rui_content/custom-scene nodes, which carry internal children.
-			if RUIConfig.host_node_pool and fiber.node.get_child_count() == 0:
+			if RuitkConfig.host_node_pool and fiber.node.get_child_count() == 0:
 				_recycle_node(fiber.node, fiber.props)
 			else:
 				fiber.node.queue_free()
@@ -928,20 +928,20 @@ func _free_host_nodes(fiber: RUIFiber) -> void:
 		c = c.sibling
 
 ## GO-05: pull a reset, orphaned node of `type` from the pool, or instantiate one. The pooled
-## node is indistinguishable from a fresh instantiate (see RUIHost.reset_for_pool), so the mount
+## node is indistinguishable from a fresh instantiate (see RuitkHost.reset_for_pool), so the mount
 ## path's apply_props(node, {}, new_props) applies cleanly.
 func _acquire_node(type: String) -> Node:
-	if RUIConfig.host_node_pool:
+	if RuitkConfig.host_node_pool:
 		var bucket = _node_pool.get(type)
 		if bucket is Array and not bucket.is_empty():
 			return bucket.pop_back()
-	return RUIHost.create_node(type)
+	return RuitkHost.create_node(type)
 
 ## GO-05: reset `node` and return it to the pool (capped), or queue_free if it can't be pooled
 ## (item-model control) or the bucket is full. `props` is the fiber's last-applied props, used to
 ## undo exactly what was set.
 func _recycle_node(node: Node, props) -> void:
-	if not RUIHost.reset_for_pool(node, props):
+	if not RuitkHost.reset_for_pool(node, props):
 		node.queue_free()
 		return
 	var cls := node.get_class()
@@ -956,7 +956,7 @@ func _recycle_node(node: Node, props) -> void:
 
 ## The first child of `fiber`'s child list (or null) — the head of the old sibling chain
 ## that `_reconcile_children` walks. Replaces the old per-frame Array materialization. [perf P1]
-func _old_first(fiber: RUIFiber) -> RUIFiber:
+func _old_first(fiber: RuitkFiber) -> RuitkFiber:
 	return fiber.child if fiber != null else null
 
 func _normalize_children(arr) -> Array:
@@ -965,7 +965,7 @@ func _normalize_children(arr) -> Array:
 	# Fast path: already a flat array of vnodes (the common case — component output and
 	# explicit child arrays). Skip the flatten + a fresh array allocation. [perf #5]
 	for c in arr:
-		if not (c is RUIVNode):
+		if not (c is RuitkVNode):
 			var out: Array = []
 			_flatten_into(arr, out)
 			return out
@@ -979,7 +979,7 @@ func _flatten_into(arr, out: Array) -> void:
 			continue
 		if c is Array:
 			_flatten_into(c, out)   # flatten nested arrays of any depth [audit m7]
-		elif c is RUIVNode:
+		elif c is RuitkVNode:
 			out.append(c)
 		elif c is String:
 			out.append(V.text(c))   # auto-wrap a raw String child as a text Label (Phase 7.2)
@@ -987,7 +987,7 @@ func _flatten_into(arr, out: Array) -> void:
 func _to_vnode_array(result) -> Array:
 	if result == null:
 		return []
-	if result is RUIVNode:
+	if result is RuitkVNode:
 		return [result]
 	if result is String:
 		return [V.text(result)]   # a component may return a bare String (Phase 7.2)
@@ -1011,10 +1011,10 @@ func _any_keyed(vnodes: Array) -> bool:
 
 ## Reconciliation key: the user key, or a namespaced positional key (control-char prefixed
 ## so it can never equal a real user key) for unkeyed children.
-func _fiber_key(f: RUIFiber):
+func _fiber_key(f: RuitkFiber):
 	return f.key if f.key != null else "idx%d" % f.index
 
-func _vnode_key(vn: RUIVNode, idx: int):
+func _vnode_key(vn: RuitkVNode, idx: int):
 	return vn.key if vn.key != null else "idx%d" % idx
 
 # --------------------------------------------------------------------------
@@ -1025,7 +1025,7 @@ func _vnode_key(vn: RUIVNode, idx: int):
 ## buddies, so it frees. Used on deletion and unmount. With fiber reuse there is no
 ## per-frame sever — only genuinely-removed subtrees pass through here. Does NOT follow the
 ## root fiber's `sibling` (that points outside the subtree, into the live tree). [perf #1]
-func _release(fiber: RUIFiber) -> void:
+func _release(fiber: RuitkFiber) -> void:
 	if fiber == null:
 		return
 	var c := fiber.child
@@ -1113,13 +1113,13 @@ func hmr_refresh(scripts: Array, resets: Array, global_rerender: bool) -> int:
 		return 0
 	var marked := _hmr_mark(_root_current, scripts, resets, global_rerender)
 	if marked > 0:
-		var sliced: bool = RUIConfig.time_slicing
-		RUIConfig.time_slicing = false
+		var sliced: bool = RuitkConfig.time_slicing
+		RuitkConfig.time_slicing = false
 		_tick()
-		RUIConfig.time_slicing = sliced
+		RuitkConfig.time_slicing = sliced
 	return marked
 
-func _hmr_mark(fiber: RUIFiber, scripts: Array, resets: Array, global_rerender: bool) -> int:
+func _hmr_mark(fiber: RuitkFiber, scripts: Array, resets: Array, global_rerender: bool) -> int:
 	var n := 0
 	if fiber.tag == F.Tag.FUNCTION:
 		var obj = fiber.component.get_object()
@@ -1136,10 +1136,10 @@ func _hmr_mark(fiber: RUIFiber, scripts: Array, resets: Array, global_rerender: 
 
 ## Deliberate state reset (Unity FullResetComponentState parity): the component's hook SHAPE
 ## changed, so its slots no longer line up — run its effect cleanups, drop subscriptions, and
-## null the state; the next render (scheduled by the caller) primes a fresh RUIComponentState
+## null the state; the next render (scheduled by the caller) primes a fresh RuitkComponentState
 ## and the hook-order guard re-locks on it. Children keep their own state unless their script
 ## changed too — reset is strictly per-fiber.
-func _hmr_reset_state(fiber: RUIFiber) -> void:
+func _hmr_reset_state(fiber: RuitkFiber) -> void:
 	if fiber.state == null:
 		return
 	_run_cleanups(fiber)

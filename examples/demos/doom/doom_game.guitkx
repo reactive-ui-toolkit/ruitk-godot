@@ -6,7 +6,7 @@
 import { DoomGameScreen } from "./doom_game_screen"
 import { DoomMainMenu } from "./doom_main_menu"
 
-export DoomGame() -> RUIVNode {
+export DoomGame() -> RuitkVNode {
   var screen = useState(DoomTypes.GameScreen.MAIN_MENU)
   var level = useState(1)
   var difficulty = useState(DoomTypes.Difficulty.NORMAL)

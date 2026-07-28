@@ -1,4 +1,4 @@
-export const UITKX_STATE_COUNTER_EXAMPLE = `StateCounterExample() -> RUIVNode {
+export const UITKX_STATE_COUNTER_EXAMPLE = `StateCounterExample() -> RuitkVNode {
   var s = useState(0)
   var count = s[0]
   var set_count = s[1]

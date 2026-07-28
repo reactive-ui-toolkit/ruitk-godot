@@ -14,11 +14,11 @@ extends RefCounted
 ## unchanged; the view dedupes against compiler diagnostics by (code, offset).
 
 const CODE := "GUITKX0105"
-const SEVERITY_ERROR := 0  # RUIGuitkxDiag.ERROR (pinned by test against the real constant)
+const SEVERITY_ERROR := 0  # RuitkGuitkxDiag.ERROR (pinned by test against the real constant)
 
 ## `known` is the project universe (Array of class names from project_bindings()["known"]).
 static func unknown_tags(text: String, known: Array) -> Array:
-	var vocab: Dictionary = RUIGuitkx.vocab()
+	var vocab: Dictionary = RuitkGuitkx.vocab()
 	var factories: Dictionary = vocab.get("v_factories_set", {})
 	if factories.is_empty():
 		for f in vocab.get("v_factories", []):
@@ -34,7 +34,7 @@ static func unknown_tags(text: String, known: Array) -> Array:
 	var i := 0
 	var n := text.length()
 	while i < n:
-		var j: int = RUIGuitkxLexer.skip_noncode(text, i)
+		var j: int = RuitkGuitkxLexer.skip_noncode(text, i)
 		if j > i:
 			i = j
 			continue
@@ -81,7 +81,7 @@ static func unknown_tags(text: String, known: Array) -> Array:
 ## not enter (window syntax only; the codemod hoists them).
 static func _local_decls(text: String) -> Array:
 	var out: Array = []
-	for dm in (RUIGuitkx.analyzed_decls(text, 0)["decls"] as Array):
+	for dm in (RuitkGuitkx.analyzed_decls(text, 0)["decls"] as Array):
 		var nm := str(dm["name"])
 		if nm != "":
 			out.append(nm)

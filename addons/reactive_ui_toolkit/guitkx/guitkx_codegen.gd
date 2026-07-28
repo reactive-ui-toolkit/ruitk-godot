@@ -1,4 +1,4 @@
-class_name RUIGuitkxCodegen
+class_name RuitkGuitkxCodegen
 extends RefCounted
 ## Filesystem side of the .guitkx toolchain: find .guitkx files, compile the stale ones, and
 ## write a SIBLING .gd next to each (Foo.guitkx -> Foo.gd). This is the corrected codegen

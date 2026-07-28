@@ -1,4 +1,4 @@
-class_name RUIGuitkxMarkup
+class_name RuitkGuitkxMarkup
 extends RefCounted
 ## Recursive-descent parser: a markup string (the inside of a `return ( ... )`) -> an AST of
 ## plain Dictionaries. Port of uitkx's UitkxParser (markup half). Control-flow directives

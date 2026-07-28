@@ -1,4 +1,4 @@
-export DemoDeepTreeNode(level: int = 0) -> RUIVNode {
+export DemoDeepTreeNode(level: int = 0) -> RuitkVNode {
   return (
     <>
       @if (level <= 0) {

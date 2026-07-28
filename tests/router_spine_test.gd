@@ -21,7 +21,7 @@ func _ok(cond: bool, msg: String) -> void:
 func _mount(render_fn: Callable, props := {}) -> Array:
 	var c := Control.new()
 	root.add_child(c)
-	var app := ReactiveRoot.create(c, V.fc(render_fn, props))
+	var app := RuitkRoot.create(c, V.fc(render_fn, props))
 	return [c, app]
 
 ## Depth-first concatenation of every Label's text under `node` (space-joined).
@@ -52,7 +52,7 @@ func _run() -> void:
 func _test_outlet_fallback() -> void:
 	# [audit #4] When a layout keeps matching but its nested route STOPS matching, the outlet must
 	# fall back to its own children (the stale OUTLET_ELEMENT must be cleared, not linger).
-	var history := RUIHistory.new("/u/edit")
+	var history := RuitkHistory.new("/u/edit")
 	var layout := V.VBoxContainer({}, [
 		V.Label({ "text": "LAYOUT" }),
 		V.outlet({}, [V.Label({ "text": "FALLBACK" })]),
@@ -79,12 +79,12 @@ func _test_outlet_fallback() -> void:
 
 func _test_can_go_reactive() -> void:
 	# [audit #13] A useCanGo consumer must re-render when the history position changes.
-	var history := RUIHistory.new("/")
+	var history := RuitkHistory.new("/")
 	var nav := { "go": null }
 	var seen := { "back": null }
 	var page := func(_p, _c):
-		nav["go"] = RUIRouter.useNavigate()
-		seen["back"] = RUIRouter.useCanGo(-1)
+		nav["go"] = RuitkRouter.useNavigate()
+		seen["back"] = RuitkRouter.useCanGo(-1)
 		return V.Label({ "text": "x" })
 	var root_comp := func(_p, _c):
 		return V.router({ "history": history }, [V.fc(page)])
@@ -101,7 +101,7 @@ func _test_can_go_reactive() -> void:
 func _test_direct_route_toggle() -> void:
 	# A bare V.route (NOT inside V.routes) renders in place and toggles match as the location changes.
 	# All its hooks must run every render regardless of match (stable hook count) — no hook-order error.
-	var history := RUIHistory.new("/")
+	var history := RuitkHistory.new("/")
 	var app := func(_p, _c):
 		return V.VBoxContainer({}, [
 			V.route({ "path": "/", "element": V.Label({ "text": "at-root" }) }),
@@ -127,7 +127,7 @@ func _test_direct_route_toggle() -> void:
 # --------------------------------------------------------------------------
 
 func _test_children_switch_and_params() -> void:
-	var history := RUIHistory.new("/")
+	var history := RuitkHistory.new("/")
 	var seen := { "id": null }
 	var user := func(m):
 		seen["id"] = m.params.get("id")
@@ -159,7 +159,7 @@ func _test_children_switch_and_params() -> void:
 
 func _test_nested_outlet_depth3() -> void:
 	# Router -> layout <Route path="/users"> (renders an Outlet) -> nested index + :id routes.
-	var history := RUIHistory.new("/")
+	var history := RuitkHistory.new("/")
 	var user := func(mm):
 		return V.Label({ "text": "user " + str(mm.params.get("id")) })
 	var layout := V.VBoxContainer({}, [
@@ -202,7 +202,7 @@ func _test_nested_outlet_depth3() -> void:
 	m[0].queue_free()
 
 func _test_index_route() -> void:
-	var history := RUIHistory.new("/dash")
+	var history := RuitkHistory.new("/dash")
 	var app := func(_p, _c):
 		return V.routes({}, [
 			V.route({ "path": "/dash", "element": V.VBoxContainer({}, [V.Label({ "text": "dash" }), V.outlet()]) }, [
@@ -223,7 +223,7 @@ func _test_index_route() -> void:
 	m[0].queue_free()
 
 func _test_declarative_redirect() -> void:
-	var history := RUIHistory.new("/old")
+	var history := RuitkHistory.new("/old")
 	var app := func(_p, _c):
 		return V.routes({}, [
 			V.route({ "path": "/old", "element": V.navigate({ "to": "/new" }) }),
@@ -241,13 +241,13 @@ func _test_declarative_redirect() -> void:
 	m[0].queue_free()
 
 func _test_blocker_vetoes() -> void:
-	var history := RUIHistory.new("/")
+	var history := RuitkHistory.new("/")
 	var nav := { "go": null }
 	var gate := { "block": true }
 	var page := func(_p, _c):
-		nav["go"] = RUIRouter.useNavigate()
-		RUIRouter.useBlocker(func(_from, _to): return gate["block"], true)
-		return V.Label({ "text": "loc " + RUIRouter.useLocation() })
+		nav["go"] = RuitkRouter.useNavigate()
+		RuitkRouter.useBlocker(func(_from, _to): return gate["block"], true)
+		return V.Label({ "text": "loc " + RuitkRouter.useLocation() })
 	var root_comp := func(_p, _c):
 		return V.router({ "history": history }, [V.fc(page)])
 	var m := _mount(root_comp)
@@ -265,13 +265,13 @@ func _test_blocker_vetoes() -> void:
 	m[0].queue_free()
 
 func _test_query_and_basename() -> void:
-	var history := RUIHistory.new("/app")
+	var history := RuitkHistory.new("/app")
 	var seen := { "q": null, "loc": null }
 	var nav := { "go": null }
 	var page := func(_p, _c):
-		nav["go"] = RUIRouter.useNavigate()
-		seen["q"] = RUIRouter.useQuery()
-		seen["loc"] = RUIRouter.useLocation()
+		nav["go"] = RuitkRouter.useNavigate()
+		seen["q"] = RuitkRouter.useQuery()
+		seen["loc"] = RuitkRouter.useLocation()
 		return V.Label({ "text": "x" })
 	var root_comp := func(_p, _c):
 		return V.router({ "history": history, "basename": "/app" }, [V.fc(page)])
@@ -289,14 +289,14 @@ func _test_query_and_basename() -> void:
 
 func _test_pure_helpers() -> void:
 	# NavLink activation rules.
-	_ok(RUIRouter._nav_link_is_active("/", "/", false, false), "'/' active only on '/'")
-	_ok(not RUIRouter._nav_link_is_active("/users", "/", false, false), "'/' not active on /users")
-	_ok(RUIRouter._nav_link_is_active("/users/5", "/users", false, false), "prefix active on segment boundary")
-	_ok(not RUIRouter._nav_link_is_active("/usersxx", "/users", false, false), "prefix NOT active mid-segment")
-	_ok(not RUIRouter._nav_link_is_active("/users/5", "/users", true, false), "end=true requires exact")
-	_ok(RUIRouter._nav_link_is_active("/Users", "/users", false, false), "case-insensitive by default")
-	_ok(not RUIRouter._nav_link_is_active("/Users", "/users", false, true), "case-sensitive rejects /Users")
+	_ok(RuitkRouter._nav_link_is_active("/", "/", false, false), "'/' active only on '/'")
+	_ok(not RuitkRouter._nav_link_is_active("/users", "/", false, false), "'/' not active on /users")
+	_ok(RuitkRouter._nav_link_is_active("/users/5", "/users", false, false), "prefix active on segment boundary")
+	_ok(not RuitkRouter._nav_link_is_active("/usersxx", "/users", false, false), "prefix NOT active mid-segment")
+	_ok(not RuitkRouter._nav_link_is_active("/users/5", "/users", true, false), "end=true requires exact")
+	_ok(RuitkRouter._nav_link_is_active("/Users", "/users", false, false), "case-insensitive by default")
+	_ok(not RuitkRouter._nav_link_is_active("/Users", "/users", false, true), "case-sensitive rejects /Users")
 	# Target resolution against a navigation base.
-	_ok(RUIRouter._resolve_target("", "/users/:id") == "/users/:id", "empty 'to' -> base")
-	_ok(RUIRouter._resolve_target("/abs", "/users") == "/abs", "absolute 'to' normalized")
-	_ok(RUIRouter._resolve_target("edit", "/users/:id") == "/users/:id/edit", "relative 'to' combined onto base")
+	_ok(RuitkRouter._resolve_target("", "/users/:id") == "/users/:id", "empty 'to' -> base")
+	_ok(RuitkRouter._resolve_target("/abs", "/users") == "/abs", "absolute 'to' normalized")
+	_ok(RuitkRouter._resolve_target("edit", "/users/:id") == "/users/:id/edit", "relative 'to' combined onto base")

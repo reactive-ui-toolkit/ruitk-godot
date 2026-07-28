@@ -1,4 +1,4 @@
-export const PORTAL_BASIC = `ModalDemo() -> RUIVNode {
+export const PORTAL_BASIC = `ModalDemo() -> RuitkVNode {
   var show = useState(false)
   var mounted = useState(false)
   var target = useRef(null)   // the host subtree we portal INTO

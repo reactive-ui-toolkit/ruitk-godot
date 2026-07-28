@@ -33,7 +33,7 @@ export const MigrationsPage: FC = () => (
     <Typography variant="body1" paragraph>
       0.11 replaces the <code>component</code> / <code>hook</code> / <code>module</code> wrapper
       keywords with <strong>plain, signature-classified declarations</strong>: a callable annotated{' '}
-      <code>{'-> RUIVNode'}</code> is a component, a <code>use_</code>-prefixed callable is a hook,
+      <code>{'-> RuitkVNode'}</code> is a component, a <code>use_</code>-prefixed callable is a hook,
       any other callable is a util, and <code>name := expr</code> is a value export (the full
       classification table lives on the <strong>.guitkx Language Reference</strong> page, under
       Declarations). It also opens the full ES import surface — rename, namespace

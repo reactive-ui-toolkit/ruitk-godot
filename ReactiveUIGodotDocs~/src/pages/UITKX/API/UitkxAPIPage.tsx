@@ -11,7 +11,7 @@ export const UitkxAPIPage: FC = () => (
       A high-level map of the main global classes (Godot <code>class_name</code>s
       registered by the addon) and where to find things. Everything lives under{' '}
       <code>addons/reactive_ui_toolkit/</code>; copy that folder into a project and the{' '}
-      <code>V</code>, <code>Hooks</code>, <code>ReactiveRoot</code>, and related
+      <code>V</code>, <code>Hooks</code>, <code>RuitkRoot</code>, and related
       class names become globally available.
     </Typography>
 
@@ -24,19 +24,19 @@ export const UitkxAPIPage: FC = () => (
           <ListItemText primary={<><code>V</code> — the virtual-node layer that <code>.guitkx</code> markup compiles to. Day to day you meet it in exactly two places: <code>V.fc(render_fn, props)</code> when mounting (wrapping a component&apos;s generated <code>render</code> as the root vnode), and the structural primitives that have no markup tag yet — <code>V.portal</code>, <code>V.suspense</code>, <code>V.error_boundary</code>, <code>V.memo</code>, and the router set — called from an embedded <code>{'{ expr }'}</code> inside markup. (GDScript reserves <code>func</code>, so the component factory is <code>V.fc</code>, not <code>V.func</code>.)</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>Hooks</code> — hook functions: <code>useState</code>, <code>useReducer</code>, <code>useEffect</code>, <code>useLayoutEffect</code>, <code>useMemo</code>, <code>useCallback</code>, <code>useRef</code>, <code>useContext</code>, <code>provideContext</code>, <code>useDeferredValue</code>, <code>useTransition</code>, <code>useImperativeHandle</code>, <code>useStableCallback</code>, <code>useStableFunc</code>, <code>useStableAction</code>, <code>useSignal</code>, <code>useSignalKey</code>, <code>useAnimate</code>, <code>useTween</code>, <code>useTweenValue</code>, <code>useSfx</code>, <code>useSafeArea</code>. Config: <code>RUIConfig.enable_hook_validation</code>, <code>RUIConfig.enable_strict_diagnostics</code>.</>} />
+          <ListItemText primary={<><code>Hooks</code> — hook functions: <code>useState</code>, <code>useReducer</code>, <code>useEffect</code>, <code>useLayoutEffect</code>, <code>useMemo</code>, <code>useCallback</code>, <code>useRef</code>, <code>useContext</code>, <code>provideContext</code>, <code>useDeferredValue</code>, <code>useTransition</code>, <code>useImperativeHandle</code>, <code>useStableCallback</code>, <code>useStableFunc</code>, <code>useStableAction</code>, <code>useSignal</code>, <code>useSignalKey</code>, <code>useAnimate</code>, <code>useTween</code>, <code>useTweenValue</code>, <code>useSfx</code>, <code>useSafeArea</code>. Config: <code>RuitkConfig.enable_hook_validation</code>, <code>RuitkConfig.enable_strict_diagnostics</code>.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>ReactiveRoot</code> — mounts a virtual tree under a container Node. <code>ReactiveRoot.create(container, V.fc(render))</code> does the initial render; keep the returned instance referenced. <code>set_root(vnode)</code> re-renders with a new top-level vnode; <code>unmount()</code> runs cleanups and frees mounted nodes.</>} />
+          <ListItemText primary={<><code>RuitkRoot</code> — mounts a virtual tree under a container Node. <code>RuitkRoot.create(container, V.fc(render))</code> does the initial render; keep the returned instance referenced. <code>set_root(vnode)</code> re-renders with a new top-level vnode; <code>unmount()</code> runs cleanups and frees mounted nodes.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>ReactiveRootNode</code> — a scene-lifecycle <code>Control</code> that mounts on <code>_ready</code> and unmounts on <code>_exit_tree</code> automatically (no need to hold a reference). Use <code>.setup(component, props)</code> in code, or attach a script that <code>extends ReactiveRootNode</code> and override <code>build()</code>.</>} />
+          <ListItemText primary={<><code>RuitkRootNode</code> — a scene-lifecycle <code>Control</code> that mounts on <code>_ready</code> and unmounts on <code>_exit_tree</code> automatically (no need to hold a reference). Use <code>.setup(component, props)</code> in code, or attach a script that <code>extends RuitkRootNode</code> and override <code>build()</code>.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIVNode</code> — the immutable virtual-node type produced by <code>V.*</code> and by the <code>.guitkx</code> codegen. You rarely construct it directly.</>} />
+          <ListItemText primary={<><code>RuitkVNode</code> — the immutable virtual-node type produced by <code>V.*</code> and by the <code>.guitkx</code> codegen. You rarely construct it directly.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIReconciler</code> — the fiber reconciler that diffs and commits vnode trees. Owned by <code>ReactiveRoot</code>; you don&apos;t use it directly.</>} />
+          <ListItemText primary={<><code>RuitkReconciler</code> — the fiber reconciler that diffs and commits vnode trees. Owned by <code>RuitkRoot</code>; you don&apos;t use it directly.</>} />
         </ListItem>
       </List>
     </Box>
@@ -47,13 +47,13 @@ export const UitkxAPIPage: FC = () => (
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIHost</code> — the &quot;host config&quot;: the only layer that knows concrete Godot node APIs. Maps element type names (<code>&quot;Button&quot;</code>, <code>&quot;LineEdit&quot;</code>, …) to node creation/prop-application, translates <code>on</code> + PascalCase(signal) handler props (<code>onPressed</code>, <code>onValueChanged</code>, …) to Godot signal connections, and drives declarative item-model adapters. Swapping this file (plus <code>RUIStyle</code>) is what retargets the reconciler at a different host.</>} />
+          <ListItemText primary={<><code>RuitkHost</code> — the &quot;host config&quot;: the only layer that knows concrete Godot node APIs. Maps element type names (<code>&quot;Button&quot;</code>, <code>&quot;LineEdit&quot;</code>, …) to node creation/prop-application, translates <code>on</code> + PascalCase(signal) handler props (<code>onPressed</code>, <code>onValueChanged</code>, …) to Godot signal connections, and drives declarative item-model adapters. Swapping this file (plus <code>RuitkStyle</code>) is what retargets the reconciler at a different host.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIStyle</code> — maps a <code>style</code> Dictionary onto Godot Control properties, size flags, Theme overrides, and StyleBox. The only place that knows Godot styling APIs. See the <strong>Style Helpers</strong> reference for the full key vocabulary.</>} />
+          <ListItemText primary={<><code>RuitkStyle</code> — maps a <code>style</code> Dictionary onto Godot Control properties, size flags, Theme overrides, and StyleBox. The only place that knows Godot styling APIs. See the <strong>Style Helpers</strong> reference for the full key vocabulary.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIStyleSheet</code> — a reusable named style set. A host element&apos;s <code>classes</code> prop merges matching styles (left-to-right), then inline <code>style</code> wins — a plain dictionary merge, no CSS cascade.</>} />
+          <ListItemText primary={<><code>RuitkStyleSheet</code> — a reusable named style set. A host element&apos;s <code>classes</code> prop merges matching styles (left-to-right), then inline <code>style</code> wins — a plain dictionary merge, no CSS cascade.</>} />
         </ListItem>
       </List>
     </Box>
@@ -64,16 +64,16 @@ export const UitkxAPIPage: FC = () => (
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIRouter</code> — router hooks and primitives. Hooks: <code>useRouter()</code>, <code>useLocation()</code>, <code>useLocationInfo()</code>, <code>useParams()</code>, <code>useQuery()</code>, <code>useSearchParams()</code>, <code>useNavigationState()</code>, <code>useNavigate(replace?)</code>, <code>useGo()</code>, <code>useCanGo(delta)</code>, <code>useMatches()</code>, <code>useRouteMatch()</code>, <code>useNavigationBase()</code>, <code>useResolvedPath(to)</code>, <code>useOutletContext()</code>, <code>useBlocker(...)</code>, <code>usePrompt(...)</code>.</>} />
+          <ListItemText primary={<><code>RuitkRouter</code> — router hooks and primitives. Hooks: <code>useRouter()</code>, <code>useLocation()</code>, <code>useLocationInfo()</code>, <code>useParams()</code>, <code>useQuery()</code>, <code>useSearchParams()</code>, <code>useNavigationState()</code>, <code>useNavigate(replace?)</code>, <code>useGo()</code>, <code>useCanGo(delta)</code>, <code>useMatches()</code>, <code>useRouteMatch()</code>, <code>useNavigationBase()</code>, <code>useResolvedPath(to)</code>, <code>useOutletContext()</code>, <code>useBlocker(...)</code>, <code>usePrompt(...)</code>.</>} />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary={<>Router primitives (no markup tags yet — called from an embedded <code>{'{ expr }'}</code>): <code>V.router</code>, <code>V.routes</code>, <code>V.route</code>, <code>V.outlet</code>, <code>V.navigate</code>, <code>V.nav_link</code>, <code>V.link</code>.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIHistory</code> — the history abstraction. Supply a custom history to control how locations are stored.</>} />
+          <ListItemText primary={<><code>RuitkHistory</code> — the history abstraction. Supply a custom history to control how locations are stored.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIRouterLocation</code>, <code>RUIRouterPath</code>, <code>RUIRouteMatch</code>, <code>RUIRouteMatcher</code>, <code>RUIRouteRanker</code> — types describing the current location, parsed path, route-matching result, and the ranking/first-match logic shared by <code>V.routes</code> and nested <code>V.route</code>.</>} />
+          <ListItemText primary={<><code>RuitkRouterLocation</code>, <code>RuitkRouterPath</code>, <code>RuitkRouteMatch</code>, <code>RuitkRouteMatcher</code>, <code>RuitkRouteRanker</code> — types describing the current location, parsed path, route-matching result, and the ranking/first-match logic shared by <code>V.routes</code> and nested <code>V.route</code>.</>} />
         </ListItem>
       </List>
     </Box>
@@ -84,10 +84,10 @@ export const UitkxAPIPage: FC = () => (
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUISignal</code> — a reactive value store that lives outside the component tree. Create and share one: <code>var counter := RUISignal.new(0)</code>. API: <code>get_value()</code>, <code>set_value(v)</code>, <code>update(func(old): return new)</code>, <code>subscribe(cb) -&gt; unsubscribe</code>. (Named <code>RUISignal</code> because Godot reserves <code>signal</code>.)</>} />
+          <ListItemText primary={<><code>RuitkSignal</code> — a reactive value store that lives outside the component tree. Create and share one: <code>var counter := RuitkSignal.new(0)</code>. API: <code>get_value()</code>, <code>set_value(v)</code>, <code>update(func(old): return new)</code>, <code>subscribe(cb) -&gt; unsubscribe</code>. (Named <code>RuitkSignal</code> because Godot reserves <code>signal</code>.)</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUISignals</code> — the process-wide keyed registry. <code>RUISignals.get_or_create(key, initial)</code> returns one shared <code>RUISignal</code> per key; <code>try_get</code>, <code>has</code>, and <code>clear()</code> (drop keyed state on a full session reset).</>} />
+          <ListItemText primary={<><code>RuitkSignals</code> — the process-wide keyed registry. <code>RuitkSignals.get_or_create(key, initial)</code> returns one shared <code>RuitkSignal</code> per key; <code>try_get</code>, <code>has</code>, and <code>clear()</code> (drop keyed state on a full session reset).</>} />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary={<>Read signals inside components with <code>useSignal(sig, selector?, comparer?)</code> or <code>useSignalKey(key, initial?, selector?, comparer?)</code>.</>} />
@@ -107,7 +107,7 @@ export const UitkxAPIPage: FC = () => (
           <ListItemText primary={<><code>Hooks.useTween(ref, property, to, duration, deps)</code> — smoothly tweens a mounted node&apos;s property when deps change. <code>Hooks.useTweenValue(from, to, duration, on_update, deps)</code> drives <code>on_update(value)</code> each frame (animate without re-rendering).</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIMedia</code> — transient one-shot audio via a self-freeing <code>AudioStreamPlayer</code>. <code>Hooks.useSfx(bus)</code> returns a stable <code>func(stream, volume_db, pitch_scale)</code> for event handlers.</>} />
+          <ListItemText primary={<><code>RuitkMedia</code> — transient one-shot audio via a self-freeing <code>AudioStreamPlayer</code>. <code>Hooks.useSfx(bus)</code> returns a stable <code>func(stream, volume_db, pitch_scale)</code> for event handlers.</>} />
         </ListItem>
       </List>
     </Box>
@@ -129,13 +129,13 @@ export const UitkxAPIPage: FC = () => (
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUISuspense</code> — the suspense boundary implementation behind <code>V.suspense</code>. GDScript can&apos;t throw-to-suspend, so readiness is signal/poll driven (<code>ready_signal</code> or <code>is_ready()</code>) and shows <code>fallback</code> until ready.</>} />
+          <ListItemText primary={<><code>RuitkSuspense</code> — the suspense boundary implementation behind <code>V.suspense</code>. GDScript can&apos;t throw-to-suspend, so readiness is signal/poll driven (<code>ready_signal</code> or <code>is_ready()</code>) and shows <code>fallback</code> until ready.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIConfig</code> — static configuration flags (hook validation, strict diagnostics), defaulting to <code>OS.is_debug_build()</code>.</>} />
+          <ListItemText primary={<><code>RuitkConfig</code> — static configuration flags (hook validation, strict diagnostics), defaulting to <code>OS.is_debug_build()</code>.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIDiagnostics</code> — collects framework warnings/errors (hook-order divergence, set-in-render, unknown host element, etc.) for the editor tooling to surface.</>} />
+          <ListItemText primary={<><code>RuitkDiagnostics</code> — collects framework warnings/errors (hook-order divergence, set-in-render, unknown host element, etc.) for the editor tooling to surface.</>} />
         </ListItem>
       </List>
     </Box>

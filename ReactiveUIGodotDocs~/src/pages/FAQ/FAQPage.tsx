@@ -63,7 +63,7 @@ export const FAQPage: FC = () => (
       Rendering is synchronous and only runs when state changes — there is no per-frame diff of a
       static UI. Each update diffs the affected subtree and applies the minimal set of node
       changes. For very large trees you can enable time-slicing
-      (<code>RUIConfig.time_slicing = true</code>) to chunk the render phase across frames; the
+      (<code>RuitkConfig.time_slicing = true</code>) to chunk the render phase across frames; the
       commit stays atomic. For typical menus and HUDs the overhead is negligible.
     </Typography>
 
@@ -86,7 +86,7 @@ export const FAQPage: FC = () => (
       How do I mount a component?
     </Typography>
     <Typography variant="body2" paragraph>
-      Call <code>ReactiveRoot.create(container, V.fc(MyComponent.render))</code> from a script on
+      Call <code>RuitkRoot.create(container, V.fc(MyComponent.render))</code> from a script on
       the <code>Control</code> that should host the UI (typically in <code>_ready()</code>), and
       call <code>unmount()</code> on the returned root in <code>_exit_tree()</code>. The container
       is any Godot <code>Control</code> or <code>Node</code>.
@@ -123,7 +123,7 @@ export const FAQPage: FC = () => (
       matched to storage slots by call order. They must be called unconditionally at the top of
       the component — never inside <code>@if</code>, <code>@for</code>, or an event handler — so
       the order is identical on every render. In debug builds{' '}
-      <code>RUIConfig.enable_hook_validation</code> detects order mismatches and warns loudly.
+      <code>RuitkConfig.enable_hook_validation</code> detects order mismatches and warns loudly.
     </Typography>
 
     <Typography variant="body1" sx={Styles.question}>
@@ -131,7 +131,7 @@ export const FAQPage: FC = () => (
     </Typography>
     <Typography variant="body2" paragraph>
       For local state use <code>useState</code> / <code>useReducer</code>. For app-wide state
-      use <strong>signals</strong>: create a <code>RUISignal</code> store, then read it in any
+      use <strong>signals</strong>: create a <code>RuitkSignal</code> store, then read it in any
       component with the <code>useSignal</code> hook — every subscriber re-renders when the value
       changes, with no prop-drilling. Context (<code>useContext</code>) is available for
       scoped-tree sharing.
@@ -147,10 +147,10 @@ export const FAQPage: FC = () => (
     </Typography>
     <Typography variant="body2" paragraph>
       No — Godot has no USS/CSS, and neither does this library. You pass a{' '}
-      <code>style</code> Dictionary on any element and <code>RUIStyle</code> maps it onto Godot{' '}
+      <code>style</code> Dictionary on any element and <code>RuitkStyle</code> maps it onto Godot{' '}
       <code>Control</code> properties, size flags, and <code>Theme</code>/<code>StyleBox</code>{' '}
       overrides (e.g. <code>{'{ "bg_color": Color(0.1,0.1,0.18), "corner_radius_all": 8, "content_margin_all": 12 }'}</code>).
-      For shared bundles, register named styles with <code>RUIStyleSheet</code> and reference them
+      For shared bundles, register named styles with <code>RuitkStyleSheet</code> and reference them
       through the <code>classes</code> prop. See the <em>Styling</em> page.
     </Typography>
 
@@ -242,7 +242,7 @@ export const FAQPage: FC = () => (
       A hook was called conditionally, so the call order differs between renders. Move every hook
       to the top level of the component, before any <code>@if</code>/<code>@for</code>/return, so
       they run in the same order every time. This validation is on in debug builds via{' '}
-      <code>RUIConfig.enable_hook_validation</code>.
+      <code>RuitkConfig.enable_hook_validation</code>.
     </Typography>
 
     <Typography variant="body1" sx={Styles.question}>

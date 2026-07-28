@@ -3,14 +3,14 @@ export const PROPTYPES_EXAMPLE = `# Every function component already bails its r
 # (shallow ==). For a custom comparison, pass __memo_eq in props — the reconciler
 # consults it to decide whether to skip the child's re-render.
 
-ExpensiveChild(data) -> RUIVNode {
+ExpensiveChild(data) -> RuitkVNode {
   # ... heavy render work over 'data' ...
   return (<Label text={ "rows: %d" % data.size() } />)
 }
 
 # Parent: only re-render ExpensiveChild when the row COUNT changes, ignoring
 # unrelated field edits inside the array.
-Parent() -> RUIVNode {
+Parent() -> RuitkVNode {
   var rows = useState([])
   return (
     <VBoxContainer>
@@ -31,7 +31,7 @@ Parent() -> RUIVNode {
 export const HOSTCONTEXT_EXAMPLE = `# useRef(null) + the ref prop capture the underlying Godot Control after commit.
 # ref["current"] is a real node — call any of its methods / read any property.
 
-ScrollToBottom(lines) -> RUIVNode {
+ScrollToBottom(lines) -> RuitkVNode {
   var scroll_ref = useRef(null)   # -> ScrollContainer node
 
   # After each new line, scroll to the bottom imperatively (layout effect = pre-paint).
@@ -68,7 +68,7 @@ var on_login = func():
 #   var deferred = useDeferredValue(query[0])`
 
 // useStableCallback (repurposed slot: FLUSHSYNC_EXAMPLE)
-export const FLUSHSYNC_EXAMPLE = `SearchForm() -> RUIVNode {
+export const FLUSHSYNC_EXAMPLE = `SearchForm() -> RuitkVNode {
   var query = useState("")
   var results = useState([])
 
@@ -95,7 +95,7 @@ export const ERROR_PATTERNS_EXAMPLE = `# NOTE: GDScript has no try/catch, so the
 # 'reset_key' changes. Structural parity with React's ErrorBoundary.
 
 # Pattern 1: fallback + on_error handler
-SafeApp() -> RUIVNode {
+SafeApp() -> RuitkVNode {
   return V.error_boundary({
     "fallback": V.Label({ "text": "Something went wrong" }),
     "on_error": func(err): push_error(err),
@@ -103,7 +103,7 @@ SafeApp() -> RUIVNode {
 }
 
 # Pattern 2: reset via a changing key
-RecoverablePanel() -> RUIVNode {
+RecoverablePanel() -> RuitkVNode {
   var reset_key = useState("v1")
   return (
     <VBoxContainer>
@@ -124,7 +124,7 @@ export const DEPTH_GUARD_EXAMPLE = `# The reconciler guards against runaway re-r
 # the guard stops the loop instead of freezing the editor/game.
 #
 # BAD — sets state on every render, looping forever:
-#   Broken() -> RUIVNode {
+#   Broken() -> RuitkVNode {
 #     var n = useState(0)
 #     n[1].call(n[0] + 1)          # <-- runs every render => infinite loop
 #     return (<Label text={ str(n[0]) } />)
@@ -141,7 +141,7 @@ export const SNAPSHOT_EXAMPLE = `# The Godot analogue of Unity's OnGenerateVisua
 # 'draw_fn' is a Callable(canvas_item) that issues the node's draw_* calls; it runs
 # during the node's 'draw' signal. Bump 'redraw_key' to repaint the SAME callback.
 
-Gauge(value) -> RUIVNode {
+Gauge(value) -> RuitkVNode {
   # Read the latest 'value' inside the closure; redraw_key forces a repaint when it changes.
   var draw = func(ci: CanvasItem):
     var r := 40.0
@@ -158,11 +158,11 @@ Gauge(value) -> RUIVNode {
 # each render never re-subscribes the 'draw' signal — it only repaints.`
 
 // Item-model adapters / custom host elements (repurposed slot: ELEMENT_REGISTRY_EXAMPLE)
-export const ELEMENT_REGISTRY_EXAMPLE = `# RUIHost is the only layer that knows concrete Godot node APIs. Item-model
+export const ELEMENT_REGISTRY_EXAMPLE = `# RuitkHost is the only layer that knows concrete Godot node APIs. Item-model
 # controls (ItemList, OptionButton, TabBar, Tree, MenuBar) are declarative: pass
 # an 'items' prop and the adapter rebuilds the control's model when it changes.
 
-Picker() -> RUIVNode {
+Picker() -> RuitkVNode {
   var choice = useState(0)
   return (
     <OptionButton items={ ["Small", "Medium", "Large"] }
@@ -176,16 +176,16 @@ Picker() -> RUIVNode {
 #
 # Userland can register an adapter for a custom item-model control. match_fn
 # selects nodes; apply_fn rebuilds them when props change:
-#   RUIHost.register_item_adapter(
+#   RuitkHost.register_item_adapter(
 #     func(node): return node is MyList,
 #     func(node, old_props, new_props): rebuild(node, new_props["items"]))`
 
-// RUIVNode / V factory (repurposed slot: VIRTUALNODE_EXAMPLE)
-export const VIRTUALNODE_EXAMPLE = `# RUIVNode is the immutable virtual node produced by V.* and by the .guitkx
+// RuitkVNode / V factory (repurposed slot: VIRTUALNODE_EXAMPLE)
+export const VIRTUALNODE_EXAMPLE = `# RuitkVNode is the immutable virtual node produced by V.* and by the .guitkx
 # codegen. In markup you never build it by hand — the compiler emits V.* calls.
 # In pure GDScript you build trees directly with the V factory:
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
   return V.fc(DemoBox.render, { "title": "Hand-built tree" }, [
     V.Label({ "text": "Built with the V factory, no .guitkx" }),
     V.HBoxContainer({ "style": { "separation": 8 } }, [

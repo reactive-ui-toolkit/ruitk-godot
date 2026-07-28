@@ -1,7 +1,7 @@
-class_name RUISignals
+class_name RuitkSignals
 extends RefCounted
 ## Process-wide string-keyed shared signal registry (Phase 7.1). Mirrors ReactiveUIToolKit's signal
-## factory: `get_or_create(key, initial)` lazily creates ONE shared RUISignal per key, so any
+## factory: `get_or_create(key, initial)` lazily creates ONE shared RuitkSignal per key, so any
 ## component anywhere in the tree (or across scenes) that reads the same key sees the same store.
 ## Subscribe with `Hooks.useSignalKey(key, initial)`.
 ##
@@ -10,22 +10,22 @@ extends RefCounted
 ## game/session reset (e.g. returning to the main menu) to drop keyed state; otherwise it persists
 ## for the process lifetime, matching the Unity reference's lazy-init registry.
 ##
-## EQUALITY: RUISignal change-detection is reference-aware (Object.is): value types by value,
+## EQUALITY: RuitkSignal change-detection is reference-aware (Object.is): value types by value,
 ## reference types (Array/Dictionary/Object) by IDENTITY — so set a freshly-built collection to
 ## notify. In-place mutation of the same reference will NOT notify; pass a per-subscriber `comparer`
 ## to useSignalKey if you must detect in-place mutation.
 
-static var _signals: Dictionary = {}   ## key:String -> RUISignal
+static var _signals: Dictionary = {}   ## key:String -> RuitkSignal
 
 ## The shared signal for `key`, created with `initial` on first access (initial ignored thereafter).
-static func get_or_create(key: String, initial = null) -> RUISignal:
-	var sig: RUISignal = _signals.get(key)
+static func get_or_create(key: String, initial = null) -> RuitkSignal:
+	var sig: RuitkSignal = _signals.get(key)
 	if sig == null:
-		sig = RUISignal.new(initial)
+		sig = RuitkSignal.new(initial)
 		_signals[key] = sig
 	return sig
 
-static func try_get(key: String) -> RUISignal:
+static func try_get(key: String) -> RuitkSignal:
 	return _signals.get(key)
 
 static func has(key: String) -> bool:

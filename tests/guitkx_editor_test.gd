@@ -384,7 +384,7 @@ func _test_schema_sync() -> void:
 	_ok(parsed is Dictionary and (parsed as Dictionary).has("hostElements"), "bundled schema parses")
 	# Every schema host element must exist in the compiler's vocabulary (the source of truth the
 	# watcher compiles with) — a tag added there but not here silently vanishes from completion.
-	var vocab_tags: Dictionary = RUIGuitkx.vocab().get("host_tags", {})
+	var vocab_tags: Dictionary = RuitkGuitkx.vocab().get("host_tags", {})
 	_ok(not vocab_tags.is_empty(), "compiler vocabulary host_tags readable")
 	var missing: Array = []
 	for el in (parsed as Dictionary).get("hostElements", []):
@@ -409,7 +409,7 @@ func _test_scan_diags() -> void:
 		"DemoBox resolves to the real demo, not a fixture (got %s)" % str(demo_box.get("path", "")))
 
 	# Severity constant stays pinned to the compiler's.
-	_ok(Scan.SEVERITY_ERROR == RUIGuitkxDiag.ERROR, "scan severity matches RUIGuitkxDiag.ERROR")
+	_ok(Scan.SEVERITY_ERROR == RuitkGuitkxDiag.ERROR, "scan severity matches RuitkGuitkxDiag.ERROR")
 
 	# The user's exact shape: typo'd open + original close -> parse error masks compiler 0105;
 	# the scan still flags the typo with a did-you-mean.
@@ -498,8 +498,8 @@ func _test_rich_hover() -> void:
 	var fmv := FileAccess.open(mv_src, FileAccess.WRITE)
 	fmv.store_string("component EditorTmpMove() {\n\treturn (\n\t\t<Label text=\"m\" />\n\t)\n}\n")
 	fmv.close()
-	RUIGuitkxCodegen.compile_file(mv_src)
-	var mv_gd: String = RUIGuitkxCodegen.gd_path_for(mv_src)
+	RuitkGuitkxCodegen.compile_file(mv_src)
+	var mv_gd: String = RuitkGuitkxCodegen.gd_path_for(mv_src)
 	_ok(FileAccess.file_exists(mv_gd), "move fixture compiled its .gd")
 	var mv_dst := "res://tests/__editor_test_moved.guitkx"
 	DirAccess.rename_absolute(ProjectSettings.globalize_path(mv_src), ProjectSettings.globalize_path(mv_dst))
@@ -514,8 +514,8 @@ func _test_rich_hover() -> void:
 	fval.store_string("export tmp_val_w: int = 7
 ")
 	fval.close()
-	RUIGuitkxCodegen.compile_file(val_src)
-	var val_gd: String = RUIGuitkxCodegen.gd_path_for(val_src)
+	RuitkGuitkxCodegen.compile_file(val_src)
+	var val_gd: String = RuitkGuitkxCodegen.gd_path_for(val_src)
 	_ok(FileAccess.file_exists(val_gd), "value-export fixture compiled its .gd")
 	var val_dst := "res://tests/__editor_test_val2.guitkx"
 	DirAccess.rename_absolute(ProjectSettings.globalize_path(val_src), ProjectSettings.globalize_path(val_dst))
@@ -524,18 +524,18 @@ func _test_rich_hover() -> void:
 	var val_imp := "res://tests/__editor_test_valimp.guitkx"
 	var fvi := FileAccess.open(val_imp, FileAccess.WRITE)
 	fvi.store_string("import { tmp_val_w } from \"./__editor_test_val\"
-export ValImp() -> RUIVNode {
+export ValImp() -> RuitkVNode {
 	return ( <Label text={str(tmp_val_w)}/> )
 }
 ")
 	fvi.close()
-	var vres: Dictionary = RUIGuitkxCodegen.compile_file(val_imp)
+	var vres: Dictionary = RuitkGuitkxCodegen.compile_file(val_imp)
 	var v2300 := false
 	for vd in (vres.get("diagnostics", []) as Array):
 		if vd is Dictionary and str((vd as Dictionary).get("code", "")) == "GUITKX2300":
 			v2300 = true
 	_ok(v2300, "importer of the OLD specifier gets GUITKX2300, not a silent stale preload")
-	for vjunk in [val_dst, val_dst + ".diags.json", RUIGuitkxCodegen.gd_path_for(val_dst), val_imp, val_imp + ".diags.json", RUIGuitkxCodegen.gd_path_for(val_imp), val_src + ".diags.json", val_gd + ".uid"]:
+	for vjunk in [val_dst, val_dst + ".diags.json", RuitkGuitkxCodegen.gd_path_for(val_dst), val_imp, val_imp + ".diags.json", RuitkGuitkxCodegen.gd_path_for(val_imp), val_src + ".diags.json", val_gd + ".uid"]:
 		if FileAccess.file_exists(str(vjunk)):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(str(vjunk)))
 
@@ -547,7 +547,7 @@ export ValImp() -> RUIVNode {
 	fhw.close()
 	PluginScript.cleanup_moved_guitkx(hw_src)
 	_ok(FileAccess.file_exists(hw_gd), "hand-written .gd under the old name is untouchable")
-	for junk in [mv_dst, mv_dst + ".diags.json", RUIGuitkxCodegen.gd_path_for(mv_dst), hw_gd, mv_gd + ".uid", hw_gd + ".uid"]:
+	for junk in [mv_dst, mv_dst + ".diags.json", RuitkGuitkxCodegen.gd_path_for(mv_dst), hw_gd, mv_gd + ".uid", hw_gd + ".uid"]:
 		if FileAccess.file_exists(junk):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(str(junk)))
 
@@ -599,15 +599,15 @@ func _test_sidecar_overlay() -> void:
 	fa.close()
 	# Plant a sweep-style sidecar with a 2107 anchored at the tag (only the sweep can produce it).
 	var at := src.find("ScOther")
-	RUIGuitkxCodegen.write_diags_sidecar(TMP_PATH, src, [{
-		"code": "GUITKX2107", "severity": RUIGuitkxDiag.ERROR,
+	RuitkGuitkxCodegen.write_diags_sidecar(TMP_PATH, src, [{
+		"code": "GUITKX2107", "severity": RuitkGuitkxDiag.ERROR,
 		"message": "component <ScOther> resolves to res://gone.gd, which no longer exists",
 		"offset": at, "length": 7,
 	}], { "ScOther": "res://gone.gd" })
 
 	var v: Control = ViewScript.new()
 	v.open_path(TMP_PATH)
-	var line := int(RUIGuitkxDiag.line_col(src, at).get("line", -1))
+	var line := int(RuitkGuitkxDiag.line_col(src, at).get("line", -1))
 	var meta: Variant = v._code_edit.get_line_gutter_metadata(line, v._code_edit.diag_gutter)
 	_ok(meta is Dictionary and str((meta as Dictionary).get("code", "")) == "GUITKX2107",
 		"hash-matched sidecar 2107 anchors at the reference line")
@@ -624,7 +624,7 @@ func _test_sidecar_overlay() -> void:
 	_ok(v._code_edit.get_line_background_color(0).a == 0.0, "D5: hints carry no line tint")
 	v.free()
 
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(str(RUIGuitkxCodegen.diags_path_for(TMP_PATH))))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(str(RuitkGuitkxCodegen.diags_path_for(TMP_PATH))))
 
 # M2 wave 2 — completion contexts (G5/G6/G7/G8/G28) + the comment toggle (E12).
 func _test_wave2_completion() -> void:
@@ -647,7 +647,7 @@ func _test_wave2_completion() -> void:
 	items = GuitkxCompletion.for_caret(s3, (RET + "<Label style={ {\"").length())
 	names = items.map(func(it): return str((it as Dictionary).get("insert", "")))
 	_ok(names.has("bg_color") and names.has("font_color") and names.has("separation"),
-		"style dict offers the RUIStyle keys")
+		"style dict offers the RuitkStyle keys")
 	_ok(GuitkxSchema.style_keys().size() == 45, "schema carries all 45 style keys")
 
 	# G7: builtin members after `Color.` in embedded code.
@@ -754,14 +754,14 @@ func _test_refs_and_rename() -> void:
 	# rewrite in lockstep; a rename-import LOCAL alias and its uses stay untouched.
 	var c_path := "res://tests/__refs_c.guitkx"
 	var d_path := "res://tests/__refs_d.guitkx"
-	var c_src := "export RefsChip() -> RUIVNode {
+	var c_src := "export RefsChip() -> RuitkVNode {
 	return ( <Label /> )
 }
 export { RefsChip }
 export default RefsChip
 "
 	var d_src := "import { RefsChip as RBadge } from \"./__refs_c\"
-export RefsUser() -> RUIVNode {
+export RefsUser() -> RuitkVNode {
 	return ( <RBadge /> )
 }
 "
@@ -775,7 +775,7 @@ export RefsUser() -> RUIVNode {
 	var edits2: Dictionary = plan2.get("edits", {})
 	var new_c: String = Refs.apply_edits_to_text(c_src, edits2.get(c_path, []), "RefsGem")
 	var new_d: String = Refs.apply_edits_to_text(d_src, edits2.get(d_path, []), "RefsGem")
-	_ok(new_c.contains("export RefsGem() -> RUIVNode") and new_c.contains("export { RefsGem }") and new_c.contains("export default RefsGem"), "decl + list marker + default marker renamed (got %s)" % new_c)
+	_ok(new_c.contains("export RefsGem() -> RuitkVNode") and new_c.contains("export { RefsGem }") and new_c.contains("export default RefsGem"), "decl + list marker + default marker renamed (got %s)" % new_c)
 	_ok(new_d.contains("import { RefsGem as RBadge }"), "clause REMOTE half renamed (got %s)" % new_d)
 	_ok(new_d.contains("<RBadge />"), "the local alias and its tag use stay untouched")
 	for p2 in [c_path, d_path]:
@@ -872,7 +872,7 @@ func _test_multifile() -> void:
 	GuitkxWorkspace.rescan()
 
 # W5/G12 — document outline: the compiler's declaration scan, offsets anchored at the NAME.
-# ES-modules leg: the fixture uses REAL syntax (the outline consumes RUIGuitkx.analyzed_decls,
+# ES-modules leg: the fixture uses REAL syntax (the outline consumes RuitkGuitkx.analyzed_decls,
 # which parses actual declarations, not a keyword regex) and covers wrapper + plain forms.
 func _test_outline() -> void:
 	const Outline := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_outline.gd")
@@ -898,7 +898,7 @@ func _test_outline() -> void:
 	_ok(Outline.outline_of("").is_empty(), "empty text -> empty outline")
 	_ok(Outline.outline_of("# just a comment\n").is_empty(), "no declarations -> empty outline")
 	# ES-modules: plain declarations outline with their signature-classified kinds + export flags.
-	var plain := "export w := 1\nexport fmt(x: int) -> String {\n\treturn str(x)\n}\nuse_t() -> int {\n\treturn 1\n}\nexport Foo() -> RUIVNode {\n\treturn (\n\t\t<Label />\n\t)\n}\n"
+	var plain := "export w := 1\nexport fmt(x: int) -> String {\n\treturn str(x)\n}\nuse_t() -> int {\n\treturn 1\n}\nexport Foo() -> RuitkVNode {\n\treturn (\n\t\t<Label />\n\t)\n}\n"
 	var pentries: Array = Outline.outline_of(plain)
 	var pkinds: Array = pentries.map(func(e): return str((e as Dictionary).get("kind", "")))
 	_ok(pkinds == ["value", "util", "hook", "component"], "plain decls outline with E-01 kinds (got %s)" % str(pkinds))
@@ -915,10 +915,10 @@ func _test_es_editor_intelligence() -> void:
 	const Completion := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_completion.gd")
 	const Hover := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_hover.gd")
 	# (a) plain sibling used as a tag in the SAME buffer -- no GUITKX0105.
-	var buf := "Chip2() -> RUIVNode {
+	var buf := "Chip2() -> RuitkVNode {
 	return ( <Label /> )
 }
-export Shell2() -> RUIVNode {
+export Shell2() -> RuitkVNode {
 	return ( <Chip2 /> )
 }
 "
@@ -936,7 +936,7 @@ priv_v := 1
 	fh.close()
 	var app_p := "res://tests/__es_ed_app.guitkx"
 	var app_src := "import * as Hud from \"./__es_ed_hud\"
-export A2() -> RUIVNode {
+export A2() -> RuitkVNode {
 	return ( <Label text={str(Hud.)}/> )
 }
 "
@@ -948,7 +948,7 @@ export A2() -> RUIVNode {
 	# (c) kind-aware hover badge for an indexed component incl. export/default.
 	var chip_p := "res://tests/__es_ed_chip.guitkx"
 	var fc2 := FileAccess.open(chip_p, FileAccess.WRITE)
-	fc2.store_string("export EsChipX() -> RUIVNode {
+	fc2.store_string("export EsChipX() -> RuitkVNode {
 	return ( <Label /> )
 }
 export default EsChipX
@@ -1070,7 +1070,7 @@ func _test_problems_project() -> void:
 	var f := FileAccess.open(a, FileAccess.WRITE)
 	f.store_string(src)
 	f.close()
-	RUIGuitkxCodegen.write_diags_sidecar(a, src, [
+	RuitkGuitkxCodegen.write_diags_sidecar(a, src, [
 		{ "code": "GUITKX9901", "severity": 0, "message": "boom", "offset": src.find("<Label"), "length": 6 },
 	])
 	GuitkxWorkspace.rescan()
@@ -1098,7 +1098,7 @@ func _test_problems_project() -> void:
 	_ok(got == [["res://x.guitkx", 3]], "activating a project row emits location_activated")
 	panel.free()
 
-	for p in [a, RUIGuitkxCodegen.diags_path_for(a)]:
+	for p in [a, RuitkGuitkxCodegen.diags_path_for(a)]:
 		if FileAccess.file_exists(str(p)):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(str(p)))
 	GuitkxWorkspace.rescan()
@@ -1141,7 +1141,7 @@ func _test_signature() -> void:
 	# Widget: the strip shows while the caret is in context and hides when it leaves (G4 UI).
 	var ce: CodeEdit = CodeEditScript.new()
 	ce.text = src
-	var lc: Dictionary = RUIGuitkxDiag.line_col(src, off)
+	var lc: Dictionary = RuitkGuitkxDiag.line_col(src, off)
 	ce.set_caret_line(int(lc["line"]))
 	ce.set_caret_column(int(lc["col"]))
 	ce._signature_refresh()
@@ -1236,10 +1236,10 @@ func _test_wave7_editing() -> void:
 	# D6: compile() returns PER-CALL refs — populated when a guitkx-bound component lowers, and
 	# structurally empty on the next call (no static bleed between compiles).
 	var src := "component RA() {\n\treturn (\n\t\t<Dep />\n\t)\n}\n"
-	var r1: Dictionary = RUIGuitkx.compile(src, "ra", ["Dep"], { "Dep": "res://x/dep.gd" })
+	var r1: Dictionary = RuitkGuitkx.compile(src, "ra", ["Dep"], { "Dep": "res://x/dep.gd" })
 	_ok(str((r1.get("refs", {}) as Dictionary).get("Dep", "")) == "res://x/dep.gd",
 		"compile returns the per-call component refs")
-	var r2: Dictionary = RUIGuitkx.compile(
+	var r2: Dictionary = RuitkGuitkx.compile(
 		"component RB() {\n\treturn (\n\t\t<Label />\n\t)\n}\n", "rb", [], {})
 	_ok((r2.get("refs", {}) as Dictionary).is_empty(), "next compile starts with empty refs (D6)")
 
@@ -1315,7 +1315,7 @@ func _test_parity_pins() -> void:
 
 	# @class_name override binds the generated class (compile + codegen surface).
 	var src := "@class_name Zed\ncomponent OvR() {\n\treturn (\n\t\t<Label />\n\t)\n}\n"
-	var r: Dictionary = RUIGuitkx.compile(src, "ovr")
+	var r: Dictionary = RuitkGuitkx.compile(src, "ovr")
 	_ok(bool(r.get("ok", false)) and str(r.get("gd", "")).contains("class_name Zed"),
 		"@class_name override names the generated class")
 
@@ -1336,9 +1336,9 @@ func _test_parity_pins() -> void:
 		if not str(wp).begins_with("res://") or str(wp).contains("\\"):
 			clean = false
 	_ok(clean, "workspace paths are canonical res:// (no backslashes)")
-	_ok(RUIGuitkxCodegen.gd_path_for("res://a/b.guitkx") == "res://a/b.gd",
+	_ok(RuitkGuitkxCodegen.gd_path_for("res://a/b.guitkx") == "res://a/b.gd",
 		"gd_path_for maps beside the source")
-	_ok(RUIGuitkxCodegen.diags_path_for("res://a/b.guitkx") == "res://a/b.guitkx.diags.json",
+	_ok(RuitkGuitkxCodegen.diags_path_for("res://a/b.guitkx") == "res://a/b.guitkx.diags.json",
 		"diags_path_for maps the sidecar name")
 
 # M3 — the byte<->char boundary (GuitkxLineIndex): CodeEdit columns are CODE POINTS (probed:
@@ -1385,7 +1385,7 @@ func _test_virtual_doc() -> void:
 	_ok(gen.contains("static func useState(initial = null) -> Array: return Hooks.useState(initial)"),
 		"hook stubs are class-level static wrappers")
 	_ok(gen.contains("## @return-tuple(Variant, Callable)"), "tuple hooks carry the @return-tuple doc")
-	_ok(gen.contains("static func render(props: Dictionary, children: Array) -> RUIVNode:"),
+	_ok(gen.contains("static func render(props: Dictionary, children: Array) -> RuitkVNode:"),
 		"top-level component emits render()")
 	_ok(gen.contains("\tvar title = props.get(\"title\")"), "params destructure from props")
 	_ok(gen.contains("\tvar b := Button.new()"), "setup splices verbatim")
@@ -1427,12 +1427,12 @@ export fmt(x: int) -> String {
 export use_t() -> int {
 	return 1
 }
-export Foo() -> RUIVNode {
+export Foo() -> RuitkVNode {
 	return (
 		<Label />
 	)
 }
-Bar() -> RUIVNode {
+Bar() -> RuitkVNode {
 	return (
 		<Label />
 	)
@@ -1442,8 +1442,8 @@ Bar() -> RUIVNode {
 	_ok(mgen.contains("static var w := { \"a\": 1 }"), "value decl emits as mapped static var (got %s)" % mgen)
 	_ok(mgen.contains("static func fmt(x: int)"), "util emits under its real name")
 	_ok(mgen.contains("static func use_t("), "plain hook emits under its real name")
-	_ok(mgen.contains("static func render(props: Dictionary, children: Array) -> RUIVNode:"), "first plain component emits render")
-	_ok(mgen.contains("static func Bar(props: Dictionary, children: Array) -> RUIVNode:"), "second plain component emits under its decl name")
+	_ok(mgen.contains("static func render(props: Dictionary, children: Array) -> RuitkVNode:"), "first plain component emits render")
+	_ok(mgen.contains("static func Bar(props: Dictionary, children: Array) -> RuitkVNode:"), "second plain component emits under its decl name")
 
 	# Markup nested inside an expression neutralizes to length-preserving null padding.
 	var n := VD._neutralize_markup("open and <PanelContainer/> ")
@@ -1461,7 +1461,7 @@ Bar() -> RUIVNode {
 		"import isEven, { get_something } from \"./more\"\n" + \
 		"import D2, * as NS from \"./more\"\n" + \
 		"import Solo from \"./third\"\n\n" + \
-		"export ImpProbe() -> RUIVNode {\n\tvar a = fx(chip_w)\n\treturn (\n\t\t<Label text={str(a)} />\n\t)\n}\n"
+		"export ImpProbe() -> RuitkVNode {\n\tvar a = fx(chip_w)\n\treturn (\n\t\t<Label text={str(a)} />\n\t)\n}\n"
 	var igen := str((VD.build(isrc) as Dictionary)["text"])
 	for stub_name in ["chip_w", "fx", "isEven", "get_something", "D2", "NS", "Solo"]:
 		_ok(igen.contains("static var %s\n" % stub_name), "import stub declared for `%s` (got %s)" % [stub_name, igen.substr(0, 400)])

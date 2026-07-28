@@ -521,7 +521,7 @@ func _test_combat() -> void:
 func _test_integration_tick() -> void:
 	var c := Control.new()
 	root.add_child(c)
-	var app := ReactiveRoot.create(c, V.fc(DoomGameScreen.render))
+	var app := RuitkRoot.create(c, V.fc(DoomGameScreen.render))
 	await process_frame
 	await process_frame
 
@@ -560,7 +560,7 @@ func _test_integration_tick() -> void:
 func _test_menu_and_switch() -> void:
 	var c := Control.new()
 	root.add_child(c)
-	var app := ReactiveRoot.create(c, V.fc(DoomGame.render))
+	var app := RuitkRoot.create(c, V.fc(DoomGame.render))
 	await process_frame
 	await process_frame
 	_ok(c.get_child_count() > 0, "DoomGame mounts at the main menu without error")

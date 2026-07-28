@@ -6,7 +6,7 @@ const __RUI_HOOK_SIG := ""
 
 const __RUI_KIND := "component"
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var xs = props.get("xs", [])
 	var __cf0: Array = []
 	for i in 3:

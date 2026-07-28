@@ -1,6 +1,6 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoRef() -> RUIVNode {
+export DemoRef() -> RuitkVNode {
   var input_ref = useRef(null)
   var focus = func():
     if input_ref["current"] != null:

@@ -1,4 +1,4 @@
-class_name RUIGuitkxJsxScan
+class_name RuitkGuitkxJsxScan
 extends RefCounted
 ## Finds markup nested INSIDE an embedded GDScript expression — e.g. `cond if c else <A/>`,
 ## `is_open and <Panel/>`, `{ items.map(func(it): return <Row item={it}/>) }`. Phase 4 §1.

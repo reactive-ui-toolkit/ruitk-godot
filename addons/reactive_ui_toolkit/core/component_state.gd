@@ -1,4 +1,4 @@
-class_name RUIComponentState
+class_name RuitkComponentState
 extends RefCounted
 ## Per-function-component hook & effect storage. SHARED across a fiber's alternates:
 ## the reconciler copies THIS REFERENCE when cloning a fiber (never deep-copies it),
@@ -6,7 +6,7 @@ extends RefCounted
 ## to the committed fiber after each commit so the state setter always schedules work
 ## on the live fiber. Mirrors ReactiveUIToolKit's FunctionComponentState.
 
-var fiber: RUIFiber = null              ## back-pointer, re-pointed at commit
+var fiber: RuitkFiber = null              ## back-pointer, re-pointed at commit
 var hooks: Array = []                   ## positional hook slots (Dictionaries)
 var hook_index: int = 0                 ## cursor, reset to 0 each render
 var effects: Array = []                 ## passive effects: {factory, deps, last_deps, cleanup}
@@ -18,7 +18,7 @@ var on_state_updated: Callable          ## () -> reconciler.schedule_update_on_f
 var is_rendering := false
 var last_output: Array = []             ## cached render output (vnodes) — reused on bailout
 
-# --- dev diagnostics (Phase 7.0; populated only when RUIConfig.enable_hook_validation) ---
+# --- dev diagnostics (Phase 7.0; populated only when RuitkConfig.enable_hook_validation) ---
 var hook_log: Array = []                ## ordered hook kinds recorded THIS render (transient)
 var hook_signatures: Array = []         ## primed hook-kind order from the first render
 var hook_order_primed := false

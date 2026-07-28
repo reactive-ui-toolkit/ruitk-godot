@@ -1,4 +1,4 @@
-class_name RUIContext
+class_name RuitkContext
 extends RefCounted
 ## A context handle created by `Hooks.createContext(default)` — React parity for `createContext`.
 ##

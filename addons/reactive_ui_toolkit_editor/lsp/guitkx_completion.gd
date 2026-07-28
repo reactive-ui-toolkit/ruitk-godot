@@ -86,10 +86,10 @@ static func _import_brace_completion(text: String, offset: int, path: String) ->
 	var sm := spec_re.search(line, region_end)
 	if sm == null:
 		return []
-	var res: Dictionary = RUIGuitkxResolve.resolve_specifier(sm.get_string(1), path, RUIGuitkxConfig.root_for(path))
+	var res: Dictionary = RuitkGuitkxResolve.resolve_specifier(sm.get_string(1), path, RuitkGuitkxConfig.root_for(path))
 	if not bool(res.get("ok", false)):
 		return []
-	var tbl: Dictionary = RUIGuitkxResolve.decl_table(str(res["guitkx"]))
+	var tbl: Dictionary = RuitkGuitkxResolve.decl_table(str(res["guitkx"]))
 	var already := {}
 	for entry in line.substr(bo + 1, region_end - bo - 1).split(","):
 		# Each listed entry may be aliased (`a as b`): the imported NAME must not be re-suggested,
@@ -181,8 +181,8 @@ static func _embedded(text: String, offset: int, path: String = "") -> Array:
 	# a module-style named import) -- offer the target's EXPORTED declaration names, kind-tagged.
 	if m != null and path != "":
 		var qual := m.get_string(1)
-		var root: String = RUIGuitkxConfig.root_for(path)
-		for im in RUIGuitkx.scan_imports(text):
+		var root: String = RuitkGuitkxConfig.root_for(path)
+		for im in RuitkGuitkx.scan_imports(text):
 			var binds_file := str(im.get("ns", "")) == qual
 			if not binds_file:
 				for nm2 in (im.get("names", []) as Array):
@@ -190,10 +190,10 @@ static func _embedded(text: String, offset: int, path: String = "") -> Array:
 						binds_file = true   # module-style named import: qualified access is its shape
 			if not binds_file:
 				continue
-			var res: Dictionary = RUIGuitkxResolve.resolve_specifier(str(im["spec"]), path, root)
+			var res: Dictionary = RuitkGuitkxResolve.resolve_specifier(str(im["spec"]), path, root)
 			if not bool(res.get("ok", false)):
 				continue
-			var tbl: Dictionary = RUIGuitkxResolve.decl_table(str(res["guitkx"]))
+			var tbl: Dictionary = RuitkGuitkxResolve.decl_table(str(res["guitkx"]))
 			var out_ns: Array = []
 			for dn in (tbl["decls"] as Dictionary):
 				var dd := (tbl["decls"] as Dictionary)[dn] as Dictionary

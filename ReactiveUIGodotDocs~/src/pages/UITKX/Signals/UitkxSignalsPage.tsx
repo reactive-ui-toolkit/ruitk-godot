@@ -14,16 +14,16 @@ export const UitkxSignalsPage: FC = () => (
       Signals
     </Typography>
     <Typography variant="body1" paragraph>
-      A <code>RUISignal</code> is a lightweight reactive value store that lives <em>outside</em> the
+      A <code>RuitkSignal</code> is a lightweight reactive value store that lives <em>outside</em> the
       component tree. Components subscribe to it with <code>useSignal(...)</code> and re-render
       when the value — or a selected slice of it — changes. It is the ideal tool whenever you want a
       single source of truth shared across components without prop-drilling (selection, filters,
       global preferences, player stats).
     </Typography>
     <Alert severity="info" sx={{ mb: 2 }}>
-      It is named <code>RUISignal</code>, not <code>Signal</code>, because Godot already uses
+      It is named <code>RuitkSignal</code>, not <code>Signal</code>, because Godot already uses
       &quot;signal&quot; for its own event mechanism. Do not confuse the two — a{' '}
-      <code>RUISignal</code> is a store you read with a hook; a Godot <code>signal</code> is what
+      <code>RuitkSignal</code> is a store you read with a hook; a Godot <code>signal</code> is what
       event props connect to.
     </Alert>
 
@@ -33,10 +33,10 @@ export const UitkxSignalsPage: FC = () => (
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<>Create a standalone store with <code>RUISignal.new(initial)</code> and share the instance (an autoload, a <code>static var</code>, …).</>} />
+          <ListItemText primary={<>Create a standalone store with <code>RuitkSignal.new(initial)</code> and share the instance (an autoload, a <code>static var</code>, …).</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<>Or use the process-wide registry: <code>RUISignals.get_or_create(key, initial)</code> lazily creates one shared signal per string key, so any component anywhere that reads the same key sees the same store.</>} />
+          <ListItemText primary={<>Or use the process-wide registry: <code>RuitkSignals.get_or_create(key, initial)</code> lazily creates one shared signal per string key, so any component anywhere that reads the same key sees the same store.</>} />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary={<>Update with <code>signal.update(func(old): return next)</code> or <code>signal.set_value(next)</code>. Both notify subscribers only when the value actually changes.</>} />
@@ -54,7 +54,7 @@ export const UitkxSignalsPage: FC = () => (
       <Typography variant="body1" paragraph>
         Outside of components, work with the signal directly. The registry is a static
         (process-global) dictionary, so keyed signals outlive the components that read them — that
-        is the point (shared app state). Call <code>RUISignals.clear()</code> on a full session
+        is the point (shared app state). Call <code>RuitkSignals.clear()</code> on a full session
         reset if you want to drop keyed state.
       </Typography>
       <CodeBlock language="gdscript" code={UITKX_SIGNALS_RUNTIME_EXAMPLE} />

@@ -1,6 +1,6 @@
-export const UITKX_ROUTER_EXAMPLE = `RouterDemo() -> RUIVNode {
-  var navigate = RUIRouter.useNavigate()
-  var search = RUIRouter.useSearchParams()   // [query, setter]
+export const UITKX_ROUTER_EXAMPLE = `RouterDemo() -> RuitkVNode {
+  var navigate = RuitkRouter.useNavigate()
+  var search = RuitkRouter.useSearchParams()   // [query, setter]
 
   var ACTIVE := { "font_color": Color(1.0, 0.85, 0.3) }
   var IDLE := { "font_color": Color(0.7, 0.7, 0.8) }
@@ -45,7 +45,7 @@ export const UITKX_ROUTER_EXAMPLE = `RouterDemo() -> RUIVNode {
   )
 }`
 
-export const UITKX_ROUTER_LAYOUT_EXAMPLE = `UsersLayout() -> RUIVNode {
+export const UITKX_ROUTER_LAYOUT_EXAMPLE = `UsersLayout() -> RuitkVNode {
   return (
     <VBoxContainer style={ {"separation": 8} }>
       <Label text="Users header" />
@@ -55,9 +55,9 @@ export const UITKX_ROUTER_LAYOUT_EXAMPLE = `UsersLayout() -> RUIVNode {
   )
 }`
 
-export const UITKX_ROUTER_DETAILS_EXAMPLE = `UserDetails() -> RUIVNode {
-  var params = RUIRouter.useParams()       // { "id": "42", ... }
-  var matches = RUIRouter.useMatches()     // breadcrumb chain (root -> current)
+export const UITKX_ROUTER_DETAILS_EXAMPLE = `UserDetails() -> RuitkVNode {
+  var params = RuitkRouter.useParams()       // { "id": "42", ... }
+  var matches = RuitkRouter.useMatches()     // breadcrumb chain (root -> current)
   return (
     <Label text={ "User id: %s" % str(params.get("id")) } />
   )

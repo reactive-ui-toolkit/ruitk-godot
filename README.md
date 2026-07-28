@@ -13,7 +13,7 @@ the last and patches only what changed on the real Godot node tree. State lives 
 saving a `.guitkx` while your game runs under F5 hot-reloads it in place (**Fast Refresh**).
 
 ```
-Counter() -> RUIVNode {
+Counter() -> RuitkVNode {
 	var s = useState(0)
 	return (
 		<VBoxContainer style={ {"separation": 8} }>
@@ -55,7 +55,7 @@ gallery — every demo is `.guitkx`).
 - **Manually:** copy `addons/reactive_ui_toolkit/` into your project's `res://addons/`.
 
 Either way, the runtime is plain GDScript with global `class_name`s (`V`, `Hooks`,
-`ReactiveRoot`, ...), so they're available immediately — **no plugin enable required**.
+`RuitkRoot`, ...), so they're available immediately — **no plugin enable required**.
 
 To actually *write* `.guitkx`, enable the plugin (**Project Settings → Plugins → Reactive UI Toolkit — Godot**) —
 it watches the filesystem and compiles each `.guitkx` to a sibling `.gd` on save. Then add editor
@@ -78,7 +78,7 @@ Requires **Godot 4.4+** (the compiler core uses 4.3+ engine APIs and the editor 
 2. Write your first component as a `.guitkx` file, e.g. `res://ui/counter.guitkx`:
 
 ```
-Counter() -> RUIVNode {
+Counter() -> RuitkVNode {
 	var s = useState(0)
 	return (
 		<VBoxContainer>
@@ -91,7 +91,7 @@ Counter() -> RUIVNode {
 
 Saving it compiles a sibling `res://ui/counter.gd` (git-ignore this — it's generated) with a real
 Godot `class_name` — `Counter`, inferred from the declaration (a component is any callable that
-annotates `-> RUIVNode`; the annotation IS the classification) — so you can reference it like any
+annotates `-> RuitkVNode`; the annotation IS the classification) — so you can reference it like any
 other class. An `@class_name` directive can override that name; it's rarely needed.
 
 3. Mount it from a plain `.gd` script — this one bootstrap point is the only place raw GDScript is
@@ -100,18 +100,18 @@ other class. An `@class_name` directive can override that name; it's rarely need
 ```gdscript
 extends Control
 
-var _app: ReactiveRoot   # keep this referenced for the UI's lifetime!
+var _app: RuitkRoot   # keep this referenced for the UI's lifetime!
 
 func _ready():
-	_app = ReactiveRoot.create(self, V.fc(Counter.render))
+	_app = RuitkRoot.create(self, V.fc(Counter.render))
 
 func _exit_tree():
 	_app.unmount()
 ```
 
-`ReactiveRoot.create(container, root_vnode)` mounts under `container` and renders. **Hold onto the
-returned `ReactiveRoot`** — it owns the reconciler; call `.unmount()` to tear down and run cleanups.
-(A `Control`-based `ReactiveRootNode` is also available if you prefer mounting via a scene node.)
+`RuitkRoot.create(container, root_vnode)` mounts under `container` and renders. **Hold onto the
+returned `RuitkRoot`** — it owns the reconciler; call `.unmount()` to tear down and run cleanups.
+(A `Control`-based `RuitkRootNode` is also available if you prefer mounting via a scene node.)
 
 From here on, edit `counter.guitkx` while the game runs under F5 and watch it update in place — see
 [Fast Refresh](#fast-refresh).
@@ -153,7 +153,7 @@ import line to add (migrating from 0.9? — [MIGRATION-0.10.md](MIGRATION-0.10.m
 import { StatusChip } from "./status_chip"
 import { use_blink } from "~/ui/hud.hooks"
 
-export Panel(level: int = 1) -> RUIVNode {
+export Panel(level: int = 1) -> RuitkVNode {
   var blink = use_blink(0.5)
   return ( <PanelContainer><StatusChip level={level} /></PanelContainer> )
 }
@@ -208,8 +208,8 @@ Call hooks **only** at the top of a component, unconditionally, in a stable orde
 
 …plus `useImperativeHandle`, `useSafeArea`, `createContext`/`provideContext`, and the
 stable-callback family — **23 hooks** in all. Bare calls (`useState(...)`) auto-resolve to
-`Hooks.useState(...)`. The [router](#router) adds **17 more**, all on `RUIRouter`
-(`RUIRouter.useNavigate`, `useLocation`, `useParams`, `useSearchParams`, `useBlocker`, …) — router
+`Hooks.useState(...)`. The [router](#router) adds **17 more**, all on `RuitkRouter`
+(`RuitkRouter.useNavigate`, `useLocation`, `useParams`, `useSearchParams`, `useBlocker`, …) — router
 hooks stay explicitly qualified.
 
 ### Control flow
@@ -230,7 +230,7 @@ code plus `return ( <markup> )`**, and nest recursively — the same model as Re
 can also appear **early**, guarding on a condition, not just as the final statement:
 
 ```
-Panel(ready: bool = false) -> RUIVNode {
+Panel(ready: bool = false) -> RuitkVNode {
 	if not ready:
 		return ( <Label text="loading" /> )
 	return ( <VBoxContainer>…</VBoxContainer> )
@@ -240,7 +240,7 @@ Panel(ready: bool = false) -> RUIVNode {
 ### Prop spread & context
 
 ```
-Card() -> RUIVNode {
+Card() -> RuitkVNode {
 	var shared = { "custom_minimum_size": Vector2(140, 0), "text": "shared" }
 	return ( <Button {...shared} onPressed={ handle } /> )
 }
@@ -252,7 +252,7 @@ carries a default value):
 
 ```gdscript
 # accent_context.gd — a module-level handle, shared by every component that imports it
-static var HANDLE: RUIContext = preload("res://.../hooks.gd").createContext(Color(0.4, 0.7, 1.0))
+static var HANDLE: RuitkContext = preload("res://.../hooks.gd").createContext(Color(0.4, 0.7, 1.0))
 ```
 
 ```
@@ -274,7 +274,7 @@ Godot has no CSS/USS — styling is `Control` properties + `Theme` overrides, an
    setters (`corner_radius_all`, `content_margin_all`, …).
 2. **Theme channels** — full `Theme` coverage (colors / constants / fonts / font-sizes / icons /
    styleboxes) plus **per-state `StyleBox` slots** (hover / pressed / focus / disabled / read-only).
-3. **`classes={ [...] }`** — named style sets registered with `RUIStyleSheet` (merged left-to-right;
+3. **`classes={ [...] }`** — named style sets registered with `RuitkStyleSheet` (merged left-to-right;
    inline `style` wins). A userland "USS classes" layer.
 
 ### Keys
@@ -293,7 +293,7 @@ add/remove/reorder instead of rebuild):
 `<ItemList>` / `<Tree>` / `<TabBar>` / `<OptionButton>` / `<PopupMenu>` take a
 declarative `items={ [...] }` prop and reconcile rows **by item identity** (selection/expansion
 preserved across renders). Wire changes with the normal `on*` event props. Register adapters for
-your own controls via `RUIHost.register_item_adapter(...)`.
+your own controls via `RuitkHost.register_item_adapter(...)`.
 
 ### Custom drawing
 
@@ -326,7 +326,7 @@ classes, so they're not tags; you reach them via `V.*` inside an embedded `{ exp
 inside your `.guitkx` file, just not as a `<Tag>`:
 
 ```
-App() -> RUIVNode {
+App() -> RuitkVNode {
 	return (
 		<VBoxContainer>
 			{ V.suspense({ "fallback": V.fc(Spinner.render), "ready_signal": ready }, [V.fc(Content.render)]) }
@@ -346,11 +346,11 @@ A faithful **React-Router-v6-style** component-tree router: nested/layout routes
 `{ V.outlet() }`, ranked first-match, merged `:params`, splat `*`, `basename`, query strings,
 `NavLink`-equivalent active styling, and navigation blockers. The route table itself is configured
 via `V.routes(...)`/`V.route(...)` (see [above](#where-v-still-shows-up)); drive it from markup with
-the router hooks on `RUIRouter`.
+the router hooks on `RuitkRouter`.
 
 ### Signals
 
-A reference-aware `RUISignal` store plus a process-wide, string-keyed `RUISignals` registry —
+A reference-aware `RuitkSignal` store plus a process-wide, string-keyed `RuitkSignals` registry —
 share state across components without prop-drilling. Read it with `useSignal`/`useSignalKey`.
 
 ### Fast Refresh
@@ -377,19 +377,19 @@ Mirrors ReactiveUIToolKit; the design (algorithms) is ported, the code is GDScri
 
 ```
 addons/reactive_ui_toolkit/core/
-  vnode.gd / v.gd            RUIVNode / V     — UI description + the ~61 factories (incl. V.comp)
-  fiber.gd                   RUIFiber         — persistent tree node; current/WIP alternates; hook store
+  vnode.gd / v.gd            RuitkVNode / V     — UI description + the ~61 factories (incl. V.comp)
+  fiber.gd                   RuitkFiber         — persistent tree node; current/WIP alternates; hook store
   hooks.gd                   Hooks            — the 23 hooks
-  reconciler.gd              RUIReconciler    — render (diff) + two-phase commit; bailout; scheduling
-  host_config.gd             RUIHost          — the Godot adapter: nodes, props, signals, items, custom draw
-  style.gd / style_sheet.gd  RUIStyle / RUIStyleSheet — declarative style -> Control props / Theme
-  signal_store.gd / signal_registry.gd  RUISignal / RUISignals
+  reconciler.gd              RuitkReconciler    — render (diff) + two-phase commit; bailout; scheduling
+  host_config.gd             RuitkHost          — the Godot adapter: nodes, props, signals, items, custom draw
+  style.gd / style_sheet.gd  RuitkStyle / RuitkStyleSheet — declarative style -> Control props / Theme
+  signal_store.gd / signal_registry.gd  RuitkSignal / RuitkSignals
   suspense.gd                                  — V.suspense boundary
   media.gd                                     — useSfx / useAnimate / V.audio / V.video
-  hmr.gd                     RUIHmr           — Fast Refresh runtime (game side)
-  router/                    RUIRouter…       — router spine, matcher, ranker, history, location
+  hmr.gd                     RuitkHmr           — Fast Refresh runtime (game side)
+  router/                    RuitkRouter…       — router spine, matcher, ranker, history, location
   reactive_root.gd / reactive_root_node.gd     — mount surfaces
-addons/reactive_ui_toolkit/guitkx/    RUIGuitkx…       — the .guitkx lexer/parser/codegen/formatter
+addons/reactive_ui_toolkit/guitkx/    RuitkGuitkx…       — the .guitkx lexer/parser/codegen/formatter
 addons/reactive_ui_toolkit/editor/                     — editor-side watcher + Fast Refresh push (hmr_debugger.gd)
 addons/reactive_ui_toolkit_editor/                     — native in-Godot .guitkx editor tab (separate addon)
 ide-extensions/                                — VS Code / VS 2022 extensions + shared language server

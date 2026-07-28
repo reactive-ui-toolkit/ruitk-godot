@@ -1,7 +1,7 @@
-class_name RUIGuitkxResolve
+class_name RuitkGuitkxResolve
 extends RefCounted
 ## Import RESOLUTION for the .guitkx compiler (0.10.0 imports leg, §M3). Turns a file's parsed
-## preamble imports (from RUIGuitkx._parse_import_at) into: (a) the lowering plan the emitter needs
+## preamble imports (from RuitkGuitkx._parse_import_at) into: (a) the lowering plan the emitter needs
 ## — component imports become `V.comp(path, func)` at their tag, value imports (hooks/modules) become
 ## `const Name = preload(path)[.Member]` header lines — and (b) the frozen family diagnostics
 ## GUITKX2300–2308 (§0.1). Pure/static + FileAccess-only, so it runs headlessly in the compiler and
@@ -118,7 +118,7 @@ static func _skip_import(src: String, i: int) -> int:
 	return Compiler.import_end(src, i)
 
 ## Resolve every import of one file into the emitter's lowering plan + the frozen import diagnostics.
-## `imports` = RUIGuitkx.compile()'s parsed list; `used(name)->bool` reports whether a LOCAL name is
+## `imports` = RuitkGuitkx.compile()'s parsed list; `used(name)->bool` reports whether a LOCAL name is
 ## referenced in the body (drives 2304 unused). Returns:
 ##   { comps: { local_name -> { gd, func } },     # component imports -> V.comp(gd, func)
 ##     values: [ { name, gd, member, kind } ],    # module + `* as` namespace -> const preloads

@@ -1,11 +1,11 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 import { DemoSignalsDisplay } from "./signals_display"
 
-export DemoSignals() -> RUIVNode {
+export DemoSignals() -> RuitkVNode {
   return (
     <DemoBox title="Signals — shared state, no prop drilling">
       <Label
-        text="Two independent components read the SAME RUISignal:"
+        text="Two independent components read the SAME RuitkSignal:"
         style={ {"font_color": Color(0.7, 0.7, 0.7)} } />
       <DemoSignalsDisplay />
       <DemoSignalsDisplay />

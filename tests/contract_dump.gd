@@ -1,6 +1,6 @@
 extends SceneTree
 ## T0.1 contract harness — the GDScript half. For every fixture under tests/contract/fixtures/,
-## runs the COMPILER-OF-RECORD pipeline (RUIGuitkx) and dumps a canonical golden JSON:
+## runs the COMPILER-OF-RECORD pipeline (RuitkGuitkx) and dumps a canonical golden JSON:
 ##
 ##   { "ok", "diagnostics":[{code,severity,off,len}], "windows":[{start,end}],
 ##     "markup":[{ "error", "error_code", "error_at", "tree" }] }

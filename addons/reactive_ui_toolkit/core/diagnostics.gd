@@ -1,6 +1,6 @@
-class_name RUIDiagnostics
+class_name RuitkDiagnostics
 extends RefCounted
-## Opt-in render/commit metrics. Toggle `RUIDiagnostics.enabled = true`, then read the
+## Opt-in render/commit metrics. Toggle `RuitkDiagnostics.enabled = true`, then read the
 ## counters or `report()`. The reconciler feeds these. Analogue of ReactiveUIToolKit's
 ## diagnostics / WhyDidYouRender (lightweight counter form).
 

@@ -1,4 +1,4 @@
-class_name RUIGuitkxFormatter
+class_name RuitkGuitkxFormatter
 extends RefCounted
 ## Canonical-form formatter for .guitkx (Phase 5). Pure + FileAccess-free so it is headlessly
 ## unit-testable. AST-driven re-emit (NOT regex post-processing): re-parse via the single parser of
@@ -7,7 +7,7 @@ extends RefCounted
 ## byte-identical except base-indent normalization of setup — a from-scratch GDScript re-indenter is
 ## unsound (no closing token), so we only re-anchor the outer indent and preserve internal structure.
 ##
-## API:  RUIGuitkxFormatter.format(source: String, opts := {}) -> { ok, text, changed, fell_back }
+## API:  RuitkGuitkxFormatter.format(source: String, opts := {}) -> { ok, text, changed, fell_back }
 ## `fell_back` (G-06): true when `text == source` because of a parse error, not because the file
 ## was already canonical -- the two used to be indistinguishable to callers.
 
@@ -184,9 +184,9 @@ static func _fmt_component(comp_name: String, params: String, setup: String, nod
 	return out
 
 ## E-01 plain component: identical body emission to _fmt_component with the keywordless header
-## (`Name(params) -> RUIVNode {`). The annotation IS the classification -- never dropped.
+## (`Name(params) -> RuitkVNode {`). The annotation IS the classification -- never dropped.
 static func _fmt_plain_component(comp_name: String, params: String, setup: String, nodes: Array, o: Dictionary) -> String:
-	var out := "%s%s -> RUIVNode {\n" % [comp_name, _fmt_params_always(params)]
+	var out := "%s%s -> RuitkVNode {\n" % [comp_name, _fmt_params_always(params)]
 	var fs := _fmt_setup(setup, 1, o)
 	if fs != "":
 		if _has_leading_blank(setup): out += "\n"

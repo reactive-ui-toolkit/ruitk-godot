@@ -4,13 +4,13 @@ extends RefCounted
 ## Document outline (parity plan G12): the file's declarations — components ◆, hooks ƒ, utils ƒ,
 ## values =, modules ▣ and their members — as [{name, kind, offset, export}], offset at the
 ## declaration NAME. ES-modules leg: declarations are SIGNATURE-classified (plain forms have no
-## keyword), so the outline consumes the compiler's own scan (RUIGuitkx.analyzed_decls — the same
+## keyword), so the outline consumes the compiler's own scan (RuitkGuitkx.analyzed_decls — the same
 ## single source of truth the workspace index and every identity table use), not a regex.
 
 static func outline_of(text: String) -> Array:
 	var out: Array = []
 	var module_spans: Array = []   # [start] of wrapper-module bodies (member funcs belong to them)
-	for dm in (RUIGuitkx.analyzed_decls(text, 0)["decls"] as Array):
+	for dm in (RuitkGuitkx.analyzed_decls(text, 0)["decls"] as Array):
 		out.append({
 			"name": str(dm["name"]), "kind": str(dm["kind"]), "offset": int(dm["name_at"]),
 			"export": bool(dm["export"]),

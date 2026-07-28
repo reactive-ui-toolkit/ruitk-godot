@@ -16,11 +16,11 @@ extends RefCounted
 ## non-engine factories (fc/comp/memo/h/text/fragment/portal/suspense/error_boundary and
 ## the router set) stay lowercase.
 ##
-## A render function has the signature:  func(props: Dictionary, children: Array) -> RUIVNode | Array
+## A render function has the signature:  func(props: Dictionary, children: Array) -> RuitkVNode | Array
 
 ## Function component.
-static func fc(render_fn: Callable, props := {}, children = null, key = null) -> RUIVNode:
-	return RUIVNode.make_component(render_fn, props, _norm(children), _key(props, key))
+static func fc(render_fn: Callable, props := {}, children = null, key = null) -> RuitkVNode:
+	return RuitkVNode.make_component(render_fn, props, _norm(children), _key(props, key))
 
 ## Lazy path-based component resolver. Generated code references sibling .guitkx components by
 ## FILE PATH (`V.fc(V.comp("res://ui/card.gd"), ...)`) instead of by global class_name, so the
@@ -59,15 +59,15 @@ static func _spread_all(parts: Array) -> Dictionary:
 ## Memoized function component (parity name for ReactiveUIToolKit's V.Memo). Functionally V.fc — every
 ## function component in this port already bails its re-render when props are unchanged. For a custom
 ## equality, pass `props.__memo_eq = func(old_props, new_props) -> bool` (consulted by the reconciler).
-static func memo(render_fn: Callable, props := {}, children = null, key = null) -> RUIVNode:
+static func memo(render_fn: Callable, props := {}, children = null, key = null) -> RuitkVNode:
 	return fc(render_fn, props, children, key)
 
 ## Generic host element by Godot class name, e.g. V.h("ProgressBar", {...}).
 ## INLINED (no make_host/_key/_norm sub-calls, no throwaway `[]` for childless elements) —
 ## this is the hottest factory path; each GDScript call elided here is ~1 per element per
 ## frame, i.e. thousands/frame in a big list. [perf]
-static func h(type: String, props := {}, children = null, key = null) -> RUIVNode:
-	var n := RUIVNode.new()
+static func h(type: String, props := {}, children = null, key = null) -> RuitkVNode:
+	var n := RuitkVNode.new()
 	n.type = type
 	n.props = props
 	n.children = _EMPTY if children == null else _norm(children)
@@ -83,132 +83,132 @@ static func h(type: String, props := {}, children = null, key = null) -> RUIVNod
 # the method, never the global class).
 
 # Containers
-static func Control(props := {}, children = null, key = null) -> RUIVNode: return h("Control", props, children, key)
-static func VBoxContainer(props := {}, children = null, key = null) -> RUIVNode: return h("VBoxContainer", props, children, key)
-static func HBoxContainer(props := {}, children = null, key = null) -> RUIVNode: return h("HBoxContainer", props, children, key)
-static func BoxContainer(props := {}, children = null, key = null) -> RUIVNode: return h("BoxContainer", props, children, key)
-static func GridContainer(props := {}, children = null, key = null) -> RUIVNode: return h("GridContainer", props, children, key)
-static func MarginContainer(props := {}, children = null, key = null) -> RUIVNode: return h("MarginContainer", props, children, key)
-static func PanelContainer(props := {}, children = null, key = null) -> RUIVNode: return h("PanelContainer", props, children, key)
-static func CenterContainer(props := {}, children = null, key = null) -> RUIVNode: return h("CenterContainer", props, children, key)
-static func ScrollContainer(props := {}, children = null, key = null) -> RUIVNode: return h("ScrollContainer", props, children, key)
-static func FlowContainer(props := {}, children = null, key = null) -> RUIVNode: return h("FlowContainer", props, children, key)
-static func HFlowContainer(props := {}, children = null, key = null) -> RUIVNode: return h("HFlowContainer", props, children, key)
-static func VFlowContainer(props := {}, children = null, key = null) -> RUIVNode: return h("VFlowContainer", props, children, key)
-static func TabContainer(props := {}, children = null, key = null) -> RUIVNode: return h("TabContainer", props, children, key)
-static func SplitContainer(props := {}, children = null, key = null) -> RUIVNode: return h("SplitContainer", props, children, key)
-static func HSplitContainer(props := {}, children = null, key = null) -> RUIVNode: return h("HSplitContainer", props, children, key)
-static func VSplitContainer(props := {}, children = null, key = null) -> RUIVNode: return h("VSplitContainer", props, children, key)
-static func AspectRatioContainer(props := {}, children = null, key = null) -> RUIVNode: return h("AspectRatioContainer", props, children, key)
-static func FoldableContainer(props := {}, children = null, key = null) -> RUIVNode: return h("FoldableContainer", props, children, key)
-static func SubViewportContainer(props := {}, children = null, key = null) -> RUIVNode: return h("SubViewportContainer", props, children, key)
+static func Control(props := {}, children = null, key = null) -> RuitkVNode: return h("Control", props, children, key)
+static func VBoxContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("VBoxContainer", props, children, key)
+static func HBoxContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("HBoxContainer", props, children, key)
+static func BoxContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("BoxContainer", props, children, key)
+static func GridContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("GridContainer", props, children, key)
+static func MarginContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("MarginContainer", props, children, key)
+static func PanelContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("PanelContainer", props, children, key)
+static func CenterContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("CenterContainer", props, children, key)
+static func ScrollContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("ScrollContainer", props, children, key)
+static func FlowContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("FlowContainer", props, children, key)
+static func HFlowContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("HFlowContainer", props, children, key)
+static func VFlowContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("VFlowContainer", props, children, key)
+static func TabContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("TabContainer", props, children, key)
+static func SplitContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("SplitContainer", props, children, key)
+static func HSplitContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("HSplitContainer", props, children, key)
+static func VSplitContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("VSplitContainer", props, children, key)
+static func AspectRatioContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("AspectRatioContainer", props, children, key)
+static func FoldableContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("FoldableContainer", props, children, key)
+static func SubViewportContainer(props := {}, children = null, key = null) -> RuitkVNode: return h("SubViewportContainer", props, children, key)
 
 # Text / display
-static func Label(props := {}, children = null, key = null) -> RUIVNode: return h("Label", props, children, key)
+static func Label(props := {}, children = null, key = null) -> RuitkVNode: return h("Label", props, children, key)
 
 ## A text node: renders a string as a Label. Raw String children are AUTO-WRAPPED to this, so
 ## `V.VBoxContainer({}, ["Score: ", score_str])` and a component returning a bare String both work
 ## instead of the string being silently dropped. (Godot renders text via Label nodes — this is the
 ## text leaf; structural, so it keeps its lowercase non-class name.)
-static func text(s, key = null) -> RUIVNode: return h("Label", { "text": str(s) }, null, key)
-static func RichTextLabel(props := {}, children = null, key = null) -> RUIVNode: return h("RichTextLabel", props, children, key)
-static func Panel(props := {}, children = null, key = null) -> RUIVNode: return h("Panel", props, children, key)
-static func ColorRect(props := {}, children = null, key = null) -> RUIVNode: return h("ColorRect", props, children, key)
-static func TextureRect(props := {}, children = null, key = null) -> RUIVNode: return h("TextureRect", props, children, key)
-static func NinePatchRect(props := {}, children = null, key = null) -> RUIVNode: return h("NinePatchRect", props, children, key)
-static func ReferenceRect(props := {}, children = null, key = null) -> RUIVNode: return h("ReferenceRect", props, children, key)
-static func HSeparator(props := {}, children = null, key = null) -> RUIVNode: return h("HSeparator", props, children, key)
-static func VSeparator(props := {}, children = null, key = null) -> RUIVNode: return h("VSeparator", props, children, key)
+static func text(s, key = null) -> RuitkVNode: return h("Label", { "text": str(s) }, null, key)
+static func RichTextLabel(props := {}, children = null, key = null) -> RuitkVNode: return h("RichTextLabel", props, children, key)
+static func Panel(props := {}, children = null, key = null) -> RuitkVNode: return h("Panel", props, children, key)
+static func ColorRect(props := {}, children = null, key = null) -> RuitkVNode: return h("ColorRect", props, children, key)
+static func TextureRect(props := {}, children = null, key = null) -> RuitkVNode: return h("TextureRect", props, children, key)
+static func NinePatchRect(props := {}, children = null, key = null) -> RuitkVNode: return h("NinePatchRect", props, children, key)
+static func ReferenceRect(props := {}, children = null, key = null) -> RuitkVNode: return h("ReferenceRect", props, children, key)
+static func HSeparator(props := {}, children = null, key = null) -> RuitkVNode: return h("HSeparator", props, children, key)
+static func VSeparator(props := {}, children = null, key = null) -> RuitkVNode: return h("VSeparator", props, children, key)
 
 # Buttons
-static func Button(props := {}, children = null, key = null) -> RUIVNode: return h("Button", props, children, key)
-static func CheckBox(props := {}, children = null, key = null) -> RUIVNode: return h("CheckBox", props, children, key)
-static func CheckButton(props := {}, children = null, key = null) -> RUIVNode: return h("CheckButton", props, children, key)
-static func OptionButton(props := {}, children = null, key = null) -> RUIVNode: return h("OptionButton", props, children, key)
-static func MenuButton(props := {}, children = null, key = null) -> RUIVNode: return h("MenuButton", props, children, key)
-static func LinkButton(props := {}, children = null, key = null) -> RUIVNode: return h("LinkButton", props, children, key)
-static func TextureButton(props := {}, children = null, key = null) -> RUIVNode: return h("TextureButton", props, children, key)
+static func Button(props := {}, children = null, key = null) -> RuitkVNode: return h("Button", props, children, key)
+static func CheckBox(props := {}, children = null, key = null) -> RuitkVNode: return h("CheckBox", props, children, key)
+static func CheckButton(props := {}, children = null, key = null) -> RuitkVNode: return h("CheckButton", props, children, key)
+static func OptionButton(props := {}, children = null, key = null) -> RuitkVNode: return h("OptionButton", props, children, key)
+static func MenuButton(props := {}, children = null, key = null) -> RuitkVNode: return h("MenuButton", props, children, key)
+static func LinkButton(props := {}, children = null, key = null) -> RuitkVNode: return h("LinkButton", props, children, key)
+static func TextureButton(props := {}, children = null, key = null) -> RuitkVNode: return h("TextureButton", props, children, key)
 
 # Inputs
-static func LineEdit(props := {}, children = null, key = null) -> RUIVNode: return h("LineEdit", props, children, key)
-static func TextEdit(props := {}, children = null, key = null) -> RUIVNode: return h("TextEdit", props, children, key)
-static func CodeEdit(props := {}, children = null, key = null) -> RUIVNode: return h("CodeEdit", props, children, key)
-static func SpinBox(props := {}, children = null, key = null) -> RUIVNode: return h("SpinBox", props, children, key)
-static func HSlider(props := {}, children = null, key = null) -> RUIVNode: return h("HSlider", props, children, key)
-static func VSlider(props := {}, children = null, key = null) -> RUIVNode: return h("VSlider", props, children, key)
-static func HScrollBar(props := {}, children = null, key = null) -> RUIVNode: return h("HScrollBar", props, children, key)
-static func VScrollBar(props := {}, children = null, key = null) -> RUIVNode: return h("VScrollBar", props, children, key)
-static func ProgressBar(props := {}, children = null, key = null) -> RUIVNode: return h("ProgressBar", props, children, key)
-static func TextureProgressBar(props := {}, children = null, key = null) -> RUIVNode: return h("TextureProgressBar", props, children, key)
-static func ColorPicker(props := {}, children = null, key = null) -> RUIVNode: return h("ColorPicker", props, children, key)
-static func ColorPickerButton(props := {}, children = null, key = null) -> RUIVNode: return h("ColorPickerButton", props, children, key)
-static func VirtualJoystick(props := {}, children = null, key = null) -> RUIVNode: return h("VirtualJoystick", props, children, key)
+static func LineEdit(props := {}, children = null, key = null) -> RuitkVNode: return h("LineEdit", props, children, key)
+static func TextEdit(props := {}, children = null, key = null) -> RuitkVNode: return h("TextEdit", props, children, key)
+static func CodeEdit(props := {}, children = null, key = null) -> RuitkVNode: return h("CodeEdit", props, children, key)
+static func SpinBox(props := {}, children = null, key = null) -> RuitkVNode: return h("SpinBox", props, children, key)
+static func HSlider(props := {}, children = null, key = null) -> RuitkVNode: return h("HSlider", props, children, key)
+static func VSlider(props := {}, children = null, key = null) -> RuitkVNode: return h("VSlider", props, children, key)
+static func HScrollBar(props := {}, children = null, key = null) -> RuitkVNode: return h("HScrollBar", props, children, key)
+static func VScrollBar(props := {}, children = null, key = null) -> RuitkVNode: return h("VScrollBar", props, children, key)
+static func ProgressBar(props := {}, children = null, key = null) -> RuitkVNode: return h("ProgressBar", props, children, key)
+static func TextureProgressBar(props := {}, children = null, key = null) -> RuitkVNode: return h("TextureProgressBar", props, children, key)
+static func ColorPicker(props := {}, children = null, key = null) -> RuitkVNode: return h("ColorPicker", props, children, key)
+static func ColorPickerButton(props := {}, children = null, key = null) -> RuitkVNode: return h("ColorPickerButton", props, children, key)
+static func VirtualJoystick(props := {}, children = null, key = null) -> RuitkVNode: return h("VirtualJoystick", props, children, key)
 
 # Media (Godot's audio/video are scene nodes — thin host elements; see also useSfx for one-shots)
-static func AudioStreamPlayer(props := {}, key = null) -> RUIVNode: return h("AudioStreamPlayer", props, null, key)
-static func VideoStreamPlayer(props := {}, key = null) -> RUIVNode: return h("VideoStreamPlayer", props, null, key)
+static func AudioStreamPlayer(props := {}, key = null) -> RuitkVNode: return h("AudioStreamPlayer", props, null, key)
+static func VideoStreamPlayer(props := {}, key = null) -> RuitkVNode: return h("VideoStreamPlayer", props, null, key)
 
-# Item-model controls (declarative props; see RUIHost adapters)
-static func TabBar(props := {}, children = null, key = null) -> RUIVNode: return h("TabBar", props, children, key)
-static func ItemList(props := {}, children = null, key = null) -> RUIVNode: return h("ItemList", props, children, key)
-static func Tree(props := {}, children = null, key = null) -> RUIVNode: return h("Tree", props, children, key)
-static func MenuBar(props := {}, children = null, key = null) -> RUIVNode: return h("MenuBar", props, children, key)
+# Item-model controls (declarative props; see RuitkHost adapters)
+static func TabBar(props := {}, children = null, key = null) -> RuitkVNode: return h("TabBar", props, children, key)
+static func ItemList(props := {}, children = null, key = null) -> RuitkVNode: return h("ItemList", props, children, key)
+static func Tree(props := {}, children = null, key = null) -> RuitkVNode: return h("Tree", props, children, key)
+static func MenuBar(props := {}, children = null, key = null) -> RuitkVNode: return h("MenuBar", props, children, key)
 
 # --- structural vnodes ---
 
 ## A fragment groups children without introducing a host node.
-static func fragment(children = null, key = null) -> RUIVNode:
-	return RUIVNode.make_fragment(_norm(children), key)
+static func fragment(children = null, key = null) -> RuitkVNode:
+	return RuitkVNode.make_fragment(_norm(children), key)
 
 ## A portal renders its children under `target` instead of the normal parent node.
-static func portal(target: Node, children = null, key = null) -> RUIVNode:
-	return RUIVNode.make_portal(target, _norm(children), key)
+static func portal(target: Node, children = null, key = null) -> RuitkVNode:
+	return RuitkVNode.make_portal(target, _norm(children), key)
 
 ## A Suspense boundary: shows props.fallback until ready (props.ready_signal fires or props.is_ready()
 ## becomes true), then renders `children`. GDScript can't throw-to-suspend, so readiness is signal/poll
-## driven — see RUISuspense.
-static func suspense(props := {}, children = null, key = null) -> RUIVNode:
-	return fc(RUISuspense.suspense_fn, props, children, key)
+## driven — see RuitkSuspense.
+static func suspense(props := {}, children = null, key = null) -> RuitkVNode:
+	return fc(RuitkSuspense.suspense_fn, props, children, key)
 
 ## An error boundary. props: { "fallback": vnode, "on_error": Callable, "reset_key": any }.
 ## NOTE: GDScript can't catch render crashes; the boundary shows `fallback` when activated
 ## imperatively and resets when `reset_key` changes. See reconciler `_begin_error_boundary`.
-static func error_boundary(props := {}, children = null, key = null) -> RUIVNode:
-	return RUIVNode.make_error_boundary(props, _norm(children), key)
+static func error_boundary(props := {}, children = null, key = null) -> RuitkVNode:
+	return RuitkVNode.make_error_boundary(props, _norm(children), key)
 
 # --- router ---
 
-## Provides router context to its subtree. props: { "history": RUIHistory, "initial": "/", "basename": "/" }.
-static func router(props := {}, children = null, key = null) -> RUIVNode:
-	return fc(RUIRouter.provider, props, children, key)
+## Provides router context to its subtree. props: { "history": RuitkHistory, "initial": "/", "basename": "/" }.
+static func router(props := {}, children = null, key = null) -> RuitkVNode:
+	return fc(RuitkRouter.provider, props, children, key)
 
 ## Renders the best-matching route. Auto-detects the API:
 ##   • a Dictionary `routes` prop  -> legacy table: { "routes": [ { "path", "component" }, ... ] }
 ##   • <Route> children            -> ranked first-match switch: V.routes({}, [ V.route({...}), ... ])
-static func routes(props := {}, children = null, key = null) -> RUIVNode:
-	return fc(RUIRouter.routes, props, children, key)
+static func routes(props := {}, children = null, key = null) -> RuitkVNode:
+	return fc(RuitkRouter.routes, props, children, key)
 
 ## A single route. props: { "path": "/users/:id", "element": vnode | "render": func(match), "index": bool,
 ## "exact": bool, "case_sensitive": bool }. Children may be nested <Route>s rendered via <Outlet/>.
-static func route(props := {}, children = null, key = null) -> RUIVNode:
-	return fc(RUIRouter.route_fn, props, children, key)
+static func route(props := {}, children = null, key = null) -> RuitkVNode:
+	return fc(RuitkRouter.route_fn, props, children, key)
 
 ## Renders the matched nested route (or `children` as a fallback). props: { "context": any }.
-static func outlet(props := {}, children = null, key = null) -> RUIVNode:
-	return fc(RUIRouter.outlet_fn, props, children, key)
+static func outlet(props := {}, children = null, key = null) -> RuitkVNode:
+	return fc(RuitkRouter.outlet_fn, props, children, key)
 
 ## Declarative redirect (navigates from an effect after commit). props: { "to": "/x", "replace": true, "state": any }.
-static func navigate(props := {}, key = null) -> RUIVNode:
-	return fc(RUIRouter.navigate_fn, props, [], key)
+static func navigate(props := {}, key = null) -> RuitkVNode:
+	return fc(RuitkRouter.navigate_fn, props, [], key)
 
 ## An active-aware navigation button. props: { "to", "label", "replace", "end", "case_sensitive",
 ## "style", "active_style", "state", "button_props" }.
-static func nav_link(props := {}, children = null, key = null) -> RUIVNode:
-	return fc(RUIRouter.nav_link_fn, props, children, key)
+static func nav_link(props := {}, children = null, key = null) -> RuitkVNode:
+	return fc(RuitkRouter.nav_link_fn, props, children, key)
 
 ## A navigation button. props: { "to": "/path", "text": "...", "replace": bool, "button_props": {...} }.
-static func link(props := {}, children = null, key = null) -> RUIVNode:
-	return fc(RUIRouter.link, props, children, key)
+static func link(props := {}, children = null, key = null) -> RuitkVNode:
+	return fc(RuitkRouter.link, props, children, key)
 
 static func _key(props, key):
 	if key != null:

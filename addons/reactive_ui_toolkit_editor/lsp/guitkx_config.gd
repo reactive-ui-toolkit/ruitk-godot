@@ -11,7 +11,7 @@ const FORMATTER_KEYS := [
 	"printWidth", "indentStyle", "indentSize", "singleAttributePerLine", "insertSpaceBeforeSelfClose",
 ]
 
-## Formatter options for the file at `path` (pass straight into RUIGuitkxFormatter.format).
+## Formatter options for the file at `path` (pass straight into RuitkGuitkxFormatter.format).
 static func formatter_opts_for(path: String) -> Dictionary:
 	var dir := path.get_base_dir()
 	if dir.is_empty() or not dir.begins_with("res://"):

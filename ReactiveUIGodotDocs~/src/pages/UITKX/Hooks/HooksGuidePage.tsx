@@ -176,7 +176,7 @@ export const HooksGuidePage: FC = () => (
       <Typography variant="h5" component="h2" gutterBottom>
         useContext &amp; provideContext
       </Typography>
-      <CodeBlock language="jsx" code={`Hooks.createContext(default_value = null, name = "") -> RUIContext   # recommended
+      <CodeBlock language="jsx" code={`Hooks.createContext(default_value = null, name = "") -> RuitkContext   # recommended
 useContext(handle_or_key)             # nearest provided value, or the handle's default
 Hooks.provideContext(handle_or_key, value) -> void`} />
       <Typography variant="body1" paragraph>
@@ -267,18 +267,18 @@ useStableAction(cb: Callable) -> Callable      # 1-arg`} />
         Hook configuration
       </Typography>
       <Typography variant="body1" paragraph>
-        <code>RUIConfig</code> exposes static flags that control runtime
+        <code>RuitkConfig</code> exposes static flags that control runtime
         validation (default: debug/editor only):
       </Typography>
       <List sx={styles.list}>
         <ListItem disablePadding>
           <ListItemText
-            primary={<><code>RUIConfig.enable_hook_validation</code> — validates that hooks are called in the same order every render, and pushes an error on the first divergence.</>}
+            primary={<><code>RuitkConfig.enable_hook_validation</code> — validates that hooks are called in the same order every render, and pushes an error on the first divergence.</>}
           />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText
-            primary={<><code>RUIConfig.enable_strict_diagnostics</code> — enables additional checks such as warning when state is set during render.</>}
+            primary={<><code>RuitkConfig.enable_strict_diagnostics</code> — enables additional checks such as warning when state is set during render.</>}
           />
         </ListItem>
       </List>

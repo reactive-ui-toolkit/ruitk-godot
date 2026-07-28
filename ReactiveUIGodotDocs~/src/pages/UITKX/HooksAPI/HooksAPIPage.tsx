@@ -97,7 +97,7 @@ const hooks: HookSig[] = [
   {
     name: 'Hooks.createContext',
     signature: '(default_value = null, name = "")',
-    returns: 'RUIContext',
+    returns: 'RuitkContext',
     category: 'Context',
     note: 'Handle for provide/useContext (React createContext)',
   },
@@ -148,7 +148,7 @@ const hooks: HookSig[] = [
   // Signals
   {
     name: 'useSignal',
-    signature: '(sig: RUISignal, selector = null, comparer = null)',
+    signature: '(sig: RuitkSignal, selector = null, comparer = null)',
     returns: 'value | slice',
     category: 'Signals',
     note: 'Subscribe + re-render; optional selector/comparer',
@@ -158,7 +158,7 @@ const hooks: HookSig[] = [
     signature: '(key: String, initial = null, selector = null, comparer = null)',
     returns: 'value | slice',
     category: 'Signals',
-    note: 'Process-wide keyed signal (RUISignals registry)',
+    note: 'Process-wide keyed signal (RuitkSignals registry)',
   },
   // Animation / Media
   {
@@ -324,13 +324,13 @@ var node_ref = useRef(null)   # after commit: node_ref["current"] is the Control
         Configuration
       </Typography>
       <Typography variant="body1" paragraph>
-        Runtime validation is controlled by static flags on <code>RUIConfig</code>{' '}
+        Runtime validation is controlled by static flags on <code>RuitkConfig</code>{' '}
         (both default to <code>OS.is_debug_build()</code>):
       </Typography>
       <CodeBlock
         language="jsx"
-        code={`static var RUIConfig.enable_hook_validation     # hook-order mismatch detection
-static var RUIConfig.enable_strict_diagnostics  # state-update-during-render warning`}
+        code={`static var RuitkConfig.enable_hook_validation     # hook-order mismatch detection
+static var RuitkConfig.enable_strict_diagnostics  # state-update-during-render warning`}
       />
     </Box>
   </Box>

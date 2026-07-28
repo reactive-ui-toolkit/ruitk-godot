@@ -1,4 +1,4 @@
-class_name RUISuspense
+class_name RuitkSuspense
 extends RefCounted
 ## Declarative Suspense boundary (Phase 7.4). Shows `fallback` until a readiness condition is met,
 ## then renders `children`. GDScript has NO throw-to-suspend (React's mechanism), so this is a
@@ -10,7 +10,7 @@ extends RefCounted
 ##   V.suspense({ "fallback": …, "is_ready": func(): return ResourceLoader.has_cached(path) }, [ … ])
 ##
 ## props:
-##   fallback     : RUIVNode shown while not ready (optional; renders nothing if omitted)
+##   fallback     : RuitkVNode shown while not ready (optional; renders nothing if omitted)
 ##   ready_signal : a Godot Signal — awaited once; readiness flips when it fires
 ##   is_ready     : Callable() -> bool — checked once immediately, then polled each frame if no signal
 

@@ -68,7 +68,7 @@ export const HmrPage: FC = () => (
           <ListItemText primary={<><strong>Editor:</strong> the watcher (<code>plugin.gd</code>) notices the save (2&nbsp;s poll + filesystem events), compiles <code>Foo.guitkx</code> → sibling <code>Foo.gd</code>, and pushes the paths of everything that compiled <em>and parses</em> to every active play session (<code>editor/hmr_debugger.gd</code>, message <code>rui_hmr:reload</code>). A game is never asked to load a script the engine would reject.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><strong>Game:</strong> <code>RUIHmr</code> (<code>core/hmr.gd</code>) reloads each script <em>in place</em> — <code>source_code</code> + <code>reload(keep_state = true)</code> on the same GDScript resource. Method-reference Callables like <code>DemoBox.render</code> keep their identity <em>and</em> dispatch the new code, so the reconciler&apos;s fiber matching still recognises every mounted component — that is why hook state survives.</>} />
+          <ListItemText primary={<><strong>Game:</strong> <code>RuitkHmr</code> (<code>core/hmr.gd</code>) reloads each script <em>in place</em> — <code>source_code</code> + <code>reload(keep_state = true)</code> on the same GDScript resource. Method-reference Callables like <code>DemoBox.render</code> keep their identity <em>and</em> dispatch the new code, so the reconciler&apos;s fiber matching still recognises every mounted component — that is why hook state survives.</>} />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary={<><strong>Re-render:</strong> a reload alone changes nothing on screen (the reconciler&apos;s bailout would keep serving its cached output), so the runtime marks exactly the fibers whose component script changed and flushes synchronously — one atomic swap-and-commit inside the debugger callback, no frame where old handlers meet new code.</>} />
@@ -81,7 +81,7 @@ export const HmrPage: FC = () => (
 
     <Section title="State Across a Reload">
       <Typography variant="body1" paragraph>
-        Reactive state lives in each component&apos;s <code>RUIComponentState</code> (a
+        Reactive state lives in each component&apos;s <code>RuitkComponentState</code> (a
         positional array of hook slots) held by the reconciler, <em>not</em> on the script. A
         refresh runs the new <code>render</code> body against the existing slots:
       </Typography>

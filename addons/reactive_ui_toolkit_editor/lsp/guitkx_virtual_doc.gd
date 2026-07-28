@@ -13,8 +13,8 @@ extends RefCounted
 ## Markup/glue is never copied, so the analyzer only ever parses real GDScript. Embedded code is
 ## spliced VERBATIM (length-preserving), so the offset SourceMap round-trips 1:1.
 ##
-## Reuses the compiler's own primitives (RUIGuitkxLexer skip_noncode/find_matching/keyword_at,
-## RUIGuitkxJsxScan.find_markup_ranges, RUIGuitkx._find_decl/_nearest_decl_keyword) — the same
+## Reuses the compiler's own primitives (RuitkGuitkxLexer skip_noncode/find_matching/keyword_at,
+## RuitkGuitkxJsxScan.find_markup_ranges, RuitkGuitkx._find_decl/_nearest_decl_keyword) — the same
 ## authorities virtualDoc.ts declares itself a mirror of.
 
 const L := preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_lexer.gd")
@@ -34,7 +34,7 @@ const HOOK_STUBS: Array[Dictionary] = [
 	{ "name": "useImperativeHandle", "params": "factory: Callable, deps: Array = []", "args": "factory, deps", "ret": " -> Variant" },
 	{ "name": "useEffect", "params": "effect: Callable, deps = null", "args": "effect, deps", "ret": " -> void" },
 	{ "name": "useLayoutEffect", "params": "effect: Callable, deps = null", "args": "effect, deps", "ret": " -> void" },
-	{ "name": "createContext", "params": "default_value = null, ctx_name: String = \"\"", "args": "default_value, ctx_name", "ret": " -> RUIContext" },
+	{ "name": "createContext", "params": "default_value = null, ctx_name: String = \"\"", "args": "default_value, ctx_name", "ret": " -> RuitkContext" },
 	{ "name": "useContext", "params": "key", "args": "key", "ret": "" },
 	{ "name": "provideContext", "params": "key, value", "args": "key, value", "ret": " -> void" },
 	{ "name": "useDeferredValue", "params": "value, deps = null", "args": "value, deps", "ret": "" },
@@ -43,7 +43,7 @@ const HOOK_STUBS: Array[Dictionary] = [
 	{ "name": "useStableFunc", "params": "cb: Callable", "args": "cb", "ret": " -> Callable" },
 	{ "name": "useStableAction", "params": "cb: Callable", "args": "cb", "ret": " -> Callable" },
 	{ "name": "useSafeArea", "params": "", "args": "", "ret": " -> Dictionary" },
-	{ "name": "useSignal", "params": "sig: RUISignal, selector = null, comparer = null", "args": "sig, selector, comparer", "ret": "" },
+	{ "name": "useSignal", "params": "sig: RuitkSignal, selector = null, comparer = null", "args": "sig, selector, comparer", "ret": "" },
 	{ "name": "useSignalKey", "params": "key: String, initial = null, selector = null, comparer = null", "args": "key, initial, selector, comparer", "ret": "" },
 	{ "name": "useTween", "params": "ref: Dictionary, property: String, to, duration: float, deps: Array = []", "args": "ref, property, to, duration, deps", "ret": " -> void" },
 	{ "name": "useTweenValue", "params": "from, to, duration: float, on_update: Callable, deps: Array = []", "args": "from, to, duration, on_update, deps", "ret": " -> void" },
@@ -179,7 +179,7 @@ func _emit_decl_func(kind: String, at: int, suffix: String, d: Dictionary = {}) 
 	if suffix != "":
 		var declared := str(d.get("name", "")) if plain else _read_decl_name(at)
 		comp_name = declared if declared != "" else "render%s" % suffix
-	_gen += "static func %s(props: Dictionary, children: Array) -> RUIVNode:\n" % comp_name
+	_gen += "static func %s(props: Dictionary, children: Array) -> RuitkVNode:\n" % comp_name
 	if body.is_empty():
 		_gen += "\tpass\n"
 		return

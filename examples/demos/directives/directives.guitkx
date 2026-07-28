@@ -1,5 +1,5 @@
 @uss "res://examples/demos/directives/directives_theme.tres"
-export DemoDirectives(items: Array = ["alpha", "beta"], mode: int = 1) -> RUIVNode {
+export DemoDirectives(items: Array = ["alpha", "beta"], mode: int = 1) -> RuitkVNode {
   # setup is plain GDScript -- its comments use `#` as usual
   var count = useState(items.size())
   var style_base = { "modulate": Color(1, 1, 1) }

@@ -15,7 +15,7 @@ export const KnownIssuesPage: FC = () => (
     </Typography>
     <List>
       <ListItem disablePadding>
-        <ListItemText primary="Hooks must be called unconditionally at the top of a component. Calling a hook inside @if, @for, @match, or an event handler breaks the call-order-to-slot mapping and causes state to desync. In debug builds RUIConfig.enable_hook_validation detects this and pushes a warning." />
+        <ListItemText primary="Hooks must be called unconditionally at the top of a component. Calling a hook inside @if, @for, @match, or an event handler breaks the call-order-to-slot mapping and causes state to desync. In debug builds RuitkConfig.enable_hook_validation detects this and pushes a warning." />
       </ListItem>
       <ListItem disablePadding>
         <ListItemText primary="Hooks are not thread-safe. Call them only on the main thread during the render cycle. Signal values may be read and written from any thread, but useSignal() itself is a hook and follows the hook rules." />
@@ -46,7 +46,7 @@ export const KnownIssuesPage: FC = () => (
         <ListItemText primary={<>Per-state StyleBox slots vary by control. Button exposes <code>hover</code>/<code>pressed</code>/<code>disabled</code>/<code>focus</code>; LineEdit exposes <code>focus</code>/<code>read_only</code>. Requesting a slot a control lacks warns once and is ignored.</>} />
       </ListItem>
       <ListItem disablePadding>
-        <ListItemText primary={<><code>RUIStyleSheet</code> (the <code>classes</code> prop) is an ordered dictionary merge, not a CSS engine — there is no selector matching, specificity, cascade, or inheritance. For real theming use a Godot <code>Theme</code>/<code>StyleBox</code> or <code>theme_type_variation</code>.</>} />
+        <ListItemText primary={<><code>RuitkStyleSheet</code> (the <code>classes</code> prop) is an ordered dictionary merge, not a CSS engine — there is no selector matching, specificity, cascade, or inheritance. For real theming use a Godot <code>Theme</code>/<code>StyleBox</code> or <code>theme_type_variation</code>.</>} />
       </ListItem>
     </List>
 
@@ -103,7 +103,7 @@ Parse Error: Failed to load resource "res://ui/missing.png"`}
     </Typography>
 
     <Alert severity="info" sx={{ mt: 2 }}>
-      For deeper diagnostics, enable <code>RUIConfig.enable_strict_diagnostics</code> (on by
+      For deeper diagnostics, enable <code>RuitkConfig.enable_strict_diagnostics</code> (on by
       default in debug builds) to catch state updates performed during render.
     </Alert>
   </Box>

@@ -9,8 +9,8 @@ editor (per-file dirty tracking, external-change detection, rename/delete follow
 undo-surviving format).
 
 This is the sibling of the **Reactive UI Toolkit — Godot** runtime addon (`addons/reactive_ui_toolkit`) and **depends on it** —
-it reuses that addon's `.guitkx` compiler (`RUIGuitkx`), formatter (`RUIGuitkxFormatter`) and lexer
-primitives (`RUIGuitkxLexer`). Install/enable **Reactive UI Toolkit — Godot first** (0.8.4 or newer — the plugin
+it reuses that addon's `.guitkx` compiler (`RuitkGuitkx`), formatter (`RuitkGuitkxFormatter`) and lexer
+primitives (`RuitkGuitkxLexer`). Install/enable **Reactive UI Toolkit — Godot first** (0.8.4 or newer — the plugin
 checks and tells you politely instead of erroring if it's missing or too old).
 
 ## Install
@@ -38,7 +38,7 @@ Requires **Godot 4.4+**.
   multi-declaration files index every declaration; and the import diagnostics
   (`GUITKX2300`–`GUITKX2309` — unresolved specifier, not exported, value-import cycle, …) surface
   exactly like the build's.
-- **Live diagnostics**: on each (debounced) edit the file is compiled with `RUIGuitkx.compile` — with
+- **Live diagnostics**: on each (debounced) edit the file is compiled with `RuitkGuitkx.compile` — with
   the full project's component universe, so an unknown `<Component />` errors (with a did-you-mean)
   exactly like the build. Errors/warnings show as **gutter icons + line tints** and in a bottom
   **Problems** panel whose scope switch flips between the **current file and the whole project**
@@ -75,7 +75,7 @@ Requires **Godot 4.4+**.
   raise a dialog, not just a console line.
 - **Save** writes only the `.guitkx`; the Reactive UI Toolkit — Godot addon's own watcher regenerates the sibling `.gd`
   (and, if a game is running under F5, hot-reloads it in place — see Fast Refresh in the root README).
-- **Format** (button or format-on-save) runs `RUIGuitkxFormatter` — never corrupts (verbatim on parse
+- **Format** (button or format-on-save) runs `RuitkGuitkxFormatter` — never corrupts (verbatim on parse
   error), applies as **one undoable edit** (Ctrl+Z survives), and honours the nearest
   **`guitkx.config.json`** (printWidth, indentStyle, indentSize, singleAttributePerLine,
   insertSpaceBeforeSelfClose) so a project formats identically here and in VS Code.

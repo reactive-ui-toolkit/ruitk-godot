@@ -6,7 +6,7 @@ const __RUI_HOOK_SIG := "useState"
 
 const __RUI_KIND := "component"
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var sel = Hooks.useState(0)
 	var demos := DemoGalleryTable.entries()
 	var buttons: Array = []

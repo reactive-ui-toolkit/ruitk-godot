@@ -1,12 +1,12 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 import { DemoContextHandleSwatch } from "./context_handle_swatch"
 
-export DemoContextHandle() -> RUIVNode {
+export DemoContextHandle() -> RuitkVNode {
   const AccentContext = preload("res://examples/demos/context_handle/accent_context.gd")
   var accent = useState(Color(0.4, 0.7, 1.0))
   Hooks.provideContext(AccentContext.HANDLE, accent[0])
   return (
-    <DemoBox title="Context handle — createContext / RUIContext">
+    <DemoBox title="Context handle — createContext / RuitkContext">
       <Label
         text="A createContext() handle (object identity, no string keys) provided to the subtree:"
         style={ {"font_color": Color(0.7, 0.7, 0.7)} } />

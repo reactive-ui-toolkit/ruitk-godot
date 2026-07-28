@@ -607,7 +607,7 @@ connection.onCompletion(async (params): Promise<CompletionItem[]> => {
         })),
       ];
     case "embedded": {
-      // style={ {…} } dict -> RUIStyle keys (the GDScript analyzer has no vocabulary for these).
+      // style={ {…} } dict -> RuitkStyle keys (the GDScript analyzer has no vocabulary for these).
       if (inStyleDict(src, offset))
         return STYLE_KEYS.map((a) => ({ label: a.name, kind: CompletionItemKind.Property, detail: a.type, documentation: a.detail }));
       // `<Type>.<frag>` built-in constants (Color.WHITE, …) as a static fallback, merged with Godot's.
@@ -687,7 +687,7 @@ function openBraceStack(src: string, offset: number): number[] {
 }
 
 // True when the cursor sits inside a `style={ {…} }` (or `*_style`) DICT — where the keys are
-// RUIStyle's, not Godot's. Requires an inner dict (not the bare `style={ref}` value, preceded by `=`).
+// RuitkStyle's, not Godot's. Requires an inner dict (not the bare `style={ref}` value, preceded by `=`).
 function inStyleDict(src: string, offset: number): boolean {
   const stack = openBraceStack(src, offset);
   if (stack.length === 0) return false;
@@ -747,7 +747,7 @@ const HOOK_HOVER: Record<string, string> = {
   useImperativeHandle: "**useImperativeHandle**(factory: Callable, deps = [])",
   useEffect: "**useEffect**(effect: Callable, deps = null)\n\nRun a side effect after commit; return a Callable to clean up. `deps = []` runs once on mount.",
   useLayoutEffect: "**useLayoutEffect**(effect: Callable, deps = null)\n\nLike `useEffect` but runs synchronously after layout.",
-  createContext: "**createContext**(default = null, name = \"\") → `RUIContext`\n\nA context handle for `provideContext` / `useContext` (object identity — no string-key collisions).",
+  createContext: "**createContext**(default = null, name = \"\") → `RuitkContext`\n\nA context handle for `provideContext` / `useContext` (object identity — no string-key collisions).",
   useContext: "**useContext**(key) → value\n\nRead the nearest provided value for a context handle (or string key).",
   provideContext: "**provideContext**(key, value)\n\nProvide a context value to the subtree below.",
   useDeferredValue: "**useDeferredValue**(value, deps = null)",
@@ -756,7 +756,7 @@ const HOOK_HOVER: Record<string, string> = {
   useStableFunc: "**useStableFunc**(cb: Callable) → `Callable`",
   useStableAction: "**useStableAction**(cb: Callable) → `Callable`",
   useSafeArea: "**useSafeArea**() → `Dictionary`",
-  useSignal: "**useSignal**(sig: RUISignal, selector = null, comparer = null)",
+  useSignal: "**useSignal**(sig: RuitkSignal, selector = null, comparer = null)",
   useSignalKey: "**useSignalKey**(key: String, initial = null, selector = null, comparer = null)",
   useTween: "**useTween**(ref, property: String, to, duration: float, deps = [])",
   useTweenValue: "**useTweenValue**(from, to, duration: float, on_update: Callable, deps = [])",

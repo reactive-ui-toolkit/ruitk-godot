@@ -6,11 +6,11 @@ const __RUI_HOOK_SIG := "useState|useState"
 
 const __RUI_KIND := "component"
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
-	var sliced = Hooks.useState(RUIConfig.time_slicing)
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
+	var sliced = Hooks.useState(RuitkConfig.time_slicing)
 	var rev = Hooks.useState(0)
 	var toggle = func():
-		RUIConfig.time_slicing = not sliced[0]
+		RuitkConfig.time_slicing = not sliced[0]
 		sliced[1].call(not sliced[0])
 	var __cf0: Array = []
 	for i in 25:

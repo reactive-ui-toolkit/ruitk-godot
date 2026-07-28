@@ -18,7 +18,7 @@ import {
 import { CodeBlock } from '../../../components/CodeBlock/CodeBlock'
 import Styles from '../../Components/ComponentPage.style'
 
-const COMPONENT_SAMPLE = `ButtonShowcase() -> RUIVNode {
+const COMPONENT_SAMPLE = `ButtonShowcase() -> RuitkVNode {
   var s = useState(true)
   return (
     <VBoxContainer style={ {"separation": 8} }>
@@ -38,7 +38,7 @@ const COMPONENT_SAMPLE = `ButtonShowcase() -> RUIVNode {
 
 // V.*-only primitives (no markup tag) are reached via an embedded { expr } inside an
 // otherwise-normal .guitkx component — never as a fictitious <Tag>.
-const FRAMEWORK_EXAMPLE = `App() -> RUIVNode {
+const FRAMEWORK_EXAMPLE = `App() -> RuitkVNode {
   var ready = useState(false)
   return (
     <VBoxContainer>
@@ -189,8 +189,8 @@ type PropRow = { name: string; type: string; desc: string }
 const baseProps: PropRow[] = [
   { name: 'key', type: 'Variant', desc: 'Stable identity for keyed reconciliation' },
   { name: 'ref', type: 'Callable | Dictionary', desc: 'Receives the live Godot node (Callable(node) or a { "current": … } box)' },
-  { name: 'style', type: 'Dictionary', desc: 'Inline style dictionary (RUIStyle shorthands + theme channels)' },
-  { name: 'classes', type: 'String | Array', desc: 'Named style-set class names registered with RUIStyleSheet' },
+  { name: 'style', type: 'Dictionary', desc: 'Inline style dictionary (RuitkStyle shorthands + theme channels)' },
+  { name: 'classes', type: 'String | Array', desc: 'Named style-set class names registered with RuitkStyleSheet' },
   { name: '<any node property>', type: 'Variant', desc: 'Any property of the underlying Control (text, disabled, editable, …) is set directly' },
   { name: 'on<Signal>', type: 'Callable', desc: 'Event handler — on + PascalCase(signal name) (onPressed, onValueChanged, …) or native on_<signal>' },
 ]

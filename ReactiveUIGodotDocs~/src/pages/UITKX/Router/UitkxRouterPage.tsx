@@ -35,7 +35,7 @@ export const UitkxRouterPage: FC = () => (
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>V.router({'{...}'})</code> establishes routing context and history for the subtree. The optional <code>basename</code> prop prefixes every URL. Provide a custom <code>history</code> (an <code>RUIHistory</code>) or an <code>initial</code> path.</>} />
+          <ListItemText primary={<><code>V.router({'{...}'})</code> establishes routing context and history for the subtree. The optional <code>basename</code> prop prefixes every URL. Provide a custom <code>history</code> (an <code>RuitkHistory</code>) or an <code>initial</code> path.</>} />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary={<><code>V.routes({'{}'}, [...])</code> ranks its <code>V.route(...)</code> children and renders the single best match (RR-v6 behaviour, first-match-wins by score).</>} />
@@ -53,7 +53,7 @@ export const UitkxRouterPage: FC = () => (
           <ListItemText primary={<><code>{'V.navigate({ "to": ... })'}</code> performs a declarative redirect from an effect after commit (defaults to <code>replace = true</code>).</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<>The <code>RUIRouter.use_*</code> hooks expose imperative navigation, location data, search params, blockers, and breadcrumbs from any descendant component.</>} />
+          <ListItemText primary={<>The <code>RuitkRouter.use_*</code> hooks expose imperative navigation, location data, search params, blockers, and breadcrumbs from any descendant component.</>} />
         </ListItem>
       </List>
     </Box>
@@ -105,7 +105,7 @@ export const UitkxRouterPage: FC = () => (
       <CodeBlock language="gdscript" code={UITKX_ROUTER_LAYOUT_EXAMPLE} />
       <Typography variant="body1" paragraph>
         Pass a value with <code>{'V.outlet({ "context": value })'}</code> and read it in
-        descendants with <code>RUIRouter.useOutletContext()</code>, the same way RR&apos;s{' '}
+        descendants with <code>RuitkRouter.useOutletContext()</code>, the same way RR&apos;s{' '}
         <code>useOutletContext</code> works.
       </Typography>
     </Box>
@@ -116,7 +116,7 @@ export const UitkxRouterPage: FC = () => (
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>{'"index": true'}</code> — the route matches the parent path exactly (no extra segment). Setting both <code>index</code> and <code>path</code> on the same route logs an actionable error via <code>RUIDiagnostics</code> / <code>push_error</code> and drops the path (the port cannot throw; it degrades).</>} />
+          <ListItemText primary={<><code>{'"index": true'}</code> — the route matches the parent path exactly (no extra segment). Setting both <code>index</code> and <code>path</code> on the same route logs an actionable error via <code>RuitkDiagnostics</code> / <code>push_error</code> and drops the path (the port cannot throw; it degrades).</>} />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary={<><code>{'"case_sensitive": true'}</code> — opt in to case-sensitive segment matching for that route. The default is case-insensitive.</>} />
@@ -129,9 +129,9 @@ export const UitkxRouterPage: FC = () => (
         Reading route params
       </Typography>
       <Typography variant="body1" paragraph>
-        Inside a routed component, <code>RUIRouter.useParams()</code> returns the captured{' '}
+        Inside a routed component, <code>RuitkRouter.useParams()</code> returns the captured{' '}
         <code>:params</code> (a defensive copy of the merged parent chain), and{' '}
-        <code>RUIRouter.useMatches()</code> returns the ordered chain of route matches from root
+        <code>RuitkRouter.useMatches()</code> returns the ordered chain of route matches from root
         to current — handy for breadcrumbs and analytics.
       </Typography>
       <CodeBlock language="gdscript" code={UITKX_ROUTER_DETAILS_EXAMPLE} />
@@ -184,19 +184,19 @@ export const UitkxRouterPage: FC = () => (
         Navigation and history
       </Typography>
       <Typography variant="body1" paragraph>
-        By default <code>V.router(...)</code> uses an in-memory <code>RUIHistory</code>. You can
+        By default <code>V.router(...)</code> uses an in-memory <code>RuitkHistory</code>. You can
         provide a custom instance via the <code>history</code> prop to control how locations are
         stored or synchronised. Inside components, use{' '}
-        <code>RUIRouter.useNavigate()</code> to push or replace locations, and{' '}
-        <code>RUIRouter.useGo()</code> / <code>RUIRouter.useCanGo(delta)</code> to implement
-        back/forward UI. Use <code>RUIRouter.useBlocker(blocker, enabled)</code> (or the
-        convenience wrapper <code>RUIRouter.usePrompt(when, message)</code>) to prevent
+        <code>RuitkRouter.useNavigate()</code> to push or replace locations, and{' '}
+        <code>RuitkRouter.useGo()</code> / <code>RuitkRouter.useCanGo(delta)</code> to implement
+        back/forward UI. Use <code>RuitkRouter.useBlocker(blocker, enabled)</code> (or the
+        convenience wrapper <code>RuitkRouter.usePrompt(when, message)</code>) to prevent
         navigation while a confirmation is pending.
       </Typography>
       <Typography variant="body1" paragraph>
         Nesting two <code>V.router(...)</code> calls in the same tree is not allowed — mirrors
         RR&apos;s <code>invariant(!useInRouterContext())</code>. Because GDScript cannot throw a
-        catchable exception, the port logs an actionable error (via <code>RUIDiagnostics</code> /{' '}
+        catchable exception, the port logs an actionable error (via <code>RuitkDiagnostics</code> /{' '}
         <code>push_error</code>) and degrades: the inner router shadows the outer for its subtree.
         Mount a single root <code>V.router(...)</code> and nest <code>V.route(...)</code> calls
         underneath it.
@@ -212,34 +212,34 @@ export const UitkxRouterPage: FC = () => (
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIRouter.useLocation()</code> — the current path String (re-renders on navigation). <code>useLocationInfo()</code> returns the full <code>RUIRouterLocation</code> (path, query, state).</>} />
+          <ListItemText primary={<><code>RuitkRouter.useLocation()</code> — the current path String (re-renders on navigation). <code>useLocationInfo()</code> returns the full <code>RuitkRouterLocation</code> (path, query, state).</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIRouter.useParams()</code> — the captured path parameters for the matched route.</>} />
+          <ListItemText primary={<><code>RuitkRouter.useParams()</code> — the captured path parameters for the matched route.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIRouter.useQuery()</code> — a defensive copy of the decoded query dictionary.</>} />
+          <ListItemText primary={<><code>RuitkRouter.useQuery()</code> — a defensive copy of the decoded query dictionary.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIRouter.useSearchParams()</code> — a <code>[query, setter]</code> pair. The setter <code>(next, replace := false)</code> preserves the path and replaces only the query string (RR&apos;s <code>useSearchParams</code> equivalent).</>} />
+          <ListItemText primary={<><code>RuitkRouter.useSearchParams()</code> — a <code>[query, setter]</code> pair. The setter <code>(next, replace := false)</code> preserves the path and replaces only the query string (RR&apos;s <code>useSearchParams</code> equivalent).</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIRouter.useNavigationState()</code> — the opaque state object passed during navigation.</>} />
+          <ListItemText primary={<><code>RuitkRouter.useNavigationState()</code> — the opaque state object passed during navigation.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIRouter.useRouteMatch()</code> — the nearest <code>RUIRouteMatch</code> (matched path, pattern, params).</>} />
+          <ListItemText primary={<><code>RuitkRouter.useRouteMatch()</code> — the nearest <code>RuitkRouteMatch</code> (matched path, pattern, params).</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIRouter.useMatches()</code> — the ordered chain of matches root → current, for breadcrumbs and analytics.</>} />
+          <ListItemText primary={<><code>RuitkRouter.useMatches()</code> — the ordered chain of matches root → current, for breadcrumbs and analytics.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIRouter.useNavigationBase()</code> / <code>useResolvedPath(to)</code> — the base for relative navigation, and the absolute path <code>useNavigate</code> would dispatch for <code>to</code>.</>} />
+          <ListItemText primary={<><code>RuitkRouter.useNavigationBase()</code> / <code>useResolvedPath(to)</code> — the base for relative navigation, and the absolute path <code>useNavigate</code> would dispatch for <code>to</code>.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIRouter.useOutletContext()</code> — the value handed down by the closest <code>{'V.outlet({ "context": ... })'}</code>.</>} />
+          <ListItemText primary={<><code>RuitkRouter.useOutletContext()</code> — the value handed down by the closest <code>{'V.outlet({ "context": ... })'}</code>.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIRouter.useNavigate(replace := false)</code> — returns <code>func(path, state := null) -&gt; bool</code>. It reads only the stable nav context, so navigate-only widgets do <em>not</em> re-render on every location change.</>} />
+          <ListItemText primary={<><code>RuitkRouter.useNavigate(replace := false)</code> — returns <code>func(path, state := null) -&gt; bool</code>. It reads only the stable nav context, so navigate-only widgets do <em>not</em> re-render on every location change.</>} />
         </ListItem>
       </List>
     </Box>

@@ -1,5 +1,5 @@
 @tool
-class_name RUIEditorSettings
+class_name RuitkEditorSettings
 extends RefCounted
 ## Project-Settings surface for the reactive_ui_toolkit_editor addon.
 ##

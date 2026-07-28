@@ -21,7 +21,7 @@ const styles = {
 type StyleRow = { name: string; mapsTo: string; notes: string }
 
 /* ------------------------------------------------------------------ */
-/*  Data tables — mirrored from RUIStyle (core/style.gd) + schema.ts   */
+/*  Data tables — mirrored from RuitkStyle (core/style.gd) + schema.ts   */
 /*  Godot has no USS/CSS. Styling = Control props + size flags         */
 /*  (layout) and Theme overrides / StyleBox (paint). The `style` dict  */
 /*  maps onto all of that.                                             */
@@ -139,7 +139,7 @@ export const CssHelpersReferencePage: FC = () => (
     <Typography variant="body1" paragraph>
       Godot has no USS/CSS, so there is no CssHelpers class. Instead, the{' '}
       <code>style</code> prop on any host element takes a plain{' '}
-      <strong>Dictionary</strong>, and <code>RUIStyle</code>{' '}
+      <strong>Dictionary</strong>, and <code>RuitkStyle</code>{' '}
       (<code>core/style.gd</code>) maps its keys onto Godot Control properties,
       size flags, Theme overrides, and StyleBox. This page is the vocabulary of
       that dictionary. From 0.9.0 every key is the <strong>literal Godot name</strong> of
@@ -170,7 +170,7 @@ export const CssHelpersReferencePage: FC = () => (
       Anything not listed here (anchors, offsets, etc.) is a plain Control
       property — set it as a normal prop on the element,
       not inside <code>style</code>. Reusable named style sets live in an{' '}
-      <code>RUIStyleSheet</code> and are attached via the <code>classes</code>{' '}
+      <code>RuitkStyleSheet</code> and are attached via the <code>classes</code>{' '}
       prop (inline <code>style</code> wins over classes).
     </Alert>
 

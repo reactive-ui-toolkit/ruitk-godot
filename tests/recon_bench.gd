@@ -51,7 +51,7 @@ func _bench(label: String, mode: int) -> void:
 				props["style"] = { "modulate": col }
 			nodes.append(V.ColorRect(props))
 		return V.Control({}, nodes)
-	var app := ReactiveRoot.create(c, V.fc(comp))
+	var app := RuitkRoot.create(c, V.fc(comp))
 	await process_frame
 	await process_frame
 	var warm := 10

@@ -1,6 +1,6 @@
 ## The titled content box every demo wraps itself in — the .guitkx markup analogue of the old
 ## DemoUtil.box(title, kids) helper. Children passed to <DemoBox> render below the heading.
-export DemoBox(title: String = "") -> RUIVNode {
+export DemoBox(title: String = "") -> RuitkVNode {
   return (
     <MarginContainer style={ {"margin_left": 20, "margin_top": 20, "margin_right": 20, "margin_bottom": 20} }>
       <VBoxContainer style={ {"separation": 12} }>

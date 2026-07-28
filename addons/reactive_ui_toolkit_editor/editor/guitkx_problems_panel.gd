@@ -86,7 +86,7 @@ func _render_rows(records: Array, project_scope: bool) -> void:
 static func project_records() -> Array:
 	var out: Array = []
 	for p in GuitkxWorkspace.all_paths():
-		var sc_path: String = RUIGuitkxCodegen.diags_path_for(str(p))
+		var sc_path: String = RuitkGuitkxCodegen.diags_path_for(str(p))
 		var raw := FileAccess.get_file_as_string(sc_path)
 		if raw.is_empty():
 			continue
@@ -99,10 +99,10 @@ static func project_records() -> Array:
 				continue
 			var ed := e as Dictionary
 			var off := int(ed.get("off", -1))
-			var lc: Dictionary = RUIGuitkxDiag.line_col(text, off) if off >= 0 else { "line": 0 }
+			var lc: Dictionary = RuitkGuitkxDiag.line_col(text, off) if off >= 0 else { "line": 0 }
 			out.append({
 				"path": str(p), "code": str(ed.get("code", "")),
-				"severity": RUIGuitkxDiag.severity_name(int(ed.get("severity", 0))),
+				"severity": RuitkGuitkxDiag.severity_name(int(ed.get("severity", 0))),
 				"message": str(ed.get("message", "")), "line": int(lc.get("line", 0)),
 			})
 	return out

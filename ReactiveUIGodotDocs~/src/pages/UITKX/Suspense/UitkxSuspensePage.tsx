@@ -32,7 +32,7 @@ export const UitkxSuspensePage: FC = () => (
       Props
     </Typography>
     <CodeBlock language="gdscript" code={`V.suspense({
-  "fallback":     <RUIVNode>,   # shown while not ready (optional; renders nothing if omitted)
+  "fallback":     <RuitkVNode>,   # shown while not ready (optional; renders nothing if omitted)
   "ready_signal": <Signal>,     # a Godot Signal — awaited ONCE; readiness flips when it fires
   "is_ready":     func() -> bool,  # checked immediately, then polled each frame if no signal
 }, [ ...the real content ])`} />

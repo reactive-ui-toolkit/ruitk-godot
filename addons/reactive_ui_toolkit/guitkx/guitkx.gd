@@ -1,4 +1,4 @@
-﻿class_name RUIGuitkx
+﻿class_name RuitkGuitkx
 extends RefCounted
 ## The .guitkx -> .gd compiler entry point (Phase 2, Milestone 2.1). Pure GDScript; run from a
 ## @tool EditorPlugin file-watcher that writes the sibling .gd (see PHASE_2_GUITKX_PLAN.md 0b â€”
@@ -7,11 +7,11 @@ extends RefCounted
 ## emit (@if/@elif/@else/@for/@while/@match, lowered inline inside {expr}/lambdas), hook
 ## auto-prefixing (bare use_* -> Hooks.use_*), and the GUITKX#### diagnostics catalog.
 ##
-## API:  RUIGuitkx.compile(source: String, basename: String) -> { ok, gd, diagnostics }
+## API:  RuitkGuitkx.compile(source: String, basename: String) -> { ok, gd, diagnostics }
 ##
-## DIAGNOSTICS (T0.2): every entry in `diagnostics` is a structured Dictionary from RUIGuitkxDiag —
+## DIAGNOSTICS (T0.2): every entry in `diagnostics` is a structured Dictionary from RuitkGuitkxDiag —
 ## { code, severity, message, offset, length } with `offset`/`length` in characters into the ORIGINAL
-## .guitkx source (offset -1 = whole file). Render with RUIGuitkxDiag.format(); never string-sniff.
+## .guitkx source (offset -1 = whole file). Render with RuitkGuitkxDiag.format(); never string-sniff.
 ## Internally, markup-node offsets are relative to the string their parser saw; `base` values thread
 ## the absolute position of that string's index 0 so nested re-parses compose (see _cbase).
 
@@ -477,9 +477,9 @@ static func _find_decl(source: String, from: int) -> Dictionary:
 ##     (index just past the `=`/`:=` -- the initializer's first char), type_text (typed only) }.
 ##   - CALLABLE: { kind: "component"|"hook"|"util", name, name_at, params, params_at, ret, ret_at,
 ##     body_open (index of the required `{`), cross_guard (E-02: true when a `use_`-prefixed name
-##     also annotates `-> RUIVNode` -- the caller emits GUITKX2321 for this) }.
+##     also annotates `-> RuitkVNode` -- the caller emits GUITKX2321 for this) }.
 ## Classification order (E-01): value forms are checked FIRST (an `=`/`:`/`:=` right after the name
-## can never start a callable); then `-> RUIVNode` -> component; then a `use_` prefix -> hook;
+## can never start a callable); then `-> RuitkVNode` -> component; then a `use_` prefix -> hook;
 ## else -> util.
 static func _scan_plain_decl(source: String, e: int) -> Dictionary:
 	var n := source.length()
@@ -526,7 +526,7 @@ static func _scan_plain_decl(source: String, e: int) -> Dictionary:
 		return {}
 	var kind := "util"
 	var cross_guard := false
-	if ret == "RUIVNode":
+	if ret == "RuitkVNode":
 		kind = "component"
 		if name.begins_with("use_"):
 			cross_guard = true
@@ -754,7 +754,7 @@ static func import_end(source: String, i: int) -> int:
 
 ## The CANONICAL import specifier from `from_guitkx` to `target_guitkx` (extensionless). The single
 ## source of truth for BOTH the strict-2305 hint (here) and the codemod (`guitkx_migrate._specifier`
-## delegates to this), and every specifier it emits round-trips through `RUIGuitkxResolve.resolve_specifier`:
+## delegates to this), and every specifier it emits round-trips through `RuitkGuitkxResolve.resolve_specifier`:
 ##   - same directory      -> `./name`
 ##   - under the `~/` root  -> `~/<root-relative>` (PATH-boundary matched: `res://ui2/x` is NOT under
 ##                            root `res://ui`, a `begins_with(root)` string-prefix bug — BH-13)
@@ -1942,7 +1942,7 @@ static func _compile_module(source: String, mi: int, class_name_override: String
 ## first EXPORTED component, else the first component, else "" (no component). This is the SINGLE
 ## source of truth shared by the emitter (`_compile_mixed` here; `_compile_component` always emits
 ## `render` for a single-component file, which is that file's sole = render component) AND the export
-## tables (`RUIGuitkxCodegen.exports_of` / `RUIGuitkxResolve.decl_table`), so cross-file func
+## tables (`RuitkGuitkxCodegen.exports_of` / `RuitkGuitkxResolve.decl_table`), so cross-file func
 ## addressing can never disagree with the emitted code — even when `@class_name` overrides the binding
 ## to a name that is not any component's decl name (the BH-02 case).
 static func render_component(decls: Array, binding: String) -> String:
@@ -2049,9 +2049,9 @@ static func _compile_mixed(source: String, decls: Array, class_name_override: St
 				else:
 					pc = _parse_plain_component_body(source, str(dm["name"]), int(dm["name_at"]), str(dm.get("params", "")), int(dm.get("params_at", -1)), int(dm["body_open"]), diags)
 					if pc.get("ok", false):
-						# E-02 cross-guard: a `use_`-prefixed name that also annotates `-> RUIVNode`.
+						# E-02 cross-guard: a `use_`-prefixed name that also annotates `-> RuitkVNode`.
 						if bool(dm.get("cross_guard", false)):
-							diags.append(D.make("GUITKX2321", D.ERROR, "`%s` is `use_`-prefixed but returns a markup node -- did you mean a component? (components are PascalCase and return RUIVNode)" % str(dm["name"]), int(dm["name_at"]), str(dm["name"]).length()))
+							diags.append(D.make("GUITKX2321", D.ERROR, "`%s` is `use_`-prefixed but returns a markup node -- did you mean a component? (components are PascalCase and return RuitkVNode)" % str(dm["name"]), int(dm["name_at"]), str(dm["name"]).length()))
 						# E-01/T2.6 (Unity UITKX2100): a plain component still must be PascalCase --
 						# the SAME rule the wrapper form already enforces, just reached a different way.
 						elif not (str(dm["name"]).unicode_at(0) >= 65 and str(dm["name"]).unicode_at(0) <= 90):
@@ -2432,7 +2432,7 @@ static func _split_return(body: String) -> Dictionary:
 		if has_top_null:
 			return { "null_only": true, "unit": unit, "anchor": anchor }
 		# Conditional markup returns alone don't make a component: without a FINAL top-level markup
-		# return, some render() paths would return nothing (invalid for `-> RUIVNode`), so 2101 stands.
+		# return, some render() paths would return nothing (invalid for `-> RuitkVNode`), so 2101 stands.
 		return { "error": D.make("GUITKX2101", D.ERROR, "component has no `return ( ... )` (only `return null`?)") }
 	var parts: Array = []
 	var cursor := 0
@@ -2834,7 +2834,7 @@ static func _emit(cls: String, comp_name: String, params: String, setup: String,
 			sig_src = str(early.get("body", ""))   # Phase C interleaved path: setup lives in body
 			break
 	out += "const __RUI_HOOK_SIG := %s\n\n" % _gd_str(_hook_signature(sig_src))
-	# G-16: a script-constant marker for RUIHmr._is_module, read via get_script_constant_map() like
+	# G-16: a script-constant marker for RuitkHmr._is_module, read via get_script_constant_map() like
 	# __RUI_HOOK_SIG -- bulletproof against a component whose setup happens to contain the literal
 	# text "static func render(" in a string/comment, which used to make the old source-text
 	# heuristic misclassify it as a module and skip the global HMR re-render every OTHER component
@@ -2883,14 +2883,14 @@ static func _hook_signature(src: String) -> String:
 		i += 1
 	return "|".join(names)
 
-# Emit one `static func <name>(props, children) -> RUIVNode:` from params + setup + a markup root.
+# Emit one `static func <name>(props, children) -> RuitkVNode:` from params + setup + a markup root.
 # `module_comps` maps intra-module component names -> true so <Foo/> emits V.fc(Foo, ...) (bare
 # sibling static func) rather than the single-file V.fc(Foo.render, ...).
 # `early` (Phase C) = { body, parts, unit, anchor } from _split_return; when `parts` holds `ret`
 # entries, setup is emitted INTERLEAVED (verbatim GDScript segments + early markup returns lowered
 # in place); otherwise the legacy whole-string path runs, byte-identical to pre-Phase-C output.
 static func _emit_func(func_name: String, params: String, setup: String, root: Dictionary, module_comps: Dictionary, skip_hooks: Array = [], diags: Array = [], base: int = -1, known: Dictionary = {}, early: Dictionary = {}, refs: Dictionary = {}) -> String:
-	var out := "static func %s(props: Dictionary, children: Array) -> RUIVNode:\n" % func_name
+	var out := "static func %s(props: Dictionary, children: Array) -> RuitkVNode:\n" % func_name
 	for p in _parse_params(params):
 		if p["default"] != "":
 			out += "\tvar %s = props.get(\"%s\", %s)\n" % [p["name"], p["name"], p["default"]]

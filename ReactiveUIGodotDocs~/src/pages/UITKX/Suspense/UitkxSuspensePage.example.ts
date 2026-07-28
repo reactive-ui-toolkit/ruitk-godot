@@ -1,4 +1,4 @@
-export const SUSPENSE_CALLBACK = `DataView() -> RUIVNode {
+export const SUSPENSE_CALLBACK = `DataView() -> RuitkVNode {
   var data = useState(null)
 
   // Kick off the async load once. is_ready() below reports readiness.
@@ -27,7 +27,7 @@ export const SUSPENSE_CALLBACK = `DataView() -> RUIVNode {
   )
 }`
 
-export const SUSPENSE_SIGNAL = `AsyncView() -> RUIVNode {
+export const SUSPENSE_SIGNAL = `AsyncView() -> RuitkVNode {
   var loader = useRef(null)
 
   // Build the loader once and expose a Godot Signal to await.

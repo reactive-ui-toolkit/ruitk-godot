@@ -1,4 +1,4 @@
-export const EVENTS_CLICK_EXAMPLE = `ClickDemo() -> RUIVNode {
+export const EVENTS_CLICK_EXAMPLE = `ClickDemo() -> RuitkVNode {
   var msg = useState("Click the button")
 
   return (
@@ -10,7 +10,7 @@ export const EVENTS_CLICK_EXAMPLE = `ClickDemo() -> RUIVNode {
   )
 }`
 
-export const EVENTS_POINTER_EXAMPLE = `PointerTracker() -> RUIVNode {
+export const EVENTS_POINTER_EXAMPLE = `PointerTracker() -> RuitkVNode {
   var inside = useState(false)
 
   return (
@@ -24,7 +24,7 @@ export const EVENTS_POINTER_EXAMPLE = `PointerTracker() -> RUIVNode {
   )
 }`
 
-export const EVENTS_KEYBOARD_EXAMPLE = `KeyboardDemo() -> RUIVNode {
+export const EVENTS_KEYBOARD_EXAMPLE = `KeyboardDemo() -> RuitkVNode {
   var last = useState("None")
 
   // Godot has no per-Control key signals; use the native gui_input escape
@@ -41,7 +41,7 @@ export const EVENTS_KEYBOARD_EXAMPLE = `KeyboardDemo() -> RUIVNode {
   )
 }`
 
-export const EVENTS_FOCUS_EXAMPLE = `FocusDemo() -> RUIVNode {
+export const EVENTS_FOCUS_EXAMPLE = `FocusDemo() -> RuitkVNode {
   var focused = useState(false)
 
   // onFocusEntered -> focus_entered, onFocusExited -> focus_exited.
@@ -53,7 +53,7 @@ export const EVENTS_FOCUS_EXAMPLE = `FocusDemo() -> RUIVNode {
   )
 }`
 
-export const EVENTS_GEOMETRY_EXAMPLE = `ResizeWatcher() -> RUIVNode {
+export const EVENTS_GEOMETRY_EXAMPLE = `ResizeWatcher() -> RuitkVNode {
   var size = useState(Vector2.ZERO)
   var box = useRef(null)
 
@@ -90,7 +90,7 @@ export const EVENTS_CHANGE_EXAMPLE = `// One rule, every control: on + PascalCas
 // LineEdit — "text_changed" passes the new String.
 <LineEdit text={ name } onTextChanged={ func(s): set_name.call(s) } />`
 
-export const EVENTS_SUBMIT_EXAMPLE = `SearchBox() -> RUIVNode {
+export const EVENTS_SUBMIT_EXAMPLE = `SearchBox() -> RuitkVNode {
   var query = useState("")
   var submitted = useState("")
 
@@ -105,7 +105,7 @@ export const EVENTS_SUBMIT_EXAMPLE = `SearchBox() -> RUIVNode {
   )
 }`
 
-export const EVENTS_NATIVE_EXAMPLE = `NativeEscapeHatch() -> RUIVNode {
+export const EVENTS_NATIVE_EXAMPLE = `NativeEscapeHatch() -> RuitkVNode {
   // The on_<signal> escape hatch binds VERBATIM to any Godot signal on the
   // node — the exact snake_case name, no case transform. It is equivalent to
   // the on + PascalCase spelling; use whichever reads better.

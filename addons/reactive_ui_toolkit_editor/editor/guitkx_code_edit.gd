@@ -152,7 +152,7 @@ func _on_theme_changed() -> void:
 ## caret line so it never covers what the user is typing, and never focusable — keystrokes stay
 ## in the editor. Honors the completion toggle (parameter hints are typing intelligence).
 func _signature_refresh() -> void:
-	if not RUIEditorSettings.is_enabled(RUIEditorSettings.KEY_COMPLETION):
+	if not RuitkEditorSettings.is_enabled(RuitkEditorSettings.KEY_COMPLETION):
 		_signature_hide()
 		return
 	var t := get_text()
@@ -405,7 +405,7 @@ func _on_gutter_clicked(line: int, gutter: int) -> void:
 # this override just maps its items onto CodeEdit options. Attribute-value / embedded contexts yield
 # nothing in Phase 1 (the analyzer layer owns those). [plans/GODOT_ANALYZER_INTEGRATION_PLAN.md §7]
 func _request_code_completion(_force: bool) -> void:
-	if not RUIEditorSettings.is_enabled(RUIEditorSettings.KEY_COMPLETION):
+	if not RuitkEditorSettings.is_enabled(RuitkEditorSettings.KEY_COMPLETION):
 		return
 	var text := get_text()
 	var off := GuitkxContext.offset_of(text, get_caret_line(), get_caret_column())
@@ -515,7 +515,7 @@ func set_line_diagnostics(by_line: Dictionary) -> void:
 # Markdown, rendered rich by _make_custom_tooltip at show time (no stale-tooltip double delay —
 # the previous native-tooltip path often needed a second hover pass to display anything).
 func _on_symbol_hovered(_symbol: String, line: int, column: int) -> void:
-	if not RUIEditorSettings.is_enabled(RUIEditorSettings.KEY_HOVER):
+	if not RuitkEditorSettings.is_enabled(RuitkEditorSettings.KEY_HOVER):
 		tooltip_text = ""
 		return
 	var text := get_text()

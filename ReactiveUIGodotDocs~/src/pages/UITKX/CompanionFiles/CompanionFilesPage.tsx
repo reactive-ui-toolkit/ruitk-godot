@@ -41,7 +41,7 @@ export const CompanionFilesPage: FC = () => (
     </Typography>
     <Typography variant="body1" paragraph>
       There are no wrapper keywords: what a declaration <em>is</em> is read from its signature
-      alone. <code>Name(params) {'-> RUIVNode { … }'}</code> is a component, a{' '}
+      alone. <code>Name(params) {'-> RuitkVNode { … }'}</code> is a component, a{' '}
       <code>use_</code>-prefixed callable is a hook, any other callable is a util, and{' '}
       <code>name := expr</code> is a value.
     </Typography>
@@ -124,7 +124,7 @@ export const CompanionFilesPage: FC = () => (
         <TableBody>
           <TableRow>
             <TableCell><code>MyComponent.guitkx</code></TableCell>
-            <TableCell>components (<code>{'-> RUIVNode'}</code>)</TableCell>
+            <TableCell>components (<code>{'-> RuitkVNode'}</code>)</TableCell>
             <TableCell>UI markup + setup code</TableCell>
           </TableRow>
           <TableRow>

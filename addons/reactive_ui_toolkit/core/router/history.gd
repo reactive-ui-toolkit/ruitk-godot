@@ -1,17 +1,17 @@
-class_name RUIHistory
+class_name RuitkHistory
 extends RefCounted
 ## In-memory navigation history (the engine-agnostic core of the router). Holds a stack of
-## RUIRouterLocation entries + an index, notifies listeners on change, and supports navigation
+## RuitkRouterLocation entries + an index, notifies listeners on change, and supports navigation
 ## blockers. Faithful port of ReactiveUIToolKit's MemoryHistory.
 ##
 ## Blocker convention (RR-correct, internally consistent): a blocker is
-## `func(from: RUIRouterLocation, to: RUIRouterLocation) -> bool` that returns TRUE to BLOCK
+## `func(from: RuitkRouterLocation, to: RuitkRouterLocation) -> bool` that returns TRUE to BLOCK
 ## (veto) the transition and FALSE to allow it. (The Unity reference's AllowTransition/UsePrompt
 ## pair is self-inconsistent; we standardize on "true = block" to match react-router's useBlocker.)
 
-var _entries: Array = []          # Array[RUIRouterLocation]
+var _entries: Array = []          # Array[RuitkRouterLocation]
 var _index := -1
-var _listeners: Array = []        # Array[Callable(loc)]  — yields RUIRouterLocation
+var _listeners: Array = []        # Array[Callable(loc)]  — yields RuitkRouterLocation
 var _blockers: Array = []         # Array[Callable(from, to) -> bool]
 
 func _init(initial := "/") -> void:
@@ -21,9 +21,9 @@ func _init(initial := "/") -> void:
 
 # --- current location ---
 
-func location_obj() -> RUIRouterLocation:
+func location_obj() -> RuitkRouterLocation:
 	if _index < 0 or _index >= _entries.size():
-		return RUIRouterLocation.parse("/")
+		return RuitkRouterLocation.parse("/")
 	return _entries[_index]
 
 ## Legacy/back-compat: the current location as a plain path String.
@@ -54,7 +54,7 @@ func go(delta: int) -> void:
 	if not can_go(delta):
 		return
 	var target := _index + delta
-	var next: RUIRouterLocation = _entries[target]
+	var next: RuitkRouterLocation = _entries[target]
 	var previous := location_obj()
 	if not _allow_transition(previous, next):
 		return
@@ -70,7 +70,7 @@ func forward() -> void:
 # --- mutating navigation ---
 
 func push(path: String, state = null) -> void:
-	var loc := RUIRouterLocation.parse(path, state)
+	var loc := RuitkRouterLocation.parse(path, state)
 	var previous := location_obj() if _index >= 0 else null
 	if previous != null and not _allow_transition(previous, loc):
 		return
@@ -81,7 +81,7 @@ func push(path: String, state = null) -> void:
 	_notify(loc)
 
 func replace(path: String, state = null) -> void:
-	var loc := RUIRouterLocation.parse(path, state)
+	var loc := RuitkRouterLocation.parse(path, state)
 	var previous := location_obj() if _index >= 0 else null
 	if previous != null and not _allow_transition(previous, loc):
 		return
@@ -94,7 +94,7 @@ func replace(path: String, state = null) -> void:
 
 # --- subscriptions ---
 
-## Listen for location changes. The callback receives a RUIRouterLocation, and is invoked once
+## Listen for location changes. The callback receives a RuitkRouterLocation, and is invoked once
 ## IMMEDIATELY with the current location (port of MemoryHistory.Listen). The immediate replay
 ## resynchronizes a late subscriber — e.g. when a child's redirect effect runs before the
 ## provider's own subscribe effect, the provider still catches the already-applied location.
@@ -108,7 +108,7 @@ func listen(cb: Callable) -> Callable:
 ## Legacy: subscribe with a String-path callback (kept for back-compat with pre-7.8 callers).
 func subscribe(cb: Callable) -> Callable:
 	var wrapped := func(loc):
-		cb.call(loc.path if loc is RUIRouterLocation else str(loc))
+		cb.call(loc.path if loc is RuitkRouterLocation else str(loc))
 	_listeners.append(wrapped)
 	return func(): _listeners.erase(wrapped)
 

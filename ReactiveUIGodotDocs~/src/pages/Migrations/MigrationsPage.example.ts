@@ -10,7 +10,7 @@ export component ScoreRow(label) {
 export hook use_countdown(start) -> int { … }
 
 # AFTER (0.11 — the codemod writes this for you)
-export ScoreRow(label) -> RUIVNode {       # component: the -> RUIVNode annotation
+export ScoreRow(label) -> RuitkVNode {       # component: the -> RuitkVNode annotation
   return ( <Label text={label}/> )
 }
 export use_countdown(start) -> int { … }   # hook: the use_ prefix

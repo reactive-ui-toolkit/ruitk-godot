@@ -119,7 +119,7 @@ function fail(m) {
   // this gate asserts a fully-clean file.
   const uriClean = "file:///tmp/CleanBody.guitkx";
   const textClean =
-    'CleanBody(items: Array) -> RUIVNode {\n\treturn (\n\t\t<VBoxContainer>\n\t\t\t@for (it in items) {\n\t\t\t\tvar label = "row " + str(it)\n\t\t\t\tif it < 3:\n\t\t\t\t\treturn null\n\t\t\t\treturn (\n\t\t\t\t\t<Label text={ label } key={ str(it) } />\n\t\t\t\t)\n\t\t\t}\n\t\t</VBoxContainer>\n\t)\n}\n';
+    'CleanBody(items: Array) -> RuitkVNode {\n\treturn (\n\t\t<VBoxContainer>\n\t\t\t@for (it in items) {\n\t\t\t\tvar label = "row " + str(it)\n\t\t\t\tif it < 3:\n\t\t\t\t\treturn null\n\t\t\t\treturn (\n\t\t\t\t\t<Label text={ label } key={ str(it) } />\n\t\t\t\t)\n\t\t\t}\n\t\t</VBoxContainer>\n\t)\n}\n';
   notify("textDocument/didOpen", { textDocument: { uri: uriClean, languageId: "guitkx", version: 1, text: textClean } });
   await new Promise((r) => setTimeout(r, 400));
   const dClean = diagnostics[uriClean] || [];

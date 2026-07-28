@@ -3,7 +3,7 @@ class_name GuitkxTokenizer
 extends RefCounted
 ## A small, line-oriented tokenizer for .guitkx, written for syntax highlighting.
 ##
-## Why this exists: RUIGuitkxLexer is NOT a token producer — it only exposes static scan primitives
+## Why this exists: RuitkGuitkxLexer is NOT a token producer — it only exposes static scan primitives
 ## (skip_noncode / find_matching / keyword_at). This class reuses those primitives to classify a
 ## single line into coloured spans. It is intentionally per-line and self-contained: Godot calls the
 ## highlighter's _get_line_syntax_highlighting(line) one line at a time with no guaranteed order, so
@@ -18,12 +18,12 @@ extends RefCounted
 ## plain operator (never a tag) and `name=` is an assignment (never an attribute) — so GDScript
 ## inside braces gets real keyword/string/number colouring without the markup rules mis-firing.
 ##
-## [G-10] Per-char reads use unicode_at + int codes (RUIGuitkxLexer.C_*) — this runs per keystroke
+## [G-10] Per-char reads use unicode_at + int codes (RuitkGuitkxLexer.C_*) — this runs per keystroke
 ## for every visible line, and GDScript `s[i]` allocates a 1-char String per access.
 
 const L = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_lexer.gd")
 
-# [G-10] LOCAL char-code consts (mirroring RUIGuitkxLexer.C_*): local class constants fold into
+# [G-10] LOCAL char-code consts (mirroring RuitkGuitkxLexer.C_*): local class constants fold into
 # the bytecode, while cross-script `L.C_X` access is a runtime member lookup per access — measured
 # 64% SLOWER than the old string compares in this per-char loop. Keep these local.
 const C_TAB := 9
@@ -89,7 +89,7 @@ func tokenize_line(text: String, gd_mode: bool = false) -> Array:
 		# 1. Strings and # comments, via the proven lexer primitive (handles r"" &"" ^"" $"" %"" prefixes,
 		#    triple quotes, and backslash escapes). skip_noncode returns the index just past the run.
 		if c == C_HASH or c == C_QUOTE or c == C_APOS:
-			var j: int = RUIGuitkxLexer.skip_noncode(text, i)
+			var j: int = RuitkGuitkxLexer.skip_noncode(text, i)
 			if j > i:
 				out.append({"start": i, "end": j, "kind": ("comment" if c == C_HASH else "string")})
 				i = j
@@ -97,7 +97,7 @@ func tokenize_line(text: String, gd_mode: bool = false) -> Array:
 		# 2. Embedded-GDScript expression { ... } — braces as symbols, the inside re-tokenized in
 		#    gd_mode and remapped to absolute columns (G11). Nested braces recurse naturally.
 		if c == C_LBRACE:
-			var close: int = RUIGuitkxLexer.find_matching(text, i)
+			var close: int = RuitkGuitkxLexer.find_matching(text, i)
 			var end := (close + 1) if close >= 0 else n
 			out.append({"start": i, "end": i + 1, "kind": "symbol"})
 			var inner_start := i + 1

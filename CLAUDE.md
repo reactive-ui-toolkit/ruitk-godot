@@ -32,7 +32,7 @@ non-zero on failure. Run them exactly like CI (`.github/workflows/test.yml`), **
 
 ```bash
 # 1. Build the class-name cache FIRST on a fresh clone: guitkx_build's two-pass parse gate
-#    reload()s every generated .gd, whose global class_name references (V, Hooks, RUIVNode, ...)
+#    reload()s every generated .gd, whose global class_name references (V, Hooks, RuitkVNode, ...)
 #    only resolve once .godot/global_script_class_cache.cfg exists (49/49 false parse fails without).
 godot --headless --path . --editor --quit || true
 # 2. Compile every examples/**/*.guitkx to its sibling .gd (the generated .gd is git-ignored)
@@ -80,7 +80,7 @@ The library exposes global `class_name`s — **no autoload or plugin-enable is r
 runtime**; the classes are available as soon as the files exist. Enabling the plugin only adds the
 `.guitkx` compile-on-save integration.
 
-- **`v.gd` (`V`) / `vnode.gd` (`RUIVNode`)** — the ~71 `V.*` factories and the immutable UI
+- **`v.gd` (`V`) / `vnode.gd` (`RuitkVNode`)** — the ~71 `V.*` factories and the immutable UI
   description. **Naming is 1:1 loyal to Godot (0.9.0, plans/archive/NAMING_LOYALTY_PROPOSAL.md +
   MIGRATION-0.9.md):** element factories are named exactly after the Godot class they create
   (`V.Button`, `V.VBoxContainer`); tags = official class names (any instantiable ClassDB Node
@@ -88,24 +88,24 @@ runtime**; the classes are available as soon as the files exist. Enabling the pl
   Godot property/theme/StyleBoxFlat names. Only structural factories are lowercase — `V.fc` is
   the function-component factory (GDScript reserves `func`, so it's not `V.func`).
 - **`hooks.gd` (`Hooks`)** — the 23 hooks. Call only at the top of a render, in a stable order.
-- **`reconciler.gd` (`RUIReconciler`)** — the fiber reconciler. Synchronous (non-time-sliced) work
+- **`reconciler.gd` (`RuitkReconciler`)** — the fiber reconciler. Synchronous (non-time-sliced) work
   loop: **render phase** (`begin_work` reconciles children + runs components descending, `complete_work`
   diffs/creates host nodes + builds the post-order effect list ascending) → **commit phase** (deletions
   → placement/update/layout effects → enforce child order → swap current↔wip → passive effects). A hook
   setter calls `request_update()`, which **coalesces to one re-render per frame**. Bailout skips
   re-running a component whose props/state/context/children are unchanged.
-- **`fiber.gd` (`RUIFiber`)** — persistent tree node carrying the per-fiber `hooks` array (how hook
+- **`fiber.gd` (`RuitkFiber`)** — persistent tree node carrying the per-fiber `hooks` array (how hook
   state survives across renders). Fresh fibers are built each pass (no C#-style double-buffer reuse);
   cycles are severed explicitly for GC.
-- **`host_config.gd` (`RUIHost`) + `style.gd`/`style_sheet.gd`** — **the only files that touch concrete
+- **`host_config.gd` (`RuitkHost`) + `style.gd`/`style_sheet.gd`** — **the only files that touch concrete
   Godot APIs.** This is the engine-boundary seam (the same one that lets React point a reconciler at
-  react-dom vs react-native). `RUIHost` maps props→node properties, `on<Pascal>`/`on_<signal>`→Godot
+  react-dom vs react-native). `RuitkHost` maps props→node properties, `on<Pascal>`/`on_<signal>`→Godot
   signals (generic — no alias table), declarative `items`→item-model controls, and `draw_fn`→a
   register-once custom-draw trampoline.
-- **Subsystems:** `router/` (React-Router-v6-style, +17 hooks on `RUIRouter`), `signal_store.gd` +
-  `signal_registry.gd` (`RUISignal`/`RUISignals` cross-component state), `suspense.gd`, `media.gd`
+- **Subsystems:** `router/` (React-Router-v6-style, +17 hooks on `RuitkRouter`), `signal_store.gd` +
+  `signal_registry.gd` (`RuitkSignal`/`RuitkSignals` cross-component state), `suspense.gd`, `media.gd`
   (`useSfx`/`useAnimate`/`V.audio`/`V.video`), `context.gd`, `diagnostics.gd`.
-- **Mount surfaces:** `reactive_root.gd` (`ReactiveRoot.create(container, root_vnode)` — hold the
+- **Mount surfaces:** `reactive_root.gd` (`RuitkRoot.create(container, root_vnode)` — hold the
   returned object for the UI's lifetime; `.unmount()` runs cleanups) and `reactive_root_node.gd`.
 
 **Known runtime constraints** (see README "Notes & limitations"): removed *plain* props don't reset to
@@ -119,7 +119,7 @@ are synchronous. Preserve these behaviors — they're faithful-to-reference, not
 `{expr}`, `@if`/`@for`). It compiles to a sibling `.gd`.
 
 - **Compiler (`addons/reactive_ui_toolkit/guitkx/`)** — pure GDScript: `guitkx_lexer.gd` → `guitkx_markup.gd` /
-  `guitkx_jsx_scan.gd` → `guitkx_codegen.gd` (`RUIGuitkxCodegen`, the entry point:
+  `guitkx_jsx_scan.gd` → `guitkx_codegen.gd` (`RuitkGuitkxCodegen`, the entry point:
   `compile_file` / `compile_all` / `find_all`) → `guitkx_formatter.gd`.
 - **Imports (0.10.0):** a file is a SEQUENCE of declarations; `export` marks cross-file visibility;
   `import { Name } from "./spec"` (also `../`, `~/` from `guitkx_config.gd`'s `"root"` walk-up) is

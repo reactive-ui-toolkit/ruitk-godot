@@ -4,8 +4,8 @@ extends Control
 ## The main-screen panel: a toolbar (Open / Save / Format + current-file label) over a GuitkxCodeEdit.
 ## Owns the edit -> debounced-compile -> diagnostics pipeline, the buffer's dirty/conflict state, and
 ## every guard that keeps the user's work safe (unsaved-switch confirms, external-change detection,
-## deleted/renamed-source tracking). Depends on the reactive_ui_toolkit addon's global classes RUIGuitkx
-## (compiler) and RUIGuitkxFormatter (formatter).
+## deleted/renamed-source tracking). Depends on the reactive_ui_toolkit addon's global classes RuitkGuitkx
+## (compiler) and RuitkGuitkxFormatter (formatter).
 ##
 ## Save writes ONLY the .guitkx text to disk; the reactive_ui_toolkit plugin's own filesystem watcher owns
 ## regenerating the sibling .gd, so the two never fight over the same file.
@@ -536,7 +536,7 @@ func _on_definition_requested(path: String, offset: int) -> void:
 		if Engine.is_editor_hint():
 			var script: Variant = load(path)
 			if script is Script:
-				var lc: Dictionary = RUIGuitkxDiag.line_col(FileAccess.get_file_as_string(path), offset)
+				var lc: Dictionary = RuitkGuitkxDiag.line_col(FileAccess.get_file_as_string(path), offset)
 				EditorInterface.edit_script(script, int(lc.get("line", 0)) + 1, int(lc.get("col", 0)))
 		return
 	if path == _current_path:
@@ -546,7 +546,7 @@ func _on_definition_requested(path: String, offset: int) -> void:
 	open_path(path)
 
 func _goto_offset(offset: int) -> void:
-	var lc: Dictionary = RUIGuitkxDiag.line_col(_code_edit.text, offset)
+	var lc: Dictionary = RuitkGuitkxDiag.line_col(_code_edit.text, offset)
 	goto_line(int(lc.get("line", 0)))
 	_code_edit.set_caret_column(int(lc.get("col", 0)))
 
@@ -559,7 +559,7 @@ func on_workspace_changed() -> void:
 	var bridge = BridgeScript.instance()
 	if bridge != null:
 		for p in open_paths():
-			var gd_path: String = RUIGuitkxCodegen.gd_path_for(str(p))
+			var gd_path: String = RuitkGuitkxCodegen.gd_path_for(str(p))
 			if FileAccess.file_exists(gd_path):
 				bridge.refresh_script(gd_path)
 	_refresh_diagnostics()
@@ -612,7 +612,7 @@ func _refresh_diagnostics() -> void:
 	# The outline is pure text (no compile) — refresh it before any of the diagnostic gates below
 	# can return, so it stays live with diagnostics disabled and on oversized files too.
 	_refresh_outline()
-	if not RUIEditorSettings.is_enabled(RUIEditorSettings.KEY_DIAGNOSTICS):
+	if not RuitkEditorSettings.is_enabled(RuitkEditorSettings.KEY_DIAGNOSTICS):
 		GuitkxDiagnosticsRenderer.clear(_code_edit, _code_edit.diag_gutter)
 		_code_edit.set_dim_lines({})
 		if _problems != null:
@@ -639,7 +639,7 @@ func _refresh_diagnostics() -> void:
 	# watcher's sweep passes — so unknown-component 0105 (with did-you-mean) arms in-editor too.
 	var pb := _project_bindings()
 	var t0 := Time.get_ticks_usec()
-	var result: Dictionary = RUIGuitkx.compile(
+	var result: Dictionary = RuitkGuitkx.compile(
 		text, _basename(text), pb.get("known", []), pb.get("bindings", {}))
 	_last_compile_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 	# Adaptive gate (P1): compiles run on the main thread, so big files stretch the debounce
@@ -687,7 +687,7 @@ func _refresh_diagnostics() -> void:
 
 func _project_bindings() -> Dictionary:
 	if not _bindings_valid:
-		_bindings_cache = RUIGuitkxCodegen.project_bindings(GuitkxWorkspace.all_paths())
+		_bindings_cache = RuitkGuitkxCodegen.project_bindings(GuitkxWorkspace.all_paths())
 		_bindings_valid = true
 	return _bindings_cache
 
@@ -699,7 +699,7 @@ static func _adaptive_wait(compile_ms: float) -> float:
 func _merge_sidecar(text: String, diags: Array) -> void:
 	if _current_path.is_empty():
 		return
-	var sc_path: String = RUIGuitkxCodegen.diags_path_for(_current_path)
+	var sc_path: String = RuitkGuitkxCodegen.diags_path_for(_current_path)
 	var raw := FileAccess.get_file_as_string(sc_path)
 	if raw.is_empty():
 		return
@@ -716,7 +716,7 @@ func _merge_sidecar(text: String, diags: Array) -> void:
 		if d is Dictionary:
 			live_codes[str((d as Dictionary).get("code", ""))] = true
 			live_at["%s@%d" % [str((d as Dictionary).get("code", "")), int((d as Dictionary).get("offset", -1))]] = true
-	if int(sc.get("src_hash", -1)) == RUIGuitkxCodegen.src_hash(text):
+	if int(sc.get("src_hash", -1)) == RuitkGuitkxCodegen.src_hash(text):
 		# Buffer == compiled content: merge precisely (sidecar keys are off/len; live uses
 		# offset/length). Compile-time codes are already in the live set — only sweep-only
 		# entries actually land.
@@ -751,7 +751,7 @@ func _merge_sidecar(text: String, diags: Array) -> void:
 ## Fade the lines after each component's markup return (unreachable code). [BUG-V6]
 func _apply_unreachable_dim(text: String) -> void:
 	var lines := {}
-	for r in RUIGuitkx.unreachable_line_ranges(text):
+	for r in RuitkGuitkx.unreachable_line_ranges(text):
 		for ln in range(int(r[0]), int(r[1]) + 1):
 			lines[ln] = true
 	_code_edit.set_dim_lines(lines)
@@ -764,12 +764,12 @@ func _apply_unreachable_dim(text: String) -> void:
 func _basename(text: String = "") -> String:
 	if not _current_path.is_empty():
 		return _current_path.get_file().get_basename()
-	var d: Dictionary = RUIGuitkx._find_decl(text, 0)
+	var d: Dictionary = RuitkGuitkx._find_decl(text, 0)
 	var nm := ""
 	if str(d.get("kind", "")) != "":
 		if bool(d.get("deprecated", false)):
 			# wrapper row: `at` is the keyword -- the name follows it.
-			var rows: Array = RUIGuitkx._enumerate_decls(text, 0)
+			var rows: Array = RuitkGuitkx._enumerate_decls(text, 0)
 			if not rows.is_empty():
 				nm = str((rows[0] as Dictionary).get("name", ""))
 		else:
@@ -823,7 +823,7 @@ func _write_editor(ed: GuitkxCodeEdit) -> bool:
 	if ed == null or ed.file_path.is_empty():
 		return false
 	var text: String = ed.text
-	if RUIEditorSettings.is_enabled(RUIEditorSettings.KEY_FORMAT_ON_SAVE):
+	if RuitkEditorSettings.is_enabled(RuitkEditorSettings.KEY_FORMAT_ON_SAVE):
 		text = _format_text(text, ed.file_path)
 	if text != ed.text:
 		_loading = true
@@ -904,7 +904,7 @@ func _on_gutter_diagnostic_clicked(line: int, record: Variant) -> void:
 	add_child(pop)
 	pop.popup(Rect2i(DisplayServer.mouse_get_position(), Vector2i(500, 0)))
 
-# RUIGuitkxFormatter.format() returns the source verbatim on any parse error, so this never
+# RuitkGuitkxFormatter.format() returns the source verbatim on any parse error, so this never
 # corrupts. Honors the nearest guitkx.config.json (G26) exactly like the VS Code extension, so
 # one project formats identically in both editors.
 func _formatted(text: String) -> String:
@@ -915,7 +915,7 @@ func _formatted(text: String) -> String:
 ## per session instead of staying silent (format-on-save used to look like a no-op) or nagging on
 ## every save of the same still-broken file.
 func _format_text(text: String, path: String) -> String:
-	var r: Dictionary = RUIGuitkxFormatter.format(text, ConfigScript.formatter_opts_for(path))
+	var r: Dictionary = RuitkGuitkxFormatter.format(text, ConfigScript.formatter_opts_for(path))
 	if bool(r.get("fell_back", false)) and not _format_fallback_warned.has(path):
 		_format_fallback_warned[path] = true
 		_alert("%s has syntax errors -- format skipped." % path.get_file())
@@ -1028,7 +1028,7 @@ func _embedded_ref_records(refs: Array) -> Array:
 		var p := str(rd.get("path", ""))
 		var off := int(rd.get("offset", 0))
 		var text := _code_edit.text if p == _current_path else FileAccess.get_file_as_string(p)
-		var lc: Dictionary = RUIGuitkxDiag.line_col(text, off)
+		var lc: Dictionary = RuitkGuitkxDiag.line_col(text, off)
 		var line := int(lc.get("line", 0))
 		var ls := 0 if line == 0 else text.rfind("\n", maxi(0, off - 1)) + 1
 		var le := text.find("\n", off)
@@ -1092,8 +1092,8 @@ func _apply_embedded_rename(bridge, offset: int, new_name: String) -> void:
 	for e in r.get("edits", []):  # descending offsets — later splices never shift earlier ones
 		var ed := e as Dictionary
 		var o := int(ed["offset"])
-		var lc: Dictionary = RUIGuitkxDiag.line_col(text, o)
-		var lc_end: Dictionary = RUIGuitkxDiag.line_col(text, o + int(ed["length"]))
+		var lc: Dictionary = RuitkGuitkxDiag.line_col(text, o)
+		var lc_end: Dictionary = RuitkGuitkxDiag.line_col(text, o + int(ed["length"]))
 		_code_edit.select(int(lc["line"]), int(lc["col"]), int(lc_end["line"]), int(lc_end["col"]))
 		_code_edit.delete_selection()
 		_code_edit.insert_text_at_caret(str(ed["new_text"]))

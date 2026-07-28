@@ -42,7 +42,7 @@ native language idiom (C# / C++ / GDScript) — uniform CONCEPTS, native SPELLIN
 - **G-03 — Wrapper keywords removed.** `component X {}` / `hook useX {}` /
   `module M {}` are replaced by plain declarations. Classification is read from the
   SIGNATURE ALONE (parse-time, no body inspection, no semantic analysis):
-  - **markup-node return type** (`VirtualNode` / `FRuiNode` / `RUIVNode` per engine)
+  - **markup-node return type** (`VirtualNode` / `FRuiNode` / `RuitkVNode` per engine)
     ⇒ **component**; PascalCase name ENFORCED (error — tags require it).
   - **`use`-prefixed name** (each engine's casing convention: `useX` C#-camel,
     `UseX` C++-Pascal, `use_x` GDScript-snake) ⇒ **hook**.

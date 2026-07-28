@@ -1,4 +1,4 @@
-class_name RUIFiber
+class_name RuitkFiber
 extends RefCounted
 ## A node in the persistent work tree. Current and work-in-progress fibers are paired
 ## via `alternate` (double buffering). Ports ReactiveUIToolKit's FiberNode.
@@ -18,9 +18,9 @@ const EFFECT_PASSIVE := 16
 const EFFECT_PORTAL_RETARGET := 32
 
 # --- tree ---
-var parent: RUIFiber = null
-var child: RUIFiber = null
-var sibling: RUIFiber = null
+var parent: RuitkFiber = null
+var child: RuitkFiber = null
+var sibling: RuitkFiber = null
 var index: int = 0
 
 # --- identity ---
@@ -52,15 +52,15 @@ var eb_active := false
 var eb_showing_fallback := false
 var eb_last_error = null
 var eb_reset_key = null
-var eb_fallback = null            ## RUIVNode
+var eb_fallback = null            ## RuitkVNode
 var eb_handler: Callable
 var eb_children: Array = []
 
 # --- reconciliation / double buffer ---
-var alternate: RUIFiber = null
+var alternate: RuitkFiber = null
 var effect_tag: int = EFFECT_NONE
-var next_effect: RUIFiber = null  ## singly-linked effect list (post-order)
-var deletions: Array = []         ## Array[RUIFiber] removed this render
+var next_effect: RuitkFiber = null  ## singly-linked effect list (post-order)
+var deletions: Array = []         ## Array[RuitkFiber] removed this render
 ## Transient mark for the full-keyed reconcile mark-and-sweep (GO-08): set true when an
 ## old fiber is matched to a vnode this pass, so the trailing sweep deletes only unmatched
 ## fibers WITHOUT a per-frame `matched` Dictionary. Reset at the top of each full-keyed pass;
@@ -75,7 +75,7 @@ var reads_context := false
 var has_pending_update := false
 var subtree_has_updates := false
 
-# --- function-component state (RUIComponentState, SHARED across alternates) ---
+# --- function-component state (RuitkComponentState, SHARED across alternates) ---
 var state = null
 
 func is_function() -> bool: return tag == Tag.FUNCTION
@@ -86,25 +86,25 @@ func is_error_boundary() -> bool: return tag == Tag.ERROR_BOUNDARY
 func is_root() -> bool: return tag == Tag.ROOT
 
 ## True if this fiber can be reused for `vnode` (same kind + type/component).
-func matches(vnode: RUIVNode) -> bool:
+func matches(vnode: RuitkVNode) -> bool:
 	match vnode.kind:
-		RUIVNode.Kind.HOST:
+		RuitkVNode.Kind.HOST:
 			return tag == Tag.HOST and type == vnode.type
-		RUIVNode.Kind.FUNCTION:
+		RuitkVNode.Kind.FUNCTION:
 			return tag == Tag.FUNCTION and component == vnode.component
-		RUIVNode.Kind.FRAGMENT:
+		RuitkVNode.Kind.FRAGMENT:
 			return tag == Tag.FRAGMENT
-		RUIVNode.Kind.PORTAL:
+		RuitkVNode.Kind.PORTAL:
 			return tag == Tag.PORTAL
-		RUIVNode.Kind.ERROR_BOUNDARY:
+		RuitkVNode.Kind.ERROR_BOUNDARY:
 			return tag == Tag.ERROR_BOUNDARY
 	return false
 
-static func tag_for_vnode(vnode: RUIVNode) -> int:
+static func tag_for_vnode(vnode: RuitkVNode) -> int:
 	match vnode.kind:
-		RUIVNode.Kind.HOST: return Tag.HOST
-		RUIVNode.Kind.FUNCTION: return Tag.FUNCTION
-		RUIVNode.Kind.FRAGMENT: return Tag.FRAGMENT
-		RUIVNode.Kind.PORTAL: return Tag.PORTAL
-		RUIVNode.Kind.ERROR_BOUNDARY: return Tag.ERROR_BOUNDARY
+		RuitkVNode.Kind.HOST: return Tag.HOST
+		RuitkVNode.Kind.FUNCTION: return Tag.FUNCTION
+		RuitkVNode.Kind.FRAGMENT: return Tag.FRAGMENT
+		RuitkVNode.Kind.PORTAL: return Tag.PORTAL
+		RuitkVNode.Kind.ERROR_BOUNDARY: return Tag.ERROR_BOUNDARY
 	return Tag.HOST

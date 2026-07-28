@@ -121,7 +121,7 @@ static func property_info(godot_class: String, prop: String) -> Dictionary:
 			}
 	return {}
 
-## The RUIStyle vocabulary (the `style={ {...} }` dict keys), from the bundled schema:
+## The RuitkStyle vocabulary (the `style={ {...} }` dict keys), from the bundled schema:
 ## [{name, type, detail}]. Godot's own tooling has no vocabulary for these.
 static func style_keys() -> Array:
 	_ensure_loaded()

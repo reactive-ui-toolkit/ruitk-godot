@@ -2,7 +2,7 @@ export const EXAMPLE_UITKX = `import { use_player_animation } from "./PlayerCard
 import * as PlayerCardStyle from "./PlayerCard.style"
 import * as PlayerCardUtils from "./PlayerCard.utils"
 
-export PlayerCard(player: Dictionary) -> RUIVNode {
+export PlayerCard(player: Dictionary) -> RuitkVNode {
   var anim = use_player_animation(player)
   var health_color = PlayerCardStyle.HEALTH_GREEN \\
     if player.health > player.max_health / 2 \\
@@ -23,7 +23,7 @@ class_name PlayerCard          # ← the binding: @class_name override, else fir
 extends RefCounted
 ## AUTO-GENERATED from PlayerCard.guitkx -- do not edit.
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
     var player = props.get("player")   # ← from the component parameter
     ...`
 
@@ -53,7 +53,7 @@ format_slot(i: int) -> String {                 # util   — file-private helper
   return "Slot %d" % i
 }
 
-export Hud() -> RUIVNode {                      # component (the -> RUIVNode annotation)
+export Hud() -> RuitkVNode {                      # component (the -> RuitkVNode annotation)
   var blink = use_blink(0.5)
   return (
     <VBoxContainer>
@@ -62,7 +62,7 @@ export Hud() -> RUIVNode {                      # component (the -> RUIVNode ann
   )
 }
 
-SlotRow() -> RUIVNode {                         # component — file-private
+SlotRow() -> RuitkVNode {                         # component — file-private
   return ( <Label text={ format_slot(0) } style={ accent } /> )
 }`
 
@@ -100,7 +100,7 @@ export CARD := {
 #   ... style={ PlayerCardStyle.CARD }`
 
 export const EXAMPLE_UTILS = `# PlayerCard.utils.guitkx — utils are any other callable: no use_ prefix,
-# no -> RUIVNode annotation.
+# no -> RuitkVNode annotation.
 export RANK_DIAMOND := 3
 export RANK_GOLD    := 2
 export RANK_SILVER  := 1

@@ -6,7 +6,7 @@ const __RUI_HOOK_SIG := "useRef"
 
 const __RUI_KIND := "component"
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var input_ref = Hooks.useRef(null)
 	var focus = func():
 		if input_ref["current"] != null:

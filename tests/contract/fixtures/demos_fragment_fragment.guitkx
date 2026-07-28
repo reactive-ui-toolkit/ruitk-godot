@@ -1,6 +1,6 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoFragment() -> RUIVNode {
+export DemoFragment() -> RuitkVNode {
   return (
     <DemoBox title="Fragment — group nodes without a wrapper">
       <Label text="A fragment inserts its children flat — no extra container node:" />

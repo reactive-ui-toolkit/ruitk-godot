@@ -15,13 +15,13 @@ import Styles from './UitkxReferencePage.style'
 const DIRECTIVE_HEADER_EXAMPLE = `@class_name MyButton
 @uss "res://ui/theme.tres"
 
-export MyButton(label: String = "Click") -> RUIVNode {
+export MyButton(label: String = "Click") -> RuitkVNode {
   return (
     <Button text={ label } onPressed={ func(): print("clicked") } />
   )
 }`
 
-const FUNCTION_STYLE_EXAMPLE = `Counter(label: String = "Count") -> RUIVNode {
+const FUNCTION_STYLE_EXAMPLE = `Counter(label: String = "Count") -> RuitkVNode {
   var s = useState(0)
   var count = s[0]
   return (
@@ -58,7 +58,7 @@ const CONTROL_FLOW_EXAMPLE = `<VBoxContainer>
   }
 </VBoxContainer>`
 
-const EARLY_RETURN_EXAMPLE = `StatusPanel(ready: bool = false) -> RUIVNode {
+const EARLY_RETURN_EXAMPLE = `StatusPanel(ready: bool = false) -> RuitkVNode {
   if not ready:
     return ( <Label text="Loading…" /> )
   return (
@@ -68,7 +68,7 @@ const EARLY_RETURN_EXAMPLE = `StatusPanel(ready: bool = false) -> RUIVNode {
   )
 }`
 
-const PROP_SPREAD_EXAMPLE = `Toolbar(cfg: Dictionary = {}) -> RUIVNode {
+const PROP_SPREAD_EXAMPLE = `Toolbar(cfg: Dictionary = {}) -> RuitkVNode {
   var base := { "text": "Save", "disabled": false }
 
   return (
@@ -135,9 +135,9 @@ export const UitkxReferencePage: FC = () => (
         </TableHead>
         <TableBody>
           <TableRow>
-            <TableCell><code>Name(params) -&gt; RUIVNode {'{ … }'}</code></TableCell>
+            <TableCell><code>Name(params) -&gt; RuitkVNode {'{ … }'}</code></TableCell>
             <TableCell><strong>Component</strong> — compiles to <code>static func render(props, children)</code></TableCell>
-            <TableCell>the <code>-&gt; RUIVNode</code> return annotation <em>is</em> the classification (PascalCase name enforced, <code>GUITKX2100</code>)</TableCell>
+            <TableCell>the <code>-&gt; RuitkVNode</code> return annotation <em>is</em> the classification (PascalCase name enforced, <code>GUITKX2100</code>)</TableCell>
           </TableRow>
           <TableRow>
             <TableCell><code>use_name(params) [-&gt; T] {'{ … }'}</code></TableCell>
@@ -159,9 +159,9 @@ export const UitkxReferencePage: FC = () => (
     </TableContainer>
     <Typography variant="body2" paragraph sx={{ mt: 1 }}>
       Two consequences worth internalizing: a component <strong>must</strong> annotate{' '}
-      <code>-&gt; RUIVNode</code> (a PascalCase callable without it is a util and its{' '}
+      <code>-&gt; RuitkVNode</code> (a PascalCase callable without it is a util and its{' '}
       <code>{'<Tag>'}</code> stops resolving), and a <code>use_</code>-prefixed callable that
-      returns <code>RUIVNode</code> is the cross-guard error <code>GUITKX2321</code> (&quot;did you
+      returns <code>RuitkVNode</code> is the cross-guard error <code>GUITKX2321</code> (&quot;did you
       mean a component?&quot;). The pre-0.11 <code>component</code> / <code>hook</code> /{' '}
       <code>module</code> wrapper keywords still compile for one deprecation window with warning{' '}
       <code>GUITKX2320</code> — run the 0.11.0 codemod (see Migrations).
@@ -210,7 +210,7 @@ export const UitkxReferencePage: FC = () => (
       Function-Style Components
     </Typography>
     <Typography variant="body2" paragraph>
-      A component is a plain declaration whose signature ends in <code>-&gt; RUIVNode</code>, with
+      A component is a plain declaration whose signature ends in <code>-&gt; RuitkVNode</code>, with
       optional typed parameters. Parameters are read from the <code>props</code> dictionary in the
       generated <code>render</code> method (with the declared default when a prop is absent).
     </Typography>
@@ -225,11 +225,11 @@ export const UitkxReferencePage: FC = () => (
         <TableBody>
           <TableRow>
             <TableCell>Declaration</TableCell>
-            <TableCell><code>Name() -&gt; RUIVNode {'{ … }'}</code></TableCell>
+            <TableCell><code>Name() -&gt; RuitkVNode {'{ … }'}</code></TableCell>
           </TableRow>
           <TableRow>
             <TableCell>With parameters</TableCell>
-            <TableCell><code>Name(label: String = "default") -&gt; RUIVNode {'{ … }'}</code></TableCell>
+            <TableCell><code>Name(label: String = "default") -&gt; RuitkVNode {'{ … }'}</code></TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Setup code</TableCell>
@@ -344,7 +344,7 @@ export const UitkxReferencePage: FC = () => (
             <TableCell><code>{'<VBoxContainer>{ my_node }</VBoxContainer>'}</code></TableCell>
             <TableCell>
               A GDScript expression in <strong>markup-child</strong> position. It may evaluate to an{' '}
-              <code>RUIVNode</code>, an <code>Array</code> of vnodes (rendered as siblings), a{' '}
+              <code>RuitkVNode</code>, an <code>Array</code> of vnodes (rendered as siblings), a{' '}
               <code>String</code> (rendered as a label), or <code>null</code> (renders nothing).
             </TableCell>
           </TableRow>
@@ -507,7 +507,7 @@ export use_flash(active: bool) -> bool {
     </Typography>
     <Typography component="ul" variant="body2">
       <li><code>@class_name</code> and <code>@uss</code> must appear in the preamble, before the first declaration.</li>
-      <li>A component must annotate <code>-&gt; RUIVNode</code> — that annotation is what classifies it as a component; a <code>use_</code> prefix classifies a hook (a <code>use_*</code> callable returning <code>RUIVNode</code> is <code>GUITKX2321</code>).</li>
+      <li>A component must annotate <code>-&gt; RuitkVNode</code> — that annotation is what classifies it as a component; a <code>use_</code> prefix classifies a hook (a <code>use_*</code> callable returning <code>RuitkVNode</code> is <code>GUITKX2321</code>).</li>
       <li>Hook calls must be unconditional at component top level — not inside a directive body (<code>@if</code>, <code>@for</code>, <code>@case</code>, etc.), or it&apos;s <code>GUITKX2104</code>.</li>
       <li>A directive body is a code block: GDScript prep statements followed by <code>return ( {'<markup>'} )</code>, nesting recursively. The pre-0.7 bare-markup form is a compile error (<code>GUITKX2103</code>).</li>
       <li>Direct children of <code>@for</code> need a <code>key</code> attribute for stable reconciliation.</li>

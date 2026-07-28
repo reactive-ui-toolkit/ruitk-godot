@@ -2,7 +2,7 @@
 extends EditorPlugin
 ## reactive_ui_toolkit_editor — a main-screen Godot editor for .guitkx files with syntax highlighting and live
 ## compiler diagnostics. Sibling to the reactive_ui_toolkit runtime addon, which it depends on for the .guitkx
-## compiler/formatter (global classes RUIGuitkx / RUIGuitkxFormatter).
+## compiler/formatter (global classes RuitkGuitkx / RuitkGuitkxFormatter).
 ##
 ## Lifecycle: registers the reactive_ui_toolkit_editor/* Project Settings and mounts the editor into the
 ## main screen plus a "Problems" list into the bottom panel. Double-click routing rides the
@@ -15,7 +15,7 @@ const PLUGIN_NAME := "ReactiveUITK"
 const Deps := preload("res://addons/reactive_ui_toolkit_editor/ruitk_editor_deps.gd")
 
 # Deliberately untyped (Control/Node): naming GuitkxEditorView here would chain-compile the whole
-# editor layer — and its RUIGuitkx* references — at plugin load, turning a missing reactive_ui_toolkit
+# editor layer — and its RuitkGuitkx* references — at plugin load, turning a missing reactive_ui_toolkit
 # into a raw script error instead of the friendly dependency message below (S1/S2/F9).
 var _view: Control
 var _problems: Control
@@ -40,7 +40,7 @@ func _enter_tree() -> void:
 		dlg.popup_centered()
 		return
 
-	RUIEditorSettings.register_all()
+	RuitkEditorSettings.register_all()
 	_register_searchable_extension()
 
 	# M3: announce the native analyzer once per session — embedded-GDScript intelligence
@@ -173,7 +173,7 @@ func _on_file_moved(old_file: String, new_file: String) -> void:
 ## [field capture: "after 1-2 renames it breaks — the .gd files stay behind"]. Clean the old
 ## name's outputs synchronously in the rename event and nudge the new name toward compilation.
 ##
-## Static + load()-indirected (never naming RUIGuitkx* here): plugin.gd must stay compilable
+## Static + load()-indirected (never naming RuitkGuitkx* here): plugin.gd must stay compilable
 ## with the reactive_ui_toolkit addon absent so the W5 dependency dialog can show.
 static func cleanup_moved_guitkx(old_source: String, new_source: String = "") -> void:
 	if old_source.get_extension().to_lower() != "guitkx":
@@ -243,7 +243,7 @@ func _make_visible(visible: bool) -> void:
 func _handles(object: Object) -> bool:
 	# The toggle lives HERE (the loader itself is engine-owned and always registered): with
 	# open_guitkx_in_editor off, we decline and the double-click lands in the Inspector.
-	return object is GuitkxResource and RUIEditorSettings.is_enabled(RUIEditorSettings.KEY_OPEN_IN_EDITOR)
+	return object is GuitkxResource and RuitkEditorSettings.is_enabled(RuitkEditorSettings.KEY_OPEN_IN_EDITOR)
 
 func _edit(object: Object) -> void:
 	if object == null:

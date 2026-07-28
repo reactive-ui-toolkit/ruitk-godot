@@ -72,7 +72,7 @@ func _start() -> void:
 	# provably-complete file set; the virtual docs make the set structurally incomplete, and false
 	# UNDEFINED noise inside user expressions would be worse than missing that diagnostic tier.
 
-## Feed every project .gd (skipping res://.godot) so cross-file types — RUIVNode, Hooks, the
+## Feed every project .gd (skipping res://.godot) so cross-file types — RuitkVNode, Hooks, the
 ## user's own classes and autoloads — resolve inside embedded expressions. One-time per editor
 ## session; salsa parses lazily at query time, so the cost here is file IO only.
 func _feed_project_scripts() -> void:
@@ -281,7 +281,7 @@ func rename(path: String, text: String, offset: int, new_name: String) -> Dictio
 	return { "ok": true, "edits": edits }
 
 ## Analyzer diagnostics for the buffer, remapped into .guitkx coords and shaped for the editor's
-## renderer: { code, severity:int (RUIGuitkxDiag tiers), message, offset, length }. Entries whose
+## renderer: { code, severity:int (RuitkGuitkxDiag tiers), message, offset, length }. Entries whose
 ## range lands in virtual glue are dropped — scaffolding can never squiggle user code.
 func diagnostics(path: String, text: String) -> Array:
 	var entry := _ensure_doc(path, text)
@@ -303,8 +303,8 @@ func diagnostics(path: String, text: String) -> Array:
 static func _severity_to_tier(severity: String) -> int:
 	match severity:
 		"error":
-			return RUIGuitkxDiag.ERROR
+			return RuitkGuitkxDiag.ERROR
 		"warning":
-			return RUIGuitkxDiag.WARNING
+			return RuitkGuitkxDiag.WARNING
 		_:
-			return RUIGuitkxDiag.HINT
+			return RuitkGuitkxDiag.HINT

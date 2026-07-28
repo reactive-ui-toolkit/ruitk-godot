@@ -1,13 +1,13 @@
-class_name RUIHost
+class_name RuitkHost
 extends RefCounted
 ## The Godot "host config" — the ONLY layer that knows about concrete Godot node
 ## APIs. The reconciler talks to nodes exclusively through here, mirroring how
 ## ReactiveUIToolKit isolates `PropsApplier` / element adapters from the reconciler.
-## Swapping this file (plus `RUIStyle`) is what would, in principle, retarget the
+## Swapping this file (plus `RuitkStyle`) is what would, in principle, retarget the
 ## same reconciler at a different host.
 ##
 ## Prop conventions on a host vnode's props Dictionary:
-##   "style"        -> handed to RUIStyle
+##   "style"        -> handed to RuitkStyle
 ##   "ref"          -> a Callable(node) or a { "current": ... } box, receives the node
 ##   event handlers -> a Callable connected to a Godot signal on the node. NAMING IS 1:1 LOYAL TO
 ##                     GODOT (0.9.0, plans/NAMING_LOYALTY_PROPOSAL.md): the event prop is the exact
@@ -134,7 +134,7 @@ static func apply_props(node: Node, old_props: Dictionary, new_props: Dictionary
 	var oc = old_props.get("classes")
 	var nc = new_props.get("classes")
 	if os != null or ns != null or oc != null or nc != null:
-		RUIStyle.apply(node, _effective_style(old_props), _effective_style(new_props))
+		RuitkStyle.apply(node, _effective_style(old_props), _effective_style(new_props))
 
 	# 5. declarative item-model controls (stateful adapters) — dispatched through an extensible
 	#    registry so userland can register adapters for custom controls (see register_item_adapter).
@@ -145,7 +145,7 @@ static func apply_props(node: Node, old_props: Dictionary, new_props: Dictionary
 		_apply_custom_draw(node, old_props, new_props)
 
 ## Resolve a host element's effective style: merge the styles of its `classes` (left-to-right via
-## RUIStyleSheet) then overlay its inline `style` (which wins). A plain dictionary merge — no CSS
+## RuitkStyleSheet) then overlay its inline `style` (which wins). A plain dictionary merge — no CSS
 ## cascade/specificity (decision #3). Returns {} when there's nothing to apply.
 static func _effective_style(props: Dictionary) -> Dictionary:
 	var classes = props.get("classes")
@@ -157,7 +157,7 @@ static func _effective_style(props: Dictionary) -> Dictionary:
 	var merged := {}
 	if classes is Array:
 		for c in classes:
-			var cs = RUIStyleSheet.resolve(str(c))
+			var cs = RuitkStyleSheet.resolve(str(c))
 			if cs is Dictionary:
 				for k in cs:
 					merged[k] = cs[k]

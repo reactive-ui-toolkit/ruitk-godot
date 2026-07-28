@@ -19,12 +19,12 @@ func _initialize():
 	var kb := src.length() / 1024.0
 	# Warm-up
 	for w in range(3):
-		RUIGuitkx.compile(src, "DoomGameScreen")
+		RuitkGuitkx.compile(src, "DoomGameScreen")
 	# Macro: full compile (per-save cost)
 	var n := 30
 	var t0 := Time.get_ticks_usec()
 	for k in range(n):
-		RUIGuitkx.compile(src, "DoomGameScreen")
+		RuitkGuitkx.compile(src, "DoomGameScreen")
 	var compile_ms := (Time.get_ticks_usec() - t0) / 1000.0 / n
 	# Micro: skip_noncode walk over the whole file (the shared primitive every matcher calls)
 	var reps := 200
@@ -34,7 +34,7 @@ func _initialize():
 		var i := 0
 		var L := src.length()
 		while i < L:
-			var j: int = RUIGuitkxLexer.skip_noncode(src, i)
+			var j: int = RuitkGuitkxLexer.skip_noncode(src, i)
 			if j != i: i = j
 			else: i += 1
 			acc += 1
@@ -43,7 +43,7 @@ func _initialize():
 	var body_open := src.find("{", src.find("component "))
 	t0 = Time.get_ticks_usec()
 	for r in range(reps):
-		RUIGuitkxLexer.find_matching_markup(src, body_open)
+		RuitkGuitkxLexer.find_matching_markup(src, body_open)
 	var fmm_ms := (Time.get_ticks_usec() - t0) / 1000.0 / reps
 	print("file %.1f KB | compile %.2f ms (%.3f ms/KB) | skip_noncode walk %.3f ms | find_matching_markup %.3f ms" % [
 		kb, compile_ms, compile_ms / kb, walk_ms, fmm_ms])

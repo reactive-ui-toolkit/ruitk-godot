@@ -1,4 +1,4 @@
-export DemoSignalsDisplay() -> RUIVNode {
+export DemoSignalsDisplay() -> RuitkVNode {
   var v = useSignal(DemoSignalsStore.shared)
   return (
     <PanelContainer style={ {"bg_color": Color(0.18, 0.18, 0.22), "corner_radius_all": 6, "content_margin_all": 10} }>

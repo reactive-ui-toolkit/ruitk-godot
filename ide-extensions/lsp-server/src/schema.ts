@@ -156,7 +156,7 @@ export function findTag(name: string): TagInfo | undefined {
   return HOST_TAGS.find((t) => t.tag === name);
 }
 
-// Style-dict keys understood by RUIStyle (addons/reactive_ui_toolkit/core/style.gd) — offered inside a
+// Style-dict keys understood by RuitkStyle (addons/reactive_ui_toolkit/core/style.gd) — offered inside a
 // `style={ {…} }` (or `*_style`) dictionary, where Godot's own LSP has no vocabulary.
 // 0.9.0: every key is the exact Godot property / theme-item / StyleBoxFlat name (mirrors
 // grammar/guitkx-schema.json styleKeys). Any StyleBoxFlat property is additionally accepted

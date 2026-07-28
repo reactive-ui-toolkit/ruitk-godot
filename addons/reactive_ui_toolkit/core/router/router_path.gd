@@ -1,8 +1,8 @@
-class_name RUIRouterPath
+class_name RuitkRouterPath
 extends RefCounted
 ## Pure path algebra for the router (Phase 7.5) — faithful port of the Unity reference RouterPath.cs.
 ## No engine dependencies; the most testable router piece. `parse` returns a plain Dictionary
-## { path, query, state } (the RUIRouterLocation shape used from 7.8 on).
+## { path, query, state } (the RuitkRouterLocation shape used from 7.8 on).
 
 static func combine(base_path: String, relative_path: String) -> String:
 	var normalized_base := normalize(base_path)

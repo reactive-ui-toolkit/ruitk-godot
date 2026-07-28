@@ -12,9 +12,9 @@ static var _index: Dictionary = {}
 static var _paths: Array = []   # every .guitkx seen by the scan (incl. hook-only files w/o tags)
 static var _scanned := false
 
-## ES-modules leg: declarations are SIGNATURE-classified (plain `Name(...) -> RUIVNode {` etc.),
+## ES-modules leg: declarations are SIGNATURE-classified (plain `Name(...) -> RuitkVNode {` etc.),
 ## which no regex can express -- the index consumes the compiler's own declaration scan
-## (RUIGuitkx.analyzed_decls, the single source of truth every identity table shares) instead of
+## (RuitkGuitkx.analyzed_decls, the single source of truth every identity table shares) instead of
 ## the retired wrapper-keyword regex. The @class_name regex stays (a line-shaped directive).
 const _Compiler := preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 static var _cn_re: RegEx = null
@@ -55,7 +55,7 @@ static func reindex(path: String, text: String) -> void:
 	_scanned = true
 
 ## Every .guitkx in the project (the last scan's file list, kept fresh by reindex/rescan).
-## Feeds RUIGuitkxCodegen.project_bindings() for the editor's cross-file diagnostics.
+## Feeds RuitkGuitkxCodegen.project_bindings() for the editor's cross-file diagnostics.
 static func all_paths() -> Array:
 	ensure_scanned()
 	return _paths

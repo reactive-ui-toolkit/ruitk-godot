@@ -1,12 +1,12 @@
 @tool
-class_name RUIEditorDeps
+class_name RuitkEditorDeps
 extends RefCounted
 ## Dependency handshake against the `reactive_ui_toolkit` runtime addon (parity plan S1/S2/F9).
 ##
 ## This editor addon REQUIRES reactive_ui_toolkit (compiler/formatter/lexer). Referencing its global
 ## classes from a script that loads while the dependency is absent is a hard, unfriendly compile
 ## failure — so plugin.gd checks HERE first and only then loads the editor scripts (which may use
-## the RUIGuitkx* classes directly). This file itself must never name them.
+## the RuitkGuitkx* classes directly). This file itself must never name them.
 
 ## Oldest reactive_ui_toolkit this editor is tested against. 0.5.0 pairs with 0.8.4: the Problems panel's
 ## project scope and the sidecar overlay read the sweep's refs/2106/2107 verdicts, and mixed-version

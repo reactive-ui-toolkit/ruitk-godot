@@ -1,4 +1,4 @@
-export const REF_BASIC_EXAMPLE = `MeasureDemo() -> RUIVNode {
+export const REF_BASIC_EXAMPLE = `MeasureDemo() -> RuitkVNode {
   var label_ref = useRef(null)   # box: { "current": <Control> }
   var width = useState(0.0)
 
@@ -17,7 +17,7 @@ export const REF_BASIC_EXAMPLE = `MeasureDemo() -> RUIVNode {
   )
 }`
 
-export const REF_MUTABLE_EXAMPLE = `RenderCounter() -> RUIVNode {
+export const REF_MUTABLE_EXAMPLE = `RenderCounter() -> RuitkVNode {
   # Mutating .current never triggers a re-render — the box persists across renders.
   var render_count = useRef(0)
   render_count["current"] += 1
@@ -33,7 +33,7 @@ export const REF_MUTABLE_EXAMPLE = `RenderCounter() -> RUIVNode {
   )
 }`
 
-export const REF_FOCUS_EXAMPLE = `AutoFocusInput() -> RUIVNode {
+export const REF_FOCUS_EXAMPLE = `AutoFocusInput() -> RuitkVNode {
   var input_ref = useRef(null)
 
   var focus_on_mount = func():
@@ -48,7 +48,7 @@ export const REF_FOCUS_EXAMPLE = `AutoFocusInput() -> RUIVNode {
 }`
 
 export const REF_IMPERATIVE_EXAMPLE = `# A child builds an imperative handle over its own node/state.
-FancyInput() -> RUIVNode {
+FancyInput() -> RuitkVNode {
   var input_ref = useRef(null)
   var val = useState("")
 
@@ -67,7 +67,7 @@ FancyInput() -> RUIVNode {
 }
 
 # A parent gets the handle by passing its own ref box down as a prop.
-FormHost() -> RUIVNode {
+FormHost() -> RuitkVNode {
   var child = useRef(null)   # will hold FancyInput's handle
   return (
     <VBoxContainer>
@@ -79,7 +79,7 @@ FormHost() -> RUIVNode {
   )
 }`
 
-export const KEY_BASIC_EXAMPLE = `TodoList() -> RUIVNode {
+export const KEY_BASIC_EXAMPLE = `TodoList() -> RuitkVNode {
   var items = useState(["Buy milk", "Walk dog"])
 
   return (
@@ -102,7 +102,7 @@ export const KEY_INDEX_ANTIPATTERN = `# BAD — using the loop index as key brea
   <TodoItem todo={ todo } key={ str(todo.id) } />
 }`
 
-export const KEY_REORDER_EXAMPLE = `ReorderDemo() -> RUIVNode {
+export const KEY_REORDER_EXAMPLE = `ReorderDemo() -> RuitkVNode {
   var items = useState(["A", "B", "C", "D", "E"])
 
   var shuffle = func():
@@ -124,14 +124,14 @@ export const KEY_REORDER_EXAMPLE = `ReorderDemo() -> RUIVNode {
   )
 }`
 
-export const KEY_RESET_EXAMPLE = `UserProfile(user_id) -> RUIVNode {
+export const KEY_RESET_EXAMPLE = `UserProfile(user_id) -> RuitkVNode {
   # Changing key forces a full unmount + remount of the child.
   return (
     <ProfileContent key={ user_id } user_id={ user_id } />
   )
 }
 
-ProfileContent(user_id) -> RUIVNode {
+ProfileContent(user_id) -> RuitkVNode {
   # All hooks reset when key changes — fresh state for each user.
   var data = useState(null)
 

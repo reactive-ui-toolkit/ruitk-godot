@@ -31,7 +31,7 @@ Requires **Godot 4.4+** (tested on 4.7).
 Create `hello.guitkx` anywhere in your project:
 
 ```
-Hello() -> RUIVNode {
+Hello() -> RuitkVNode {
   var count = useState(0)
   return (
     <VBoxContainer style={ {"separation": 8} }>
@@ -46,7 +46,7 @@ Saving it generates a sibling `hello.gd` (the addon's watcher compiles automatic
 from any scene script:
 
 ```gdscript
-var root := RUIReconciler.create_root(self)
+var root := RuitkReconciler.create_root(self)
 root.render(V.fc(V.comp("res://hello.gd"), {}))
 ```
 
@@ -58,7 +58,7 @@ strict, and the error tells you the exact import to add):
 ```
 import { Hello } from "./hello"
 
-export Screen() -> RUIVNode {
+export Screen() -> RuitkVNode {
   return ( <PanelContainer><Hello /></PanelContainer> )
 }
 ```

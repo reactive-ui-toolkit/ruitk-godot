@@ -1,4 +1,4 @@
-class_name RUIStyle
+class_name RuitkStyle
 extends RefCounted
 ## Declarative styling for Godot Controls. Godot has no USS/CSS: styling is Control
 ## properties + size flags (layout) and Theme overrides / StyleBox (paint). This layer

@@ -1,4 +1,4 @@
-class_name RUIGuitkxDiag
+class_name RuitkGuitkxDiag
 extends RefCounted
 ## Structured diagnostics for the .guitkx compiler (SYNTAX_PARITY_EXECUTION_PLAN T0.2). ONE shape
 ## everywhere: { code, severity, message, offset, length } where `offset`/`length` are CHARACTER

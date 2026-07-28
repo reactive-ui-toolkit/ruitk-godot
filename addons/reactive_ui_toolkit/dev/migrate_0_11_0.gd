@@ -1,7 +1,7 @@
 extends SceneTree
 ## 0.11.0 ES-modules modernization runner (SHIPPED with the addon, like dev/migrate_0_10_0.gd):
 ## rewrite every `.guitkx` in YOUR project to plain, signature-classified declarations —
-## `component X {}` becomes `X() -> RUIVNode {}`, `hook use_x {}` becomes `use_x {}`,
+## `component X {}` becomes `X() -> RuitkVNode {}`, `hook use_x {}` becomes `use_x {}`,
 ## `module M { … }` hoists its members to top level (+ `@class_name M` so the binding stays M),
 ## and imports of hoisted modules flip to `import * as M`. Idempotent + re-runnable; run once
 ## after updating to 0.11.0:

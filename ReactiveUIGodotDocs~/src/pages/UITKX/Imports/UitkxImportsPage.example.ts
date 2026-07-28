@@ -3,7 +3,7 @@
 export const EXAMPLE_IMPORT_BASIC = `import { StatusChip } from "./status_chip"
 import * as DoomHudStyles from "~/demos/doom/doom_hud_styles"
 
-export Hud(level: int = 1) -> RUIVNode {
+export Hud(level: int = 1) -> RuitkVNode {
 	var styles = DoomHudStyles.for_level(level)
 	return (
 		<PanelContainer>
@@ -40,11 +40,11 @@ export const EXAMPLE_EXPORT = `# A file may hold several plain declarations; \`e
 # across files. The binding (the file's class_name) is the @class_name
 # override, else the first exported decl.
 
-export Hud() -> RUIVNode {
+export Hud() -> RuitkVNode {
 	return ( <LocalRow /> )
 }
 
-LocalRow() -> RUIVNode {      # no export = file-private, unreachable from other files
+LocalRow() -> RuitkVNode {      # no export = file-private, unreachable from other files
 	return ( <Label text="row" /> )
 }
 

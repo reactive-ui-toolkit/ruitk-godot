@@ -19,15 +19,15 @@ func _run() -> void:
 	await _smoke("Doom (Phase 1 static frame)", DoomGameScreen.render)
 	await _test_root_fills()
 	await _test_diagnostics_buttons()
-	RUIDiagnostics.enabled = false   # demos may have toggled these
-	RUIConfig.time_slicing = false
+	RuitkDiagnostics.enabled = false   # demos may have toggled these
+	RuitkConfig.time_slicing = false
 	print("\n[demos_test] %d passed, %d failed" % [_passes, _fails])
 	quit(1 if _fails > 0 else 0)
 
 func _smoke(title: String, fn: Callable) -> void:
 	var c := Control.new()
 	root.add_child(c)
-	var app := ReactiveRoot.create(c, V.fc(fn))
+	var app := RuitkRoot.create(c, V.fc(fn))
 	await process_frame
 	await process_frame   # let mount-effects (e.g. portal) settle
 	if c.get_child_count() > 0:
@@ -43,7 +43,7 @@ func _test_root_fills() -> void:
 	var c := Control.new()
 	c.size = Vector2(900, 640)
 	root.add_child(c)
-	var app := ReactiveRoot.create(c, V.fc(DemoGallery.render))
+	var app := RuitkRoot.create(c, V.fc(DemoGallery.render))
 	await process_frame
 	var hbox: Control = c.get_child(0)
 	var fills: bool = hbox.size.x >= 880 and hbox.size.y >= 620
@@ -57,10 +57,10 @@ func _test_root_fills() -> void:
 
 ## The Diagnostics demo's buttons must actually move the displayed numbers.
 func _test_diagnostics_buttons() -> void:
-	RUIDiagnostics.reset()
+	RuitkDiagnostics.reset()
 	var c := Control.new()
 	root.add_child(c)
-	var app := ReactiveRoot.create(c, V.fc(DemoDiagnostics.render))
+	var app := RuitkRoot.create(c, V.fc(DemoDiagnostics.render))
 	await process_frame
 	await process_frame
 	var labels: Array = []

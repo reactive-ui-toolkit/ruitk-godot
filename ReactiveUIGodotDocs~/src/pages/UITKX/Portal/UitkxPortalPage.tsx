@@ -27,7 +27,7 @@ export const UitkxPortalPage: FC = () => (
       Signature
     </Typography>
     <CodeBlock language="gdscript" code={`# V is the vnode factory. target is any live Godot Node to parent into.
-static func portal(target: Node, children = null, key = null) -> RUIVNode`} />
+static func portal(target: Node, children = null, key = null) -> RuitkVNode`} />
 
     <Typography variant="h5" component="h2" gutterBottom>
       Basic usage

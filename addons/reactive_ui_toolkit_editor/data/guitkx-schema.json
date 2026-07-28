@@ -8,7 +8,7 @@
   "declarations": [
     { "keyword": "export", "description": "Mark a declaration cross-file visible (`export Name...`), defer marks with `export { a, b }`, or set the default with `export default Name`." },
     { "keyword": "import", "description": "Bind other files: `import { a, b as c } from ...`, `import * as X from ...`, `import X from ...` (default). Specifiers are extensionless ./ ../ ~/ paths." },
-    { "keyword": "component", "description": "DEPRECATED wrapper (0.11.0): write a plain declaration instead -- `Name(params) -> RUIVNode { ... }`. The annotation IS the classification." },
+    { "keyword": "component", "description": "DEPRECATED wrapper (0.11.0): write a plain declaration instead -- `Name(params) -> RuitkVNode { ... }`. The annotation IS the classification." },
     { "keyword": "hook", "description": "DEPRECATED wrapper (0.11.0): write a plain `use_name(params) { ... }` declaration -- the use_ prefix IS the classification." },
     { "keyword": "module", "description": "DEPRECATED wrapper (0.11.0): a FILE is the module now -- declare several plain decls and `import * as X` to consume them qualified." }
   ],

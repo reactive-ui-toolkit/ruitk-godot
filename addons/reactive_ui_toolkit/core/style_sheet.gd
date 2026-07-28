@@ -1,7 +1,7 @@
-class_name RUIStyleSheet
+class_name RuitkStyleSheet
 extends RefCounted
 ## A tiny userland "stylesheet" registry (Phase 7.11) — the reduced-scope analog of UITKX's USS
-## classes (decision #3). It maps a class name to a plain style Dictionary (the same shape RUIStyle
+## classes (decision #3). It maps a class name to a plain style Dictionary (the same shape RuitkStyle
 ## consumes). A host element's `classes: ["card", "primary"]` prop is resolved against this registry
 ## at apply time and merged left-to-right, with the element's inline `style` winning last.
 ##
@@ -9,8 +9,8 @@ extends RefCounted
 ## inheritance — just an ordered dictionary merge. For real theming, use Godot's Theme/StyleBox
 ## (via `style`) or `theme_type_variation`; this is sugar for sharing named style bundles.
 ##
-##   RUIStyleSheet.register("card", { "bg_color": Color(0.15,0.15,0.18), "corner_radius_all": 8, "content_margin_all": 12 })
-##   RUIStyleSheet.merge({ "danger": { "font_color": Color.RED }, "muted": { "font_color": Color.GRAY } })
+##   RuitkStyleSheet.register("card", { "bg_color": Color(0.15,0.15,0.18), "corner_radius_all": 8, "content_margin_all": 12 })
+##   RuitkStyleSheet.merge({ "danger": { "font_color": Color.RED }, "muted": { "font_color": Color.GRAY } })
 ##   V.PanelContainer({ "classes": ["card", "danger"], "style": { "content_margin_all": 16 } }, [...])   # overrides card
 
 static var _sheets: Dictionary = {}

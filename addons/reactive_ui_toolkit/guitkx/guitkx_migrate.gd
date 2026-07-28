@@ -1,4 +1,4 @@
-class_name RUIGuitkxMigrate
+class_name RuitkGuitkxMigrate
 extends RefCounted
 ## The 0.10.0 import-migration CODEMOD (§M6). Rewrites every `.guitkx` in place so the tree satisfies
 ## strict cross-file resolution: (a) prefix `export ` onto EVERY top-level declaration (export-
@@ -169,7 +169,7 @@ static func _walk(dir: String, out: Array) -> void:
 # insertion (the shipped 0.10.0 migrate_source, unchanged) -> hoist wrapper modules to top-level
 # plain declarations (+ `@class_name M` so the binding/global identity survives -- the G-07 hatch
 # doing exactly its job) -> rewrite the remaining `component`/`hook` wrapper keywords to plain
-# E-01 declarations (components gain the `-> RUIVNode` annotation THAT IS the classification) ->
+# E-01 declarations (components gain the `-> RuitkVNode` annotation THAT IS the classification) ->
 # flip importers of hoisted modules to `import * as M` when they consume M qualified (`M.x`).
 # Idempotent + re-runnable: a plain-syntax tree reports 0 changed. Runner:
 # dev/migrate_0_11_0.gd (always whole-project, like migrate_0_10_0.gd).
@@ -288,7 +288,7 @@ static func _hoist_module(src: String, row: Dictionary) -> String:
 		replacement += "\n"
 	return src.substr(0, int(row["start"])) + replacement + src.substr(int(row["next"]))
 
-## `[export ]component X[(params)] {` -> `[export ]X(params) -> RUIVNode {` -- the annotation IS
+## `[export ]component X[(params)] {` -> `[export ]X(params) -> RuitkVNode {` -- the annotation IS
 ## the E-01 classification; `()` is added when absent (formatter canon). Header whitespace
 ## normalizes; the body is untouched.
 static func _rewrite_component_header(src: String, row: Dictionary) -> String:
@@ -308,7 +308,7 @@ static func _rewrite_component_header(src: String, row: Dictionary) -> String:
 	var j := Compiler._skip_ws_only(src, after)
 	if j >= n or src[j] != "{":
 		return src
-	return src.substr(0, at) + "%s%s -> RUIVNode " % [name, params_txt] + src.substr(j)
+	return src.substr(0, at) + "%s%s -> RuitkVNode " % [name, params_txt] + src.substr(j)
 
 ## `[export ]hook use_x…` -> `[export ]use_x…` (keyword dropped; params/ret/body untouched).
 static func _rewrite_hook_header(src: String, row: Dictionary) -> String:

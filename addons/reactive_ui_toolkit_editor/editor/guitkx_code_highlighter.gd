@@ -66,7 +66,7 @@ func _es_color(es: EditorSettings, name: String, fallback: Color) -> Color:
 
 func _get_line_syntax_highlighting(line: int) -> Dictionary:
 	# Honoured live (cheap ProjectSettings lookup) so toggling KEY_HIGHLIGHTING needs no plugin reload.
-	if not RUIEditorSettings.is_enabled(RUIEditorSettings.KEY_HIGHLIGHTING):
+	if not RuitkEditorSettings.is_enabled(RuitkEditorSettings.KEY_HIGHLIGHTING):
 		return {}
 	if _dim_lines.has(line):
 		return { 0: { "color": _c_dim } }

@@ -18,7 +18,7 @@ const HOOKS := {
 	"useImperativeHandle": "**useImperativeHandle**(factory: Callable, deps = [])",
 	"useEffect": "**useEffect**(effect: Callable, deps = null)\n\nRun a side effect after commit; return a Callable to clean up. `deps = []` runs once on mount.",
 	"useLayoutEffect": "**useLayoutEffect**(effect: Callable, deps = null)\n\nLike `useEffect` but runs synchronously after layout.",
-	"createContext": "**createContext**(default = null, name = \"\") → `RUIContext`\n\nA context handle for `provideContext` / `useContext` (object identity — no string-key collisions).",
+	"createContext": "**createContext**(default = null, name = \"\") → `RuitkContext`\n\nA context handle for `provideContext` / `useContext` (object identity — no string-key collisions).",
 	"useContext": "**useContext**(key) → value\n\nRead the nearest provided value for a context handle (or string key).",
 	"provideContext": "**provideContext**(key, value)\n\nProvide a context value to the subtree below.",
 	"useDeferredValue": "**useDeferredValue**(value, deps = null)",
@@ -27,7 +27,7 @@ const HOOKS := {
 	"useStableFunc": "**useStableFunc**(cb: Callable) → `Callable`",
 	"useStableAction": "**useStableAction**(cb: Callable) → `Callable`",
 	"useSafeArea": "**useSafeArea**() → `Dictionary`",
-	"useSignal": "**useSignal**(sig: RUISignal, selector = null, comparer = null)",
+	"useSignal": "**useSignal**(sig: RuitkSignal, selector = null, comparer = null)",
 	"useSignalKey": "**useSignalKey**(key: String, initial = null, selector = null, comparer = null)",
 	"useTween": "**useTween**(ref, property: String, to, duration: float, deps = [])",
 	"useTweenValue": "**useTweenValue**(from, to, duration: float, on_update: Callable, deps = [])",
@@ -88,11 +88,11 @@ static func _tag_hover(word: String) -> String:
 	if GuitkxWorkspace.is_component(word):
 		var e := GuitkxWorkspace.lookup(word)
 		# M7.1 kind-aware hover: kind + export/default badges from the declaring file's decl
-		# table (cached per source hash -- RUIGuitkxResolve.decl_table).
+		# table (cached per source hash -- RuitkGuitkxResolve.decl_table).
 		var badge := "user component"
 		var epath := str(e.get("path", ""))
 		if epath != "":
-			var tbl: Dictionary = RUIGuitkxResolve.decl_table(epath)
+			var tbl: Dictionary = RuitkGuitkxResolve.decl_table(epath)
 			var dd = (tbl["decls"] as Dictionary).get(str(e.get("name", word)))
 			if dd is Dictionary:
 				badge = "user %s" % str((dd as Dictionary)["kind"])

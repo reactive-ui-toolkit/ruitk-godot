@@ -111,7 +111,7 @@ export const AssetsPage: FC = () => (
       <Typography variant="body2" paragraph sx={{ mt: 1, opacity: 0.7 }}>
         For a single StyleBox instead of a whole Theme, drop a <code>.stylebox.tres</code> into
         the <code>styleboxes</code> theme channel of a <code>style</code> dict — or let{' '}
-        <code>RUIStyle</code> build one from <code>bg_color</code> / <code>border_*</code> /{' '}
+        <code>RuitkStyle</code> build one from <code>bg_color</code> / <code>border_*</code> /{' '}
         <code>pad</code> for you. See the <strong>Styling</strong> page.
       </Typography>
     </Box>

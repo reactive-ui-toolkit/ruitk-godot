@@ -1,4 +1,4 @@
-class_name RUIGuitkxLexer
+class_name RuitkGuitkxLexer
 extends RefCounted
 ## The load-bearing scanner for the .guitkx compiler — the GDScript-lexis port of uitkx's
 ## string/char/comment-skipping state machine (which appears 3x in the C# code). Everything

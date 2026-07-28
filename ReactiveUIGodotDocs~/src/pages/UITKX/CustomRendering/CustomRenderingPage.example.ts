@@ -42,7 +42,7 @@ export scatter(canvas: CanvasItem) -> void {
 // is a new callable, so the node repaints whenever its owner re-renders.
 export const CUSTOM_RENDERING_PAINTER_EXAMPLE = `import * as DrawHelpers from "./draw_helpers"
 
-PolygonCanvas() -> RUIVNode {
+PolygonCanvas() -> RuitkVNode {
   var sides = useState(3)
 
   return (
@@ -58,7 +58,7 @@ PolygonCanvas() -> RUIVNode {
 // Drawing that depends on state, toggled by a button.
 export const CUSTOM_RENDERING_RAW_MESH_EXAMPLE = `import * as DrawHelpers from "./draw_helpers"
 
-QuadCanvas() -> RUIVNode {
+QuadCanvas() -> RuitkVNode {
   var blue = useState(true)
 
   return (
@@ -73,7 +73,7 @@ QuadCanvas() -> RUIVNode {
 // Stable callback + redraw_key: repaint on demand WITHOUT changing the callback.
 export const CUSTOM_RENDERING_REDRAW_KEY_EXAMPLE = `import * as DrawHelpers from "./draw_helpers"
 
-ScatterCanvas() -> RUIVNode {
+ScatterCanvas() -> RuitkVNode {
   var tick = useState(0)
 
   // A stable callable: its identity never changes between renders, so the node

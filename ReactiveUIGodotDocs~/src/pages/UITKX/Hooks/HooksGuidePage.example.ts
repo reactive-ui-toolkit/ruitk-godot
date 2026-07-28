@@ -1,4 +1,4 @@
-export const HOOKS_USESTATE_EXAMPLE = `CounterDemo() -> RUIVNode {
+export const HOOKS_USESTATE_EXAMPLE = `CounterDemo() -> RuitkVNode {
   # useState returns [value, setter]. Destructure by index.
   var count = useState(0)
 
@@ -14,7 +14,7 @@ export const HOOKS_USESTATE_EXAMPLE = `CounterDemo() -> RUIVNode {
   )
 }`
 
-export const HOOKS_USEREDUCER_EXAMPLE = `ReducerDemo() -> RUIVNode {
+export const HOOKS_USEREDUCER_EXAMPLE = `ReducerDemo() -> RuitkVNode {
   # reducer(state, action) -> new_state. Actions are just values (here: String).
   var reducer = func(state, action):
     match action:
@@ -36,7 +36,7 @@ export const HOOKS_USEREDUCER_EXAMPLE = `ReducerDemo() -> RUIVNode {
   )
 }`
 
-export const HOOKS_USEEFFECT_EXAMPLE = `EffectDemo() -> RUIVNode {
+export const HOOKS_USEEFFECT_EXAMPLE = `EffectDemo() -> RuitkVNode {
   var seconds = useState(0)
 
   # [] => run once on mount. The effect returns a cleanup Callable (run on unmount).
@@ -56,7 +56,7 @@ export const HOOKS_USEEFFECT_EXAMPLE = `EffectDemo() -> RUIVNode {
   return (<Label text={ "Elapsed: %ds" % seconds[0] } />)
 }`
 
-export const HOOKS_USELAYOUTEFFECT_EXAMPLE = `LayoutMeasure() -> RUIVNode {
+export const HOOKS_USELAYOUTEFFECT_EXAMPLE = `LayoutMeasure() -> RuitkVNode {
   var el_ref = useRef(null)     # Control ref box
   var width = useState(0.0)
 
@@ -74,7 +74,7 @@ export const HOOKS_USELAYOUTEFFECT_EXAMPLE = `LayoutMeasure() -> RUIVNode {
   )
 }`
 
-export const HOOKS_USEMEMO_EXAMPLE = `ExpensiveList() -> RUIVNode {
+export const HOOKS_USEMEMO_EXAMPLE = `ExpensiveList() -> RuitkVNode {
   var filter = useState("")
   var items = useState(get_all_items())   # an Array
 
@@ -93,7 +93,7 @@ export const HOOKS_USEMEMO_EXAMPLE = `ExpensiveList() -> RUIVNode {
   )
 }`
 
-export const HOOKS_USECALLBACK_EXAMPLE = `StableCallback() -> RUIVNode {
+export const HOOKS_USECALLBACK_EXAMPLE = `StableCallback() -> RuitkVNode {
   var count = useState(0)
 
   # Returns a Callable whose identity is stable while deps are unchanged.
@@ -107,7 +107,7 @@ export const HOOKS_USECALLBACK_EXAMPLE = `StableCallback() -> RUIVNode {
   )
 }`
 
-export const HOOKS_USEREF_EXAMPLE = `RefDemo() -> RUIVNode {
+export const HOOKS_USEREF_EXAMPLE = `RefDemo() -> RuitkVNode {
   # Mutable value ref — persists across renders, no re-render on change.
   var render_count = useRef(0)
   render_count["current"] += 1
@@ -133,7 +133,7 @@ export const HOOKS_CONTEXT_EXAMPLE = `# ============ theme_provider.guitkx =====
 # Two files -- the provider imports the card it renders (cross-file refs are explicit since 0.10).
 import { ThemedCard } from "./themed_card"
 
-export ThemeProvider() -> RUIVNode {
+export ThemeProvider() -> RuitkVNode {
   Hooks.provideContext("theme", "dark")
 
   return (
@@ -145,7 +145,7 @@ export ThemeProvider() -> RUIVNode {
 
 # ============ themed_card.guitkx ============
 # Consumer component — any depth in the subtree; \`export\` makes it importable
-export ThemedCard() -> RUIVNode {
+export ThemedCard() -> RuitkVNode {
   var theme = useContext("theme")   # "dark"
 
   return (
@@ -158,7 +158,7 @@ export ThemedCard() -> RUIVNode {
   )
 }`
 
-export const HOOKS_STABLE_EXAMPLE = `EventOptimization() -> RUIVNode {
+export const HOOKS_STABLE_EXAMPLE = `EventOptimization() -> RuitkVNode {
   var name = useState("")
 
   # useStableAction wraps a 1-arg callback with a stable identity that always
@@ -176,7 +176,7 @@ export const HOOKS_STABLE_EXAMPLE = `EventOptimization() -> RUIVNode {
   )
 }`
 
-export const HOOKS_DEFERRED_EXAMPLE = `SearchResults() -> RUIVNode {
+export const HOOKS_DEFERRED_EXAMPLE = `SearchResults() -> RuitkVNode {
   var query = useState("")
 
   # Deferred value lags one frame behind: the LineEdit updates immediately while
@@ -191,7 +191,7 @@ export const HOOKS_DEFERRED_EXAMPLE = `SearchResults() -> RUIVNode {
   )
 }`
 
-export const HOOKS_IMPERATIVE_EXAMPLE = `FancyInput(handle_ref) -> RUIVNode {
+export const HOOKS_IMPERATIVE_EXAMPLE = `FancyInput(handle_ref) -> RuitkVNode {
   var input_ref = useRef(null)
   var val = useState("")
 

@@ -1,6 +1,6 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoCounter() -> RUIVNode {
+export DemoCounter() -> RuitkVNode {
   var s = useState(0)
   return (
     <DemoBox title="Counter — useState">

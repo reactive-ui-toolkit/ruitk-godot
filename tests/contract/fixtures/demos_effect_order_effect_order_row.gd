@@ -6,7 +6,7 @@ const __RUI_HOOK_SIG := "useEffect"
 
 const __RUI_KIND := "component"
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var idx = props.get("idx")
 	var append = props.get("append")
 	var eff = func():

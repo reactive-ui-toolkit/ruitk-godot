@@ -3,7 +3,7 @@ import { Box, List, ListItem, ListItemText, Typography } from '@mui/material'
 import { CodeBlock } from '../../../components/CodeBlock/CodeBlock'
 import Styles from '../../Introduction/IntroductionPage.style'
 
-const QUICK_SAMPLE = `CounterCard() -> RUIVNode {
+const QUICK_SAMPLE = `CounterCard() -> RuitkVNode {
   var s = useState(0)
   return (
     <VBoxContainer>

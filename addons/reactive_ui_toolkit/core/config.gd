@@ -1,4 +1,4 @@
-class_name RUIConfig
+class_name RuitkConfig
 extends RefCounted
 ## Global reactive-UI configuration.
 ##
@@ -7,8 +7,8 @@ extends RefCounted
 ## render phase is then chunked across frames (commit stays atomic). Ports the frame-budget
 ## idea from ReactiveUIToolKit's RenderScheduler.
 ##
-##   RUIConfig.time_slicing = true
-##   RUIConfig.frame_budget_ms = 8.0   # work per frame before parking until the next one
+##   RuitkConfig.time_slicing = true
+##   RuitkConfig.frame_budget_ms = 8.0   # work per frame before parking until the next one
 
 static var time_slicing := false
 static var frame_budget_ms := 8.0

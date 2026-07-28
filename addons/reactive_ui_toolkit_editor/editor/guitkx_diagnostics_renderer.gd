@@ -4,15 +4,15 @@ extends RefCounted
 ## Turns the .guitkx compiler's STRUCTURED diagnostics into on-CodeEdit visuals (a gutter icon + a
 ## faint line tint) and structured records for the Problems panel.
 ##
-## Since T0.2, RUIGuitkx.compile() returns diagnostics as Dictionaries
+## Since T0.2, RuitkGuitkx.compile() returns diagnostics as Dictionaries
 ## { code, severity, message, offset, length } with `offset` a character position into the compiled
-## source -- so the line is EXACT (offset -> line via RUIGuitkxDiag.line_col), no token-search
+## source -- so the line is EXACT (offset -> line via RuitkGuitkxDiag.line_col), no token-search
 ## guessing. A diagnostic with offset -1 ("whole file") anchors to line 0.
 
 # Lazy cross-addon load, NOT a parse-time preload: a const preload of a reactive_ui_toolkit path makes
 # this script (and everything that names it) fail to compile whenever the dependency is absent —
 # before the plugin's friendly dependency check can run (parity plan S1). The plugin gates all
-# loads on RUIEditorDeps.satisfied(), so by the time render() runs the file exists.
+# loads on RuitkEditorDeps.satisfied(), so by the time render() runs the file exists.
 static var _diag: GDScript = null
 
 static func _diag_cls() -> GDScript:

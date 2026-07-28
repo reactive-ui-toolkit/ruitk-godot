@@ -1,4 +1,4 @@
-class_name RUIGuitkxConfig
+class_name RuitkGuitkxConfig
 extends RefCounted
 ## `guitkx.config.json` discovery for the COMPILER (0.10.0 imports leg, §M3). Walk up from a file's
 ## folder to `res://`; the NEAREST config wins with NO merge — a formatter-only config in a subdir

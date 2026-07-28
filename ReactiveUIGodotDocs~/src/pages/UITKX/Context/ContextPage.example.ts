@@ -1,7 +1,7 @@
 export const CONTEXT_HANDLE_API = `# Create a context handle (React parity for createContext). Declare it once —
 # a top-level value or a script static — and share the SAME handle between
 # provider and consumers.
-Hooks.createContext(default_value = null, name = "") -> RUIContext
+Hooks.createContext(default_value = null, name = "") -> RuitkContext
 
 # Provide a value for all descendants (call inside a component's setup body).
 Hooks.provideContext(handle_or_key, value) -> void
@@ -17,10 +17,10 @@ class_name AppContexts
 extends RefCounted
 
 # The argument is the DEFAULT returned by useContext(Theme) when unprovided.
-static var Theme: RUIContext = Hooks.createContext({ "accent": Color.CYAN }, "Theme")
+static var Theme: RuitkContext = Hooks.createContext({ "accent": Color.CYAN }, "Theme")
 
 # ── Provider ────────────────────────────────────────────────
-AppRoot(my_theme: Dictionary) -> RUIVNode {
+AppRoot(my_theme: Dictionary) -> RuitkVNode {
   # Pass the HANDLE (not a string) plus the value.
   Hooks.provideContext(AppContexts.Theme, my_theme)
 
@@ -32,7 +32,7 @@ AppRoot(my_theme: Dictionary) -> RUIVNode {
 }
 
 # ── Consumer ────────────────────────────────────────────────
-Toolbar() -> RUIVNode {
+Toolbar() -> RuitkVNode {
   # Pass the same handle. Returns my_theme, or the handle's default if no
   # AppRoot provided one above this component.
   var theme = Hooks.useContext(AppContexts.Theme)
@@ -52,7 +52,7 @@ export const CONTEXT_HANDLE_MODULE_EXAMPLE = `# Idiomatic single-file form: the 
 
 Theme := Hooks.createContext({ "accent": Color.CYAN }, "Theme")
 
-ThemePanel(accent: Color = Color.MAGENTA) -> RUIVNode {
+ThemePanel(accent: Color = Color.MAGENTA) -> RuitkVNode {
   # Provide overrides the default for this subtree.
   Hooks.provideContext(ThemePanel.Theme, { "accent": accent })
 
@@ -63,7 +63,7 @@ ThemePanel(accent: Color = Color.MAGENTA) -> RUIVNode {
   )
 }
 
-AccentDot() -> RUIVNode {
+AccentDot() -> RuitkVNode {
   # If no ThemePanel provided a value above, this returns { "accent": Color.CYAN }
   # — the handle's default — rather than null.
   var theme = Hooks.useContext(ThemePanel.Theme)
@@ -74,7 +74,7 @@ AccentDot() -> RUIVNode {
 }`
 
 export const CONTEXT_BASIC_EXAMPLE = `# Provider — makes a value available to all descendants
-AppRoot() -> RUIVNode {
+AppRoot() -> RuitkVNode {
   Hooks.provideContext("user_name", "Alice")
   Hooks.provideContext("theme", "dark")
 
@@ -87,7 +87,7 @@ AppRoot() -> RUIVNode {
 }
 
 # Consumer — reads the value anywhere in the subtree
-Sidebar() -> RUIVNode {
+Sidebar() -> RuitkVNode {
   var user_name = useContext("user_name")
   var theme = useContext("theme")
 
@@ -98,7 +98,7 @@ Sidebar() -> RUIVNode {
   )
 }`
 
-export const CONTEXT_SHADOWING_EXAMPLE = `OuterProvider() -> RUIVNode {
+export const CONTEXT_SHADOWING_EXAMPLE = `OuterProvider() -> RuitkVNode {
   Hooks.provideContext("theme", "light")
 
   return (
@@ -109,7 +109,7 @@ export const CONTEXT_SHADOWING_EXAMPLE = `OuterProvider() -> RUIVNode {
   )
 }
 
-InnerProvider() -> RUIVNode {
+InnerProvider() -> RuitkVNode {
   Hooks.provideContext("theme", "dark")   # shadows outer
 
   return (
@@ -119,7 +119,7 @@ InnerProvider() -> RUIVNode {
   )
 }`
 
-export const CONTEXT_DYNAMIC_EXAMPLE = `ThemeToggle() -> RUIVNode {
+export const CONTEXT_DYNAMIC_EXAMPLE = `ThemeToggle() -> RuitkVNode {
   var dark = useState(true)
   Hooks.provideContext("theme", "dark" if dark[0] else "light")
 
@@ -132,7 +132,7 @@ export const CONTEXT_DYNAMIC_EXAMPLE = `ThemeToggle() -> RUIVNode {
   )
 }
 
-ThemedPanel() -> RUIVNode {
+ThemedPanel() -> RuitkVNode {
   var theme = useContext("theme")
   # Automatically re-renders when the provided value changes
 
@@ -151,7 +151,7 @@ export const CONTEXT_VS_SIGNALS = `# Use context when:
 # - Different parts of the tree need different values
 # - Provider/consumer relationship is 1-to-many within a branch
 
-# Use signals (RUISignal / useSignalKey) when:
+# Use signals (RuitkSignal / useSignalKey) when:
 # - Data is truly global (e.g., user session, app-wide settings)
 # - Multiple independent trees need the same value
 # - You want process-wide reactivity without a component hierarchy`
@@ -167,7 +167,7 @@ const LOCALE := "app.locale"
 const AUTH := "app.auth"
 
 # Provider
-AppShell(current_theme, auth_state) -> RUIVNode {
+AppShell(current_theme, auth_state) -> RuitkVNode {
   Hooks.provideContext(AppContextKeys.THEME, current_theme)
   Hooks.provideContext(AppContextKeys.LOCALE, "en-US")
   Hooks.provideContext(AppContextKeys.AUTH, auth_state)
@@ -175,7 +175,7 @@ AppShell(current_theme, auth_state) -> RUIVNode {
 }
 
 # Consumer
-LocalizedLabel() -> RUIVNode {
+LocalizedLabel() -> RuitkVNode {
   var locale = useContext(AppContextKeys.LOCALE)
   # ...
 }`

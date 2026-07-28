@@ -1,4 +1,4 @@
-class_name RUIRouter
+class_name RuitkRouter
 extends RefCounted
 ## React-Router-style routing built on the reactive core (context + hooks). All pieces are static
 ## render functions used via the V.router/route/routes/outlet/navigate/nav_link/link helpers. This
@@ -21,13 +21,13 @@ extends RefCounted
 ## Legacy table routing (kept working): V.routes({ "routes": [ { "path", "component" }, ... ] }).
 ##
 ## Hooks (call from any descendant component):
-##   RUIRouter.useNavigate(replace := false) -> func(path, state := null) -> bool
-##   RUIRouter.useLocation()    -> current path String
-##   RUIRouter.useQuery()       -> { ... } decoded query
-##   RUIRouter.useParams()      -> { "id": "1", ... } for the matched route
-##   RUIRouter.useMatches()     -> [RUIRouteMatch ...] root -> current
-##   RUIRouter.useGo() / useCanGo(delta) / useResolvedPath(to) / useSearchParams()
-##   RUIRouter.useBlocker(blocker, enabled) / usePrompt(when, message)
+##   RuitkRouter.useNavigate(replace := false) -> func(path, state := null) -> bool
+##   RuitkRouter.useLocation()    -> current path String
+##   RuitkRouter.useQuery()       -> { ... } decoded query
+##   RuitkRouter.useParams()      -> { "id": "1", ... } for the matched route
+##   RuitkRouter.useMatches()     -> [RuitkRouteMatch ...] root -> current
+##   RuitkRouter.useGo() / useCanGo(delta) / useResolvedPath(to) / useSearchParams()
+##   RuitkRouter.useBlocker(blocker, enabled) / usePrompt(when, message)
 
 # --- context keys ------------------------------------------------------------
 # Split nav/loc (M4): NAV_CTX is memoized (stable identity) so navigate-only consumers don't
@@ -47,11 +47,11 @@ const OUTLET_CONTEXT := "__rui_router_outlet_context"
 # --- per-route context entry (owner-stamped; used for nav-base + parent-chain resolution) ----
 class RouteContextEntry:
 	extends RefCounted
-	var route_match: RUIRouteMatch
+	var route_match: RuitkRouteMatch
 	var navigation_base: String
 	var parent: RouteContextEntry
-	var owner   # the RUIComponentState that published this entry (identity stamp)
-	func _init(m: RUIRouteMatch, nb: String, p: RouteContextEntry, o) -> void:
+	var owner   # the RuitkComponentState that published this entry (identity stamp)
+	func _init(m: RuitkRouteMatch, nb: String, p: RouteContextEntry, o) -> void:
 		route_match = m
 		navigation_base = "/" if (nb == null or nb == "") else nb
 		parent = p
@@ -61,7 +61,7 @@ static var _root_entry_cache: RouteContextEntry = null
 
 static func _root_entry() -> RouteContextEntry:
 	if _root_entry_cache == null:
-		_root_entry_cache = RouteContextEntry.new(RUIRouteMatch.create_root("/"), "/", null, null)
+		_root_entry_cache = RouteContextEntry.new(RuitkRouteMatch.create_root("/"), "/", null, null)
 	return _root_entry_cache
 
 # =============================================================================
@@ -75,7 +75,7 @@ static func provider(props: Dictionary, children: Array):
 	if existing_owner != null and existing_owner != Hooks._cur and not nest_warned["current"]:
 		nest_warned["current"] = true
 		var nmsg := "[Router] <Router> cannot be nested inside another <Router>. Use a single root <Router> and compose <Route>s underneath it; for a sub-section use <Routes>. (Degrading: the inner router will shadow the outer for its subtree.)"
-		RUIDiagnostics.emit(nmsg)
+		RuitkDiagnostics.emit(nmsg)
 		push_error(nmsg)
 
 	var provided_history = props.get("history", null)
@@ -84,10 +84,10 @@ static func provider(props: Dictionary, children: Array):
 	var basename := "/" if (basename_in == null or str(basename_in) == "") else str(basename_in)
 
 	var resolved_history = Hooks.useMemo(func():
-		return provided_history if provided_history != null else RUIHistory.new(initial_path)
+		return provided_history if provided_history != null else RuitkHistory.new(initial_path)
 	, [provided_history, initial_path])
 
-	var loc_state := Hooks.useState(resolved_history.location_obj() if resolved_history != null else RUIRouterLocation.parse("/"))
+	var loc_state := Hooks.useState(resolved_history.location_obj() if resolved_history != null else RuitkRouterLocation.parse("/"))
 	var location = loc_state[0]
 	var set_location: Callable = loc_state[1]
 
@@ -110,12 +110,12 @@ static func provider(props: Dictionary, children: Array):
 	# app-relative); navigation re-attaches it. Memoized so LOC_CTX identity is stable between navs.
 	var visible_location = Hooks.useMemo(func():
 		if location == null:
-			return RUIRouterLocation.parse("/")
-		return RUIRouterLocation.new(RUIRouterPath.strip_basename(location.path, basename), location.query, location.state)
+			return RuitkRouterLocation.parse("/")
+		return RuitkRouterLocation.new(RuitkRouterPath.strip_basename(location.path, basename), location.query, location.state)
 	, [location, basename])
 	Hooks.provideContext(LOC_CTX, visible_location)
 
-	var root_match := RUIRouteMatch.create_root(visible_location.path)
+	var root_match := RuitkRouteMatch.create_root(visible_location.path)
 	Hooks.provideContext(ROUTE_MATCH, root_match)
 	Hooks.provideContext(ROUTE_PATTERN, "/")
 	Hooks.provideContext(NAV_BASE_CTX, "/")
@@ -136,10 +136,10 @@ static func _build_nav_ctx(history, basename: String) -> Dictionary:
 			"history": null,
 		}
 	var do_navigate := func(path, state = null):
-		history.push(RUIRouterPath.with_basename(str(path), basename), state)
+		history.push(RuitkRouterPath.with_basename(str(path), basename), state)
 		return true
 	var do_replace := func(path, state = null):
-		history.replace(RUIRouterPath.with_basename(str(path), basename), state)
+		history.replace(RuitkRouterPath.with_basename(str(path), basename), state)
 		return true
 	var do_go := func(delta):
 		if not history.can_go(delta):
@@ -173,18 +173,18 @@ static func route_fn(props: Dictionary, children: Array):
 	var is_index: bool = bool(props.get("index", false))
 	var case_sensitive: bool = bool(props.get("case_sensitive", false))
 	var element = props.get("element", null)
-	var render_func = props.get("render", null)   # func(match: RUIRouteMatch) -> vnode
+	var render_func = props.get("render", null)   # func(match: RuitkRouteMatch) -> vnode
 
 	# Index routes are pinned to the parent pattern; a path is meaningless (decision #2: warn + drop).
 	if is_index and path != null and str(path) != "":
 		var imsg := "[Router] <Route index> cannot also declare a 'path'. Index routes always match the parent route's pattern exactly. Dropping the path."
-		RUIDiagnostics.emit(imsg)
+		RuitkDiagnostics.emit(imsg)
 		push_error(imsg)
 		path = null
 
 	var parent_entry = _resolve_current_entry()
 	var parent_navigation_base: String = parent_entry.navigation_base if parent_entry != null else "/"
-	var parent_match: RUIRouteMatch = parent_entry.route_match if (parent_entry != null and parent_entry.route_match != null) else RUIRouteMatch.create_root(router["location"].path)
+	var parent_match: RuitkRouteMatch = parent_entry.route_match if (parent_entry != null and parent_entry.route_match != null) else RuitkRouteMatch.create_root(router["location"].path)
 	var parent_pattern: String = parent_match.pattern if parent_match != null else "/"
 
 	var resolved_path: String
@@ -193,14 +193,14 @@ static func route_fn(props: Dictionary, children: Array):
 	elif path == null or str(path) == "":
 		resolved_path = parent_pattern
 	else:
-		resolved_path = RUIRouterPath.combine(parent_pattern, str(path))
+		resolved_path = RuitkRouterPath.combine(parent_pattern, str(path))
 
 	# RR v6 leaf semantics: a route consumes the FULL path (exact) unless it is a layout (has
 	# nested <Route> children rendered via <Outlet/>) or carries a trailing splat in its pattern.
 	var effective_exact: bool = exact or is_index or not _has_route_children(children)
 	var loc_path: String = router["location"].path
 	var m = Hooks.useMemo(func():
-		return RUIRouteMatcher.match(loc_path, resolved_path, effective_exact, parent_match, case_sensitive)
+		return RuitkRouteMatcher.match(loc_path, resolved_path, effective_exact, parent_match, case_sensitive)
 	, [loc_path, resolved_path, effective_exact, parent_match, case_sensitive])
 
 	# All hooks run UNCONDITIONALLY (before the no-match early return) so the hook count is stable
@@ -209,7 +209,7 @@ static func route_fn(props: Dictionary, children: Array):
 	# not match in place; computing these with a null `m` is harmless — they just aren't provided.)
 	var provided_pattern: String = resolved_path if (resolved_path != null and resolved_path != "") else (m.pattern if m != null else parent_pattern)
 	var base_seed: String = resolved_path if (resolved_path != null and resolved_path != "") else parent_navigation_base
-	var navigation_base := RUIRouterPath.combine(base_seed if base_seed != null else "/", "")
+	var navigation_base := RuitkRouterPath.combine(base_seed if base_seed != null else "/", "")
 	var route_entry = Hooks.useMemo(func():
 		return RouteContextEntry.new(m, navigation_base, parent_entry, Hooks._cur)
 	, [m, navigation_base, parent_entry, Hooks._cur])
@@ -234,7 +234,7 @@ static func route_fn(props: Dictionary, children: Array):
 
 	if render_func is Callable:
 		return render_func.call(m)
-	if element is RUIVNode:
+	if element is RuitkVNode:
 		return element
 	return _fragment(children)
 
@@ -243,7 +243,7 @@ static func route_fn(props: Dictionary, children: Array):
 # =============================================================================
 static func outlet_fn(props: Dictionary, children: Array):
 	if useRouter() == null:
-		if RUIConfig.enable_strict_diagnostics:
+		if RuitkConfig.enable_strict_diagnostics:
 			push_warning("[Router] <Outlet/> rendered outside any <Router>. The outlet will render nothing.")
 		return null
 	var ctx = props.get("context", null)
@@ -266,18 +266,18 @@ static func routes(props: Dictionary, children: Array):
 static func _routes_table(props: Dictionary, _children: Array):
 	var route_list: Array = props.get("routes", [])
 	var location := useLocation()
-	var matched = RUIRouteMatcher.match_routes(route_list, location)
+	var matched = RuitkRouteMatcher.match_routes(route_list, location)
 	if matched == null:
 		return []
 	var route = matched["route"]
 	var params: Dictionary = matched["params"]
 	var pattern := str(route.get("path", "/"))
 	# Publish a RouteMatch so useParams() works uniformly (legacy + spine).
-	Hooks.provideContext(ROUTE_MATCH, RUIRouteMatch.new(location, pattern, params))
+	Hooks.provideContext(ROUTE_MATCH, RuitkRouteMatch.new(location, pattern, params))
 	var comp = route.get("component")
 	if comp is Callable:
 		return V.fc(comp, { "params": params })
-	if comp is RUIVNode:
+	if comp is RuitkVNode:
 		return comp
 	return []
 
@@ -287,7 +287,7 @@ static func _routes_switch(_props: Dictionary, children: Array):
 	if router == null:
 		return null
 	var parent_entry = _resolve_current_entry()
-	var parent_match: RUIRouteMatch = parent_entry.route_match if (parent_entry != null and parent_entry.route_match != null) else RUIRouteMatch.create_root(router["location"].path)
+	var parent_match: RuitkRouteMatch = parent_entry.route_match if (parent_entry != null and parent_entry.route_match != null) else RuitkRouteMatch.create_root(router["location"].path)
 	var parent_pattern: String = parent_match.pattern if parent_match != null else "/"
 
 	var candidates: Array = []
@@ -297,7 +297,7 @@ static func _routes_switch(_props: Dictionary, children: Array):
 		return null
 	var loc_path: String = router["location"].path
 	var picked = Hooks.useMemo(func():
-		return RUIRouteRanker.pick(candidates, loc_path, parent_match)
+		return RuitkRouteRanker.pick(candidates, loc_path, parent_match)
 	, [loc_path, parent_match, candidates.size()])
 	if picked == null:
 		return null
@@ -327,7 +327,7 @@ static func nav_link_fn(props: Dictionary, _children: Array):
 		return null
 	var route_match = Hooks.useContext(ROUTE_MATCH)
 	if route_match == null:
-		route_match = RUIRouteMatch.create_root(router["location"].path)
+		route_match = RuitkRouteMatch.create_root(router["location"].path)
 	var base = Hooks.useContext(NAV_BASE_CTX)
 	var navigation_base: String = base if base != null else (route_match.pattern if route_match != null else "/")
 
@@ -389,7 +389,7 @@ static func useRouter():
 		return null
 	var loc = Hooks.useContext(LOC_CTX)
 	return {
-		"location": loc if loc is RUIRouterLocation else RUIRouterLocation.parse("/"),
+		"location": loc if loc is RuitkRouterLocation else RuitkRouterLocation.parse("/"),
 		"navigate": nav["navigate"],
 		"replace": nav["replace"],
 		"go": nav["go"],
@@ -401,12 +401,12 @@ static func useRouter():
 ## The current location object (or null outside a Router).
 static func useLocationInfo():
 	var loc = Hooks.useContext(LOC_CTX)
-	return loc if loc is RUIRouterLocation else null
+	return loc if loc is RuitkRouterLocation else null
 
 ## The current location path String. Reads only LOC_CTX (re-renders on navigation).
 static func useLocation() -> String:
 	var loc = Hooks.useContext(LOC_CTX)
-	if loc is RUIRouterLocation:
+	if loc is RuitkRouterLocation:
 		return loc.path
 	return str(loc) if loc != null else "/"
 
@@ -414,23 +414,23 @@ static func useLocation() -> String:
 ## own dict is part of an immutable-identity object used for context change-detection. [audit]
 static func useQuery() -> Dictionary:
 	var loc = Hooks.useContext(LOC_CTX)
-	return loc.query.duplicate() if loc is RUIRouterLocation else {}
+	return loc.query.duplicate() if loc is RuitkRouterLocation else {}
 
 ## The opaque navigation state of the current location.
 static func useNavigationState():
 	var loc = Hooks.useContext(LOC_CTX)
-	return loc.state if loc is RUIRouterLocation else null
+	return loc.state if loc is RuitkRouterLocation else null
 
 ## Captured :params of the matched route (merged down the parent chain). Returns a defensive copy
 ## (the RouteMatch is an immutable-identity object used for context change-detection). [audit]
 static func useParams() -> Dictionary:
 	var m = Hooks.useContext(ROUTE_MATCH)
-	return m.params.duplicate() if m is RUIRouteMatch else {}
+	return m.params.duplicate() if m is RuitkRouteMatch else {}
 
-## The matched RUIRouteMatch for the nearest route (or null).
+## The matched RuitkRouteMatch for the nearest route (or null).
 static func useRouteMatch():
 	var m = Hooks.useContext(ROUTE_MATCH)
-	return m if m is RUIRouteMatch else null
+	return m if m is RuitkRouteMatch else null
 
 ## A navigator: func(path, state := null) -> bool. Resolves relative paths against the current
 ## route's navigation base. Reads only the STABLE nav contexts, so navigate-only widgets do NOT
@@ -489,7 +489,7 @@ static func useSearchParams() -> Array:
 	var setter := func(next: Dictionary, replace := false):
 		if router == null:
 			return
-		var qs := RUIRouterPath.build_query(next)
+		var qs := RuitkRouterPath.build_query(next)
 		var target := current_path if qs == "" else current_path + "?" + qs
 		if replace:
 			router["replace"].call(target, current_state)
@@ -498,7 +498,7 @@ static func useSearchParams() -> Array:
 	return [current, setter]
 
 ## Register a navigation blocker for the lifetime of this component (while `enabled`).
-## blocker: func(from: RUIRouterLocation, to: RUIRouterLocation) -> bool, returns TRUE to block.
+## blocker: func(from: RuitkRouterLocation, to: RuitkRouterLocation) -> bool, returns TRUE to block.
 static func useBlocker(blocker: Callable, enabled := true) -> void:
 	var nav = Hooks.useContext(NAV_CTX)   # stable — register once, not every render
 	Hooks.useEffect(func():
@@ -514,7 +514,7 @@ static func useBlocker(blocker: Callable, enabled := true) -> void:
 ## message is logged in strict-diagnostics mode (the host has no dialog surface).
 static func usePrompt(when: bool, message := "") -> void:
 	useBlocker(func(_from, _to):
-		if when and message != "" and RUIConfig.enable_strict_diagnostics:
+		if when and message != "" and RuitkConfig.enable_strict_diagnostics:
 			push_warning("[Router prompt] " + message)
 		return when   # true == block
 	, when)
@@ -524,7 +524,7 @@ static func usePrompt(when: bool, message := "") -> void:
 # =============================================================================
 
 static func _is_route(child) -> bool:
-	return child is RUIVNode and child.kind == RUIVNode.Kind.FUNCTION and child.component.is_valid() and child.component.get_method() == "route_fn"
+	return child is RuitkVNode and child.kind == RuitkVNode.Kind.FUNCTION and child.component.is_valid() and child.component.get_method() == "route_fn"
 
 # Walks `nodes` for <Route> vnodes (descending transparently through fragments), building ranked
 # candidates against `parent_resolved_path`. `counter` is a single-element Array used as an int
@@ -535,7 +535,7 @@ static func _collect_route_candidates(nodes: Array, parent_resolved_path: String
 	for child in nodes:
 		if child == null:
 			continue
-		if child is RUIVNode and child.kind == RUIVNode.Kind.FRAGMENT and not child.children.is_empty():
+		if child is RuitkVNode and child.kind == RuitkVNode.Kind.FRAGMENT and not child.children.is_empty():
 			_collect_route_candidates(child.children, parent_resolved_path, candidates, counter)
 			continue
 		if not _is_route(child):
@@ -547,7 +547,7 @@ static func _collect_route_candidates(nodes: Array, parent_resolved_path: String
 		if is_index or child_path == null or str(child_path) == "":
 			resolved = parent_resolved_path if parent_resolved_path != null else "/"
 		else:
-			resolved = RUIRouterPath.combine(parent_resolved_path if parent_resolved_path != null else "/", str(child_path))
+			resolved = RuitkRouterPath.combine(parent_resolved_path if parent_resolved_path != null else "/", str(child_path))
 		# Leaf routes (no nested <Route> children) match exactly; layouts match as a prefix.
 		var is_leaf := not _has_route_children(child.children)
 		candidates.append({
@@ -567,7 +567,7 @@ static func _has_route_children(nodes) -> bool:
 	for child in nodes:
 		if child == null:
 			continue
-		if child is RUIVNode and child.kind == RUIVNode.Kind.FRAGMENT and not child.children.is_empty():
+		if child is RuitkVNode and child.kind == RuitkVNode.Kind.FRAGMENT and not child.children.is_empty():
 			if _has_route_children(child.children):
 				return true
 			continue
@@ -575,7 +575,7 @@ static func _has_route_children(nodes) -> bool:
 			return true
 	return false
 
-static func _select_nested_route_for_outlet(children: Array, current_location: String, parent_match: RUIRouteMatch, parent_resolved_path: String):
+static func _select_nested_route_for_outlet(children: Array, current_location: String, parent_match: RuitkRouteMatch, parent_resolved_path: String):
 	if children == null or children.is_empty():
 		return null
 	var candidates: Array = []
@@ -583,7 +583,7 @@ static func _select_nested_route_for_outlet(children: Array, current_location: S
 	_collect_route_candidates(children, parent_resolved_path, candidates, counter)
 	if candidates.is_empty():
 		return null
-	var picked = RUIRouteRanker.pick(candidates, current_location, parent_match)
+	var picked = RuitkRouteRanker.pick(candidates, current_location, parent_match)
 	if picked == null:
 		return null
 	return picked["candidate"]["node"]
@@ -598,7 +598,7 @@ static func _resolve_current_entry() -> RouteContextEntry:
 		return entry.parent if entry.parent != null else _root_entry()
 	return entry
 
-static func _append_chain(parent, m: RUIRouteMatch) -> Array:
+static func _append_chain(parent, m: RuitkRouteMatch) -> Array:
 	if m == null:
 		return parent if parent is Array else []
 	if not (parent is Array) or parent.is_empty():
@@ -612,13 +612,13 @@ static func _resolve_target(to: String, navigation_base: String) -> String:
 	if to == null or to == "":
 		return navigation_base if navigation_base != null else "/"
 	if to.begins_with("/"):
-		return RUIRouterPath.normalize(to)
-	return RUIRouterPath.combine(navigation_base if navigation_base != null else "/", to)
+		return RuitkRouterPath.normalize(to)
+	return RuitkRouterPath.combine(navigation_base if navigation_base != null else "/", to)
 
 # Mirrors RR's NavLink activation: end => exact; "/" only on "/"; else prefix-on-segment-boundary.
 static func _nav_link_is_active(current_location: String, resolved_target: String, end: bool, case_sensitive: bool) -> bool:
-	var norm_loc := RUIRouterPath.normalize(current_location)
-	var norm_target := RUIRouterPath.normalize(resolved_target)
+	var norm_loc := RuitkRouterPath.normalize(current_location)
+	var norm_target := RuitkRouterPath.normalize(resolved_target)
 	var cl := norm_loc if case_sensitive else norm_loc.to_lower()
 	var ct := norm_target if case_sensitive else norm_target.to_lower()
 	if ct == "/":

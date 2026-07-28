@@ -39,7 +39,7 @@ export const UitkxConceptsPage: FC = () => (
           <ListItemText primary="useState returns a [value, setter] array; you update state by calling the setter, e.g. s[1].call(s[0] + 1)." />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary="A .guitkx file is a module holding plain top-level declarations, classified by signature: a callable annotated -> RUIVNode is a component, a use_-prefixed callable is a hook, any other callable is a util, and name := expr is a value. export marks what other files may import." />
+          <ListItemText primary="A .guitkx file is a module holding plain top-level declarations, classified by signature: a callable annotated -> RuitkVNode is a component, a use_-prefixed callable is a hook, any other callable is a util, and name := expr is a value. export marks what other files may import." />
         </ListItem>
       </List>
     </Box>
@@ -82,19 +82,19 @@ export const UitkxConceptsPage: FC = () => (
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIConfig.time_slicing</code> — opt into cooperative render slicing (default <code>false</code>). <code>RUIConfig.frame_budget_ms</code> sets the per-frame budget (default <code>8.0</code>).</>} />
+          <ListItemText primary={<><code>RuitkConfig.time_slicing</code> — opt into cooperative render slicing (default <code>false</code>). <code>RuitkConfig.frame_budget_ms</code> sets the per-frame budget (default <code>8.0</code>).</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIConfig.enable_hook_validation</code> — rules-of-hooks checks (defaults to <code>OS.is_debug_build()</code>).</>} />
+          <ListItemText primary={<><code>RuitkConfig.enable_hook_validation</code> — rules-of-hooks checks (defaults to <code>OS.is_debug_build()</code>).</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIConfig.enable_strict_diagnostics</code> — stricter diagnostics in debug builds (defaults to <code>OS.is_debug_build()</code>).</>} />
+          <ListItemText primary={<><code>RuitkConfig.enable_strict_diagnostics</code> — stricter diagnostics in debug builds (defaults to <code>OS.is_debug_build()</code>).</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIDiagnostics.enabled = true</code> — start counting renders, commits, placements, updates, and deletions. Read them with <code>RUIDiagnostics.report()</code> and clear with <code>RUIDiagnostics.reset()</code>.</>} />
+          <ListItemText primary={<><code>RuitkDiagnostics.enabled = true</code> — start counting renders, commits, placements, updates, and deletions. Read them with <code>RuitkDiagnostics.report()</code> and clear with <code>RuitkDiagnostics.reset()</code>.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RUIDiagnostics.capture = true</code> — collect emitted messages into <code>RUIDiagnostics.messages</code> for inspection in tests or an overlay.</>} />
+          <ListItemText primary={<><code>RuitkDiagnostics.capture = true</code> — collect emitted messages into <code>RuitkDiagnostics.messages</code> for inspection in tests or an overlay.</>} />
         </ListItem>
       </List>
     </Box>
@@ -114,12 +114,12 @@ export const UitkxConceptsPage: FC = () => (
         <li>
           <strong>Generate</strong> — On save, the editor plugin compiles each <code>.guitkx</code>{' '}
           file into a sibling <code>.gd</code> class with a{' '}
-          <code>static func render(props, children) -&gt; RUIVNode</code> method.
+          <code>static func render(props, children) -&gt; RuitkVNode</code> method.
         </li>
         <li>
           <strong>Mount</strong> — <code>V.fc(Component.render)</code> wraps the generated method as
-          an <code>RUIVNode</code>. <code>ReactiveRoot.create</code> (or{' '}
-          <code>ReactiveRootNode</code>) mounts it under a <code>Control</code>.
+          an <code>RuitkVNode</code>. <code>RuitkRoot.create</code> (or{' '}
+          <code>RuitkRootNode</code>) mounts it under a <code>Control</code>.
         </li>
         <li>
           <strong>Reconcile</strong> — A hook setter calls <code>request_update()</code>, which
@@ -144,7 +144,7 @@ export const UitkxConceptsPage: FC = () => (
       </Typography>
       <Typography component="ul" variant="body2">
         <li>
-          <strong>Mount</strong> — build the <code>RUIVNode</code> tree → create the{' '}
+          <strong>Mount</strong> — build the <code>RuitkVNode</code> tree → create the{' '}
           <code>Control</code> nodes → run effects.
         </li>
         <li>
@@ -152,7 +152,7 @@ export const UitkxConceptsPage: FC = () => (
         </li>
         <li>
           <strong>Unmount</strong> — run all cleanup functions → remove the <code>Control</code>{' '}
-          nodes from the tree (<code>ReactiveRoot.unmount()</code>).
+          nodes from the tree (<code>RuitkRoot.unmount()</code>).
         </li>
       </Typography>
     </Box>

@@ -96,7 +96,7 @@ export const UitkxDifferencesPage: FC = () => (
           <ListItemText primary={<><strong>Prop spread</strong> is supported in <code>.guitkx</code>: <code>{'<Button {...cfg} onPressed={ f } />'}</code> merges a <code>Dictionary</code> of props onto a host element or component, left-to-right with later winning — just like <code>{'{...obj}'}</code> in JSX.</>} />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary={<><strong>Context handles</strong> are supported: <code>Hooks.createContext(default)</code> returns an <code>RUIContext</code> you pass to <code>provideContext</code> / <code>useContext</code> — the parity of React&apos;s <code>createContext</code>, with a built-in default and no string-key collisions. (Bare String keys still work for back-compat.)</>} />
+          <ListItemText primary={<><strong>Context handles</strong> are supported: <code>Hooks.createContext(default)</code> returns an <code>RuitkContext</code> you pass to <code>provideContext</code> / <code>useContext</code> — the parity of React&apos;s <code>createContext</code>, with a built-in default and no string-key collisions. (Bare String keys still work for back-compat.)</>} />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary={<><strong>Event handlers</strong> are named after the Godot signal itself — <code>on</code> + PascalCase(signal name): <code>onPressed</code>, <code>onTextChanged</code>, <code>onValueChanged</code>, <code>onFocusEntered</code>, and so on, for every signal of every node. There are no React alias names (<code>onClick</code>/<code>onChange</code> were removed in 0.9.0 — see <code>MIGRATION-0.9.md</code>); the native <code>on_&lt;signal&gt;</code> spelling remains as a verbatim escape hatch.</>} />
@@ -131,7 +131,7 @@ export const UitkxDifferencesPage: FC = () => (
           <ListItemText primary="useTransition and useDeferredValue exist for API parity but are synchronous — they don't provide true concurrency." />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary="Optional cooperative render slicing can be enabled via RUIConfig.time_slicing / RUIConfig.frame_budget_ms, within Godot's runtime constraints." />
+          <ListItemText primary="Optional cooperative render slicing can be enabled via RuitkConfig.time_slicing / RuitkConfig.frame_budget_ms, within Godot's runtime constraints." />
         </ListItem>
       </List>
     </Box>

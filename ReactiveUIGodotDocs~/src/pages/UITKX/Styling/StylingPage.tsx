@@ -98,14 +98,14 @@ export const StylingPage: FC = () => {
     <Typography variant="body1" paragraph>
       Godot has no USS/CSS. In ReactiveUI you style any host element by passing a{' '}
       <strong><code>style</code> Dictionary</strong> — <code>style={'{{ … }}'}</code> — and the{' '}
-      <strong><code>RUIStyle</code></strong> layer maps it onto Godot <code>Control</code>{' '}
+      <strong><code>RuitkStyle</code></strong> layer maps it onto Godot <code>Control</code>{' '}
       properties, size flags, and <code>Theme</code> / <code>StyleBox</code> overrides. It is the
       only place that knows Godot styling APIs, so you never touch <code>add_theme_*_override</code>{' '}
       or build a <code>StyleBoxFlat</code> by hand.
     </Typography>
 
     <Alert severity="info" sx={{ mb: 3 }}>
-      <code>RUIStyle</code> and <code>RUIStyleSheet</code> are global{' '}
+      <code>RuitkStyle</code> and <code>RuitkStyleSheet</code> are global{' '}
       <code>class_name</code>s — available anywhere once the <code>reactive_ui_toolkit</code> addon is
       enabled. You rarely call them directly; the <code>style</code> and <code>classes</code> props
       do the work.
@@ -190,7 +190,7 @@ export const StylingPage: FC = () => {
       Style-key reference
     </Typography>
     <Typography variant="body1" paragraph>
-      Every key understood by <code>RUIStyle</code>. Click a card to see its Godot mapping and an
+      Every key understood by <code>RuitkStyle</code>. Click a card to see its Godot mapping and an
       example value. Anything not listed here (anchors, offsets, arbitrary <code>Control</code>{' '}
       properties) is a plain prop on the element, not part of <code>style</code>.
     </Typography>
@@ -239,7 +239,7 @@ export const StylingPage: FC = () => {
     </Typography>
     <Typography variant="body1" paragraph>
       Godot retains hover / pressed / focus / disabled / read_only states natively — no event
-      wiring. Nest a style dict under the matching key and RUIStyle builds a{' '}
+      wiring. Nest a style dict under the matching key and RuitkStyle builds a{' '}
       <code>StyleBoxFlat</code> for that slot:
     </Typography>
     <CodeBlock
@@ -285,13 +285,13 @@ export const StylingPage: FC = () => {
       code={`<Label text="outlined text" style={ {\n    "font_size": 24,\n    "colors": {\n        "font_color": Color(1, 1, 1),\n        "font_outline_color": Color(0.2, 0.2, 0.6),\n    },\n    "constants": { "outline_size": 4 },\n} } />`}
     />
 
-    {/* ── Named bundles (RUIStyleSheet) ─────────────────────── */}
+    {/* ── Named bundles (RuitkStyleSheet) ─────────────────────── */}
     <Typography id="stylesheets" variant="h5" component="h2" sx={{ mt: 6 }} gutterBottom>
-      Named style bundles (RUIStyleSheet)
+      Named style bundles (RuitkStyleSheet)
     </Typography>
     <Typography variant="body1" paragraph>
-      <code>RUIStyleSheet</code> is a tiny userland registry — the reduced-scope analogue of USS
-      classes. It maps a class name to a plain style dict (the same shape <code>RUIStyle</code>{' '}
+      <code>RuitkStyleSheet</code> is a tiny userland registry — the reduced-scope analogue of USS
+      classes. It maps a class name to a plain style dict (the same shape <code>RuitkStyle</code>{' '}
       consumes). A host element&apos;s <code>classes</code> prop resolves against the registry and
       merges left-to-right, with the element&apos;s inline <code>style</code> winning last.
     </Typography>
@@ -306,8 +306,8 @@ export const StylingPage: FC = () => {
       Registering bundles
     </Typography>
     <Typography variant="body1" paragraph>
-      Register a single bundle with <code>RUIStyleSheet.register(name, style)</code>, or bulk-register
-      a map with <code>RUIStyleSheet.merge(map)</code> — a good fit for an autoload&apos;s{' '}
+      Register a single bundle with <code>RuitkStyleSheet.register(name, style)</code>, or bulk-register
+      a map with <code>RuitkStyleSheet.merge(map)</code> — a good fit for an autoload&apos;s{' '}
       <code>_ready()</code>.
     </Typography>
     <CodeBlock language="gdscript" code={EXAMPLE_USS_BASIC} />
@@ -350,7 +350,7 @@ export const StylingPage: FC = () => {
         <li><Link href="#patterns">Patterns</Link></li>
         <li><Link href="#per-state">Per-state StyleBox slots</Link></li>
         <li><Link href="#theme-channels">Generic theme channels</Link></li>
-        <li><Link href="#stylesheets">Named style bundles (RUIStyleSheet)</Link></li>
+        <li><Link href="#stylesheets">Named style bundles (RuitkStyleSheet)</Link></li>
       </Box>
     </Paper>
   </Box>

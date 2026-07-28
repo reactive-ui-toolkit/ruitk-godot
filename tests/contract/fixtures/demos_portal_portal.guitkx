@@ -1,6 +1,6 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoPortal() -> RUIVNode {
+export DemoPortal() -> RuitkVNode {
   var show = useState(true)
   var mounted = useState(false)
   var target = useRef(null)

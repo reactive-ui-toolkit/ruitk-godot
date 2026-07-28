@@ -1,10 +1,10 @@
 /**
- * Complete catalog of every key understood by the RUIStyle style layer
+ * Complete catalog of every key understood by the RuitkStyle style layer
  * (addons/reactive_ui_toolkit/core/style.gd). Used by StylingPage to render property cards.
  *
  * Godot has no USS/CSS. A `style={ { … } }` Dictionary on any host element is
  * mapped onto Godot Control properties, size flags, and Theme / StyleBox
- * overrides by RUIStyle. This catalog is the authoritative documentation of that
+ * overrides by RuitkStyle. This catalog is the authoritative documentation of that
  * vocabulary — it mirrors the STYLE_KEYS array in the LSP schema
  * (ide-extensions/lsp-server/src/schema.ts).
  *
@@ -19,7 +19,7 @@ export interface PropertyCard {
   type: string
   /** One-line description of what the key does. */
   description: string
-  /** How RUIStyle applies it to Godot (the underlying Control / Theme / StyleBox API). */
+  /** How RuitkStyle applies it to Godot (the underlying Control / Theme / StyleBox API). */
   godotMapping: string
   /** Example value as it appears in a style Dictionary literal, e.g. `Color(0.1, 0.1, 0.18)`. */
   example: string
@@ -40,7 +40,7 @@ export type PropertyCategory =
   | 'Misc'
 
 // ---------------------------------------------------------------------------
-// The catalog — one entry per RUIStyle key (schema.ts STYLE_KEYS).
+// The catalog — one entry per RuitkStyle key (schema.ts STYLE_KEYS).
 // ---------------------------------------------------------------------------
 
 export const STYLE_PROPERTY_CATALOG: PropertyCard[] = [

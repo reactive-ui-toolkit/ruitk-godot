@@ -1,4 +1,4 @@
-class_name RUIRouteRanker
+class_name RuitkRouteRanker
 extends RefCounted
 ## Faithful port of the Unity reference RouteRanker.cs (Phase 7.5). Scoring (per resolved-path
 ## segment): static +10, :param +3, index-route +2, empty +1, splat -2; plus the index-route
@@ -12,8 +12,8 @@ const EMPTY_SEGMENT := 1
 const SPLAT_PENALTY := -2
 
 static func compute_score(resolved_path: String, is_index: bool) -> int:
-	var normalized := RUIRouterPath.normalize(resolved_path if resolved_path != null else "/")
-	var segments: Array = [] if normalized == "/" else RUIRouterPath.split_segments(normalized)
+	var normalized := RuitkRouterPath.normalize(resolved_path if resolved_path != null else "/")
+	var segments: Array = [] if normalized == "/" else RuitkRouterPath.split_segments(normalized)
 	var score: int = segments.size()
 	if is_index:
 		score += INDEX_ROUTE
@@ -33,7 +33,7 @@ static func compute_score(resolved_path: String, is_index: bool) -> int:
 
 ## candidates: Array of { declaration_index, resolved_path, is_index, exact, case_sensitive, node }.
 ## Returns { candidate, match } or null (no candidate matched).
-static func pick(candidates: Array, current_location: String, parent_match: RUIRouteMatch):
+static func pick(candidates: Array, current_location: String, parent_match: RuitkRouteMatch):
 	if candidates == null or candidates.is_empty():
 		return null
 	var scored: Array = []
@@ -47,7 +47,7 @@ static func pick(candidates: Array, current_location: String, parent_match: RUIR
 		var c: Dictionary = entry["cand"]
 		var exact: bool = c["is_index"] or c["exact"]
 		var pat: String = ((parent_match.pattern if parent_match != null else "/") if c["is_index"] else c["resolved_path"])
-		var m := RUIRouteMatcher.match(current_location, pat, exact, parent_match, c["case_sensitive"])
+		var m := RuitkRouteMatcher.match(current_location, pat, exact, parent_match, c["case_sensitive"])
 		if m != null:
 			return { "candidate": c, "match": m }
 	return null

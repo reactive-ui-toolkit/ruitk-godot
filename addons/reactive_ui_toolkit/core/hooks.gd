@@ -1,7 +1,7 @@
 class_name Hooks
 extends RefCounted
 ## React-style hooks over the fiber reconciler. State lives in the current fiber's
-## RUIComponentState; a static pointer (`_cur`) is set around each component render by
+## RuitkComponentState; a static pointer (`_cur`) is set around each component render by
 ## the reconciler via `_begin`/`_end`.
 ##
 ## RULES OF HOOKS: call hooks only at the top level of a render function — never in
@@ -11,26 +11,26 @@ extends RefCounted
 ## plus separate cursors for state-hooks, passive effects, and layout effects; context
 ## reads are kept OUT of the slot array (so useContext can't perturb hook order).
 
-static var _cur: RUIComponentState = null
+static var _cur: RuitkComponentState = null
 
 # --------------------------------------------------------------------------
 # Render-phase plumbing (called by the reconciler only)
 # --------------------------------------------------------------------------
 
-static func _begin(state: RUIComponentState) -> void:
+static func _begin(state: RuitkComponentState) -> void:
 	_cur = state
 	state.hook_index = 0
 	state.effect_index = 0
 	state.layout_index = 0
 	state.context_deps = []
 	state.is_rendering = true
-	if RUIConfig.enable_hook_validation:
+	if RuitkConfig.enable_hook_validation:
 		state.hook_log = []
 
 static func _end() -> void:
 	if _cur != null:
 		_cur.is_rendering = false
-		if RUIConfig.enable_hook_validation:
+		if RuitkConfig.enable_hook_validation:
 			if not _cur.hook_order_primed:
 				_cur.hook_signatures = _cur.hook_log.duplicate()
 				_cur.hook_order_primed = true
@@ -40,43 +40,43 @@ static func _end() -> void:
 
 # --------------------------------------------------------------------------
 # Dev diagnostics (Phase 7.0) — hook-order validation + state-update-in-render guard.
-# All gated behind RUIConfig flags (default debug-only); push_error/warning + degrade.
+# All gated behind RuitkConfig flags (default debug-only); push_error/warning + degrade.
 # --------------------------------------------------------------------------
 
 ## Record a hook call's kind in render order (no-op unless validation is on).
-static func _record(state: RUIComponentState, kind: String) -> void:
-	if RUIConfig.enable_hook_validation:
+static func _record(state: RuitkComponentState, kind: String) -> void:
+	if RuitkConfig.enable_hook_validation:
 		state.hook_log.append(kind)
 
 ## Compare this render's hook order to the primed signature; push_error on first divergence.
-static func _check_hook_order(state: RUIComponentState) -> void:
+static func _check_hook_order(state: RuitkComponentState) -> void:
 	var prev: Array = state.hook_signatures
 	var now: Array = state.hook_log
 	var n: int = min(prev.size(), now.size())
 	for i in n:
 		if prev[i] != now[i]:
 			var m := "[Hooks][order] %s: hook #%d changed '%s' -> '%s' across renders — hooks must run in the same order every render (no hooks inside if/for/lambdas)." % [_comp_label(state), i, prev[i], now[i]]
-			RUIDiagnostics.emit(m)
+			RuitkDiagnostics.emit(m)
 			push_error(m)
 			return
 	if prev.size() != now.size():
 		var m2 := "[Hooks][order] %s: hook count changed %d -> %d across renders — a hook is being called conditionally." % [_comp_label(state), prev.size(), now.size()]
-		RUIDiagnostics.emit(m2)
+		RuitkDiagnostics.emit(m2)
 		push_error(m2)
 
 ## A readable component name for diagnostics (the render Callable's method, or <anonymous>).
-static func _comp_label(state: RUIComponentState) -> String:
+static func _comp_label(state: RuitkComponentState) -> String:
 	if state != null and state.fiber != null and state.fiber.component is Callable:
 		var m := (state.fiber.component as Callable).get_method()
 		return m if m != "" else "<anonymous>"
 	return "<component>"
 
 ## Push a strict warning once per (component, key).
-static func _warn_once(state: RUIComponentState, key: String, msg: String) -> void:
+static func _warn_once(state: RuitkComponentState, key: String, msg: String) -> void:
 	if state.diag_warned.has(key):
 		return
 	state.diag_warned[key] = true
-	RUIDiagnostics.emit(msg)
+	RuitkDiagnostics.emit(msg)
 	push_warning(msg)
 
 # --------------------------------------------------------------------------
@@ -97,11 +97,11 @@ static func useState(initial = null) -> Array:
 	var slot: Dictionary = s.hooks[i]
 	return [slot["value"], slot["setter"]]
 
-static func _make_setter(state: RUIComponentState, i: int) -> Callable:
+static func _make_setter(state: RuitkComponentState, i: int) -> Callable:
 	return func(update):
 		if i >= state.hooks.size():   # state torn down (unmounted) — ignore late calls [audit C3]
 			return
-		if state.is_rendering and RUIConfig.enable_strict_diagnostics:
+		if state.is_rendering and RuitkConfig.enable_strict_diagnostics:
 			_warn_once(state, "set_in_render", "[Hooks][Strict] state set during render of %s — move it to an effect or event handler (setting state in the render body loops)." % _comp_label(state))
 		var slot: Dictionary = state.hooks[i]
 		var prev = slot["value"]
@@ -129,11 +129,11 @@ static func useReducer(reducer: Callable, initial = null) -> Array:
 	var slot2: Dictionary = s.hooks[i]
 	return [slot2["value"], slot2["dispatch"]]
 
-static func _make_dispatch(state: RUIComponentState, i: int) -> Callable:
+static func _make_dispatch(state: RuitkComponentState, i: int) -> Callable:
 	return func(action):
 		if i >= state.hooks.size():
 			return
-		if state.is_rendering and RUIConfig.enable_strict_diagnostics:
+		if state.is_rendering and RuitkConfig.enable_strict_diagnostics:
 			_warn_once(state, "set_in_render", "[Hooks][Strict] dispatch during render of %s — move it to an effect or event handler." % _comp_label(state))
 		var slot: Dictionary = state.hooks[i]
 		var prev = slot["value"]
@@ -220,25 +220,25 @@ static func useLayoutEffect(effect: Callable, deps = null) -> void:
 
 ## Create a context handle — React parity for `createContext(default)`. Pass the handle to
 ## provideContext/useContext instead of a string key to avoid cross-feature key collisions and to
-## get a default value when no provider exists. See [RUIContext].
-static func createContext(default_value = null, ctx_name: String = "") -> RUIContext:
-	return RUIContext.new(default_value, ctx_name)
+## get a default value when no provider exists. See [RuitkContext].
+static func createContext(default_value = null, ctx_name: String = "") -> RuitkContext:
+	return RuitkContext.new(default_value, ctx_name)
 
-## useContext(key) -> nearest provided value walking up the fiber tree. `key` is a [RUIContext]
+## useContext(key) -> nearest provided value walking up the fiber tree. `key` is a [RuitkContext]
 ## handle (recommended, collision-free) OR a String (back-compat). Returns the handle's `default`
 ## when no ancestor provides it (String keys return null). Does NOT consume a hook slot; records the
 ## read so context changes re-render.
 static func useContext(key):
 	var s := _cur
-	var fiber: RUIFiber = s.fiber
+	var fiber: RuitkFiber = s.fiber
 	fiber.reads_context = true
 	var val = _resolve_context(fiber, key)
-	if val == null and key is RUIContext:
+	if val == null and key is RuitkContext:
 		val = key.default   # no provider up the tree -> the handle's default
 	s.context_deps.append({ "key": key, "value": val })
 	return val
 
-static func _resolve_context(fiber: RUIFiber, key):  # key: RUIContext handle or String
+static func _resolve_context(fiber: RuitkFiber, key):  # key: RuitkContext handle or String
 	var f := fiber
 	while f != null:
 		if f.provided_context != null and f.provided_context.has(key):
@@ -247,11 +247,11 @@ static func _resolve_context(fiber: RUIFiber, key):  # key: RUIContext handle or
 	return null
 
 ## provideContext(key, value): expose `value` under `key` to this fiber's subtree. `key` is a
-## [RUIContext] handle (recommended) or a String (back-compat); a handle's object identity keys the
+## [RuitkContext] handle (recommended) or a String (back-compat); a handle's object identity keys the
 ## map so distinct contexts never collide. On change, marks consuming descendants dirty so they
 ## re-render even through bailouts.
 static func provideContext(key, value) -> void:
-	var fiber: RUIFiber = _cur.fiber
+	var fiber: RuitkFiber = _cur.fiber
 	if fiber.provided_context == null:
 		fiber.provided_context = {}
 	var changed := true
@@ -265,7 +265,7 @@ static func provideContext(key, value) -> void:
 ## DFS over the committed subtree marking consumers of `key` dirty. Returns whether
 ## anything was marked (so intermediate ancestors get subtree_has_updates). Stops at a
 ## nested provider that shadows the same key.
-static func _propagate_context_change(key, first: RUIFiber) -> bool:  # key: RUIContext handle or String
+static func _propagate_context_change(key, first: RuitkFiber) -> bool:  # key: RuitkContext handle or String
 	var any := false
 	var f := first
 	while f != null:
@@ -322,7 +322,7 @@ static func useDeferredValue(value, deps = null):
 			_schedule_deferred_commit(s, i)
 	return slot["value"]
 
-static func _schedule_deferred_commit(state: RUIComponentState, i: int) -> void:
+static func _schedule_deferred_commit(state: RuitkComponentState, i: int) -> void:
 	var loop := Engine.get_main_loop()
 	if not (loop is SceneTree):
 		# No frame loop (e.g. a pure unit context) — commit synchronously so the value isn't stuck.
@@ -417,9 +417,9 @@ static func useSafeArea() -> Dictionary:
 		"bottom": maxi(0, screen.y - (rect.position.y + rect.size.y)),
 	}
 
-## useSignal(signal, selector?, comparer?) -> selected value. Subscribes to a RUISignal
+## useSignal(signal, selector?, comparer?) -> selected value. Subscribes to a RuitkSignal
 ## and re-renders when the (optionally selected) value changes. Unsubscribes on unmount.
-static func useSignal(sig: RUISignal, selector = null, comparer = null):
+static func useSignal(sig: RuitkSignal, selector = null, comparer = null):
 	var s := _cur
 	_record(s, "signal")
 	var i := s.hook_index
@@ -443,18 +443,18 @@ static func useSignal(sig: RUISignal, selector = null, comparer = null):
 	slot2["value"] = _select_signal(sig, selector)
 	return slot2["value"]
 
-static func _select_signal(sig: RUISignal, selector):
+static func _select_signal(sig: RuitkSignal, selector):
 	if sig == null:
 		return null
 	return selector.call(sig.get_value()) if (selector is Callable) else sig.get_value()
 
 ## useSignalKey(key, initial, selector?, comparer?) -> selected value of the PROCESS-WIDE signal
-## registered under `key` (created lazily via RUISignals). Subscribes + re-renders like useSignal;
+## registered under `key` (created lazily via RuitkSignals). Subscribes + re-renders like useSignal;
 ## the registry entry outlives the component, so any component reading the same key shares one store.
 static func useSignalKey(key: String, initial = null, selector = null, comparer = null):
-	return useSignal(RUISignals.get_or_create(key, initial), selector, comparer)
+	return useSignal(RuitkSignals.get_or_create(key, initial), selector, comparer)
 
-static func _make_signal_sub(state: RUIComponentState, i: int) -> Callable:
+static func _make_signal_sub(state: RuitkComponentState, i: int) -> Callable:
 	# Reads sig/selector/comparer from the SLOT (not captured args) so the latest ones are used after
 	# a re-bind. Default change-detection is reference-aware (a new equal collection counts as changed). [audit]
 	return func(_v):
@@ -537,7 +537,7 @@ static func useAnimate(ref: Dictionary, tracks: Array, autoplay := true, deps: A
 	useEffect(eff, deps)
 
 ## useSfx(bus) -> a stable func(stream: AudioStream, volume_db := 0.0, pitch_scale := 1.0) that plays
-## a one-shot sound on a transient, self-freeing AudioStreamPlayer (RUIMedia). Call it from event
+## a one-shot sound on a transient, self-freeing AudioStreamPlayer (RuitkMedia). Call it from event
 ## handlers; identity is stable across renders unless `bus` changes. Mirrors ReactiveUIToolKit's UseSfx.
 static func useSfx(bus := "Master") -> Callable:
 	var s := _cur
@@ -547,7 +547,7 @@ static func useSfx(bus := "Master") -> Callable:
 	if i >= s.hooks.size() or s.hooks[i].get("bus") != bus:
 		var captured_bus := bus
 		var action := func(stream: AudioStream, volume_db := 0.0, pitch_scale := 1.0):
-			RUIMedia.play_one_shot(stream, captured_bus, volume_db, pitch_scale)
+			RuitkMedia.play_one_shot(stream, captured_bus, volume_db, pitch_scale)
 		var slot := { "kind": "sfx", "bus": bus, "action": action }
 		if i >= s.hooks.size():
 			s.hooks.append(slot)

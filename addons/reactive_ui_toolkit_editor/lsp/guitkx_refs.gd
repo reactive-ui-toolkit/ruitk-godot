@@ -13,7 +13,7 @@ static func tag_refs_in(text: String, tag: String) -> Array:
 	var n := text.length()
 	var i := 0
 	while i < n:
-		var j: int = RUIGuitkxLexer.skip_noncode(text, i)
+		var j: int = RuitkGuitkxLexer.skip_noncode(text, i)
 		if j > i:
 			i = j
 			continue
@@ -45,7 +45,7 @@ static func tag_refs_in(text: String, tag: String) -> Array:
 	# Declaration + @class_name tokens (the rename must move these too). ES-modules leg: the
 	# compiler scan finds BOTH plain and wrapper decl names (a regex cannot express signature
 	# classification); values/utils/hooks are not tags and stay out.
-	for dm in (RUIGuitkx.analyzed_decls(text, 0)["decls"] as Array):
+	for dm in (RuitkGuitkx.analyzed_decls(text, 0)["decls"] as Array):
 		if str(dm["kind"]) == "component" and str(dm["name"]) == tag and int(dm["name_at"]) >= 0:
 			out.append({ "offset": int(dm["name_at"]), "length": tag.length(), "kind": "decl" })
 	var cm := _cn_re().search(text)
@@ -65,7 +65,7 @@ static func project_refs(tag: String) -> Array:
 		var dtext := FileAccess.get_file_as_string(str(dp))
 		if dtext.is_empty():
 			continue
-		for ddm in (RUIGuitkx.analyzed_decls(dtext, 0)["decls"] as Array):
+		for ddm in (RuitkGuitkx.analyzed_decls(dtext, 0)["decls"] as Array):
 			if str(ddm["name"]) == tag:
 				decl_paths[str(dp)] = true
 	for p in GuitkxWorkspace.all_paths():
@@ -73,7 +73,7 @@ static func project_refs(tag: String) -> Array:
 		if text.is_empty():
 			continue
 		for rc in _clause_refs_in(text, tag, str(p), decl_paths):
-			var clc: Dictionary = RUIGuitkxDiag.line_col(text, int(rc["offset"]))
+			var clc: Dictionary = RuitkGuitkxDiag.line_col(text, int(rc["offset"]))
 			var cline := int(clc.get("line", 0))
 			var cls := 0 if cline == 0 else text.rfind("\n", int(rc["offset"]) - 1) + 1
 			var cle := text.find("\n", int(rc["offset"]))
@@ -85,7 +85,7 @@ static func project_refs(tag: String) -> Array:
 				"preview": text.substr(cls, cle - cls).strip_edges(),
 			})
 		for r in tag_refs_in(text, tag):
-			var lc: Dictionary = RUIGuitkxDiag.line_col(text, int(r["offset"]))
+			var lc: Dictionary = RuitkGuitkxDiag.line_col(text, int(r["offset"]))
 			var line := int(lc.get("line", 0))
 			var ls := 0 if line == 0 else text.rfind("\n", int(r["offset"]) - 1) + 1
 			var le := text.find("\n", int(r["offset"]))
@@ -138,11 +138,11 @@ static func apply_edits_to_text(text: String, edits: Array, replacement: String)
 ## scanExportMarkerRefs.
 static func _clause_refs_in(text: String, tag: String, path: String, decl_paths: Dictionary) -> Array:
 	var out: Array = []
-	var root: String = RUIGuitkxConfig.root_for(path)
-	for im in RUIGuitkx.scan_imports(text):
+	var root: String = RuitkGuitkxConfig.root_for(path)
+	for im in RuitkGuitkx.scan_imports(text):
 		if (im.get("names", []) as Array).is_empty():
 			continue   # `* as` / default clauses carry no remote NAME
-		var res: Dictionary = RUIGuitkxResolve.resolve_specifier(str(im["spec"]), path, root)
+		var res: Dictionary = RuitkGuitkxResolve.resolve_specifier(str(im["spec"]), path, root)
 		if not bool(res.get("ok", false)) or not decl_paths.has(str(res["guitkx"])):
 			continue
 		for nm in (im["names"] as Array):
@@ -150,7 +150,7 @@ static func _clause_refs_in(text: String, tag: String, path: String, decl_paths:
 			if str(nd.get("remote", nd["name"])) == tag:
 				out.append({ "offset": int(nd.get("remote_at", nd["at"])), "length": tag.length(), "kind": "import" })
 	if decl_paths.has(path):
-		for dm in RUIGuitkx._enumerate_decls(text, 0):
+		for dm in RuitkGuitkx._enumerate_decls(text, 0):
 			var kd := str(dm["kind"])
 			if kd == "export_default" and str(dm["name"]) == tag and int(dm["name_at"]) >= 0:
 				out.append({ "offset": int(dm["name_at"]), "length": tag.length(), "kind": "export_marker" })

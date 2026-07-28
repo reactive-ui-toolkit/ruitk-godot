@@ -2,7 +2,7 @@
 ## each points at a Demo<Name>.render — one folder per demo under examples/demos/ (now .guitkx).
 import * as DemoGalleryTable from "./gallery_table"
 
-export DemoGallery() -> RUIVNode {
+export DemoGallery() -> RuitkVNode {
   var sel = useState(0)
   var demos := DemoGalleryTable.entries()
   var buttons: Array = []

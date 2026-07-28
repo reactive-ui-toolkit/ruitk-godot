@@ -260,7 +260,7 @@ export const AdvancedAPIPage: FC = () => (
         Host elements &amp; item-model adapters
       </Typography>
       <Typography variant="body1" paragraph>
-        <code>RUIHost</code> is the only layer that knows concrete Godot node
+        <code>RuitkHost</code> is the only layer that knows concrete Godot node
         APIs. Item-model controls (<code>ItemList</code>, <code>OptionButton</code>,{' '}
         <code>TabBar</code>, <code>Tree</code>, <code>MenuBar</code>) are
         declarative: pass an <code>items</code> prop and the adapter rebuilds the
@@ -271,18 +271,18 @@ export const AdvancedAPIPage: FC = () => (
 
       <Alert severity="info" sx={{ mt: 1 }}>
         Userland can register an adapter for a custom item-model control via{' '}
-        <code>RUIHost.register_item_adapter(name, adapter)</code> — useful for
+        <code>RuitkHost.register_item_adapter(name, adapter)</code> — useful for
         third-party controls that need declarative item rebuilding.
       </Alert>
     </Box>
 
-    {/* ── RUIVNode / V factory ─────────────────────────────────── */}
+    {/* ── RuitkVNode / V factory ─────────────────────────────────── */}
     <Box sx={styles.section}>
       <Typography variant="h5" component="h2" gutterBottom>
-        RUIVNode &amp; the V factory
+        RuitkVNode &amp; the V factory
       </Typography>
       <Typography variant="body1" paragraph>
-        <code>RUIVNode</code> is the immutable node type representing the virtual
+        <code>RuitkVNode</code> is the immutable node type representing the virtual
         tree. In <code>.guitkx</code> files the codegen emits <code>V.*</code>{' '}
         calls for you; in pure GDScript you build trees directly with the{' '}
         <code>V</code> factory.

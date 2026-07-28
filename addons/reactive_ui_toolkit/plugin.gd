@@ -1,9 +1,9 @@
 @tool
 extends EditorPlugin
-## The library is plain GDScript exposing global `class_name`s (V, Hooks, ReactiveRoot, ...), so
+## The library is plain GDScript exposing global `class_name`s (V, Hooks, RuitkRoot, ...), so
 ## it is usable as soon as the files exist -- enabling this plugin is optional for the RUNTIME.
 ## The plugin's job is the .guitkx toolchain: it watches the project filesystem and compiles each
-## `Foo.guitkx` to a sibling `Foo.gd` (see RUIGuitkxCodegen). On compile it nudges the editor's
+## `Foo.guitkx` to a sibling `Foo.gd` (see RuitkGuitkxCodegen). On compile it nudges the editor's
 ## EditorFileSystem so the generated script is picked up and hot-reloaded.
 ##
 ## RECOMPILE TRIGGERS (why more than filesystem_changed):

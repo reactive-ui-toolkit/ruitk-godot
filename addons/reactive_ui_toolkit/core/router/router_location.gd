@@ -1,4 +1,4 @@
-class_name RUIRouterLocation
+class_name RuitkRouterLocation
 extends RefCounted
 ## A full router location (Phase 7.8) — port of the Unity reference RouterLocation.cs.
 ## `path` is the normalized pathname, `query` the decoded query dictionary, `state` the
@@ -18,6 +18,6 @@ func _to_string() -> String:
 	return path
 
 ## Parse a raw "/path?a=1&b=2" string (+ optional opaque state) into a location.
-static func parse(raw: String, state_obj = null) -> RUIRouterLocation:
-	var d := RUIRouterPath.parse(raw, state_obj)
-	return RUIRouterLocation.new(d["path"], d["query"], d["state"])
+static func parse(raw: String, state_obj = null) -> RuitkRouterLocation:
+	var d := RuitkRouterPath.parse(raw, state_obj)
+	return RuitkRouterLocation.new(d["path"], d["query"], d["state"])

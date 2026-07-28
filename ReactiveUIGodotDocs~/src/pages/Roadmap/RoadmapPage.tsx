@@ -26,10 +26,10 @@ export const RoadmapPage: FC = () => (
         <ListItemText primary={<><Chip label="Done" size="small" color="success" sx={{ mr: 1 }} />~60 curated host elements named 1:1 after Godot classes (containers, buttons, inputs, item-model controls, media), plus an open tag vocabulary — any instantiable Godot Node class via ClassDB (0.9.0)</>} />
       </ListItem>
       <ListItem disablePadding>
-        <ListItemText primary={<><Chip label="Done" size="small" color="success" sx={{ mr: 1 }} />Styling redesigned for Godot — RUIStyle style dicts (Control props + size flags + Theme/StyleBox) and RUIStyleSheet named bundles</>} />
+        <ListItemText primary={<><Chip label="Done" size="small" color="success" sx={{ mr: 1 }} />Styling redesigned for Godot — RuitkStyle style dicts (Control props + size flags + Theme/StyleBox) and RuitkStyleSheet named bundles</>} />
       </ListItem>
       <ListItem disablePadding>
-        <ListItemText primary={<><Chip label="Done" size="small" color="success" sx={{ mr: 1 }} />Signals (RUISignal) for app-wide state, plus the client-side router (routes, outlet, navigate, nav_link)</>} />
+        <ListItemText primary={<><Chip label="Done" size="small" color="success" sx={{ mr: 1 }} />Signals (RuitkSignal) for app-wide state, plus the client-side router (routes, outlet, navigate, nav_link)</>} />
       </ListItem>
       <ListItem disablePadding>
         <ListItemText primary={<><Chip label="Done" size="small" color="success" sx={{ mr: 1 }} />Fragment, Portal, Suspense, and error-boundary components</>} />
