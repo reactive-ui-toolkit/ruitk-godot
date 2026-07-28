@@ -106,9 +106,9 @@ for (const t of (schema.hostElements ?? []) as SchemaTag[]) {
 
 // https://vite.dev/config/
 export default defineConfig({
-  // GitHub Pages PROJECT site: served from /ReactiveUI-Godot/. Asset URLs are base-prefixed and the
+  // GitHub Pages PROJECT site: served from /ruitk-godot/. Asset URLs are base-prefixed and the
   // router basename mirrors this (see src/main.tsx). Switch both to '/' for a custom domain.
-  base: '/ReactiveUI-Godot/',
+  base: '/ruitk-godot/',
   plugins: [react()],
   define: {
     __PACKAGE_VERSION__: JSON.stringify(readAddonVersion()),

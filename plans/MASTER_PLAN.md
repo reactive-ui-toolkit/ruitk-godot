@@ -1,4 +1,4 @@
-# MASTER PLAN — the single consolidated work-list (ReactiveUI-Godot)
+# MASTER PLAN — the single consolidated work-list (Reactive UI Toolkit — Godot)
 
 > **Consolidation of every live plan, 2026-07-14.** The 2026-07 plans audit closed and archived
 > eight plans (see `archive/README.md` for the per-plan record); everything still open across all

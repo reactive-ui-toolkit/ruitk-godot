@@ -1,9 +1,9 @@
 ---
 name: release-process
-description: The ReactiveUI-Godot release runbook — version bumps, the two-lane changelog system (hand-written library lane vs script-generated tooling lane), Discord notes, verification gates, and the merge→fast-forward→Publish flow. Use when preparing, staging, or publishing a release of any artifact in this repo.
+description: The Reactive UI Toolkit — Godot release runbook — version bumps, the two-lane changelog system (hand-written library lane vs script-generated tooling lane), Discord notes, verification gates, and the merge→fast-forward→Publish flow. Use when preparing, staging, or publishing a release of any artifact in this repo.
 ---
 
-# Release process (ReactiveUI-Godot)
+# Release process (Reactive UI Toolkit — Godot)
 
 Everything a release needs, in order. The repo holds four independently-versioned
 deliverables; a release touches only the ones whose shipped code changed — check with

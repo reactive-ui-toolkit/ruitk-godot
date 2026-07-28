@@ -1,9 +1,9 @@
 ---
 name: new-component
-description: Create a new .guitkx component for ReactiveUI-Godot — file placement, component/props/hooks/events syntax, children, styling, and what the compiler generates.
+description: Create a new .guitkx component for Reactive UI Toolkit — Godot — file placement, component/props/hooks/events syntax, children, styling, and what the compiler generates.
 ---
 
-# Writing a ReactiveUI-Godot component
+# Writing a Reactive UI Toolkit — Godot component
 
 ## Where files go
 

@@ -1,6 +1,6 @@
 /**
  * Host element descriptors — the single source of truth for the curated Godot
- * host tags (named 1:1 after their Godot classes) that ReactiveUI-Godot exposes
+ * host tags (named 1:1 after their Godot classes) that Reactive UI Toolkit — Godot exposes
  * in `.guitkx` markup. Beyond this curated set, any instantiable Godot Node
  * class is a valid tag at runtime (open vocabulary via ClassDB).
  *
