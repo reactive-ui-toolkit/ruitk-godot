@@ -5,14 +5,14 @@
 			"error": "",
 			"error_at": -1,
 			"error_code": "",
-			"tree": "[{\"at\":128,\"attrs\":[{\"at\":137,\"end\":174,\"kind\":\"str\",\"name\":\"title\",\"value\":\"Text Field — controlled input\",\"vat\":144}],\"children\":[{\"at\":182,\"attrs\":[{\"at\":200,\"end\":213,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"s[0]\",\"vat\":207},{\"at\":222,\"end\":256,\"kind\":\"str\",\"name\":\"placeholder_text\",\"value\":\"Type something…\",\"vat\":240},{\"at\":265,\"end\":304,\"kind\":\"expr\",\"name\":\"onTextChanged\",\"value\":\"func(t): s[1].call(t)\",\"vat\":281},{\"at\":313,\"end\":341,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"min_width\\\": 280}\",\"vat\":321}],\"children\":[],\"line\":7,\"t\":\"el\",\"tag\":\"LineEdit\"},{\"at\":351,\"attrs\":[{\"at\":358,\"end\":422,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"\\\"You typed: \\\\\\\"%s\\\\\\\"  (%d chars)\\\" % [s[0], s[0].length()]\",\"vat\":365}],\"children\":[],\"line\":12,\"t\":\"el\",\"tag\":\"Label\"}],\"line\":6,\"t\":\"el\",\"tag\":\"DemoBox\"}]"
+			"tree": "[{\"at\":130,\"attrs\":[{\"at\":139,\"end\":176,\"kind\":\"str\",\"name\":\"title\",\"value\":\"Text Field — controlled input\",\"vat\":146}],\"children\":[{\"at\":184,\"attrs\":[{\"at\":202,\"end\":215,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"s[0]\",\"vat\":209},{\"at\":224,\"end\":258,\"kind\":\"str\",\"name\":\"placeholder_text\",\"value\":\"Type something…\",\"vat\":242},{\"at\":267,\"end\":306,\"kind\":\"expr\",\"name\":\"onTextChanged\",\"value\":\"func(t): s[1].call(t)\",\"vat\":283},{\"at\":315,\"end\":343,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"min_width\\\": 280}\",\"vat\":323}],\"children\":[],\"line\":7,\"t\":\"el\",\"tag\":\"LineEdit\"},{\"at\":353,\"attrs\":[{\"at\":360,\"end\":424,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"\\\"You typed: \\\\\\\"%s\\\\\\\"  (%d chars)\\\" % [s[0], s[0].length()]\",\"vat\":367}],\"children\":[],\"line\":12,\"t\":\"el\",\"tag\":\"Label\"}],\"line\":6,\"t\":\"el\",\"tag\":\"DemoBox\"}]"
 		}
 	],
 	"ok": true,
 	"windows": [
 		{
-			"end": 443,
-			"start": 123
+			"end": 445,
+			"start": 125
 		}
 	]
 }

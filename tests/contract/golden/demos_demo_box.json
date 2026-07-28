@@ -5,14 +5,14 @@
 			"error": "",
 			"error_at": -1,
 			"error_code": "",
-			"tree": "[{\"at\":250,\"attrs\":[{\"at\":267,\"end\":355,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"margin_left\\\": 20, \\\"margin_top\\\": 20, \\\"margin_right\\\": 20, \\\"margin_bottom\\\": 20}\",\"vat\":275}],\"children\":[{\"at\":363,\"attrs\":[{\"at\":378,\"end\":406,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"separation\\\": 12}\",\"vat\":386}],\"children\":[{\"at\":416,\"attrs\":[{\"at\":423,\"end\":437,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"title\",\"vat\":430},{\"at\":438,\"end\":502,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"font_size\\\": 24, \\\"font_color\\\": Color(0.55, 0.8, 1.0)}\",\"vat\":446}],\"children\":[],\"line\":7,\"t\":\"el\",\"tag\":\"Label\"},{\"at\":514,\"attrs\":[],\"children\":[],\"line\":8,\"t\":\"el\",\"tag\":\"HSeparator\"},{\"at\":537,\"code\":\"children\",\"t\":\"expr\",\"vat\":539}],\"line\":6,\"t\":\"el\",\"tag\":\"VBoxContainer\"}],\"line\":5,\"t\":\"el\",\"tag\":\"MarginContainer\"}]"
+			"tree": "[{\"at\":252,\"attrs\":[{\"at\":269,\"end\":357,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"margin_left\\\": 20, \\\"margin_top\\\": 20, \\\"margin_right\\\": 20, \\\"margin_bottom\\\": 20}\",\"vat\":277}],\"children\":[{\"at\":365,\"attrs\":[{\"at\":380,\"end\":408,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"separation\\\": 12}\",\"vat\":388}],\"children\":[{\"at\":418,\"attrs\":[{\"at\":425,\"end\":439,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"title\",\"vat\":432},{\"at\":440,\"end\":504,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"font_size\\\": 24, \\\"font_color\\\": Color(0.55, 0.8, 1.0)}\",\"vat\":448}],\"children\":[],\"line\":7,\"t\":\"el\",\"tag\":\"Label\"},{\"at\":516,\"attrs\":[],\"children\":[],\"line\":8,\"t\":\"el\",\"tag\":\"HSeparator\"},{\"at\":539,\"code\":\"children\",\"t\":\"expr\",\"vat\":541}],\"line\":6,\"t\":\"el\",\"tag\":\"VBoxContainer\"}],\"line\":5,\"t\":\"el\",\"tag\":\"MarginContainer\"}]"
 		}
 	],
 	"ok": true,
 	"windows": [
 		{
-			"end": 598,
-			"start": 245
+			"end": 600,
+			"start": 247
 		}
 	]
 }

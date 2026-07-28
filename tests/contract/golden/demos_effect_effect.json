@@ -5,14 +5,14 @@
 			"error": "",
 			"error_at": -1,
 			"error_code": "",
-			"tree": "[{\"at\":344,\"attrs\":[{\"at\":353,\"end\":392,\"kind\":\"str\",\"name\":\"title\",\"value\":\"useEffect — lifecycle + cleanup\",\"vat\":360}],\"children\":[{\"at\":400,\"attrs\":[{\"at\":416,\"end\":461,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"\\\"Toggle dependency (now %s)\\\" % on[0]\",\"vat\":423},{\"at\":470,\"end\":513,\"kind\":\"expr\",\"name\":\"onPressed\",\"value\":\"func(): on[1].call(not on[0])\",\"vat\":482}],\"children\":[],\"line\":13,\"t\":\"el\",\"tag\":\"Button\"},{\"at\":523,\"attrs\":[{\"at\":538,\"end\":593,\"kind\":\"str\",\"name\":\"text\",\"value\":\"Effect log (cleanup runs before the next setup):\",\"vat\":544},{\"at\":602,\"end\":648,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"font_color\\\": Color(0.7, 0.7, 0.7)}\",\"vat\":610}],\"children\":[],\"line\":16,\"t\":\"el\",\"tag\":\"Label\"},{\"at\":658,\"attrs\":[{\"at\":665,\"end\":699,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"\\\"\\\\n\\\".join(log[\\\"current\\\"])\",\"vat\":672}],\"children\":[],\"line\":19,\"t\":\"el\",\"tag\":\"Label\"}],\"line\":12,\"t\":\"el\",\"tag\":\"DemoBox\"}]"
+			"tree": "[{\"at\":346,\"attrs\":[{\"at\":355,\"end\":394,\"kind\":\"str\",\"name\":\"title\",\"value\":\"useEffect — lifecycle + cleanup\",\"vat\":362}],\"children\":[{\"at\":402,\"attrs\":[{\"at\":418,\"end\":463,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"\\\"Toggle dependency (now %s)\\\" % on[0]\",\"vat\":425},{\"at\":472,\"end\":515,\"kind\":\"expr\",\"name\":\"onPressed\",\"value\":\"func(): on[1].call(not on[0])\",\"vat\":484}],\"children\":[],\"line\":13,\"t\":\"el\",\"tag\":\"Button\"},{\"at\":525,\"attrs\":[{\"at\":540,\"end\":595,\"kind\":\"str\",\"name\":\"text\",\"value\":\"Effect log (cleanup runs before the next setup):\",\"vat\":546},{\"at\":604,\"end\":650,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"font_color\\\": Color(0.7, 0.7, 0.7)}\",\"vat\":612}],\"children\":[],\"line\":16,\"t\":\"el\",\"tag\":\"Label\"},{\"at\":660,\"attrs\":[{\"at\":667,\"end\":701,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"\\\"\\\\n\\\".join(log[\\\"current\\\"])\",\"vat\":674}],\"children\":[],\"line\":19,\"t\":\"el\",\"tag\":\"Label\"}],\"line\":12,\"t\":\"el\",\"tag\":\"DemoBox\"}]"
 		}
 	],
 	"ok": true,
 	"windows": [
 		{
-			"end": 720,
-			"start": 339
+			"end": 722,
+			"start": 341
 		}
 	]
 }

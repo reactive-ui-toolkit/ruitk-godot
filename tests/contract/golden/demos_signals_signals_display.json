@@ -5,14 +5,14 @@
 			"error": "",
 			"error_at": -1,
 			"error_code": "",
-			"tree": "[{\"at\":102,\"attrs\":[{\"at\":118,\"end\":215,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"bg_color\\\": Color(0.18, 0.18, 0.22), \\\"corner_radius_all\\\": 6, \\\"content_margin_all\\\": 10}\",\"vat\":126}],\"children\":[{\"at\":223,\"attrs\":[{\"at\":230,\"end\":262,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"\\\"consumer sees: %d\\\" % v\",\"vat\":237}],\"children\":[],\"line\":5,\"t\":\"el\",\"tag\":\"Label\"}],\"line\":4,\"t\":\"el\",\"tag\":\"PanelContainer\"}]"
+			"tree": "[{\"at\":104,\"attrs\":[{\"at\":120,\"end\":217,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"bg_color\\\": Color(0.18, 0.18, 0.22), \\\"corner_radius_all\\\": 6, \\\"content_margin_all\\\": 10}\",\"vat\":128}],\"children\":[{\"at\":225,\"attrs\":[{\"at\":232,\"end\":264,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"\\\"consumer sees: %d\\\" % v\",\"vat\":239}],\"children\":[],\"line\":5,\"t\":\"el\",\"tag\":\"Label\"}],\"line\":4,\"t\":\"el\",\"tag\":\"PanelContainer\"}]"
 		}
 	],
 	"ok": true,
 	"windows": [
 		{
-			"end": 290,
-			"start": 97
+			"end": 292,
+			"start": 99
 		}
 	]
 }
