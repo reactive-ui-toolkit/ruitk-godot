@@ -1,26 +1,26 @@
-Copyright (c) 2026 Yaniv Kalfa (ReactiveUI for Godot)
+Copyright (c) 2026 Yaniv Kalfa (Reactive UI Toolkit — Godot)
 
-Licensed under the ReactiveUI Community License 1.0 - the full text follows.
+Licensed under the Reactive UI Toolkit Community License 1.1 - the full text follows.
 Free to use, modify, and ship inside your own projects and commercial
 products if your company earned less than US $250,000 in the last 12 months;
 above that, shipping a product requires a commercial license (see
 LICENSE-COMMERCIAL.md). Not to be redistributed or sold as a product that
 competes with this software.
 
-Required Notice: Copyright (c) 2026 Yaniv Kalfa (ReactiveUI for Godot)
+Required Notice: Copyright (c) 2026 Yaniv Kalfa (Reactive UI Toolkit — Godot)
 
 ---
 
-# ReactiveUI Community License 1.0
+# Reactive UI Toolkit Community License 1.1
 
 **In plain words (courtesy summary, not the license):** free to use, modify,
 and ship in your projects and commercial products if your company earned less
 than **US $250,000** in the last 12 months. Above that, shipping a product
-requires a commercial license for ReactiveUI for Godot — see
+requires a commercial license for Reactive UI Toolkit — Godot — see
 `LICENSE-COMMERCIAL.md`, distributed alongside this license. The same terms
-and prices are offered for each library in the ReactiveUI family (Godot,
+and prices are offered for each library in the Reactive UI Toolkit family (Godot,
 Unity, Unreal), each licensed per product. Either way: include "Made with
-ReactiveUI" in your product credits, and don't resell this software as a
+Reactive UI Toolkit" in your product credits, and don't resell this software as a
 product that competes with it.
 
 ## Acceptance
@@ -103,7 +103,7 @@ product.
 ## Attribution
 
 If you distribute or publish a product incorporating the software to end
-users, you must include the line "Made with ReactiveUI" (or "ReactiveUI for
+users, you must include the line "Made with Reactive UI Toolkit" (or "Reactive UI Toolkit —
 Godot") in the product's credits, about screen, or accompanying
 documentation, wherever other third-party software is credited. If the
 product credits no third-party software at all, this requirement is satisfied

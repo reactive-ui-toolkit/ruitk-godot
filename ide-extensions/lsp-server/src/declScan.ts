@@ -30,7 +30,7 @@ export interface FoundDecl {
   paramsAt?: number;
   ret?: string;
   bodyOpen?: number; // index of the callable body's `{`
-  crossGuard?: boolean; // `use_`-prefixed AND `-> RUIVNode` (GUITKX2321 -- E-02)
+  crossGuard?: boolean; // `use_`-prefixed AND `-> RuitkVNode` (GUITKX2321 -- E-02)
   eqStyle?: "plain" | "typed" | "infer"; // value decls
   valueStart?: number; // value decls: index of the initializer's first char
   typeText?: string; // value decls, typed form
@@ -99,7 +99,7 @@ export function looksLikeDecl(src: string, i: number): boolean {
 // Signature-only classification of a plain declaration whose NAME starts at `e` (E-01, no body
 // inspection — the exact mirror of guitkx.gd _scan_plain_decl). null when the shape doesn't match
 // any plain-decl form. Classification order: value forms first (`=`/`: Type =`/`:=` after the
-// name); then `-> RUIVNode` => component; then a `use_` prefix => hook; else => util.
+// name); then `-> RuitkVNode` => component; then a `use_` prefix => hook; else => util.
 export function scanPlainDecl(src: string, e: number): FoundDecl | null {
   const n = src.length;
   const ns = e;
@@ -142,7 +142,7 @@ export function scanPlainDecl(src: string, e: number): FoundDecl | null {
   if (p >= n || src[p] !== "{") return null;
   let kind: DeclKind = "util";
   let crossGuard = false;
-  if (ret === "RUIVNode") {
+  if (ret === "RuitkVNode") {
     kind = "component";
     if (name.startsWith("use_")) crossGuard = true;
   } else if (name.startsWith("use_")) {

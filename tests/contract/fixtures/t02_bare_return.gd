@@ -6,5 +6,5 @@ const __RUI_HOOK_SIG := ""
 
 const __RUI_KIND := "component"
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	return V.Label({ "text": "hi" })

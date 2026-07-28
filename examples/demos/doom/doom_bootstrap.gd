@@ -3,7 +3,7 @@ extends Control
 ## `DoomGameRuntimeBootstrap.cs` -- mounts the Doom demo as its own standalone scene
 ## (not embedded in the gallery, per plan §1.8: it needs full-bleed rendering and
 ## exclusive mouse capture). Mirrors examples/app.gd's own
-## ReactiveRoot.create()/.unmount() mount pattern.
+## RuitkRoot.create()/.unmount() mount pattern.
 ##
 ## Phase 2 (plans/DOOM_GAME_GUITKX_PORT_PLAN.md): also owns raw input capture and
 ## `Input.mouse_mode` (plan §1.5) -- `.guitkx` components/hooks are plain functions,
@@ -18,7 +18,7 @@ extends Control
 ## separate-input-system hack needed), and `MOUSE_MODE_CAPTURED` both locks and
 ## hides the OS cursor natively (no blank-cursor-texture hack needed).
 
-var _app: ReactiveRoot
+var _app: RuitkRoot
 
 # Optional perf overlay, toggled with F3 (hidden by default). A convenience for
 # diagnosing which stages spike: it splits the CPU frame into sim (GameLogic.tick)
@@ -37,7 +37,7 @@ func _ready() -> void:
 	# swallow every mouse motion/click as its OWN GUI input before it ever
 	# becomes "unhandled" input, so _unhandled_input below would never fire.
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_app = ReactiveRoot.create(self, V.fc(DoomGame.render))
+	_app = RuitkRoot.create(self, V.fc(DoomGame.render))
 	# Start at the menu with the cursor free. DoomGame captures the cursor when it
 	# switches to the game screen (its screen-change effect) and releases it again
 	# on the menu / death / victory overlays.

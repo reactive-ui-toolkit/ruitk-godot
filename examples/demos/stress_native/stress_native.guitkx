@@ -5,7 +5,7 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 import * as DemoStressNativeHooks from "./stress_native.hooks"
 
-export DemoStressNative() -> RUIVNode {
+export DemoStressNative() -> RuitkVNode {
   var box_count = useState(300)
   var duration = useState(10.0)
   var count_text = useState("300")

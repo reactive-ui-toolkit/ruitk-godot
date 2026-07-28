@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Questions & discussion
-    url: https://github.com/yanivkalfa/ReactiveUI-Godot/discussions
+    url: https://github.com/reactive-ui-toolkit/ruitk-godot/discussions
     about: Ask questions, share ideas, or get help in GitHub Discussions.
   - name: Documentation
-    url: https://github.com/yanivkalfa/ReactiveUI-Godot#readme
+    url: https://github.com/reactive-ui-toolkit/ruitk-godot#readme
     about: Read the README and docs for guides, API reference, and the GUITKX language.

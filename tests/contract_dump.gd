@@ -1,6 +1,6 @@
 extends SceneTree
 ## T0.1 contract harness — the GDScript half. For every fixture under tests/contract/fixtures/,
-## runs the COMPILER-OF-RECORD pipeline (RUIGuitkx) and dumps a canonical golden JSON:
+## runs the COMPILER-OF-RECORD pipeline (RuitkGuitkx) and dumps a canonical golden JSON:
 ##
 ##   { "ok", "diagnostics":[{code,severity,off,len}], "windows":[{start,end}],
 ##     "markup":[{ "error", "error_code", "error_at", "tree" }] }
@@ -24,9 +24,9 @@ extends SceneTree
 const FIXTURES := "res://tests/contract/fixtures"
 const GOLDEN := "res://tests/contract/golden"
 
-const L = preload("res://addons/reactive_ui/guitkx/guitkx_lexer.gd")
-const Markup = preload("res://addons/reactive_ui/guitkx/guitkx_markup.gd")
-const Compiler = preload("res://addons/reactive_ui/guitkx/guitkx.gd")
+const L = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_lexer.gd")
+const Markup = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_markup.gd")
+const Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 
 func _initialize() -> void:
 	var check := "--check" in OS.get_cmdline_user_args()

@@ -4,8 +4,8 @@ extends SceneTree
 ## land, dirty-state logic, path retargeting, and diagnostics rendering records.
 ## Run: godot --headless --path . --script res://tests/guitkx_editor_test.gd
 
-const CodeEditScript := preload("res://addons/reactive_ui_editor/editor/guitkx_code_edit.gd")
-const ViewScript := preload("res://addons/reactive_ui_editor/editor/guitkx_editor_view.gd")
+const CodeEditScript := preload("res://addons/reactive_ui_toolkit_editor/editor/guitkx_code_edit.gd")
+const ViewScript := preload("res://addons/reactive_ui_toolkit_editor/editor/guitkx_editor_view.gd")
 const TMP_PATH := "res://tests/__editor_test_tmp.guitkx"
 const TMP_SRC := "component EditorTmp() {\n\treturn (\n\t\t<Label text=\"hi\" />\n\t)\n}\n"
 
@@ -52,7 +52,7 @@ func _initialize() -> void:
 	print("[guitkx_editor_test] %d passed, %d failed" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
-# Never leave a temp .guitkx behind: the reactive_ui watcher in a live editor would sweep/compile it.
+# Never leave a temp .guitkx behind: the reactive_ui_toolkit watcher in a live editor would sweep/compile it.
 func _cleanup_tmp() -> void:
 	if FileAccess.file_exists(TMP_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(TMP_PATH))
@@ -62,23 +62,23 @@ func _cleanup_tmp() -> void:
 # (false when compilation failed), not on null.
 func _test_parses() -> void:
 	for p in [
-		"res://addons/reactive_ui_editor/plugin.gd",
-		"res://addons/reactive_ui_editor/rui_editor_deps.gd",
-		"res://addons/reactive_ui_editor/editor/guitkx_editor_view.gd",
-		"res://addons/reactive_ui_editor/editor/guitkx_code_edit.gd",
-		"res://addons/reactive_ui_editor/editor/guitkx_find_bar.gd",
-		"res://addons/reactive_ui_editor/editor/guitkx_diagnostics_renderer.gd",
-		"res://addons/reactive_ui_editor/editor/guitkx_problems_panel.gd",
-		"res://addons/reactive_ui_editor/editor/guitkx_references_panel.gd",
-		"res://addons/reactive_ui_editor/editor/guitkx_search_panel.gd",
-		"res://addons/reactive_ui_editor/lsp/guitkx_outline.gd",
-		"res://addons/reactive_ui_editor/lsp/guitkx_signature.gd",
-		"res://addons/reactive_ui_editor/lsp/guitkx_source_map.gd",
-		"res://addons/reactive_ui_editor/lsp/guitkx_line_index.gd",
-		"res://addons/reactive_ui_editor/lsp/guitkx_virtual_doc.gd",
-		"res://addons/reactive_ui_editor/lsp/guitkx_analyzer_bridge.gd",
-		"res://addons/reactive_ui_editor/resources/guitkx_resource.gd",
-		"res://addons/reactive_ui_editor/resources/guitkx_resource_loader.gd",
+		"res://addons/reactive_ui_toolkit_editor/plugin.gd",
+		"res://addons/reactive_ui_toolkit_editor/ruitk_editor_deps.gd",
+		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_editor_view.gd",
+		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_code_edit.gd",
+		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_find_bar.gd",
+		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_diagnostics_renderer.gd",
+		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_problems_panel.gd",
+		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_references_panel.gd",
+		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_search_panel.gd",
+		"res://addons/reactive_ui_toolkit_editor/lsp/guitkx_outline.gd",
+		"res://addons/reactive_ui_toolkit_editor/lsp/guitkx_signature.gd",
+		"res://addons/reactive_ui_toolkit_editor/lsp/guitkx_source_map.gd",
+		"res://addons/reactive_ui_toolkit_editor/lsp/guitkx_line_index.gd",
+		"res://addons/reactive_ui_toolkit_editor/lsp/guitkx_virtual_doc.gd",
+		"res://addons/reactive_ui_toolkit_editor/lsp/guitkx_analyzer_bridge.gd",
+		"res://addons/reactive_ui_toolkit_editor/resources/guitkx_resource.gd",
+		"res://addons/reactive_ui_toolkit_editor/resources/guitkx_resource_loader.gd",
 	]:
 		var s: GDScript = load(p)
 		_ok(s != null and s.can_instantiate(), "%s compiles" % str(p).get_file())
@@ -298,7 +298,7 @@ func _test_intelligence_wiring() -> void:
 
 # W4/G24 — find bar: open seeds from selection, counts, steps forward/back with wrap, case toggle.
 func _test_find_bar() -> void:
-	const FindBar := preload("res://addons/reactive_ui_editor/editor/guitkx_find_bar.gd")
+	const FindBar := preload("res://addons/reactive_ui_toolkit_editor/editor/guitkx_find_bar.gd")
 	var ce: CodeEdit = CodeEditScript.new()
 	ce.text = "alpha beta\ngamma alpha\nALPHA end"
 	var bar: HBoxContainer = FindBar.new()
@@ -336,11 +336,11 @@ func _test_find_bar() -> void:
 
 # W5/F9 — dependency handshake facts + the numeric version comparator.
 func _test_deps_handshake() -> void:
-	const Deps := preload("res://addons/reactive_ui_editor/rui_editor_deps.gd")
+	const Deps := preload("res://addons/reactive_ui_toolkit_editor/ruitk_editor_deps.gd")
 	var check: Dictionary = Deps.satisfied()
-	_ok(bool(check.get("ok", false)), "handshake passes in this repo (reactive_ui present)")
+	_ok(bool(check.get("ok", false)), "handshake passes in this repo (reactive_ui_toolkit present)")
 	var ver: String = Deps.installed_version()
-	_ok(ver != "" and ver.split(".").size() == 3, "installed reactive_ui version parses (got '%s')" % ver)
+	_ok(ver != "" and ver.split(".").size() == 3, "installed reactive_ui_toolkit version parses (got '%s')" % ver)
 	_ok(not Deps._version_lt(ver, Deps.MIN_REACTIVE_UI), "installed version satisfies MIN_REACTIVE_UI")
 	_ok(Deps._version_lt("0.8.1", "0.8.2"), "semver: 0.8.1 < 0.8.2")
 	_ok(Deps._version_lt("0.9.9", "0.10.0"), "semver: numeric, not lexicographic")
@@ -351,7 +351,7 @@ func _test_deps_handshake() -> void:
 	_ok(not Deps.godot_version_ok("4.3.2"), "gate: 4.3.x is refused")
 	_ok(Deps.godot_version_ok("4.4.0") and Deps.godot_version_ok("4.7.1") and Deps.godot_version_ok("5.0.0"), "gate: 4.4+/5.x pass")
 	# The runtime addon's watcher gate agrees (same floor, its own testable static).
-	const RtPlugin := preload("res://addons/reactive_ui/plugin.gd")
+	const RtPlugin := preload("res://addons/reactive_ui_toolkit/plugin.gd")
 	_ok(str(RtPlugin.MIN_GODOT) == str(Deps.MIN_GODOT), "gate: runtime and editor addons claim the SAME floor")
 	_ok(RtPlugin.godot_supported() and not RtPlugin.godot_supported("4.3.2") and RtPlugin.godot_supported("4.4.0"), "gate: runtime godot_supported matches")
 
@@ -359,32 +359,32 @@ func _test_deps_handshake() -> void:
 # silent drift (between the two shipping editors, and against the compiler's tag universe) into
 # CI failures.
 func _test_schema_sync() -> void:
-	var bundled := FileAccess.get_file_as_string("res://addons/reactive_ui_editor/data/guitkx-schema.json")
+	var bundled := FileAccess.get_file_as_string("res://addons/reactive_ui_toolkit_editor/data/guitkx-schema.json")
 	var grammar := FileAccess.get_file_as_string("res://ide-extensions/grammar/guitkx-schema.json")
 	_ok(bundled != "", "bundled schema readable")
 	if grammar != "":
 		# Byte-identity with the source grammar (the copy the VS Code tooling ships from). The
 		# grammar file is absent from store installs — this arm runs in the repo/CI only.
 		_ok(bundled == grammar,
-			"bundled schema == ide-extensions grammar (resync: copy grammar/guitkx-schema.json into addons/reactive_ui_editor/data/)")
+			"bundled schema == ide-extensions grammar (resync: copy grammar/guitkx-schema.json into addons/reactive_ui_toolkit_editor/data/)")
 	# Store-packaging sync (field feedback on the AL listing): the addon folder carries its own
 	# README/CHANGELOG/LICENSE so installs never touch the user's project root. The CHANGELOG is
 	# a mirror of the root one — this tripwire keeps them byte-identical (resync: cp CHANGELOG.md
-	# addons/reactive_ui/CHANGELOG.md).
-	_ok(FileAccess.get_file_as_string("res://addons/reactive_ui/CHANGELOG.md")
+	# addons/reactive_ui_toolkit/CHANGELOG.md).
+	_ok(FileAccess.get_file_as_string("res://addons/reactive_ui_toolkit/CHANGELOG.md")
 		== FileAccess.get_file_as_string("res://CHANGELOG.md"),
 		"addon CHANGELOG mirrors the root CHANGELOG")
-	_ok(FileAccess.file_exists("res://addons/reactive_ui/README.md"), "addon carries its own README")
-	_ok(FileAccess.file_exists("res://addons/reactive_ui/LICENSE"), "addon carries its own LICENSE")
-	_ok(FileAccess.file_exists("res://addons/reactive_ui_editor/README.md")
-		and FileAccess.file_exists("res://addons/reactive_ui_editor/LICENSE"),
+	_ok(FileAccess.file_exists("res://addons/reactive_ui_toolkit/README.md"), "addon carries its own README")
+	_ok(FileAccess.file_exists("res://addons/reactive_ui_toolkit/LICENSE"), "addon carries its own LICENSE")
+	_ok(FileAccess.file_exists("res://addons/reactive_ui_toolkit_editor/README.md")
+		and FileAccess.file_exists("res://addons/reactive_ui_toolkit_editor/LICENSE"),
 		"editor addon carries its own README + LICENSE")
 
 	var parsed: Variant = JSON.parse_string(bundled)
 	_ok(parsed is Dictionary and (parsed as Dictionary).has("hostElements"), "bundled schema parses")
 	# Every schema host element must exist in the compiler's vocabulary (the source of truth the
 	# watcher compiles with) — a tag added there but not here silently vanishes from completion.
-	var vocab_tags: Dictionary = RUIGuitkx.vocab().get("host_tags", {})
+	var vocab_tags: Dictionary = RuitkGuitkx.vocab().get("host_tags", {})
 	_ok(not vocab_tags.is_empty(), "compiler vocabulary host_tags readable")
 	var missing: Array = []
 	for el in (parsed as Dictionary).get("hostElements", []):
@@ -395,7 +395,7 @@ func _test_schema_sync() -> void:
 
 # Field captures from the M1 acceptance pass: fixture pollution + parse-masked 0105.
 func _test_scan_diags() -> void:
-	const Scan := preload("res://addons/reactive_ui_editor/lsp/guitkx_scan_diags.gd")
+	const Scan := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_scan_diags.gd")
 
 	# .gdignore honored: the contract fixtures (duplicate/broken decls) never reach the index.
 	GuitkxWorkspace.rescan()
@@ -409,7 +409,7 @@ func _test_scan_diags() -> void:
 		"DemoBox resolves to the real demo, not a fixture (got %s)" % str(demo_box.get("path", "")))
 
 	# Severity constant stays pinned to the compiler's.
-	_ok(Scan.SEVERITY_ERROR == RUIGuitkxDiag.ERROR, "scan severity matches RUIGuitkxDiag.ERROR")
+	_ok(Scan.SEVERITY_ERROR == RuitkGuitkxDiag.ERROR, "scan severity matches RuitkGuitkxDiag.ERROR")
 
 	# The user's exact shape: typo'd open + original close -> parse error masks compiler 0105;
 	# the scan still flags the typo with a did-you-mean.
@@ -475,7 +475,7 @@ func _test_rich_hover() -> void:
 
 	# The resource loader must NEVER return an error for an unreadable file — ResourceLoader
 	# caches failures, permanently red-✕ing the file in the dock (field capture).
-	const Loader := preload("res://addons/reactive_ui_editor/resources/guitkx_resource_loader.gd")
+	const Loader := preload("res://addons/reactive_ui_toolkit_editor/resources/guitkx_resource_loader.gd")
 	var ldr := Loader.new()
 	var out: Variant = ldr._load("res://tests/__no_such_file_ever.guitkx", "", false, 0)
 	_ok(out is Resource, "loader returns an (empty) resource for an unreadable path, never an error")
@@ -493,13 +493,13 @@ func _test_rich_hover() -> void:
 	# Rapid-rename hygiene (field capture: "after 1-2 renames it breaks — the .gd stays behind"):
 	# moving a .guitkx must synchronously remove the OLD name's generated outputs, or stacked
 	# renames leave multiple .gd files declaring the same class_name.
-	const PluginScript := preload("res://addons/reactive_ui_editor/plugin.gd")
+	const PluginScript := preload("res://addons/reactive_ui_toolkit_editor/plugin.gd")
 	var mv_src := "res://tests/__editor_test_move.guitkx"
 	var fmv := FileAccess.open(mv_src, FileAccess.WRITE)
 	fmv.store_string("component EditorTmpMove() {\n\treturn (\n\t\t<Label text=\"m\" />\n\t)\n}\n")
 	fmv.close()
-	RUIGuitkxCodegen.compile_file(mv_src)
-	var mv_gd: String = RUIGuitkxCodegen.gd_path_for(mv_src)
+	RuitkGuitkxCodegen.compile_file(mv_src)
+	var mv_gd: String = RuitkGuitkxCodegen.gd_path_for(mv_src)
 	_ok(FileAccess.file_exists(mv_gd), "move fixture compiled its .gd")
 	var mv_dst := "res://tests/__editor_test_moved.guitkx"
 	DirAccess.rename_absolute(ProjectSettings.globalize_path(mv_src), ProjectSettings.globalize_path(mv_dst))
@@ -514,8 +514,8 @@ func _test_rich_hover() -> void:
 	fval.store_string("export tmp_val_w: int = 7
 ")
 	fval.close()
-	RUIGuitkxCodegen.compile_file(val_src)
-	var val_gd: String = RUIGuitkxCodegen.gd_path_for(val_src)
+	RuitkGuitkxCodegen.compile_file(val_src)
+	var val_gd: String = RuitkGuitkxCodegen.gd_path_for(val_src)
 	_ok(FileAccess.file_exists(val_gd), "value-export fixture compiled its .gd")
 	var val_dst := "res://tests/__editor_test_val2.guitkx"
 	DirAccess.rename_absolute(ProjectSettings.globalize_path(val_src), ProjectSettings.globalize_path(val_dst))
@@ -524,18 +524,18 @@ func _test_rich_hover() -> void:
 	var val_imp := "res://tests/__editor_test_valimp.guitkx"
 	var fvi := FileAccess.open(val_imp, FileAccess.WRITE)
 	fvi.store_string("import { tmp_val_w } from \"./__editor_test_val\"
-export ValImp() -> RUIVNode {
+export ValImp() -> RuitkVNode {
 	return ( <Label text={str(tmp_val_w)}/> )
 }
 ")
 	fvi.close()
-	var vres: Dictionary = RUIGuitkxCodegen.compile_file(val_imp)
+	var vres: Dictionary = RuitkGuitkxCodegen.compile_file(val_imp)
 	var v2300 := false
 	for vd in (vres.get("diagnostics", []) as Array):
 		if vd is Dictionary and str((vd as Dictionary).get("code", "")) == "GUITKX2300":
 			v2300 = true
 	_ok(v2300, "importer of the OLD specifier gets GUITKX2300, not a silent stale preload")
-	for vjunk in [val_dst, val_dst + ".diags.json", RUIGuitkxCodegen.gd_path_for(val_dst), val_imp, val_imp + ".diags.json", RUIGuitkxCodegen.gd_path_for(val_imp), val_src + ".diags.json", val_gd + ".uid"]:
+	for vjunk in [val_dst, val_dst + ".diags.json", RuitkGuitkxCodegen.gd_path_for(val_dst), val_imp, val_imp + ".diags.json", RuitkGuitkxCodegen.gd_path_for(val_imp), val_src + ".diags.json", val_gd + ".uid"]:
 		if FileAccess.file_exists(str(vjunk)):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(str(vjunk)))
 
@@ -547,13 +547,13 @@ export ValImp() -> RUIVNode {
 	fhw.close()
 	PluginScript.cleanup_moved_guitkx(hw_src)
 	_ok(FileAccess.file_exists(hw_gd), "hand-written .gd under the old name is untouchable")
-	for junk in [mv_dst, mv_dst + ".diags.json", RUIGuitkxCodegen.gd_path_for(mv_dst), hw_gd, mv_gd + ".uid", hw_gd + ".uid"]:
+	for junk in [mv_dst, mv_dst + ".diags.json", RuitkGuitkxCodegen.gd_path_for(mv_dst), hw_gd, mv_gd + ".uid", hw_gd + ".uid"]:
 		if FileAccess.file_exists(junk):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(str(junk)))
 
 # M2 wave 1b / G26 — guitkx.config.json discovery + end-to-end formatter plumbing.
 func _test_formatter_config() -> void:
-	const Config := preload("res://addons/reactive_ui_editor/lsp/guitkx_config.gd")
+	const Config := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_config.gd")
 	var dir := "res://tests/__cfg_tmp"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir + "/nested"))
 	var w := func(p: String, s: String):
@@ -599,15 +599,15 @@ func _test_sidecar_overlay() -> void:
 	fa.close()
 	# Plant a sweep-style sidecar with a 2107 anchored at the tag (only the sweep can produce it).
 	var at := src.find("ScOther")
-	RUIGuitkxCodegen.write_diags_sidecar(TMP_PATH, src, [{
-		"code": "GUITKX2107", "severity": RUIGuitkxDiag.ERROR,
+	RuitkGuitkxCodegen.write_diags_sidecar(TMP_PATH, src, [{
+		"code": "GUITKX2107", "severity": RuitkGuitkxDiag.ERROR,
 		"message": "component <ScOther> resolves to res://gone.gd, which no longer exists",
 		"offset": at, "length": 7,
 	}], { "ScOther": "res://gone.gd" })
 
 	var v: Control = ViewScript.new()
 	v.open_path(TMP_PATH)
-	var line := int(RUIGuitkxDiag.line_col(src, at).get("line", -1))
+	var line := int(RuitkGuitkxDiag.line_col(src, at).get("line", -1))
 	var meta: Variant = v._code_edit.get_line_gutter_metadata(line, v._code_edit.diag_gutter)
 	_ok(meta is Dictionary and str((meta as Dictionary).get("code", "")) == "GUITKX2107",
 		"hash-matched sidecar 2107 anchors at the reference line")
@@ -624,7 +624,7 @@ func _test_sidecar_overlay() -> void:
 	_ok(v._code_edit.get_line_background_color(0).a == 0.0, "D5: hints carry no line tint")
 	v.free()
 
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(str(RUIGuitkxCodegen.diags_path_for(TMP_PATH))))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(str(RuitkGuitkxCodegen.diags_path_for(TMP_PATH))))
 
 # M2 wave 2 — completion contexts (G5/G6/G7/G8/G28) + the comment toggle (E12).
 func _test_wave2_completion() -> void:
@@ -647,7 +647,7 @@ func _test_wave2_completion() -> void:
 	items = GuitkxCompletion.for_caret(s3, (RET + "<Label style={ {\"").length())
 	names = items.map(func(it): return str((it as Dictionary).get("insert", "")))
 	_ok(names.has("bg_color") and names.has("font_color") and names.has("separation"),
-		"style dict offers the RUIStyle keys")
+		"style dict offers the RuitkStyle keys")
 	_ok(GuitkxSchema.style_keys().size() == 45, "schema carries all 45 style keys")
 
 	# G7: builtin members after `Color.` in embedded code.
@@ -707,7 +707,7 @@ func _test_comment_toggle() -> void:
 
 # M2 wave 3 — references (G2), rename (G3), hook goto-def (G27).
 func _test_refs_and_rename() -> void:
-	const Refs := preload("res://addons/reactive_ui_editor/lsp/guitkx_refs.gd")
+	const Refs := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_refs.gd")
 	# Two fixture files: a component + a consumer referencing it twice (+ a comparison decoy).
 	var a_path := "res://tests/__refs_a.guitkx"
 	var b_path := "res://tests/__refs_b.guitkx"
@@ -754,14 +754,14 @@ func _test_refs_and_rename() -> void:
 	# rewrite in lockstep; a rename-import LOCAL alias and its uses stay untouched.
 	var c_path := "res://tests/__refs_c.guitkx"
 	var d_path := "res://tests/__refs_d.guitkx"
-	var c_src := "export RefsChip() -> RUIVNode {
+	var c_src := "export RefsChip() -> RuitkVNode {
 	return ( <Label /> )
 }
 export { RefsChip }
 export default RefsChip
 "
 	var d_src := "import { RefsChip as RBadge } from \"./__refs_c\"
-export RefsUser() -> RUIVNode {
+export RefsUser() -> RuitkVNode {
 	return ( <RBadge /> )
 }
 "
@@ -775,7 +775,7 @@ export RefsUser() -> RUIVNode {
 	var edits2: Dictionary = plan2.get("edits", {})
 	var new_c: String = Refs.apply_edits_to_text(c_src, edits2.get(c_path, []), "RefsGem")
 	var new_d: String = Refs.apply_edits_to_text(d_src, edits2.get(d_path, []), "RefsGem")
-	_ok(new_c.contains("export RefsGem() -> RUIVNode") and new_c.contains("export { RefsGem }") and new_c.contains("export default RefsGem"), "decl + list marker + default marker renamed (got %s)" % new_c)
+	_ok(new_c.contains("export RefsGem() -> RuitkVNode") and new_c.contains("export { RefsGem }") and new_c.contains("export default RefsGem"), "decl + list marker + default marker renamed (got %s)" % new_c)
 	_ok(new_d.contains("import { RefsGem as RBadge }"), "clause REMOTE half renamed (got %s)" % new_d)
 	_ok(new_d.contains("<RBadge />"), "the local alias and its tag use stay untouched")
 	for p2 in [c_path, d_path]:
@@ -872,10 +872,10 @@ func _test_multifile() -> void:
 	GuitkxWorkspace.rescan()
 
 # W5/G12 — document outline: the compiler's declaration scan, offsets anchored at the NAME.
-# ES-modules leg: the fixture uses REAL syntax (the outline consumes RUIGuitkx.analyzed_decls,
+# ES-modules leg: the fixture uses REAL syntax (the outline consumes RuitkGuitkx.analyzed_decls,
 # which parses actual declarations, not a keyword regex) and covers wrapper + plain forms.
 func _test_outline() -> void:
-	const Outline := preload("res://addons/reactive_ui_editor/lsp/guitkx_outline.gd")
+	const Outline := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_outline.gd")
 	var src := "hook useThing(x) {\n\treturn x\n}\nmodule Helpers {\n\thook one() {\n\t\treturn 1\n\t}\n\thook two() {\n\t\treturn 2\n\t}\n}\n"
 	var entries: Array = Outline.outline_of(src)
 	_ok(entries.size() == 4, "outline lists hook + module + 2 member funcs (got %d)" % entries.size())
@@ -898,7 +898,7 @@ func _test_outline() -> void:
 	_ok(Outline.outline_of("").is_empty(), "empty text -> empty outline")
 	_ok(Outline.outline_of("# just a comment\n").is_empty(), "no declarations -> empty outline")
 	# ES-modules: plain declarations outline with their signature-classified kinds + export flags.
-	var plain := "export w := 1\nexport fmt(x: int) -> String {\n\treturn str(x)\n}\nuse_t() -> int {\n\treturn 1\n}\nexport Foo() -> RUIVNode {\n\treturn (\n\t\t<Label />\n\t)\n}\n"
+	var plain := "export w := 1\nexport fmt(x: int) -> String {\n\treturn str(x)\n}\nuse_t() -> int {\n\treturn 1\n}\nexport Foo() -> RuitkVNode {\n\treturn (\n\t\t<Label />\n\t)\n}\n"
 	var pentries: Array = Outline.outline_of(plain)
 	var pkinds: Array = pentries.map(func(e): return str((e as Dictionary).get("kind", "")))
 	_ok(pkinds == ["value", "util", "hook", "component"], "plain decls outline with E-01 kinds (got %s)" % str(pkinds))
@@ -911,14 +911,14 @@ func _test_outline() -> void:
 # tag in the live unknown-tag scan (the wrapper-only _local_decls regex false-flagged it);
 # (b) namespace-member completion after `X.`; (c) kind-aware hover badges.
 func _test_es_editor_intelligence() -> void:
-	const ScanDiags := preload("res://addons/reactive_ui_editor/lsp/guitkx_scan_diags.gd")
-	const Completion := preload("res://addons/reactive_ui_editor/lsp/guitkx_completion.gd")
-	const Hover := preload("res://addons/reactive_ui_editor/lsp/guitkx_hover.gd")
+	const ScanDiags := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_scan_diags.gd")
+	const Completion := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_completion.gd")
+	const Hover := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_hover.gd")
 	# (a) plain sibling used as a tag in the SAME buffer -- no GUITKX0105.
-	var buf := "Chip2() -> RUIVNode {
+	var buf := "Chip2() -> RuitkVNode {
 	return ( <Label /> )
 }
-export Shell2() -> RUIVNode {
+export Shell2() -> RuitkVNode {
 	return ( <Chip2 /> )
 }
 "
@@ -936,7 +936,7 @@ priv_v := 1
 	fh.close()
 	var app_p := "res://tests/__es_ed_app.guitkx"
 	var app_src := "import * as Hud from \"./__es_ed_hud\"
-export A2() -> RUIVNode {
+export A2() -> RuitkVNode {
 	return ( <Label text={str(Hud.)}/> )
 }
 "
@@ -948,7 +948,7 @@ export A2() -> RUIVNode {
 	# (c) kind-aware hover badge for an indexed component incl. export/default.
 	var chip_p := "res://tests/__es_ed_chip.guitkx"
 	var fc2 := FileAccess.open(chip_p, FileAccess.WRITE)
-	fc2.store_string("export EsChipX() -> RUIVNode {
+	fc2.store_string("export EsChipX() -> RuitkVNode {
 	return ( <Label /> )
 }
 export default EsChipX
@@ -989,7 +989,7 @@ export default fmt
 	GuitkxWorkspace.rescan()
 
 func _test_replace() -> void:
-	const FindBar := preload("res://addons/reactive_ui_editor/editor/guitkx_find_bar.gd")
+	const FindBar := preload("res://addons/reactive_ui_toolkit_editor/editor/guitkx_find_bar.gd")
 	var ce: CodeEdit = CodeEditScript.new()
 	ce.text = "alpha beta\ngamma alpha\nALPHA end"
 	var bar: HBoxContainer = FindBar.new()
@@ -1029,7 +1029,7 @@ func _test_replace() -> void:
 
 # W5/E18-replacement — project-wide .guitkx search over the workspace index.
 func _test_project_search() -> void:
-	const SearchPanel := preload("res://addons/reactive_ui_editor/editor/guitkx_search_panel.gd")
+	const SearchPanel := preload("res://addons/reactive_ui_toolkit_editor/editor/guitkx_search_panel.gd")
 	var a := "res://tests/__w5_a.guitkx"
 	var b := "res://tests/__w5_b.guitkx"
 	for pair in [[a, "component W5A() {\n\treturn (\n\t\t<Label text=\"needle needle\" />\n\t)\n}\n"],
@@ -1064,13 +1064,13 @@ func _test_project_search() -> void:
 # W5/G14+G34 — project-scope Problems: sidecar aggregation with resolved lines, codes in rows,
 # and project-row activation emitting (path, line).
 func _test_problems_project() -> void:
-	const ProblemsPanel := preload("res://addons/reactive_ui_editor/editor/guitkx_problems_panel.gd")
+	const ProblemsPanel := preload("res://addons/reactive_ui_toolkit_editor/editor/guitkx_problems_panel.gd")
 	var a := "res://tests/__w5_diag.guitkx"
 	var src := "component W5Diag() {\n\treturn (\n\t\t<Label text=\"x\" />\n\t)\n}\n"
 	var f := FileAccess.open(a, FileAccess.WRITE)
 	f.store_string(src)
 	f.close()
-	RUIGuitkxCodegen.write_diags_sidecar(a, src, [
+	RuitkGuitkxCodegen.write_diags_sidecar(a, src, [
 		{ "code": "GUITKX9901", "severity": 0, "message": "boom", "offset": src.find("<Label"), "length": 6 },
 	])
 	GuitkxWorkspace.rescan()
@@ -1098,7 +1098,7 @@ func _test_problems_project() -> void:
 	_ok(got == [["res://x.guitkx", 3]], "activating a project row emits location_activated")
 	panel.free()
 
-	for p in [a, RUIGuitkxCodegen.diags_path_for(a)]:
+	for p in [a, RuitkGuitkxCodegen.diags_path_for(a)]:
 		if FileAccess.file_exists(str(p)):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(str(p)))
 	GuitkxWorkspace.rescan()
@@ -1106,7 +1106,7 @@ func _test_problems_project() -> void:
 # W6/G4 — signature help: the back-scan arms only inside an event-handler lambda's parameter list
 # on a HOST tag, resolves the bound signal via ClassDB, and tracks the active parameter.
 func _test_signature() -> void:
-	const Sig := preload("res://addons/reactive_ui_editor/lsp/guitkx_signature.gd")
+	const Sig := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_signature.gd")
 	var src := "component S() {\n\treturn (\n\t\t<CheckBox on_toggled={ func (t): pass } />\n\t)\n}\n"
 	var off := src.find("func (") + "func (".length()
 	var sig: Dictionary = Sig.signature_at(src, off)
@@ -1141,7 +1141,7 @@ func _test_signature() -> void:
 	# Widget: the strip shows while the caret is in context and hides when it leaves (G4 UI).
 	var ce: CodeEdit = CodeEditScript.new()
 	ce.text = src
-	var lc: Dictionary = RUIGuitkxDiag.line_col(src, off)
+	var lc: Dictionary = RuitkGuitkxDiag.line_col(src, off)
 	ce.set_caret_line(int(lc["line"]))
 	ce.set_caret_column(int(lc["col"]))
 	ce._signature_refresh()
@@ -1236,10 +1236,10 @@ func _test_wave7_editing() -> void:
 	# D6: compile() returns PER-CALL refs — populated when a guitkx-bound component lowers, and
 	# structurally empty on the next call (no static bleed between compiles).
 	var src := "component RA() {\n\treturn (\n\t\t<Dep />\n\t)\n}\n"
-	var r1: Dictionary = RUIGuitkx.compile(src, "ra", ["Dep"], { "Dep": "res://x/dep.gd" })
+	var r1: Dictionary = RuitkGuitkx.compile(src, "ra", ["Dep"], { "Dep": "res://x/dep.gd" })
 	_ok(str((r1.get("refs", {}) as Dictionary).get("Dep", "")) == "res://x/dep.gd",
 		"compile returns the per-call component refs")
-	var r2: Dictionary = RUIGuitkx.compile(
+	var r2: Dictionary = RuitkGuitkx.compile(
 		"component RB() {\n\treturn (\n\t\t<Label />\n\t)\n}\n", "rb", [], {})
 	_ok((r2.get("refs", {}) as Dictionary).is_empty(), "next compile starts with empty refs (D6)")
 
@@ -1315,7 +1315,7 @@ func _test_parity_pins() -> void:
 
 	# @class_name override binds the generated class (compile + codegen surface).
 	var src := "@class_name Zed\ncomponent OvR() {\n\treturn (\n\t\t<Label />\n\t)\n}\n"
-	var r: Dictionary = RUIGuitkx.compile(src, "ovr")
+	var r: Dictionary = RuitkGuitkx.compile(src, "ovr")
 	_ok(bool(r.get("ok", false)) and str(r.get("gd", "")).contains("class_name Zed"),
 		"@class_name override names the generated class")
 
@@ -1336,15 +1336,15 @@ func _test_parity_pins() -> void:
 		if not str(wp).begins_with("res://") or str(wp).contains("\\"):
 			clean = false
 	_ok(clean, "workspace paths are canonical res:// (no backslashes)")
-	_ok(RUIGuitkxCodegen.gd_path_for("res://a/b.guitkx") == "res://a/b.gd",
+	_ok(RuitkGuitkxCodegen.gd_path_for("res://a/b.guitkx") == "res://a/b.gd",
 		"gd_path_for maps beside the source")
-	_ok(RUIGuitkxCodegen.diags_path_for("res://a/b.guitkx") == "res://a/b.guitkx.diags.json",
+	_ok(RuitkGuitkxCodegen.diags_path_for("res://a/b.guitkx") == "res://a/b.guitkx.diags.json",
 		"diags_path_for maps the sidecar name")
 
 # M3 — the byte<->char boundary (GuitkxLineIndex): CodeEdit columns are CODE POINTS (probed:
 # "aé😀b" -> length 4, caret col 4, 8 UTF-8 bytes); the analyzer speaks UTF-8 bytes.
 func _test_line_index() -> void:
-	const LI := preload("res://addons/reactive_ui_editor/lsp/guitkx_line_index.gd")
+	const LI := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_line_index.gd")
 	var s := "aé😀b"  # 1 + 2 + 4 + 1 UTF-8 bytes; 4 code points
 	_ok(LI.char_to_byte(s, 0) == 0, "char 0 -> byte 0")
 	_ok(LI.char_to_byte(s, 1) == 1, "ascii char -> 1 byte")
@@ -1362,7 +1362,7 @@ func _test_line_index() -> void:
 
 # M3 — GuitkxSourceMap: length-preserving spans translate by constant delta; outside -> -1.
 func _test_source_map() -> void:
-	const SM := preload("res://addons/reactive_ui_editor/lsp/guitkx_source_map.gd")
+	const SM := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_source_map.gd")
 	var m: RefCounted = SM.new()
 	m.add_span(100, 10, 5)
 	m.add_span(300, 40, 8)
@@ -1376,7 +1376,7 @@ func _test_source_map() -> void:
 # M3 — the virtual-document port (GuitkxVirtualDoc): scope-aware emission, verbatim mapping,
 # hook stubs byte-identical to hooks.gd, misspelled-decl recovery, markup neutralization.
 func _test_virtual_doc() -> void:
-	const VD := preload("res://addons/reactive_ui_editor/lsp/guitkx_virtual_doc.gd")
+	const VD := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_virtual_doc.gd")
 	var src := "component Probe(title) {\n\tvar b := Button.new()\n\treturn (\n\t\t<VBoxContainer>\n\t\t\t<Label text={ title } />\n\t\t\t@if (b.visible) {\n\t\t\t\t<Label text={ str(b.text) } />\n\t\t\t}\n\t\t</VBoxContainer>\n\t)\n}\n"
 	var built: Dictionary = VD.build(src)
 	var gen := str(built["text"])
@@ -1385,7 +1385,7 @@ func _test_virtual_doc() -> void:
 	_ok(gen.contains("static func useState(initial = null) -> Array: return Hooks.useState(initial)"),
 		"hook stubs are class-level static wrappers")
 	_ok(gen.contains("## @return-tuple(Variant, Callable)"), "tuple hooks carry the @return-tuple doc")
-	_ok(gen.contains("static func render(props: Dictionary, children: Array) -> RUIVNode:"),
+	_ok(gen.contains("static func render(props: Dictionary, children: Array) -> RuitkVNode:"),
 		"top-level component emits render()")
 	_ok(gen.contains("\tvar title = props.get(\"title\")"), "params destructure from props")
 	_ok(gen.contains("\tvar b := Button.new()"), "setup splices verbatim")
@@ -1399,7 +1399,7 @@ func _test_virtual_doc() -> void:
 
 	# Hook-stub parity: every stub's signature text must appear VERBATIM in hooks.gd (the same
 	# discipline the TS twin asserts in core.test.ts — three implementations, one authority).
-	var hooks_src := FileAccess.get_file_as_string("res://addons/reactive_ui/core/hooks.gd")
+	var hooks_src := FileAccess.get_file_as_string("res://addons/reactive_ui_toolkit/core/hooks.gd")
 	var stubs_ok := true
 	for h in VD.HOOK_STUBS:
 		var sig := "static func %s(%s)%s" % [str(h["name"]), str(h["params"]), str(h["ret"])]
@@ -1427,12 +1427,12 @@ export fmt(x: int) -> String {
 export use_t() -> int {
 	return 1
 }
-export Foo() -> RUIVNode {
+export Foo() -> RuitkVNode {
 	return (
 		<Label />
 	)
 }
-Bar() -> RUIVNode {
+Bar() -> RuitkVNode {
 	return (
 		<Label />
 	)
@@ -1442,8 +1442,8 @@ Bar() -> RUIVNode {
 	_ok(mgen.contains("static var w := { \"a\": 1 }"), "value decl emits as mapped static var (got %s)" % mgen)
 	_ok(mgen.contains("static func fmt(x: int)"), "util emits under its real name")
 	_ok(mgen.contains("static func use_t("), "plain hook emits under its real name")
-	_ok(mgen.contains("static func render(props: Dictionary, children: Array) -> RUIVNode:"), "first plain component emits render")
-	_ok(mgen.contains("static func Bar(props: Dictionary, children: Array) -> RUIVNode:"), "second plain component emits under its decl name")
+	_ok(mgen.contains("static func render(props: Dictionary, children: Array) -> RuitkVNode:"), "first plain component emits render")
+	_ok(mgen.contains("static func Bar(props: Dictionary, children: Array) -> RuitkVNode:"), "second plain component emits under its decl name")
 
 	# Markup nested inside an expression neutralizes to length-preserving null padding.
 	var n := VD._neutralize_markup("open and <PanelContainer/> ")
@@ -1461,17 +1461,17 @@ Bar() -> RUIVNode {
 		"import isEven, { get_something } from \"./more\"\n" + \
 		"import D2, * as NS from \"./more\"\n" + \
 		"import Solo from \"./third\"\n\n" + \
-		"export ImpProbe() -> RUIVNode {\n\tvar a = fx(chip_w)\n\treturn (\n\t\t<Label text={str(a)} />\n\t)\n}\n"
+		"export ImpProbe() -> RuitkVNode {\n\tvar a = fx(chip_w)\n\treturn (\n\t\t<Label text={str(a)} />\n\t)\n}\n"
 	var igen := str((VD.build(isrc) as Dictionary)["text"])
 	for stub_name in ["chip_w", "fx", "isEven", "get_something", "D2", "NS", "Solo"]:
 		_ok(igen.contains("static var %s\n" % stub_name), "import stub declared for `%s` (got %s)" % [stub_name, igen.substr(0, 400)])
 	_ok(not igen.contains("static var fmt\n"), "a rename stubs the LOCAL alias, not the remote name")
 
-# M3 — the analyzer bridge. DUAL-MODE by design: with the reactive_ui_analyzer GDExtension
+# M3 — the analyzer bridge. DUAL-MODE by design: with the reactive_ui_toolkit_analyzer GDExtension
 # installed (dev machines) the full e2e surface is asserted; without it (CI) the degrade path is
 # asserted — instance() null, editor pipeline unaffected. Both paths stay covered somewhere.
 func _test_analyzer_bridge() -> void:
-	const Bridge := preload("res://addons/reactive_ui_editor/lsp/guitkx_analyzer_bridge.gd")
+	const Bridge := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_analyzer_bridge.gd")
 	var src := "component Probe(title) {\n\tvar b := Button.new()\n\treturn (\n\t\t<VBoxContainer>\n\t\t\t<Label text={ title } />\n\t\t\t<Label text={ str(b.text) } />\n\t\t</VBoxContainer>\n\t)\n}\n"
 	if not Bridge.available():
 		print("[guitkx_editor_test]    (native analyzer ABSENT - asserting the degrade path)")

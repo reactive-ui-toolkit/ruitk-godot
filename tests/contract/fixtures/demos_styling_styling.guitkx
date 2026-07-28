@@ -1,6 +1,6 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoStyling() -> RUIVNode {
+export DemoStyling() -> RuitkVNode {
   return (
     <DemoBox title="Styling — StyleBoxFlat + theme channels">
       <PanelContainer style={ DemoStylingStyle.PANEL }>

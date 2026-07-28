@@ -1,7 +1,7 @@
 # GD ↔ TS grammar contract harness (SYNTAX_PARITY_EXECUTION_PLAN T0.1)
 
 The `.guitkx` grammar is implemented twice — in GDScript for the compiler
-(`addons/reactive_ui/guitkx/*.gd`) and in TypeScript for the LSP
+(`addons/reactive_ui_toolkit/guitkx/*.gd`) and in TypeScript for the LSP
 (`ide-extensions/lsp-server/src/{markup,formatGuitkx,scanner}.ts`). This harness makes that
 duplication safe: **the GDScript compiler is the grammar of record**, and every fixture here pins
 that both implementations agree on real files.

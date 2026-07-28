@@ -5,14 +5,14 @@
 			"error": "",
 			"error_at": -1,
 			"error_code": "",
-			"tree": "[{\"at\":69,\"children\":[{\"at\":78,\"branches\":[{\"body_at\":96,\"body_markup\":\"\\n        return (\\n          <Label text=\\\"🌳 leaf\\\" style={ {\\\"font_color\\\": Color(0.5, 0.9, 0.5)} } />\\n        )\\n      \",\"cond\":\"level <= 0\"}],\"else_body\":\"\\n        return (\\n          <MarginContainer style={ {\\\"margin_left\\\": 5, \\\"margin_top\\\": 5, \\\"margin_right\\\": 5, \\\"margin_bottom\\\": 5} }>\\n            <PanelContainer style={ {\\\"bg_color\\\": Color(0.15, 0.15, 0.18), \\\"content_margin_all\\\": 4} }>\\n              <VBoxContainer style={ {\\\"separation\\\": 2} }>\\n                <Label text={ \\\"level %d\\\" % level } style={ {\\\"font_color\\\": Color(0.6, 0.7, 0.9)} } />\\n                <DemoDeepTreeNode level={ level - 1 } />\\n              </VBoxContainer>\\n            </PanelContainer>\\n          </MarginContainer>\\n        )\\n      \",\"else_body_at\":220,\"t\":\"if\"}],\"t\":\"frag\"}]"
+			"tree": "[{\"at\":71,\"children\":[{\"at\":80,\"branches\":[{\"body_at\":98,\"body_markup\":\"\\n        return (\\n          <Label text=\\\"🌳 leaf\\\" style={ {\\\"font_color\\\": Color(0.5, 0.9, 0.5)} } />\\n        )\\n      \",\"cond\":\"level <= 0\"}],\"else_body\":\"\\n        return (\\n          <MarginContainer style={ {\\\"margin_left\\\": 5, \\\"margin_top\\\": 5, \\\"margin_right\\\": 5, \\\"margin_bottom\\\": 5} }>\\n            <PanelContainer style={ {\\\"bg_color\\\": Color(0.15, 0.15, 0.18), \\\"content_margin_all\\\": 4} }>\\n              <VBoxContainer style={ {\\\"separation\\\": 2} }>\\n                <Label text={ \\\"level %d\\\" % level } style={ {\\\"font_color\\\": Color(0.6, 0.7, 0.9)} } />\\n                <DemoDeepTreeNode level={ level - 1 } />\\n              </VBoxContainer>\\n            </PanelContainer>\\n          </MarginContainer>\\n        )\\n      \",\"else_body_at\":222,\"t\":\"if\"}],\"t\":\"frag\"}]"
 		}
 	],
 	"ok": true,
 	"windows": [
 		{
-			"end": 787,
-			"start": 64
+			"end": 789,
+			"start": 66
 		}
 	]
 }

@@ -1,15 +1,15 @@
-# ReactiveUI Commercial License Agreement
+# Reactive UI Toolkit Commercial License Agreement
 
 This agreement is between **Yaniv Kalfa** ("Licensor") and the purchasing
 entity named on the order ("Licensee"), and governs commercial use of
-**ReactiveUI for Godot**, including its compiler, editor tooling, and IDE
+**Reactive UI Toolkit — Godot**, including its compiler, editor tooling, and IDE
 extensions (the "Software"). The identical agreement is offered for each
-library in the ReactiveUI family (Godot, Unity, Unreal) — the order names the
+library in the Reactive UI Toolkit family (Godot, Unity, Unreal) — the order names the
 licensed product(s).
 
 ## 1. What this license is for
 
-The Software is otherwise available under the ReactiveUI Community License,
+The Software is otherwise available under the Reactive UI Toolkit Community License,
 whose Free Tier Condition limits royalty-free commercial shipping to entities
 under US $250,000 in trailing-12-month gross revenue plus funding. This
 agreement grants the commercial rights for entities above that threshold, for
@@ -44,7 +44,7 @@ The order specifies one of:
 
 ## 4. Attribution
 
-Licensee shall include "Made with ReactiveUI" in the product's credits, about
+Licensee shall include "Made with Reactive UI Toolkit" in the product's credits, about
 screen, or accompanying documentation wherever other third-party software is
 credited.
 
@@ -84,4 +84,4 @@ subscriptions renew at their original price for up to 3 years.
 
 *To purchase, contact <yanivkalfa@gmail.com>. Questions and edge cases
 (nonprofits, just-over-the-threshold, contractors) — same address: we would
-rather you ship with ReactiveUI than not.*
+rather you ship with Reactive UI Toolkit than not.*

@@ -1,7 +1,7 @@
 import { DemoBailoutChild } from "./bailout_child"
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoBailout() -> RUIVNode {
+export DemoBailout() -> RuitkVNode {
   var n = useState(0)
   return (
     <DemoBox title="Bailout — unchanged children skip re-render">

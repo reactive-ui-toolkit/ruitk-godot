@@ -55,20 +55,20 @@ func _test_react_events() -> void:
 	var hit := { "n": 0 }
 	var cb := func(): hit["n"] += 1
 	var btn := Button.new()
-	RUIHost.apply_props(btn, {}, { "onPressed": cb })
+	RuitkHost.apply_props(btn, {}, { "onPressed": cb })
 	_ok(btn.is_connected("pressed", cb), "onPressed binds the `pressed` signal")
 	btn.emit_signal("pressed")
 	_ok(hit["n"] == 1, "onPressed handler fires on `pressed`")
 	var m: Dictionary = btn.get_meta("__rui_events", {})
 	_ok(m.has("onPressed") and m["onPressed"]["sig"] == "pressed", "meta records the RESOLVED signal `pressed`")
-	RUIHost.apply_props(btn, { "onPressed": cb }, {})   # removing the prop disconnects + clears meta
+	RuitkHost.apply_props(btn, { "onPressed": cb }, {})   # removing the prop disconnects + clears meta
 	_ok(not btn.is_connected("pressed", cb), "removing onPressed disconnects `pressed`")
 	_ok(not btn.get_meta("__rui_events", {}).has("onPressed"), "removing onPressed clears its meta record")
 	# The 0.8 React aliases were REMOVED: the old click alias resolves to a nonexistent `click`
 	# signal and must NOT bind anything (a rename warning is pushed — asserted here as the no-op).
 	# NOTE for future codemod runs: the alias literal is built to stay out of regex reach.
 	var removed_click := "on" + "Click"
-	RUIHost.apply_props(btn, {}, { removed_click: cb })
+	RuitkHost.apply_props(btn, {}, { removed_click: cb })
 	_ok(not btn.is_connected("pressed", cb), "removed alias %s does NOT bind `pressed`" % removed_click)
 	_ok(not btn.get_meta("__rui_events", {}).has(removed_click), "removed alias %s records no event meta" % removed_click)
 	btn.free()
@@ -76,32 +76,32 @@ func _test_react_events() -> void:
 	# The polymorphic onChange is gone — each control uses its real signal, loyal to Godot.
 	var le := LineEdit.new()
 	var lecb := func(_t): pass
-	RUIHost.apply_props(le, {}, { "onTextChanged": lecb })
+	RuitkHost.apply_props(le, {}, { "onTextChanged": lecb })
 	_ok(le.is_connected("text_changed", lecb), "onTextChanged on LineEdit -> text_changed")
-	RUIHost.apply_props(le, { "onTextChanged": lecb }, { "onChange": lecb })
+	RuitkHost.apply_props(le, { "onTextChanged": lecb }, { "onChange": lecb })
 	_ok(not le.is_connected("text_changed", lecb), "removed alias onChange does NOT bind text_changed")
 	le.free()
 	var ob := OptionButton.new()
 	var obcb := func(_i): pass
-	RUIHost.apply_props(ob, {}, { "onItemSelected": obcb })
+	RuitkHost.apply_props(ob, {}, { "onItemSelected": obcb })
 	_ok(ob.is_connected("item_selected", obcb), "onItemSelected on OptionButton -> item_selected")
 	_ok(not ob.is_connected("toggled", obcb), "onItemSelected did not touch `toggled`")
 	ob.free()
 	var sl := HSlider.new()
 	var slcb := func(_v): pass
-	RUIHost.apply_props(sl, {}, { "onValueChanged": slcb })
+	RuitkHost.apply_props(sl, {}, { "onValueChanged": slcb })
 	_ok(sl.is_connected("value_changed", slcb), "onValueChanged on HSlider -> value_changed")
 	sl.free()
 
 	# Native on_<signal> escape hatch: back-compat AND reaches arbitrary signals with no React alias.
 	var btn2 := Button.new()
 	var oldcb := func(): pass
-	RUIHost.apply_props(btn2, {}, { "on_pressed": oldcb })
+	RuitkHost.apply_props(btn2, {}, { "on_pressed": oldcb })
 	_ok(btn2.is_connected("pressed", oldcb), "native on_pressed still binds `pressed` (non-breaking)")
 	btn2.free()
 	var ctl := Control.new()
 	var gicb := func(_e): pass
-	RUIHost.apply_props(ctl, {}, { "on_gui_input": gicb })
+	RuitkHost.apply_props(ctl, {}, { "on_gui_input": gicb })
 	_ok(ctl.is_connected("gui_input", gicb), "native on_gui_input reaches an arbitrary signal")
 	ctl.free()
 
@@ -110,7 +110,7 @@ func _test_custom_draw() -> void:
 	var draw_fn := func(canvas): drawn["node"] = canvas
 	var panel := Control.new()
 	# initial apply: stores the latest draw_fn + registers ONE trampoline on the `draw` signal
-	RUIHost.apply_props(panel, {}, { "draw_fn": draw_fn })
+	RuitkHost.apply_props(panel, {}, { "draw_fn": draw_fn })
 	_ok(panel.has_meta("__rui_draw_tramp"), "draw_fn registers a draw trampoline")
 	_ok(panel.get_meta("__rui_draw") == draw_fn, "latest draw_fn stored in meta")
 	var tramp: Callable = panel.get_meta("__rui_draw_tramp")
@@ -120,14 +120,14 @@ func _test_custom_draw() -> void:
 	_ok(drawn["node"] == panel, "trampoline invokes draw_fn(node)")
 	# a fresh closure each render swaps the meta but reuses the SAME trampoline (no re-subscribe)
 	var draw_fn2 := func(canvas): pass
-	RUIHost.apply_props(panel, { "draw_fn": draw_fn }, { "draw_fn": draw_fn2 })
+	RuitkHost.apply_props(panel, { "draw_fn": draw_fn }, { "draw_fn": draw_fn2 })
 	_ok(panel.get_meta("__rui_draw") == draw_fn2, "draw_fn swapped to the new closure")
 	_ok(panel.get_meta("__rui_draw_tramp") == tramp, "same trampoline reused (no re-subscribe)")
 	# bumping redraw_key with a stable callback is handled (same trampoline, no crash)
-	RUIHost.apply_props(panel, { "draw_fn": draw_fn2, "redraw_key": 0 }, { "draw_fn": draw_fn2, "redraw_key": 1 })
+	RuitkHost.apply_props(panel, { "draw_fn": draw_fn2, "redraw_key": 0 }, { "draw_fn": draw_fn2, "redraw_key": 1 })
 	_ok(panel.get_meta("__rui_draw_tramp") == tramp, "redraw_key bump keeps the same trampoline")
 	# removing draw_fn disconnects the trampoline + clears the meta
-	RUIHost.apply_props(panel, { "draw_fn": draw_fn2 }, {})
+	RuitkHost.apply_props(panel, { "draw_fn": draw_fn2 }, {})
 	_ok(not panel.has_meta("__rui_draw_tramp"), "removing draw_fn disconnects the trampoline")
 	_ok(not panel.is_connected("draw", tramp), "trampoline disconnected from `draw`")
 	panel.free()
@@ -154,16 +154,16 @@ func _test_reuse_by_slot() -> void:
 	var cont: Node = m[0].get_child(0)
 	var n0 = cont.get_child(0)
 	var n4 = cont.get_child(4)
-	RUIDiagnostics.enabled = true
-	RUIDiagnostics.placements = 0
-	RUIDiagnostics.deletions = 0
+	RuitkDiagnostics.enabled = true
+	RuitkDiagnostics.placements = 0
+	RuitkDiagnostics.deletions = 0
 	ctrl["set"].call(1)
 	await process_frame
 	await process_frame
 	_ok(cont.get_child(0) == n0 and cont.get_child(4) == n4, "reuse_by_slot: nodes REUSED across a full key change")
-	_ok(RUIDiagnostics.placements == 0 and RUIDiagnostics.deletions == 0, "reuse_by_slot: ZERO mount/unmount churn (got p=%d d=%d)" % [RUIDiagnostics.placements, RUIDiagnostics.deletions])
+	_ok(RuitkDiagnostics.placements == 0 and RuitkDiagnostics.deletions == 0, "reuse_by_slot: ZERO mount/unmount churn (got p=%d d=%d)" % [RuitkDiagnostics.placements, RuitkDiagnostics.deletions])
 	_ok((cont.get_child(0) as ColorRect).color.g == float(1 % 8) / 8.0, "reuse_by_slot: reused node's props updated in place")
-	RUIDiagnostics.enabled = false
+	RuitkDiagnostics.enabled = false
 	m[1].unmount()
 	m[0].queue_free()
 
@@ -171,14 +171,14 @@ func _test_reuse_by_slot() -> void:
 	var m2 := _mount(make.call(false))
 	await process_frame
 	var cont2: Node = m2[0].get_child(0)
-	RUIDiagnostics.enabled = true
-	RUIDiagnostics.placements = 0
-	RUIDiagnostics.deletions = 0
+	RuitkDiagnostics.enabled = true
+	RuitkDiagnostics.placements = 0
+	RuitkDiagnostics.deletions = 0
 	ctrl["set"].call(2)
 	await process_frame
 	await process_frame
-	_ok(RUIDiagnostics.placements > 0 or RUIDiagnostics.deletions > 0, "without reuse_by_slot: all-keys-churn still churns nodes (opt-in gate works)")
-	RUIDiagnostics.enabled = false
+	_ok(RuitkDiagnostics.placements > 0 or RuitkDiagnostics.deletions > 0, "without reuse_by_slot: all-keys-churn still churns nodes (opt-in gate works)")
+	RuitkDiagnostics.enabled = false
 	m2[1].unmount()
 	m2[0].queue_free()
 
@@ -193,11 +193,11 @@ func _test_host_node_pool() -> void:
 	var btn := Button.new()
 	root.add_child(btn)
 	var propsA := { "onPressed": cbA, "disabled": true, "style": { "modulate": Color.RED } }
-	RUIHost.apply_props(btn, {}, propsA)
+	RuitkHost.apply_props(btn, {}, propsA)
 	_ok(btn.disabled and btn.modulate == Color.RED and btn.is_connected("pressed", cbA), "element A applied (event+style+plain)")
 
 	# Recycle A exactly as the reconciler does on key churn.
-	var accepted := RUIHost.reset_for_pool(btn, propsA)
+	var accepted := RuitkHost.reset_for_pool(btn, propsA)
 	_ok(accepted, "reset_for_pool accepts a plain Button")
 	_ok(btn.get_parent() == null, "recycled node is detached from the tree")
 	_ok(btn.has_meta("__rui_pool_old"), "recycled node stashed its last props for the reuse diff")
@@ -206,8 +206,8 @@ func _test_host_node_pool() -> void:
 	var propsZ := { "onPressed": cbZ, "style": { "modulate": Color.GREEN } }
 	var stash: Dictionary = btn.get_meta("__rui_pool_old")
 	btn.remove_meta("__rui_pool_old")
-	RUIHost.reset_removed_plain(btn, stash, propsZ)
-	RUIHost.apply_props(btn, stash, propsZ)
+	RuitkHost.reset_removed_plain(btn, stash, propsZ)
+	RuitkHost.apply_props(btn, stash, propsZ)
 	_ok(btn.disabled == false, "reuse: removed plain prop `disabled` reset to class default")
 	_ok(btn.modulate == Color.GREEN, "reuse: style modulate is Z's, not A's stale red")
 	_ok(btn.is_connected("pressed", cbZ) and not btn.is_connected("pressed", cbA), "reuse: Z's handler bound, A's gone")
@@ -217,7 +217,7 @@ func _test_host_node_pool() -> void:
 
 	# Item-model controls are NOT pooled (their non-node item state isn't generically cleared).
 	var ob := OptionButton.new()
-	_ok(RUIHost.reset_for_pool(ob, { "items": [{ "text": "x" }] }) == false, "item-model control refused by the pool")
+	_ok(RuitkHost.reset_for_pool(ob, { "items": [{ "text": "x" }] }) == false, "item-model control refused by the pool")
 	ob.free()
 
 	# End-to-end: churn a keyed list many times through a live root; the pool must not corrupt
@@ -249,8 +249,8 @@ func _test_host_node_pool() -> void:
 func _test_classes_lean_path() -> void:
 	# [audit #1] A `classes`-only element (no inline style / events / ref) must take the GENERIC
 	# apply path so the resolved class style is (re)applied and node.set("classes",...) never fires.
-	RUIStyleSheet.register("c_a", { "font_color": Color(1, 0, 0) })
-	RUIStyleSheet.register("c_b", { "font_color": Color(0, 0, 1) })
+	RuitkStyleSheet.register("c_a", { "font_color": Color(1, 0, 0) })
+	RuitkStyleSheet.register("c_b", { "font_color": Color(0, 0, 1) })
 	var ctl := { "set": null }
 	var comp := func(_p, _c):
 		var s = Hooks.useState(["c_a"])
@@ -264,7 +264,7 @@ func _test_classes_lean_path() -> void:
 	await process_frame
 	await process_frame
 	_ok(btn.get_theme_color("font_color") == Color(0, 0, 1), "classes-only re-render: c_b applied blue (lean path didn't crash/skip), got %s" % str(btn.get_theme_color("font_color")))
-	RUIStyleSheet.clear()
+	RuitkStyleSheet.clear()
 	m[1].unmount()
 	m[0].queue_free()
 
@@ -289,7 +289,7 @@ func _test_reference_equality() -> void:
 
 func _test_signal_rebind() -> void:
 	# [audit #2] useSignal must re-bind to a NEW selector across renders (not freeze the mount one).
-	var sig := RUISignal.new({ "a": 10, "b": 20 })
+	var sig := RuitkSignal.new({ "a": 10, "b": 20 })
 	var ctl := { "set_key": null }
 	var seen := { "v": null }
 	var comp := func(_p, _c):
@@ -320,7 +320,7 @@ func _ok(cond: bool, msg: String) -> void:
 func _mount(render_fn: Callable, props := {}) -> Array:
 	var c := Control.new()
 	root.add_child(c)
-	var app := ReactiveRoot.create(c, V.fc(render_fn, props))
+	var app := RuitkRoot.create(c, V.fc(render_fn, props))
 	return [c, app]
 
 # --------------------------------------------------------------------------
@@ -374,7 +374,7 @@ func _test_text_children() -> void:
 
 func _test_signal_key() -> void:
 	# Phase 7.1: a process-wide keyed signal shared by two independent components.
-	RUISignals.clear()
+	RuitkSignals.clear()
 	var renders := { "a": 0, "b": 0 }
 	var comp_a := func(_p, _ch):
 		renders["a"] += 1
@@ -385,51 +385,51 @@ func _test_signal_key() -> void:
 	_mount(comp_a)
 	_mount(comp_b)
 	_ok(renders["a"] == 1 and renders["b"] == 1, "both keyed components mounted once")
-	var sig := RUISignals.get_or_create("counter")
+	var sig := RuitkSignals.get_or_create("counter")
 	_ok(sig.get_value() == 10, "shared keyed signal carries the initial value, got %s" % str(sig.get_value()))
 	sig.set_value(20)   # updating the shared store re-renders every reader
 	await process_frame
 	await process_frame
 	_ok(renders["a"] == 2 and renders["b"] == 2, "both readers re-rendered on keyed update, got a=%d b=%d" % [renders["a"], renders["b"]])
-	RUISignals.clear()
+	RuitkSignals.clear()
 
 func _test_hook_diagnostics() -> void:
 	# Phase 7.0 dev diagnostics: hook-order validation + state-update-in-render guard, captured via
-	# RUIDiagnostics.messages (push_error/warning aren't interceptable headlessly).
-	var _hv := RUIConfig.enable_hook_validation
-	var _sd := RUIConfig.enable_strict_diagnostics
-	RUIConfig.enable_hook_validation = true
-	RUIConfig.enable_strict_diagnostics = true
-	RUIDiagnostics.capture = true
-	RUIDiagnostics.clear_messages()
+	# RuitkDiagnostics.messages (push_error/warning aren't interceptable headlessly).
+	var _hv := RuitkConfig.enable_hook_validation
+	var _sd := RuitkConfig.enable_strict_diagnostics
+	RuitkConfig.enable_hook_validation = true
+	RuitkConfig.enable_strict_diagnostics = true
+	RuitkDiagnostics.capture = true
+	RuitkDiagnostics.clear_messages()
 	# render 1 primes the hook order: state, state, effect
-	var st := RUIComponentState.new()
+	var st := RuitkComponentState.new()
 	Hooks._begin(st); Hooks.useState(0); Hooks.useState(1); Hooks.useEffect(func(): return null, []); Hooks._end()
-	_ok(RUIDiagnostics.messages.is_empty(), "first render primes hook order with no diagnostic")
+	_ok(RuitkDiagnostics.messages.is_empty(), "first render primes hook order with no diagnostic")
 	# render 2 drops the conditional 2nd useState -> order mismatch
 	Hooks._begin(st); Hooks.useState(0); Hooks.useEffect(func(): return null, []); Hooks._end()
-	_ok(RUIDiagnostics.messages.any(func(m): return "[Hooks][order]" in m), "hook-order mismatch detected, got %s" % str(RUIDiagnostics.messages))
+	_ok(RuitkDiagnostics.messages.any(func(m): return "[Hooks][order]" in m), "hook-order mismatch detected, got %s" % str(RuitkDiagnostics.messages))
 
 	# state-update-during-render guard
-	RUIDiagnostics.clear_messages()
-	var st2 := RUIComponentState.new()
+	RuitkDiagnostics.clear_messages()
+	var st2 := RuitkComponentState.new()
 	Hooks._begin(st2)
 	var sv: Array = Hooks.useState(0)
 	sv[1].call(1)   # setter invoked while is_rendering -> strict warning
 	Hooks._end()
-	_ok(RUIDiagnostics.messages.any(func(m): return "[Hooks][Strict]" in m), "state-set-in-render warned, got %s" % str(RUIDiagnostics.messages))
+	_ok(RuitkDiagnostics.messages.any(func(m): return "[Hooks][Strict]" in m), "state-set-in-render warned, got %s" % str(RuitkDiagnostics.messages))
 
 	# silence when the flags are off (a different hook order must NOT warn)
-	RUIConfig.enable_hook_validation = false
-	RUIConfig.enable_strict_diagnostics = false
-	RUIDiagnostics.clear_messages()
-	var st3 := RUIComponentState.new()
+	RuitkConfig.enable_hook_validation = false
+	RuitkConfig.enable_strict_diagnostics = false
+	RuitkDiagnostics.clear_messages()
+	var st3 := RuitkComponentState.new()
 	Hooks._begin(st3); Hooks.useState(0); Hooks._end()
 	Hooks._begin(st3); Hooks.useEffect(func(): return null); Hooks._end()
-	_ok(RUIDiagnostics.messages.is_empty(), "no diagnostics emitted when flags are off, got %s" % str(RUIDiagnostics.messages))
-	RUIDiagnostics.capture = false
-	RUIConfig.enable_hook_validation = _hv
-	RUIConfig.enable_strict_diagnostics = _sd
+	_ok(RuitkDiagnostics.messages.is_empty(), "no diagnostics emitted when flags are off, got %s" % str(RuitkDiagnostics.messages))
+	RuitkDiagnostics.capture = false
+	RuitkConfig.enable_hook_validation = _hv
+	RuitkConfig.enable_strict_diagnostics = _sd
 
 func _test_effects() -> void:
 	var log: Array = []
@@ -649,7 +649,7 @@ func _test_layout_effect() -> void:
 	m[0].queue_free()
 
 func _test_signal() -> void:
-	var sig := RUISignal.new(0)
+	var sig := RuitkSignal.new(0)
 	var renders := { "n": 0 }
 	var seen := { "v": null }
 	var comp := func(_p, _ch):
@@ -673,17 +673,17 @@ func _test_signal() -> void:
 	_ok(renders["n"] == 2, "no re-render after unmount (unsubscribed): %d" % renders["n"])
 
 func _test_router() -> void:
-	var history := RUIHistory.new("/")
+	var history := RuitkHistory.new("/")
 	var seen := { "id": null }
 	var nav := { "go": null }
 	var home := func(_p, _c):
 		return V.Label({ "text": "home" })
 	var user := func(_p, _c):
-		var params = RUIRouter.useParams()
+		var params = RuitkRouter.useParams()
 		seen["id"] = params.get("id")
 		return V.Label({ "text": "user " + str(params.get("id")) })
 	var app := func(_p, _c):
-		nav["go"] = RUIRouter.useNavigate()
+		nav["go"] = RuitkRouter.useNavigate()
 		return V.routes({ "routes": [
 			{ "path": "/", "component": home },
 			{ "path": "/users/:id", "component": user },
@@ -727,23 +727,23 @@ func _test_tween() -> void:
 	m[0].queue_free()
 
 func _test_diagnostics() -> void:
-	RUIDiagnostics.enabled = true
-	RUIDiagnostics.reset()
+	RuitkDiagnostics.enabled = true
+	RuitkDiagnostics.reset()
 	var ctrl := { "set": null }
 	var comp := func(_p, _c):
 		var s = Hooks.useState(0)
 		ctrl["set"] = s[1]
 		return V.Label({ "text": str(s[0]) })
 	var m := _mount(comp)
-	_ok(RUIDiagnostics.renders >= 1, "counted initial render: %d" % RUIDiagnostics.renders)
-	_ok(RUIDiagnostics.placements >= 1, "counted placements: %d" % RUIDiagnostics.placements)
-	var r0: int = RUIDiagnostics.renders
+	_ok(RuitkDiagnostics.renders >= 1, "counted initial render: %d" % RuitkDiagnostics.renders)
+	_ok(RuitkDiagnostics.placements >= 1, "counted placements: %d" % RuitkDiagnostics.placements)
+	var r0: int = RuitkDiagnostics.renders
 	ctrl["set"].call(1)
 	await process_frame
 	await process_frame
-	_ok(RUIDiagnostics.renders > r0, "counted update render: %d > %d" % [RUIDiagnostics.renders, r0])
-	_ok(RUIDiagnostics.updates >= 1, "counted prop update: %d" % RUIDiagnostics.updates)
-	RUIDiagnostics.enabled = false
+	_ok(RuitkDiagnostics.renders > r0, "counted update render: %d > %d" % [RuitkDiagnostics.renders, r0])
+	_ok(RuitkDiagnostics.updates >= 1, "counted prop update: %d" % RuitkDiagnostics.updates)
+	RuitkDiagnostics.enabled = false
 	m[1].unmount()
 	m[0].queue_free()
 
@@ -767,16 +767,16 @@ func _test_item_list() -> void:
 	m[0].queue_free()
 
 func _test_root_node() -> void:
-	var rn := ReactiveRootNode.new()
+	var rn := RuitkRootNode.new()
 	rn.setup(func(_p, _c): return V.Label({ "text": "rooted" }))
 	root.add_child(rn)   # _ready mounts
 	await process_frame
-	_ok(rn.get_child_count() >= 1, "ReactiveRootNode mounted on _ready: %d children" % rn.get_child_count())
+	_ok(rn.get_child_count() >= 1, "RuitkRootNode mounted on _ready: %d children" % rn.get_child_count())
 	var lbl: Node = rn.get_child(0)
-	_ok(lbl is Label and lbl.text == "rooted", "ReactiveRootNode rendered the label")
+	_ok(lbl is Label and lbl.text == "rooted", "RuitkRootNode rendered the label")
 	rn.queue_free()   # _exit_tree unmounts
 	await process_frame
-	_ok(true, "ReactiveRootNode freed without error")
+	_ok(true, "RuitkRootNode freed without error")
 
 func _test_tree() -> void:
 	var ctrl := { "set": null }
@@ -807,8 +807,8 @@ func _test_tree() -> void:
 	m[0].queue_free()
 
 func _test_time_slicing() -> void:
-	RUIConfig.time_slicing = true
-	RUIConfig.frame_budget_ms = 0.0   # park after every unit of work
+	RuitkConfig.time_slicing = true
+	RuitkConfig.frame_budget_ms = 0.0   # park after every unit of work
 	var ctrl := { "set": null }
 	var comp := func(_p, _c):
 		var s = Hooks.useState(0)
@@ -827,7 +827,7 @@ func _test_time_slicing() -> void:
 		await process_frame
 	_ok(vbox.get_child(0).text == "item 0-1", "sliced update completed, got '%s'" % vbox.get_child(0).text)
 	_ok(vbox.get_child(7).text == "item 7-1", "sliced update reached last item, got '%s'" % vbox.get_child(7).text)
-	RUIConfig.time_slicing = false
+	RuitkConfig.time_slicing = false
 	m[1].unmount()
 	m[0].queue_free()
 
@@ -880,15 +880,15 @@ func _test_ref_null_on_unmount() -> void:
 	m[0].queue_free()
 
 func _test_router_context_split() -> void:
-	var history := RUIHistory.new("/")
+	var history := RuitkHistory.new("/")
 	var nav_renders := { "n": 0 }
 	var nav := { "go": null }
 	var nav_only := func(_p, _c):
 		nav_renders["n"] += 1
-		nav["go"] = RUIRouter.useNavigate()
+		nav["go"] = RuitkRouter.useNavigate()
 		return V.Button({ "text": "nav" })
 	var loc_view := func(_p, _c):
-		return V.Label({ "text": RUIRouter.useLocation() })
+		return V.Label({ "text": RuitkRouter.useLocation() })
 	var app := func(_p, _c):
 		return V.VBoxContainer({}, [V.fc(nav_only), V.fc(loc_view)])
 	var root_comp := func(_p, _c):
@@ -959,9 +959,9 @@ func _test_item_model_adapters() -> void:
 	m[0].queue_free()
 
 func _test_classes_stylesheet() -> void:
-	# Phase 7.11: `classes` resolve against RUIStyleSheet and merge (inline wins).
-	RUIStyleSheet.register("card", { "bg_color": Color(0.1, 0.2, 0.3), "corner_radius_all": 8 })
-	RUIStyleSheet.register("danger", { "font_color": Color(1, 0, 0) })
+	# Phase 7.11: `classes` resolve against RuitkStyleSheet and merge (inline wins).
+	RuitkStyleSheet.register("card", { "bg_color": Color(0.1, 0.2, 0.3), "corner_radius_all": 8 })
+	RuitkStyleSheet.register("danger", { "font_color": Color(1, 0, 0) })
 	var comp := func(_p, _c):
 		return V.Button({ "classes": ["card", "danger"], "style": { "font_color": Color(0, 1, 0) }, "text": "x" })
 	var m := _mount(comp)
@@ -970,7 +970,7 @@ func _test_classes_stylesheet() -> void:
 	# danger sets red, inline overrides to green -> inline wins.
 	_ok(btn.get_theme_color("font_color") == Color(0, 1, 0), "inline style overrides class style, got %s" % str(btn.get_theme_color("font_color")))
 	_ok(btn.has_theme_stylebox_override("normal"), "card class applied a stylebox (bg_color/corner_radius)")
-	RUIStyleSheet.clear()
+	RuitkStyleSheet.clear()
 	m[1].unmount()
 	m[0].queue_free()
 

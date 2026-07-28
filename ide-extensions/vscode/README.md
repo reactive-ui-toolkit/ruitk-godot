@@ -1,10 +1,10 @@
-# Reactive UI - Godot - VS Code (GUITKX)
+# Reactive UI Toolkit — Godot - VS Code (GUITKX)
 
 Language support for **`.guitkx`**, the JSX-like markup of
-[ReactiveUI for Godot](https://github.com/yanivkalfa/ReactiveUI-Godot) — a React-style reactive
+[Reactive UI Toolkit — Godot](https://github.com/reactive-ui-toolkit/ruitk-godot) — a React-style reactive
 UI library for Godot 4.x — plus a full, headless GDScript language service for your plain `.gd`
 files. Everything runs **in-process via
-[gdscript-analyzer](https://github.com/yanivkalfa/gdscript-analyzer)**: no running Godot editor,
+[gdscript-analyzer](https://github.com/reactive-ui-toolkit/gdscript-analyzer)**: no running Godot editor,
 no TCP connection, works fully offline.
 
 ## Features
@@ -32,9 +32,9 @@ no TCP connection, works fully offline.
   `guitkx.useGdformat` toggle each analysis layer independently; this extension's `.gd` analysis
   runs alongside the godot-tools extension — disable godot-tools' language server, or turn this
   extension's off, to avoid duplicate diagnostics.
-- **Shares its compiler with the in-Godot editor** — the **Reactive UI Editor** addon is a native
+- **Shares its compiler with the in-Godot editor** — the **Reactive UI Toolkit — Godot Editor** addon is a native
   in-Godot `.guitkx` editor with the same language features; both editors share the same compiler,
-  formatter, and diagnostic codes, and the runtime addon (`reactive_ui`) compiles `.guitkx` to
+  formatter, and diagnostic codes, and the runtime addon (`reactive_ui_toolkit`) compiles `.guitkx` to
   plain `.gd` on save with hot reload (Fast Refresh).
 
 ## Requirements
@@ -44,6 +44,9 @@ no TCP connection, works fully offline.
   no Godot editor, no TCP/language-server connection required.
 
 ## Changelog
+
+### [0.13.0] - 2026-07-28
+- Reactive UI Toolkit rebrand (rides the library 0.13.0 — see MIGRATION-0.13.md): the repository is now github.com/reactive-ui-toolkit/ruitk-godot (listing links, READMEs, and the analyzer download URLs all point at the org; old GitHub URLs redirect), the product label in the descriptions is "Reactive UI Toolkit — Godot", and the bundled license is retitled Reactive UI Toolkit Community License 1.1 — terms unchanged except the binding Attribution clause, whose required credit line follows the product name and is now "Made with Reactive UI Toolkit" (or "Reactive UI Toolkit — Godot"): update an existing "Made with ReactiveUI" credits line when you upgrade. The language surface follows the library's class rename: the component classifier is `-> RuitkVNode`, and the schema, TextMate grammar, virtual-document stubs, and language server all classify the `Ruitk*` spellings. Extension IDs, display names, and the `guitkx` language identity are unchanged — nothing to reinstall or reconfigure; run the library's one-command codemod in your project and the extensions pick the new spellings up.
 
 ### [0.12.1] - 2026-07-25
 - Null-only components (library 0.12.1, React semantics): a component whose body has a top-level `return null` and no markup return is now legal — it renders nothing. The live GUITKX2101 missing-return check exempts the shape (a nested-only guard with a fall-through path is still flagged), and Format Document re-emits such a body verbatim instead of falling back unformatted (it previously bailed; it never corrupted). Embedded-GDScript intelligence inside null-only bodies already worked and is unchanged.
@@ -64,7 +67,7 @@ no TCP connection, works fully offline.
 - Requirements corrected on both marketplace pages: there is nothing to install — VS Code runs the language server on its own built-in Node runtime, and the VS2022 VSIX bundles a Node runtime of its own. The "Node.js on your PATH" requirement was a stale pre-bundling claim.
 
 ### [0.10.2] - 2026-07-16
-- Extension descriptions now link the repo (github.com/yanivkalfa/ReactiveUI-Godot) and the community Discord (discord.gg/Knedqu4Wyv), so both marketplace listing pages point back to the project and its community from the very top.
+- Extension descriptions now link the repo (github.com/reactive-ui-toolkit/ruitk-godot) and the community Discord (discord.gg/Knedqu4Wyv), so both marketplace listing pages point back to the project and its community from the very top.
 
 ### [0.10.1] - 2026-07-16
 - Marketplace listing overhaul: distinguishable display names — `GUITKX (Godot - VS Code)` / `GUITKX (Godot - VS2022)` — and a structured page body (Title / Description / Features / Requirements / Changelog) on both marketplaces + Open VSX.

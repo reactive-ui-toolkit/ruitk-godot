@@ -1,6 +1,6 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoMemo() -> RUIVNode {
+export DemoMemo() -> RuitkVNode {
   var n = useState(1)
   var other = useState(0)
   var calc_count = useRef(0)

@@ -1,6 +1,6 @@
-# ReactiveUI Contributor License Agreement
+# Reactive UI Toolkit Contributor License Agreement
 
-The ReactiveUI family offers commercial licenses over the combined work, so
+The Reactive UI Toolkit family offers commercial licenses over the combined work, so
 every outside contribution needs this agreement before it can be merged —
 otherwise each contributor would retain veto rights over commercial licensing
 of code containing their patch. Accepting is a one-time action per
@@ -8,7 +8,7 @@ contributor.
 
 ---
 
-Thank you for contributing to the ReactiveUI family of projects ("the
+Thank you for contributing to the Reactive UI Toolkit family of projects ("the
 Project"), maintained by Yaniv Kalfa ("the Maintainer").
 
 By submitting a contribution (any original work of authorship submitted for

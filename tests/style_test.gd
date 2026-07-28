@@ -29,41 +29,41 @@ func _ok(cond: bool, msg: String) -> void:
 func _mount(fn: Callable, props := {}) -> Array:
 	var c := Control.new()
 	root.add_child(c)
-	return [c, ReactiveRoot.create(c, V.fc(fn, props))]
+	return [c, RuitkRoot.create(c, V.fc(fn, props))]
 
 ## 0.9.0 naming loyalty: exact Godot names, Godot enum-name strings, anchors_preset,
 ## verbatim StyleBoxFlat properties + *_all umbrellas, radians rotation, removed-key no-op.
 func _test_loyal_keys_090() -> void:
 	var n := Control.new()
 	# size flags: raw constant, exact name string, case-insensitive tail
-	RUIStyle.apply(n, {}, { "size_flags_horizontal": Control.SIZE_EXPAND_FILL })
+	RuitkStyle.apply(n, {}, { "size_flags_horizontal": Control.SIZE_EXPAND_FILL })
 	_ok(n.size_flags_horizontal == Control.SIZE_EXPAND_FILL, "size_flags_horizontal takes the Godot constant")
-	RUIStyle.apply(n, { "size_flags_horizontal": Control.SIZE_EXPAND_FILL }, { "size_flags_horizontal": "SIZE_SHRINK_CENTER" })
+	RuitkStyle.apply(n, { "size_flags_horizontal": Control.SIZE_EXPAND_FILL }, { "size_flags_horizontal": "SIZE_SHRINK_CENTER" })
 	_ok(n.size_flags_horizontal == Control.SIZE_SHRINK_CENTER, "exact constant-name string accepted")
-	RUIStyle.apply(n, { "size_flags_horizontal": "SIZE_SHRINK_CENTER" }, { "size_flags_vertical": "expand_fill" })
+	RuitkStyle.apply(n, { "size_flags_horizontal": "SIZE_SHRINK_CENTER" }, { "size_flags_vertical": "expand_fill" })
 	_ok(n.size_flags_horizontal == Control.SIZE_FILL, "removed size_flags_horizontal resets to SIZE_FILL")
 	_ok(n.size_flags_vertical == Control.SIZE_EXPAND_FILL, "unprefixed constant tail accepted (case-insensitive)")
 	# anchors_preset (replaces the pre-0.9 `fill` extension)
-	RUIStyle.apply(n, {}, { "anchors_preset": Control.PRESET_FULL_RECT })
+	RuitkStyle.apply(n, {}, { "anchors_preset": Control.PRESET_FULL_RECT })
 	_ok(n.anchor_right == 1.0 and n.anchor_bottom == 1.0, "anchors_preset PRESET_FULL_RECT anchors the control")
-	RUIStyle.apply(n, { "anchors_preset": Control.PRESET_FULL_RECT }, { "anchors_preset": "PRESET_TOP_LEFT" })
+	RuitkStyle.apply(n, { "anchors_preset": Control.PRESET_FULL_RECT }, { "anchors_preset": "PRESET_TOP_LEFT" })
 	_ok(n.anchor_right == 0.0, "anchors_preset accepts the constant-name string")
 	# custom_minimum_size exact name + the kept min_width/min_height extensions
-	RUIStyle.apply(n, {}, { "custom_minimum_size": Vector2(30, 40) })
+	RuitkStyle.apply(n, {}, { "custom_minimum_size": Vector2(30, 40) })
 	_ok(n.custom_minimum_size == Vector2(30, 40), "custom_minimum_size applies verbatim")
-	RUIStyle.apply(n, { "custom_minimum_size": Vector2(30, 40) }, { "min_width": 55 })
+	RuitkStyle.apply(n, { "custom_minimum_size": Vector2(30, 40) }, { "min_width": 55 })
 	_ok(n.custom_minimum_size == Vector2(55, 0), "min_width extension sets .x (removed custom_minimum_size resets first)")
 	# rotation is radians now (Godot's own semantics)
-	RUIStyle.apply(n, {}, { "rotation": PI })
+	RuitkStyle.apply(n, {}, { "rotation": PI })
 	_ok(absf(n.rotation - PI) < 0.0001, "style rotation is radians, applied verbatim")
 	# exact property/theme names that replaced shorthands
-	RUIStyle.apply(n, {}, { "tooltip_text": "tip", "clip_contents": true, "pivot_offset": Vector2(3, 4), "font_outline_color": Color.RED })
+	RuitkStyle.apply(n, {}, { "tooltip_text": "tip", "clip_contents": true, "pivot_offset": Vector2(3, 4), "font_outline_color": Color.RED })
 	_ok(n.tooltip_text == "tip" and n.clip_contents and n.pivot_offset == Vector2(3, 4), "tooltip_text/clip_contents/pivot_offset apply")
 	_ok(n.get_theme_color("font_outline_color") == Color.RED, "font_outline_color theme override applies")
 	n.free()
 	# StyleBox builder: *_all umbrellas + ANY StyleBoxFlat property verbatim; per-side wins over umbrella
 	var p := PanelContainer.new()
-	RUIStyle.apply(p, {}, { "bg_color": Color.BLUE, "corner_radius_all": 6, "border_width_all": 2, "border_width_left": 5, "shadow_size": 3 })
+	RuitkStyle.apply(p, {}, { "bg_color": Color.BLUE, "corner_radius_all": 6, "border_width_all": 2, "border_width_left": 5, "shadow_size": 3 })
 	var sb := p.get_theme_stylebox("panel") as StyleBoxFlat
 	_ok(sb != null and sb.bg_color == Color.BLUE, "bg_color (exact StyleBoxFlat name) applies")
 	_ok(sb.corner_radius_top_left == 6 and sb.corner_radius_bottom_right == 6, "corner_radius_all umbrella (Godot's set_corner_radius_all)")
@@ -72,28 +72,28 @@ func _test_loyal_keys_090() -> void:
 	p.free()
 	# margin_* exact theme constants (replaced the `margin` umbrella)
 	var m := MarginContainer.new()
-	RUIStyle.apply(m, {}, { "margin_left": 7, "margin_top": 8 })
+	RuitkStyle.apply(m, {}, { "margin_left": 7, "margin_top": 8 })
 	_ok(m.get_theme_constant("margin_left") == 7 and m.get_theme_constant("margin_top") == 8, "margin_* exact theme constants apply")
 	m.free()
 	# a removed pre-0.9 key is a warning + no-op, never a silent misapply
 	var q := Control.new()
 	var before := q.custom_minimum_size
-	RUIStyle.apply(q, {}, { "min_size": Vector2(9, 9) })
+	RuitkStyle.apply(q, {}, { "min_size": Vector2(9, 9) })
 	_ok(q.custom_minimum_size == before, "removed key 'min_size' does not apply (warns with the rename)")
 	q.free()
 
 func _test_state_styles() -> void:
 	# Phase 7.3: per-state StyleBox slots (Godot retains hover/pressed/etc. natively).
 	var btn := Button.new()
-	RUIStyle.apply(btn, {}, { "hover": { "bg_color": Color.RED }, "pressed": { "bg_color": Color.BLUE } })
+	RuitkStyle.apply(btn, {}, { "hover": { "bg_color": Color.RED }, "pressed": { "bg_color": Color.BLUE } })
 	_ok(btn.has_theme_stylebox_override("hover"), "hover state stylebox applied to Button")
 	_ok(btn.has_theme_stylebox_override("pressed"), "pressed state stylebox applied to Button")
-	RUIStyle.apply(btn, { "hover": { "bg_color": Color.RED }, "pressed": { "bg_color": Color.BLUE } }, { "pressed": { "bg_color": Color.BLUE } })
+	RuitkStyle.apply(btn, { "hover": { "bg_color": Color.RED }, "pressed": { "bg_color": Color.BLUE } }, { "pressed": { "bg_color": Color.BLUE } })
 	_ok(not btn.has_theme_stylebox_override("hover"), "removed hover state stylebox")
 	_ok(btn.has_theme_stylebox_override("pressed"), "kept unchanged pressed state stylebox")
 	# a Label has no hover slot -> warn-once + no override (never crashes)
 	var lbl := Label.new()
-	RUIStyle.apply(lbl, {}, { "hover": { "bg_color": Color.RED } })
+	RuitkStyle.apply(lbl, {}, { "hover": { "bg_color": Color.RED } })
 	_ok(not lbl.has_theme_stylebox_override("hover"), "Label has no hover slot -> no override")
 	btn.free()
 	lbl.free()

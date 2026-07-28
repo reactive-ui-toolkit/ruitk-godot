@@ -6,7 +6,7 @@ const __RUI_HOOK_SIG := "useRef|useState|useTween"
 
 const __RUI_KIND := "component"
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var box_ref = Hooks.useRef(null)
 	var n = Hooks.useState(0)
 	Hooks.useTween(box_ref, "modulate", Color(1, 1, 1, 1), 0.5, [n[0]])

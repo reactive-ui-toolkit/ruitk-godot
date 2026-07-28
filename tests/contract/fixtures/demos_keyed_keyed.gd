@@ -6,7 +6,7 @@ const __RUI_HOOK_SIG := "useState"
 
 const __RUI_KIND := "component"
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var items = Hooks.useState(["A", "B", "C", "D", "E"])
 	var shuffle = func():
 		var arr: Array = items[0].duplicate()

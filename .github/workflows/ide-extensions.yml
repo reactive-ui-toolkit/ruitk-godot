@@ -18,7 +18,7 @@ on:
     paths:
       [
         "ide-extensions/**",
-        "addons/reactive_ui_editor/CHANGELOG.md",
+        "addons/reactive_ui_toolkit_editor/CHANGELOG.md",
         ".github/workflows/ide-extensions.yml",
       ]
   # No `paths:` filter on PRs: these jobs are *required* status checks, so they must

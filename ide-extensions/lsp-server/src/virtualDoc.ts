@@ -33,7 +33,7 @@ export const HOOK_STUBS: { name: string; params: string; args: string; ret: stri
   { name: "useImperativeHandle", params: "factory: Callable, deps: Array = []", args: "factory, deps", ret: " -> Variant" },
   { name: "useEffect", params: "effect: Callable, deps = null", args: "effect, deps", ret: " -> void" },
   { name: "useLayoutEffect", params: "effect: Callable, deps = null", args: "effect, deps", ret: " -> void" },
-  { name: "createContext", params: "default_value = null, ctx_name: String = \"\"", args: "default_value, ctx_name", ret: " -> RUIContext" },
+  { name: "createContext", params: "default_value = null, ctx_name: String = \"\"", args: "default_value, ctx_name", ret: " -> RuitkContext" },
   { name: "useContext", params: "key", args: "key", ret: "" },
   { name: "provideContext", params: "key, value", args: "key, value", ret: " -> void" },
   { name: "useDeferredValue", params: "value, deps = null", args: "value, deps", ret: "" },
@@ -42,7 +42,7 @@ export const HOOK_STUBS: { name: string; params: string; args: string; ret: stri
   { name: "useStableFunc", params: "cb: Callable", args: "cb", ret: " -> Callable" },
   { name: "useStableAction", params: "cb: Callable", args: "cb", ret: " -> Callable" },
   { name: "useSafeArea", params: "", args: "", ret: " -> Dictionary" },
-  { name: "useSignal", params: "sig: RUISignal, selector = null, comparer = null", args: "sig, selector, comparer", ret: "" },
+  { name: "useSignal", params: "sig: RuitkSignal, selector = null, comparer = null", args: "sig, selector, comparer", ret: "" },
   { name: "useSignalKey", params: "key: String, initial = null, selector = null, comparer = null", args: "key, initial, selector, comparer", ret: "" },
   { name: "useTween", params: "ref: Dictionary, property: String, to, duration: float, deps: Array = []", args: "ref, property, to, duration, deps", ret: " -> void" },
   { name: "useTweenValue", params: "from, to, duration: float, on_update: Callable, deps: Array = []", args: "from, to, duration, on_update, deps", ret: " -> void" },
@@ -174,7 +174,7 @@ function emitDeclFunc(ctx: Ctx, kind: "component" | "hook", at: number, suffix: 
   // components compile under their REAL names (`_emit_func(c["name"], ...)`) — mirror both, so a
   // sibling expr referencing a member component by name resolves instead of false-flagging.
   const compName = suffix === "" ? "render" : (plain ? (d!.name ?? "") : readDeclName(ctx.src, at)) || `render${suffix}`;
-  ctx.gen += `static func ${compName}(props: Dictionary, children: Array) -> RUIVNode:\n`;
+  ctx.gen += `static func ${compName}(props: Dictionary, children: Array) -> RuitkVNode:\n`;
   if (!body) {
     ctx.gen += "\tpass\n";
     return;

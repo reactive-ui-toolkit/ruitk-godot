@@ -1,4 +1,4 @@
-# MASTER PLAN — the single consolidated work-list (ReactiveUI-Godot)
+# MASTER PLAN — the single consolidated work-list (Reactive UI Toolkit — Godot)
 
 > **Consolidation of every live plan, 2026-07-14.** The 2026-07 plans audit closed and archived
 > eight plans (see `archive/README.md` for the per-plan record); everything still open across all
@@ -39,7 +39,7 @@ release.
 |---|---|---|---|---|
 | 3.1 | **Markup tags for the `V.*`-only structural primitives** — `Portal`, `Suspense`, `ErrorBoundary`, `Memo`, `Audio`/`Video`, router set (`Router`/`Routes`/`Route`/`Outlet`/`NavLink`) — so the README's escape-hatch list shrinks | open, unscoped | design pass: tag grammar for children-as-routes etc. | PARITY_PLAN G2 / README roadmap |
 | 3.2 | **Niche adapter decision** — `SubViewport` / `GraphEdit` / `GraphNode`: port dedicated adapters or explicitly defer (Unity sibling shipped its analogue @0.6.3) | undecided | owner decision, then either a small port or a documented defer | PARITY_PLAN G2 (archived) |
-| 3.3 | **Native-editor embedded-GDScript depth** — the remaining analyzer wiring so `reactive_ui_editor` matches the VS Code extension inside `{expr}`/setup (completion/hover exist; the gap list lives in the editor README "Known limits") | partial (gdext bridge shipped 0.6.0) | scope the remaining queries; medium effort | PARITY_PLAN G1 / README roadmap |
+| 3.3 | **Native-editor embedded-GDScript depth** — the remaining analyzer wiring so `reactive_ui_toolkit_editor` matches the VS Code extension inside `{expr}`/setup (completion/hover exist; the gap list lives in the editor README "Known limits") | partial (gdext bridge shipped 0.6.0) | scope the remaining queries; medium effort | PARITY_PLAN G1 / README roadmap |
 
 ## 4. Performance (measured leftovers — behavior-preserving, benchmark before/after)
 

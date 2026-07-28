@@ -1,5 +1,5 @@
 // Per-Control property/signal data from the generated ClassDB dump (Phase 6c). The Node LSP has no
-// in-process ClassDB, so addons/reactive_ui/dev/classdb_dump.gd writes own-only members per class and
+// in-process ClassDB, so addons/reactive_ui_toolkit/dev/classdb_dump.gd writes own-only members per class and
 // we base-flatten here. Bundled with the extension; regenerated per Godot minor.
 
 import { readFileSync } from "fs";

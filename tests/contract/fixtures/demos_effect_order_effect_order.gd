@@ -6,7 +6,7 @@ const __RUI_HOOK_SIG := "useState|useState"
 
 const __RUI_KIND := "component"
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var n = Hooks.useState(3)
 	var log = Hooks.useState([])
 	var append = func(msg): log[1].call(func(arr): return arr + [msg])

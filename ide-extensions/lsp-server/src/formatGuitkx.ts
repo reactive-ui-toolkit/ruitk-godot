@@ -1,4 +1,4 @@
-// In-process TypeScript formatter — a faithful port of addons/reactive_ui/guitkx/guitkx_formatter.gd.
+// In-process TypeScript formatter — a faithful port of addons/reactive_ui_toolkit/guitkx/guitkx_formatter.gd.
 // Lets VS Code / VS2022 "Format Document" run instantly, offline, with NO Godot binary (the old path
 // shelled out to headless Godot). Output is kept BYTE-IDENTICAL to the GDScript formatter via a shared
 // golden-fixture corpus asserted on both sides (test-fixtures/formatter-cases.json). AST-driven re-emit
@@ -193,10 +193,10 @@ function fmtHook(name: string, params: string, body: string, o: FmtOptions, retH
   return out;
 }
 
-// E-01 plain component: identical body emission with the keywordless header (the -> RUIVNode
+// E-01 plain component: identical body emission with the keywordless header (the -> RuitkVNode
 // annotation IS the classification -- never dropped). Mirrors guitkx_formatter.gd.
 function fmtPlainComponent(name: string, params: string, setup: string, nodes: MarkupNode[], o: FmtOptions): string {
-  let out = `${name}(${params.trim()}) -> RUIVNode {\n`;
+  let out = `${name}(${params.trim()}) -> RuitkVNode {\n`;
   const fs2 = fmtSetup(setup, 1, o);
   if (fs2 !== "") {
     if (hasLeadingBlank(setup)) out += "\n";

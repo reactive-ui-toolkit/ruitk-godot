@@ -1,10 +1,10 @@
-# Reactive UI - Godot - VS Code (GUITKX)
+# Reactive UI Toolkit — Godot - VS Code (GUITKX)
 
 Language support for **`.guitkx`**, the JSX-like markup of
-[ReactiveUI for Godot](https://github.com/yanivkalfa/ReactiveUI-Godot) — a React-style reactive
+[Reactive UI Toolkit — Godot](https://github.com/reactive-ui-toolkit/ruitk-godot) — a React-style reactive
 UI library for Godot 4.x — plus a full, headless GDScript language service for your plain `.gd`
 files. Everything runs **in-process via
-[gdscript-analyzer](https://github.com/yanivkalfa/gdscript-analyzer)**: no running Godot editor,
+[gdscript-analyzer](https://github.com/reactive-ui-toolkit/gdscript-analyzer)**: no running Godot editor,
 no TCP connection, works fully offline.
 
 ## Features
@@ -32,9 +32,9 @@ no TCP connection, works fully offline.
   `guitkx.useGdformat` toggle each analysis layer independently; this extension's `.gd` analysis
   runs alongside the godot-tools extension — disable godot-tools' language server, or turn this
   extension's off, to avoid duplicate diagnostics.
-- **Shares its compiler with the in-Godot editor** — the **Reactive UI Editor** addon is a native
+- **Shares its compiler with the in-Godot editor** — the **Reactive UI Toolkit — Godot Editor** addon is a native
   in-Godot `.guitkx` editor with the same language features; both editors share the same compiler,
-  formatter, and diagnostic codes, and the runtime addon (`reactive_ui`) compiles `.guitkx` to
+  formatter, and diagnostic codes, and the runtime addon (`reactive_ui_toolkit`) compiles `.guitkx` to
   plain `.gd` on save with hot reload (Fast Refresh).
 
 ## Requirements

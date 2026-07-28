@@ -1,7 +1,7 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 import { DemoDeepTreeNode } from "./deep_tree_node"
 
-export DemoDeepTree() -> RUIVNode {
+export DemoDeepTree() -> RuitkVNode {
   var depth = useState(8)
   return (
     <DemoBox title="Deep component tree">

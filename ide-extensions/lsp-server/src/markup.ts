@@ -1,4 +1,4 @@
-// Faithful TypeScript port of addons/reactive_ui/guitkx/guitkx_markup.gd (the markup recursive-descent
+// Faithful TypeScript port of addons/reactive_ui_toolkit/guitkx/guitkx_markup.gd (the markup recursive-descent
 // parser). It MUST produce node shapes byte-identical to the GDScript parser; the in-process formatter
 // (formatGuitkx.ts) re-emits from this AST, kept identical to guitkx_formatter.gd via a shared golden
 // fixture corpus asserted on both sides (the same discipline as scanner.ts === guitkx_lexer.gd). Built

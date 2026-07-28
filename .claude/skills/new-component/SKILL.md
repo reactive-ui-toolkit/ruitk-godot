@@ -1,16 +1,16 @@
 ---
 name: new-component
-description: Create a new .guitkx component for ReactiveUI-Godot — file placement, component/props/hooks/events syntax, children, styling, and what the compiler generates.
+description: Create a new .guitkx component for Reactive UI Toolkit — Godot: file placement, component/props/hooks/events syntax, children, styling, and what the compiler generates.
 ---
 
-# Writing a ReactiveUI-Godot component
+# Writing a component for Reactive UI Toolkit — Godot
 
 ## Where files go
 
 - One component per `.guitkx` file, named in snake_case after the component:
   `res://ui/<feature>/<component_name>.guitkx` (any folder works; group by feature).
   Examples of the house style: `examples/demos/counter/counter.guitkx`.
-- Saving the file makes the `reactive_ui` watcher compile a **sibling `.gd`** next to it
+- Saving the file makes the `reactive_ui_toolkit` watcher compile a **sibling `.gd`** next to it
   (`<name>.guitkx` → generated GDScript). You never write or edit that file; renames/moves in the
   FileSystem dock retarget it automatically. The repo gitignores generated siblings — they
   regenerate on open; exported games pick them up from disk.
@@ -24,7 +24,7 @@ description: Create a new .guitkx component for ReactiveUI-Godot — file placem
 
 ```
 ## Doc comment: shows in editor hover for <ScoreCard>.
-export ScoreCard(title: String = "", max_score: int = 100) -> RUIVNode {
+export ScoreCard(title: String = "", max_score: int = 100) -> RuitkVNode {
   var s = useState(0)                      # setup: plain GDScript lines before `return (`
   return (
     <DemoBox title={ title }>
@@ -41,10 +41,10 @@ export ScoreCard(title: String = "", max_score: int = 100) -> RUIVNode {
 
 Rules that matter:
 - **Declarations are plain and signature-classified (0.11.0)** — no `component`/`hook`/`module`
-  wrapper keywords. A callable annotated `-> RUIVNode` IS a component (PascalCase name enforced);
+  wrapper keywords. A callable annotated `-> RuitkVNode` IS a component (PascalCase name enforced);
   a `use_`-prefixed callable is a hook; `name := expr` / `name: T = expr` is a value; anything
   else is a util. A file may mix several declarations.
-- **Props** are the component's parameter list — typed, with defaults: `X(title: String = "") -> RUIVNode`.
+- **Props** are the component's parameter list — typed, with defaults: `X(title: String = "") -> RuitkVNode`.
   Pass them as attributes: `<X title="hi" />` or `<X title={ expr } />`. Spread is supported: `{...obj}`.
 - **Hooks** are camelCase and return an indexable pair where stateful: `var s = useState(0)` →
   `s[0]` is the value, `s[1]` the setter Callable — call it `s[1].call(new_value)` (an updater

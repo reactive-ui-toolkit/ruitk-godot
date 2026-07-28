@@ -1,4 +1,4 @@
-export DemoBailoutChild() -> RUIVNode {
+export DemoBailoutChild() -> RuitkVNode {
   var renders = useRef(0)
   renders["current"] += 1
   return (

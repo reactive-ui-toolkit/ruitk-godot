@@ -1,10 +1,10 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoSlicing() -> RUIVNode {
-  var sliced = useState(RUIConfig.time_slicing)
+export DemoSlicing() -> RuitkVNode {
+  var sliced = useState(RuitkConfig.time_slicing)
   var rev = useState(0)
   var toggle = func():
-    RUIConfig.time_slicing = not sliced[0]
+    RuitkConfig.time_slicing = not sliced[0]
     sliced[1].call(not sliced[0])
   return (
     <DemoBox title="Time-slicing — chunk big renders across frames">

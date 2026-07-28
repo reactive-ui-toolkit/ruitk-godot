@@ -16,8 +16,8 @@ this skill is the process for executing it.
    installed, stop and ask the user for its path.
 2. Dump ClassDB under each (the script ships in the addon):
    ```bash
-   <old-godot> --headless --path . --script res://addons/reactive_ui/dev/classdb_dump.gd -- res://classdb-old.json
-   <new-godot> --headless --path . --script res://addons/reactive_ui/dev/classdb_dump.gd -- res://classdb-new.json
+   <old-godot> --headless --path . --script res://addons/reactive_ui_toolkit/dev/classdb_dump.gd -- res://classdb-old.json
+   <new-godot> --headless --path . --script res://addons/reactive_ui_toolkit/dev/classdb_dump.gd -- res://classdb-new.json
    ```
 3. Diff: `node scripts/godot-api-diff.mjs classdb-old.json classdb-new.json --json diff-report.json`.
    Delete the three temp files when done (they are not committed).

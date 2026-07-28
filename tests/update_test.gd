@@ -21,7 +21,7 @@ func _run() -> void:
 		props["out"]["set"] = s[1]      # expose the setter to the test
 		return V.Label({ "text": "v=%d" % int(s[0]) })
 
-	var app := ReactiveRoot.create(container, V.fc(comp, { "out": out }))
+	var app := RuitkRoot.create(container, V.fc(comp, { "out": out }))
 
 	# --- initial render ---
 	var label1: Node = container.get_child(0)

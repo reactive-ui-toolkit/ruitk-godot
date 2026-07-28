@@ -1,7 +1,7 @@
 
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoHello() -> RUIVNode {
+export DemoHello() -> RuitkVNode {
   return (
     <DemoBox title="Hello World">
       <Label text="Hello, reactive Godot! 👋" style={ {"font_size": 20} } />

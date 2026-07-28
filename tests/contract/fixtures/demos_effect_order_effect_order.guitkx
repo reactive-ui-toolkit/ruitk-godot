@@ -1,7 +1,7 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 import { DemoEffectOrderRow } from "./effect_order_row"
 
-export DemoEffectOrder() -> RUIVNode {
+export DemoEffectOrder() -> RuitkVNode {
   var n = useState(3)
   var log = useState([])
   var append = func(msg): log[1].call(func(arr): return arr + [msg])

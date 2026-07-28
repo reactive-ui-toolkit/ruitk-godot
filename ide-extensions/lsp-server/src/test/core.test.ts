@@ -302,7 +302,7 @@ test("missingReturnComponents: a lone `return null` guard still counts as missin
 
 test("missingReturnComponents: a TOP-LEVEL `return null` is the legal null-only component (React semantics)", () => {
   // plain E-01 form
-  assert.equal(missingReturnComponents("Gone() -> RUIVNode {\n\treturn null\n}\n").length, 0, "null-only plain component");
+  assert.equal(missingReturnComponents("Gone() -> RuitkVNode {\n\treturn null\n}\n").length, 0, "null-only plain component");
   // wrapper form, with a conditional guard above the final top-level null
   assert.equal(missingReturnComponents("component Gone(a: bool) {\n\tif a:\n\t\treturn null\n\treturn null\n}\n").length, 0, "null-only wrapper component");
   // the guard-only shape (nested null, fall-through) stays MISSING — totality still enforced
@@ -310,7 +310,7 @@ test("missingReturnComponents: a TOP-LEVEL `return null` is the legal null-only 
 });
 
 test("formatter: a null-only component formats without inventing a markup return, idempotently", () => {
-  const src = "export Gone(active: bool) -> RUIVNode {\n\tif active:\n\t\treturn null\n\treturn null\n}\n";
+  const src = "export Gone(active: bool) -> RuitkVNode {\n\tif active:\n\t\treturn null\n\treturn null\n}\n";
   const once = formatGuitkx(src).text;
   assert.ok(!once.includes("return (\n"), `no empty markup window invented:\n${once}`);
   assert.ok(once.includes("return null"), "body's own returns preserved");
@@ -339,7 +339,7 @@ test("declarationDiags stays silent for a valid header (no false positives)", ()
   const d = declarationDiags("@class_name X\ncomponent X {\n\treturn ( <Label /> )\n}\n");
   assert.equal(d.filter((x) => x.severity !== "warning").length, 0, `got ${JSON.stringify(d)}`);
   assert.ok(d.some((x) => x.code === "GUITKX2320"), `got ${JSON.stringify(d)}`);
-  assert.equal(declarationDiags("@class_name X\nX() -> RUIVNode {\n\treturn ( <Label /> )\n}\n").length, 0);
+  assert.equal(declarationDiags("@class_name X\nX() -> RuitkVNode {\n\treturn ( <Label /> )\n}\n").length, 0);
 });
 
 test("declarationDiags flags a misspelled @class_name DIRECTIVE (@clasaas_name -> GUITKX0300)", () => {
@@ -484,12 +484,12 @@ test("findDecl: E-01 classification routes a typo'd wrapper to the plain decl th
 });
 
 test("markupWindows: a typo'd wrapper classifies as a util (no window -- matches the compiler); malformed tags keep theirs", () => {
-  // E-01: `comssponent Card() {` reads as junk + a plain UTIL `Card()` (no -> RUIVNode), so there
+  // E-01: `comssponent Card() {` reads as junk + a plain UTIL `Card()` (no -> RuitkVNode), so there
   // is no markup window -- byte-for-byte the compiler's view (contract fixture t05, promoted from
   // pending when the two sides converged). Embedded analysis still covers the body as a util.
   assert.equal(markupWindows("comssponent Card() {\n\treturn (\n\t\t<VBox />\n\t)\n}\n").length, 0);
   // the PLAIN spelling of the same component has its window
-  assert.equal(markupWindows("Card() -> RUIVNode {\n\treturn (\n\t\t<VBox />\n\t)\n}\n").length, 1);
+  assert.equal(markupWindows("Card() -> RuitkVNode {\n\treturn (\n\t\t<VBox />\n\t)\n}\n").length, 1);
   // a malformed `<  a>` tag inside the markup no longer collapses the whole window (structural span)
   assert.equal(markupWindows("component C() {\n\treturn (\n\t\t<VBox>\n\t\t\t<  a>\n\t\t</VBox>\n\t)\n}\n").length, 1);
 });
@@ -568,9 +568,9 @@ test("cross-file goto: a Hooks.<hook> reference resolves INTO the library file (
   // uri) with its range in THAT file's text. The server chains a bare `useRef` to this RHS; here we
   // drive both steps.
   const az = new AnalyzerAdapter();
-  const hooksUri = "file:///proj/addons/reactive_ui/core/hooks.gd";
+  const hooksUri = "file:///proj/addons/reactive_ui_toolkit/core/hooks.gd";
   const hooks = "class_name Hooks\nstatic func useRef(initial = null) -> Dictionary:\n\treturn {}\n";
-  az.loadLibrary(hooksUri, hooks, "res://addons/reactive_ui/core/hooks.gd");
+  az.loadLibrary(hooksUri, hooks, "res://addons/reactive_ui_toolkit/core/hooks.gd");
 
   const vUri = "file:///proj/x.__guitkx_virtual.gd";
   const vtext =
@@ -598,7 +598,7 @@ test("cross-file goto: a Hooks.<hook> reference resolves INTO the library file (
 // The wrapper stubs are only sound while their signatures are byte-identical to hooks.gd — drift
 // would surface as false arg-type/arity errors inside virtual docs. This is the drift tripwire.
 test("hook wrapper stubs match hooks.gd declarations byte-for-byte (params, return, @return-tuple)", () => {
-  const hooksGd = readFileSync(join(__dirname, "..", "..", "..", "..", "addons", "reactive_ui", "core", "hooks.gd"), "utf8");
+  const hooksGd = readFileSync(join(__dirname, "..", "..", "..", "..", "addons", "reactive_ui_toolkit", "core", "hooks.gd"), "utf8");
   const decls = new Map<string, { params: string; ret: string; tuple: string | null }>();
   const gdLines = hooksGd.split("\n");
   for (let i = 0; i < gdLines.length; i++) {
@@ -646,9 +646,9 @@ test("hook wrapper stubs match hooks.gd declarations byte-for-byte (params, retu
 // wrapper stub — `s[1]` projects to Callable via constant-index on the tuple.
 test("analyzer e2e: workspace-complete arms UNDEFINED_FUNCTION for a typo'd hook, valid hooks stay silent", () => {
   const az = new AnalyzerAdapter();
-  const hooksUri = "file:///proj/addons/reactive_ui/core/hooks.gd";
-  const hooksGd = readFileSync(join(__dirname, "..", "..", "..", "..", "addons", "reactive_ui", "core", "hooks.gd"), "utf8");
-  az.loadLibrary(hooksUri, hooksGd, "res://addons/reactive_ui/core/hooks.gd");
+  const hooksUri = "file:///proj/addons/reactive_ui_toolkit/core/hooks.gd";
+  const hooksGd = readFileSync(join(__dirname, "..", "..", "..", "..", "addons", "reactive_ui_toolkit", "core", "hooks.gd"), "utf8");
+  az.loadLibrary(hooksUri, hooksGd, "res://addons/reactive_ui_toolkit/core/hooks.gd");
   az.setWorkspaceComplete(true);
 
   const bad = "component X() {\n\tvar s = usseState(0)\n\treturn (<Label text={ str(s) } />)\n}\n";
@@ -717,8 +717,8 @@ test("hook declarations: `-> Hint` survives (like _ret_suffix), tuple-style hint
 // every param read was "undefined". Both fixed at the emitter; this pins them against the real analyzer.
 test("analyzer e2e: module members and hook params never false-flag; a typo in a member still fires", () => {
   const az = new AnalyzerAdapter();
-  const hooksGd = readFileSync(join(__dirname, "..", "..", "..", "..", "addons", "reactive_ui", "core", "hooks.gd"), "utf8");
-  az.loadLibrary("file:///proj/addons/reactive_ui/core/hooks.gd", hooksGd, "res://addons/reactive_ui/core/hooks.gd");
+  const hooksGd = readFileSync(join(__dirname, "..", "..", "..", "..", "addons", "reactive_ui_toolkit", "core", "hooks.gd"), "utf8");
+  az.loadLibrary("file:///proj/addons/reactive_ui_toolkit/core/hooks.gd", hooksGd, "res://addons/reactive_ui_toolkit/core/hooks.gd");
   az.setWorkspaceComplete(true);
 
   const mod = 'module Widgets {\n\tcomponent A() { return (<Label text="a" />) }\n\tcomponent B() {\n\t\tvar s := useState(0)\n\t\treturn (<A />)\n\t}\n}\n';
@@ -1227,7 +1227,7 @@ test("rename: import-clause remote halves + export markers rewrite (E-08/E-07/E-
   const glyphHits = scanImportClauseRefs(app, "Glyph", () => true);
   assert.equal(glyphHits.length, 0, "the local alias is not a remote reference");
   // Export markers in the declaring file.
-  const decl = 'Chip() -> RUIVNode {\n\treturn ( <Label /> )\n}\nexport { Chip, other }\nexport default Chip\n';
+  const decl = 'Chip() -> RuitkVNode {\n\treturn ( <Label /> )\n}\nexport { Chip, other }\nexport default Chip\n';
   const marks = scanExportMarkerRefs(decl, "Chip");
   assert.equal(marks.length, 2, "list entry + default marker both rewrite");
   for (const h of marks) assert.equal(decl.slice(h.start, h.end), "Chip");
@@ -1237,7 +1237,7 @@ test("rename: import-clause remote halves + export markers rewrite (E-08/E-07/E-
 // Audit regression: the @class_name preamble scan is ORDER-AGNOSTIC (0.10.0 rule) — an @uss/@theme
 // line BEFORE @class_name must not abort the scan at the directive word (the plain-decl break).
 test("readClassName survives @uss before @class_name (order-agnostic preamble)", () => {
-  const src = '@uss "res://theme.tres"\n@class_name Themed\nT() -> RUIVNode {\n\treturn ( <Label /> )\n}\n';
+  const src = '@uss "res://theme.tres"\n@class_name Themed\nT() -> RuitkVNode {\n\treturn ( <Label /> )\n}\n';
   const d = scanDeclarations(src);
   assert.deepEqual(d.map((x) => x.binding), ["Themed"], JSON.stringify(d));
 });
@@ -1278,7 +1278,7 @@ test("buildVirtualDoc stubs EVERY part of a combined import (editor resolution, 
   const src =
     'import isEven, { getSomething as fetch } from "./utils"\n' +
     'import D2, * as NS from "./more"\n' +
-    "\nexport C() -> RUIVNode {\n\tvar a = fetch()\n\treturn ( <Label /> )\n}\n";
+    "\nexport C() -> RuitkVNode {\n\tvar a = fetch()\n\treturn ( <Label /> )\n}\n";
   const { text } = buildVirtualDoc(src);
   assert.ok(/static var isEven\b/.test(text), "combined default binding declared: " + text);
   assert.ok(/static var fetch\b/.test(text), "renamed LOCAL of the named part declared");
@@ -1290,7 +1290,7 @@ test("buildVirtualDoc stubs EVERY part of a combined import (editor resolution, 
   const sameName =
     'import is_even, { get_something } from "./utils"\n' +
     'import { is_even } from "./more"\n' +
-    "\nexport C2() -> RUIVNode {\n\tvar a = is_even()\n\treturn ( <Label /> )\n}\n";
+    "\nexport C2() -> RuitkVNode {\n\tvar a = is_even()\n\treturn ( <Label /> )\n}\n";
   const gen2 = buildVirtualDoc(sameName).text;
   const stubCount = (gen2.match(/static var is_even\b/g) ?? []).length;
   assert.equal(stubCount, 1, "same local across imports declares exactly ONE stub: " + gen2);
@@ -1316,14 +1316,14 @@ test("importBraceAt arms the brace context for bare AND combined prefixes (field
   const c3 = importBraceAt(listed, listed.indexOf("}") - 1);
   assert.deepEqual(c3?.already, ["getSomething", "a", "b"], "names AND aliases join the exclusion set");
   assert.equal(importBraceAt(combined, 3), null, "a caret before the brace is not the context");
-  const dict = "export C() -> RUIVNode {\n\tvar x = { }\n\treturn ( <Label /> )\n}\n";
+  const dict = "export C() -> RuitkVNode {\n\tvar x = { }\n\treturn ( <Label /> )\n}\n";
   assert.equal(importBraceAt(dict, dict.indexOf("{ }") + 1), null, "a GDScript dict brace is not an import list");
 });
 
 test("importBindingTokens colors imported bindings by the KIND of the export they bind", () => {
   const { importBindingTokens, importKindTokenOf } = require("../semanticTokens");
   const target = [
-    "export Card() -> RUIVNode {",
+    "export Card() -> RuitkVNode {",
     "\treturn ( <Label /> )",
     "}",
     "",
@@ -1370,7 +1370,7 @@ test("guitkxVirtualLibText mirrors new-mode member exports (values/utils/hooks �
   const wi = new WorkspaceIndex();
   wi.reindex(
     "file:///proj/hud.guitkx",
-    "export Hud() -> RUIVNode {\n\treturn ( <Label /> )\n}\n\nexport use_x() {\n\treturn 1\n}\n\nexport fmt() {\n\treturn 2\n}\n\nval := 1\nexport { val }\n"
+    "export Hud() -> RuitkVNode {\n\treturn ( <Label /> )\n}\n\nexport use_x() {\n\treturn 1\n}\n\nexport fmt() {\n\treturn 2\n}\n\nval := 1\nexport { val }\n"
   );
   const lib = guitkxVirtualLibText(wi.entriesFor("file:///proj/hud.guitkx"));
   assert.ok(lib, "a new-mode file produces a virtual library");
@@ -1399,7 +1399,7 @@ test("formatter preserves combined import lines byte-for-byte (round-trip + idem
   const src =
     'import isEven, { fmt } from "./utils"\n' +
     'import D, * as NS from "./x"\n' +
-    "\nexport C() -> RUIVNode {\n\treturn ( <Label /> )\n}\n";
+    "\nexport C() -> RuitkVNode {\n\treturn ( <Label /> )\n}\n";
   const out = formatGuitkx(src);
   assert.ok(out.text.includes('import isEven, { fmt } from "./utils"'), "named part must not be dropped: " + out.text);
   assert.ok(out.text.includes('import D, * as NS from "./x"'), "star part must not be dropped");

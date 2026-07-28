@@ -75,9 +75,9 @@ SHAs; PR pages re-light automatically since the objects were never gc'd:
 ```bash
 cd C:/Yanivs/GameDev/ReactiveUI/blackout-backups/2026-07-18/ReactiveUI-Godot.git
 # 1. All branches (force — overwrites master/dev; repo-admin ruleset bypass carries it)
-git push --force https://github.com/yanivkalfa/ReactiveUI-Godot.git "refs/heads/*:refs/heads/*"
+git push --force https://github.com/reactive-ui-toolkit/ruitk-godot.git "refs/heads/*:refs/heads/*"
 # 2. All 209 old tags (the v0.12.0-wave tags are untouched; no name collisions)
-git push https://github.com/yanivkalfa/ReactiveUI-Godot.git "refs/tags/*:refs/tags/*"
+git push https://github.com/reactive-ui-toolkit/ruitk-godot.git "refs/tags/*:refs/tags/*"
 ```
 
 Post-restore notes:

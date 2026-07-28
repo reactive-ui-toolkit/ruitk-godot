@@ -2,7 +2,7 @@
 // the LSP can surface the compiler's FULL diagnostic catalog in VS Code without a running editor.
 // Gated by a source hash: if the open buffer no longer matches the last-compiled source, the sidecar
 // is stale and suppressed (it reappears on the next save+compile). srcHash MUST stay identical to
-// RUIGuitkxCodegen.src_hash (FNV-1a over code points).
+// RuitkGuitkxCodegen.src_hash (FNV-1a over code points).
 //
 // Schema v2 (T0.2): { v:2, src_hash, diagnostics:[{ code, severity:int (0 err/1 warn/2 hint),
 // message (no code prefix), off, len }] } — `off`/`len` are character offsets into the compiled
@@ -14,7 +14,7 @@ import { readFileSync } from "fs";
 
 export interface SidecarDiag {
   code: string;
-  severity: number; // 0 = error, 1 = warning, 2 = hint (compiler-domain, RUIGuitkxDiag)
+  severity: number; // 0 = error, 1 = warning, 2 = hint (compiler-domain, RuitkGuitkxDiag)
   message: string;
   off: number; // char offset into the compiled source; -1 = whole file
   len: number;

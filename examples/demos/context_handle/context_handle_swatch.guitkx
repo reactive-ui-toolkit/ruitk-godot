@@ -1,5 +1,5 @@
 
-export DemoContextHandleSwatch() -> RUIVNode {
+export DemoContextHandleSwatch() -> RuitkVNode {
   const AccentContext = preload("res://examples/demos/context_handle/accent_context.gd")
   var c = Hooks.useContext(AccentContext.HANDLE)
   return (

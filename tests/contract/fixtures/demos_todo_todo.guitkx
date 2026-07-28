@@ -1,7 +1,7 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 import { DemoTodoRow } from "./todo_row"
 
-export DemoTodo() -> RUIVNode {
+export DemoTodo() -> RuitkVNode {
   var items = useState([])
   var text = useState("")
   var next_id = useRef(1)

@@ -1,5 +1,5 @@
 // T0.3 vocabulary tripwires. The single source of truth for the .guitkx language vocabulary is
-// addons/reactive_ui/guitkx/vocabulary.json (loaded by guitkx.gd); the LSP ships a copy at
+// addons/reactive_ui_toolkit/guitkx/vocabulary.json (loaded by guitkx.gd); the LSP ships a copy at
 // src/vocabulary.json. These tests keep the copy honest and pin every consumer table to it, so
 // HOST_TAGS/hook-list drift between the compiler and the LSP (matrix §5.1 items 2-3's data half)
 // is structurally impossible again. The GD-side twin lives in tests/guitkx_test.gd
@@ -16,9 +16,9 @@ import { HOOK_STUBS } from "../virtualDoc";
 const ROOT = join(__dirname, "..", "..", "..", "..");
 
 test("vocabulary.json copy is byte-identical to the canonical addons/ file", () => {
-  const canonical = readFileSync(join(ROOT, "addons", "reactive_ui", "guitkx", "vocabulary.json"), "utf8").replace(/\r/g, "");
+  const canonical = readFileSync(join(ROOT, "addons", "reactive_ui_toolkit", "guitkx", "vocabulary.json"), "utf8").replace(/\r/g, "");
   const shipped = readFileSync(join(__dirname, "..", "..", "src", "vocabulary.json"), "utf8").replace(/\r/g, "");
-  assert.strictEqual(shipped, canonical, "sync the copy: cp addons/reactive_ui/guitkx/vocabulary.json ide-extensions/lsp-server/src/vocabulary.json");
+  assert.strictEqual(shipped, canonical, "sync the copy: cp addons/reactive_ui_toolkit/guitkx/vocabulary.json ide-extensions/lsp-server/src/vocabulary.json");
 });
 
 test("schema HOST_TAGS covers every vocabulary tag with the vocabulary's factory (aliases included)", () => {

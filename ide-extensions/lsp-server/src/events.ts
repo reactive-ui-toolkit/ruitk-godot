@@ -1,7 +1,7 @@
 // Shared event <-> Godot-signal vocabulary for guitkx markup intelligence. This is the single
 // source of truth the LSP uses so completion, hover, signature help, validation and semantic tokens
 // all speak the SAME canonical event names the RUNTIME actually binds. It mirrors
-// addons/reactive_ui/core/host_config.gd (_resolve_signal / _is_event / camel<->snake) — keep the
+// addons/reactive_ui_toolkit/core/host_config.gd (_resolve_signal / _is_event / camel<->snake) — keep the
 // two in lockstep.
 //
 // NAMING IS 1:1 LOYAL TO GODOT (0.9.0, MIGRATION-0.9.md): the event name is the exact signal name

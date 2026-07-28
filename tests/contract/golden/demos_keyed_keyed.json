@@ -5,14 +5,14 @@
 			"error": "",
 			"error_at": -1,
 			"error_code": "",
-			"tree": "[{\"at\":303,\"attrs\":[{\"at\":312,\"end\":361,\"kind\":\"str\",\"name\":\"title\",\"value\":\"Keyed diff — identity survives reordering\",\"vat\":319}],\"children\":[{\"at\":369,\"attrs\":[{\"at\":377,\"end\":391,\"kind\":\"str\",\"name\":\"text\",\"value\":\"Shuffle\",\"vat\":383},{\"at\":392,\"end\":413,\"kind\":\"expr\",\"name\":\"onPressed\",\"value\":\"shuffle\",\"vat\":404}],\"children\":[],\"line\":12,\"t\":\"el\",\"tag\":\"Button\"},{\"at\":423,\"attrs\":[{\"at\":438,\"end\":531,\"kind\":\"str\",\"name\":\"text\",\"value\":\"Each tile keeps its node (and its random color) across shuffles — that's keys at work.\",\"vat\":444},{\"at\":540,\"end\":586,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"font_color\\\": Color(0.7, 0.7, 0.7)}\",\"vat\":548}],\"children\":[],\"line\":13,\"t\":\"el\",\"tag\":\"Label\"},{\"at\":596,\"attrs\":[{\"at\":611,\"end\":638,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"separation\\\": 6}\",\"vat\":619}],\"children\":[{\"at\":648,\"body_at\":671,\"body_markup\":\"\\n          return (\\n            <DemoKeyedTile key={ str(id) } id={ id } />\\n          )\\n        \",\"header\":\"id in items[0]\",\"t\":\"for\"}],\"line\":16,\"t\":\"el\",\"tag\":\"HBoxContainer\"}],\"line\":11,\"t\":\"el\",\"tag\":\"DemoBox\"}]"
+			"tree": "[{\"at\":305,\"attrs\":[{\"at\":314,\"end\":363,\"kind\":\"str\",\"name\":\"title\",\"value\":\"Keyed diff — identity survives reordering\",\"vat\":321}],\"children\":[{\"at\":371,\"attrs\":[{\"at\":379,\"end\":393,\"kind\":\"str\",\"name\":\"text\",\"value\":\"Shuffle\",\"vat\":385},{\"at\":394,\"end\":415,\"kind\":\"expr\",\"name\":\"onPressed\",\"value\":\"shuffle\",\"vat\":406}],\"children\":[],\"line\":12,\"t\":\"el\",\"tag\":\"Button\"},{\"at\":425,\"attrs\":[{\"at\":440,\"end\":533,\"kind\":\"str\",\"name\":\"text\",\"value\":\"Each tile keeps its node (and its random color) across shuffles — that's keys at work.\",\"vat\":446},{\"at\":542,\"end\":588,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"font_color\\\": Color(0.7, 0.7, 0.7)}\",\"vat\":550}],\"children\":[],\"line\":13,\"t\":\"el\",\"tag\":\"Label\"},{\"at\":598,\"attrs\":[{\"at\":613,\"end\":640,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"separation\\\": 6}\",\"vat\":621}],\"children\":[{\"at\":650,\"body_at\":673,\"body_markup\":\"\\n          return (\\n            <DemoKeyedTile key={ str(id) } id={ id } />\\n          )\\n        \",\"header\":\"id in items[0]\",\"t\":\"for\"}],\"line\":16,\"t\":\"el\",\"tag\":\"HBoxContainer\"}],\"line\":11,\"t\":\"el\",\"tag\":\"DemoBox\"}]"
 		}
 	],
 	"ok": true,
 	"windows": [
 		{
-			"end": 809,
-			"start": 298
+			"end": 811,
+			"start": 300
 		}
 	]
 }

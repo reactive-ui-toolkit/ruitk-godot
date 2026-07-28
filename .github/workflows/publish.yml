@@ -4,7 +4,7 @@ name: Publish
 # button publishes EVERYTHING whose version changed. Each job reads its OWN version, SKIPS if the
 # matching tag already exists, and tags + uploads on success -- so re-running is idempotent and a job
 # only ships when its artifact was bumped:
-#   - release-addon   -> Godot addon: zip addons/reactive_ui + GitHub release, gated on `v<plugin.cfg>`
+#   - release-addon   -> Godot addon: zip addons/reactive_ui_toolkit + GitHub release, gated on `v<plugin.cfg>`
 #   - publish-vscode  -> VS Code extension: VS Marketplace + Open VSX, gated on `vscode-v<package.json>`
 #   - publish-vs2022  -> VS 2022 extension: VsixPublisher, gated on `vs2022-v<vsixmanifest>`
 #
@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   # ════════════════════════════════════════════════════════════════════════════
-  # Documentation site — build ReactiveUIGodotDocs~ and push dist/ to the `documentations`
+  # Documentation site — build RuitkGodotDocs~ and push dist/ to the `documentations`
   # branch (GitHub Pages serves that branch, root). Runs every dispatch (not version-gated), so a
   # docs-only change redeploys. One-time setup: Settings > Pages > Deploy from branch > documentations / root.
   # ════════════════════════════════════════════════════════════════════════════
@@ -42,11 +42,11 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies
-        working-directory: ReactiveUIGodotDocs~
+        working-directory: RuitkGodotDocs~
         run: npm ci
 
       - name: Build
-        working-directory: ReactiveUIGodotDocs~
+        working-directory: RuitkGodotDocs~
         run: npm run build
 
       - name: Deploy to documentations branch
@@ -60,7 +60,7 @@ jobs:
           }
 
           find _docs_branch -mindepth 1 -not -path '*/.git/*' -not -name '.git' -delete
-          cp -r ReactiveUIGodotDocs~/dist/* _docs_branch/
+          cp -r RuitkGodotDocs~/dist/* _docs_branch/
           touch _docs_branch/.nojekyll   # serve Vite's _-prefixed/asset files verbatim (no Jekyll)
 
           cd _docs_branch
@@ -73,7 +73,7 @@ jobs:
           git worktree remove _docs_branch
 
   # ════════════════════════════════════════════════════════════════════════════
-  # Godot addon — zip addons/reactive_ui + GitHub release, publishes only if version changed
+  # Godot addon — zip addons/reactive_ui_toolkit + GitHub release, publishes only if version changed
   # ════════════════════════════════════════════════════════════════════════════
   release-addon:
     name: Package addon + GitHub release (idempotent)
@@ -90,7 +90,7 @@ jobs:
       - name: Read addon version from plugin.cfg
         id: ver
         run: |
-          VER=$(grep -oP '^version="\K[^"]+' addons/reactive_ui/plugin.cfg | head -1)
+          VER=$(grep -oP '^version="\K[^"]+' addons/reactive_ui_toolkit/plugin.cfg | head -1)
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "tag=v$VER" >> "$GITHUB_OUTPUT"
           echo "Addon version: $VER"
@@ -118,9 +118,13 @@ jobs:
         # Scan BEFORE the build: guitkx_build's two-pass parse gate needs the global class cache
         # on a fresh clone (same fix as test.yml -- Publish #48 failed here with 49x "Identifier
         # V not declared"). The second scan registers the generated .gd for the suites.
+        # The suite list MIRRORS test.yml, contract-golden freshness check and all three codemod
+        # tripwires included. Publish is the last gate before artifacts leave the building, so it
+        # must never run a narrower battery than the push/PR gate does.
         run: |
           godot --headless --path . --editor --quit || true
           godot --headless --path . --script res://tests/guitkx_build.gd
+          godot --headless --path . --script res://tests/contract_dump.gd -- --check
           godot --headless --path . --editor --quit || true
           godot --headless --path . --script res://tests/core_test.gd
           godot --headless --path . --script res://tests/style_test.gd
@@ -132,12 +136,15 @@ jobs:
           godot --headless --path . --script res://tests/hmr_test.gd
           godot --headless --path . --script res://tests/guitkx_lsp_test.gd
           godot --headless --path . --script res://tests/guitkx_editor_test.gd
+          godot --headless --path . --script res://tests/guitkx_migrate.gd
+          godot --headless --path . --script res://tests/guitkx_modernize.gd
+          godot --headless --path . --script res://tests/guitkx_rename_migrate.gd
 
-      - name: Package the addon (only addons/reactive_ui ships)
+      - name: Package the addon (only addons/reactive_ui_toolkit ships)
         if: steps.check.outputs.exists == 'false'
         run: |
           mkdir -p dist
-          zip -r "dist/reactive_ui-${{ steps.ver.outputs.version }}.zip" addons/reactive_ui -x '*/.git*'
+          zip -r "dist/reactive_ui_toolkit-${{ steps.ver.outputs.version }}.zip" addons/reactive_ui_toolkit -x '*/.git*'
 
       - name: Create + push tag
         if: steps.check.outputs.exists == 'false'
@@ -152,9 +159,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          name: Reactive UI ${{ steps.ver.outputs.version }}
+          name: Reactive UI Toolkit — Godot ${{ steps.ver.outputs.version }}
           generate_release_notes: true
-          files: dist/reactive_ui-${{ steps.ver.outputs.version }}.zip
+          files: dist/reactive_ui_toolkit-${{ steps.ver.outputs.version }}.zip
 
   # ════════════════════════════════════════════════════════════════════════════
   # Classic Godot Asset Library — post a version "edit" for each new addon release.
@@ -193,9 +200,9 @@ jobs:
         run: echo "::notice title=Godot Asset Store::Classic AL edit posted for ${{ needs.release-addon.outputs.tag }}. The NEW store (store.godotengine.org) still needs its manual version-add in the publisher dashboard."
 
   # ════════════════════════════════════════════════════════════════════════════
-  # Godot EDITOR addon (reactive_ui_editor) — zip + GitHub release, tag editor-v<ver>.
+  # Godot EDITOR addon (reactive_ui_toolkit_editor) — zip + GitHub release, tag editor-v<ver>.
   # Independent versioning from the runtime addon; the zip carries its own LICENSE. Since 0.6.1
-  # the zip BUNDLES the reactive_ui_analyzer GDExtension (fetched, version-pinned, from the
+  # the zip BUNDLES the reactive_ui_toolkit_analyzer GDExtension (fetched, version-pinned, from the
   # gdscript-analyzer release) next to the editor folder — one download = the full experience.
   # This zip is the store artifact for BOTH stores: the new store takes the upload directly; the
   # classic AL takes it via the "Custom" download provider (a plain Download Commit cannot ship
@@ -216,7 +223,7 @@ jobs:
       - name: Read editor addon version from plugin.cfg
         id: ver
         run: |
-          VER=$(grep -oP '^version="\K[^"]+' addons/reactive_ui_editor/plugin.cfg | head -1)
+          VER=$(grep -oP '^version="\K[^"]+' addons/reactive_ui_toolkit_editor/plugin.cfg | head -1)
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "tag=editor-v$VER" >> "$GITHUB_OUTPUT"
           echo "Editor addon version: $VER"
@@ -241,16 +248,19 @@ jobs:
           ANALYZER_VERSION: "0.6.1"
         run: |
           curl -fsSL -o analyzer.zip \
-            "https://github.com/yanivkalfa/gdscript-analyzer/releases/download/v${ANALYZER_VERSION}/reactive-ui-analyzer-${ANALYZER_VERSION}.zip"
-          rm -rf addons/reactive_ui_analyzer
+            "https://github.com/reactive-ui-toolkit/gdscript-analyzer/releases/download/v${ANALYZER_VERSION}/reactive-ui-analyzer-${ANALYZER_VERSION}.zip"
+          rm -rf addons/reactive_ui_toolkit_analyzer
           unzip -o analyzer.zip -d .
+          # The analyzer repo (unrenamed, R8) still ships the folder as addons/reactive_ui_analyzer —
+          # move it to the toolkit name this repo bundles and feature-detects.
+          mv addons/reactive_ui_analyzer addons/reactive_ui_toolkit_analyzer
           # Refuse to ship a partial bundle: the descriptor and EVERY platform binary must exist.
           for f in \
-            addons/reactive_ui_analyzer/gdscript_analyzer.gdextension \
-            addons/reactive_ui_analyzer/bin/gdscript_gdext.windows.x86_64.dll \
-            addons/reactive_ui_analyzer/bin/libgdscript_gdext.linux.x86_64.so \
-            addons/reactive_ui_analyzer/bin/libgdscript_gdext.linux.arm64.so \
-            addons/reactive_ui_analyzer/bin/libgdscript_gdext.macos.universal.dylib; do
+            addons/reactive_ui_toolkit_analyzer/gdscript_analyzer.gdextension \
+            addons/reactive_ui_toolkit_analyzer/bin/gdscript_gdext.windows.x86_64.dll \
+            addons/reactive_ui_toolkit_analyzer/bin/libgdscript_gdext.linux.x86_64.so \
+            addons/reactive_ui_toolkit_analyzer/bin/libgdscript_gdext.linux.arm64.so \
+            addons/reactive_ui_toolkit_analyzer/bin/libgdscript_gdext.macos.universal.dylib; do
             [ -f "$f" ] || { echo "::error::analyzer bundle incomplete: missing $f"; exit 1; }
           done
           echo "version=${ANALYZER_VERSION}" >> "$GITHUB_OUTPUT"
@@ -277,17 +287,17 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         run: |
           mkdir -p dist
-          zip -r "dist/reactive_ui_editor-${{ steps.ver.outputs.version }}.zip" \
-            addons/reactive_ui_editor addons/reactive_ui_analyzer -x '*/.git*'
+          zip -r "dist/reactive_ui_toolkit_editor-${{ steps.ver.outputs.version }}.zip" \
+            addons/reactive_ui_toolkit_editor addons/reactive_ui_toolkit_analyzer -x '*/.git*'
 
       - name: Extract this version's changelog section for the release body
         if: steps.check.outputs.exists == 'false'
         run: |
-          awk '/^## \[/{n++} n==1' addons/reactive_ui_editor/CHANGELOG.md > dist/release-body.md
+          awk '/^## \[/{n++} n==1' addons/reactive_ui_toolkit_editor/CHANGELOG.md > dist/release-body.md
           echo "" >> dist/release-body.md
-          echo "_Requires the [Reactive UI](https://github.com/yanivkalfa/ReactiveUI-Godot) addon (see the release notes for the minimum version)._" >> dist/release-body.md
+          echo "_Requires the [Reactive UI Toolkit — Godot](https://github.com/reactive-ui-toolkit/ruitk-godot) addon (see the release notes for the minimum version)._" >> dist/release-body.md
           echo "" >> dist/release-body.md
-          echo "_Bundles the native analyzer (\`addons/reactive_ui_analyzer\`) ${{ steps.analyzer.outputs.version }} — Windows x86_64, Linux x86_64/arm64, macOS universal. Exclude that folder from game export presets; macOS users see its README for the one-line de-quarantine._" >> dist/release-body.md
+          echo "_Bundles the native analyzer (\`addons/reactive_ui_toolkit_analyzer\`) ${{ steps.analyzer.outputs.version }} — Windows x86_64, Linux x86_64/arm64, macOS universal. Exclude that folder from game export presets; macOS users see its README for the one-line de-quarantine._" >> dist/release-body.md
 
       - name: Create + push tag
         if: steps.check.outputs.exists == 'false'
@@ -302,9 +312,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          name: Reactive UI Editor ${{ steps.ver.outputs.version }}
+          name: Reactive UI Toolkit — Godot Editor ${{ steps.ver.outputs.version }}
           body_path: dist/release-body.md
-          files: dist/reactive_ui_editor-${{ steps.ver.outputs.version }}.zip
+          files: dist/reactive_ui_toolkit_editor-${{ steps.ver.outputs.version }}.zip
 
   # ════════════════════════════════════════════════════════════════════════════
   # Classic Asset Library — post a version "edit" for each new EDITOR release.

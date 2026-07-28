@@ -1,6 +1,6 @@
 ## Faithful port of the Unity `DoomFace.uitkx` -- the Doomguy mug widget.
 ## `frame` is state.player.face_state (0=god, 1..5 hp buckets, 6=hurt, 7=dead).
-export DoomFace(frame: int = 0) -> RUIVNode {
+export DoomFace(frame: int = 0) -> RuitkVNode {
   var faces = DoomTextures.faces()
   var idx = clampi(frame, 0, 7)
   var panel_bg = Color(0.20, 0.16, 0.10, 1.0)
