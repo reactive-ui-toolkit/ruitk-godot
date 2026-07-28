@@ -1,8 +1,43 @@
 # Changelog
 
-All notable changes to **Reactive UI for Godot** are documented here.
+All notable changes to **Reactive UI Toolkit — Godot** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
+
+## [0.13.0] — 2026-07-28
+
+### Changed — BREAKING: the Reactive UI Toolkit rename (names only, zero behavior changes)
+
+The family umbrella rebrand. The library is now **Reactive UI Toolkit — Godot**, one leg of
+the [Reactive UI Toolkit](https://github.com/reactive-ui-toolkit) family (Godot, Unity,
+Unreal), and the repository moved to
+[reactive-ui-toolkit/ruitk-godot](https://github.com/reactive-ui-toolkit/ruitk-godot) (old
+GitHub URLs redirect). It is a complete rename — identifiers included — with **zero behavior
+changes** and a one-command migration; see **MIGRATION-0.13.md**.
+
+- **Addon folders renamed:** `addons/reactive_ui` → `addons/reactive_ui_toolkit`,
+  `addons/reactive_ui_editor` → `addons/reactive_ui_toolkit_editor`, and the bundled analyzer
+  `addons/reactive_ui_analyzer` → `addons/reactive_ui_toolkit_analyzer` (release zips follow:
+  `reactive_ui_toolkit-<ver>.zip` / `reactive_ui_toolkit_editor-<ver>.zip`).
+- **Class prefix renamed (36 whole-word pairs):** every `RUI*` global class is now `Ruitk*`
+  (`RUIVNode` → `RuitkVNode`, `RUIRouter` → `RuitkRouter`, …), and the mount surfaces
+  `ReactiveRoot` / `ReactiveRootNode` are now `RuitkRoot` / `RuitkRootNode`. The component
+  classifier annotation is `-> RuitkVNode`. **`V` and `Hooks` are unchanged** — the
+  family-parity authoring surface stays identical across all three engines.
+- **One-command migration (clean break, no compatibility window):**
+  `godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_13_0.gd`
+  rewrites a whole project (classes across `.guitkx`/`.gd`, folder paths across
+  `.gd`/`.guitkx`/`.tscn`/`.tres` + `project.godot`'s plugin list; idempotent). Then **delete
+  the old `addons/reactive_ui*` folders by hand** — store updates never delete, and duplicate
+  global `class_name` parse errors are the symptom of skipping that step. Re-save your
+  `.guitkx` files (or run your build sweep) so generated `.gd` re-emit with the new names.
+- **License retitled:** the ReactiveUI Community License 1.0 is now the
+  **Reactive UI Toolkit Community License 1.1** (credit line: "Made with Reactive UI
+  Toolkit"); terms otherwise unchanged, and every previously released version keeps the
+  license it shipped with.
+- **Unchanged, deliberately:** the `.guitkx` extension, the `GUITKX####` diagnostic codes,
+  the `guitkx` tool/package names, and the IDE extension identities — the language keeps its
+  name; only the content under the listings updated.
 
 ## [0.12.1] — 2026-07-25
 

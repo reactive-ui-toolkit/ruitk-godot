@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="GuitkxVsix.ReactiveUITK" Version="0.12.1" Language="en-US" Publisher="ReactiveUITK" />
+    <Identity Id="GuitkxVsix.ReactiveUITK" Version="0.13.0" Language="en-US" Publisher="ReactiveUITK" />
     <DisplayName>GUITKX (Godot - VS2022)</DisplayName>
     <Description xml:space="preserve">Syntax highlighting and language intelligence for .guitkx markup (Reactive UI Toolkit — Godot) — embedded GDScript analyzed headlessly, no running Godot editor required. Repo: https://github.com/reactive-ui-toolkit/ruitk-godot · Discord: https://discord.gg/Knedqu4Wyv</Description>
     <License>LICENSE.txt</License>

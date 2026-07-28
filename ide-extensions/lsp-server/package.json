@@ -1,6 +1,6 @@
 {
   "name": "guitkx-language-server",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "description": "Language server for .guitkx (Reactive UI Toolkit — Godot markup): markup intelligence + headless embedded-GDScript analysis via @gdscript-analyzer/core (no running Godot editor required).",
   "license": "LicenseRef-ReactiveUI-Community-1.0",
   "main": "out/server.js",

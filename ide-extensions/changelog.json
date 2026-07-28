@@ -1,6 +1,25 @@
 {
   "entries": [
     {
+      "date": "2026-07-28",
+      "versions": {
+        "editor": "0.11.0"
+      },
+      "editor": [
+        "Reactive UI Toolkit rebrand (rides the library 0.13.0 — see MIGRATION-0.13.md): the addon folder is now `addons/reactive_ui_toolkit_editor`, the bundled analyzer folder `addons/reactive_ui_toolkit_analyzer`, its classes are `Ruitk*`-prefixed, and it depends on the renamed `addons/reactive_ui_toolkit` runtime. The display name is \"Reactive UI Toolkit — Godot Editor\" and the bundled license is retitled Reactive UI Toolkit Community License 1.1 (terms unchanged). Zero behavior changes. After updating, delete the old `addons/reactive_ui_editor` and `addons/reactive_ui_analyzer` folders by hand (store updates never delete — duplicate global class_name parse errors are the symptom), and re-enable the plugin if the rename left it disabled."
+      ]
+    },
+    {
+      "date": "2026-07-28",
+      "versions": {
+        "vscode": "0.13.0",
+        "vs2022": "0.13.0"
+      },
+      "shared": [
+        "Reactive UI Toolkit rebrand (rides the library 0.13.0 — see MIGRATION-0.13.md): the repository is now github.com/reactive-ui-toolkit/ruitk-godot (listing links, READMEs, and the analyzer download URLs all point at the org; old GitHub URLs redirect), the product label in the descriptions is \"Reactive UI Toolkit — Godot\", and the bundled license is retitled Reactive UI Toolkit Community License 1.1 (terms unchanged). The language surface follows the library's class rename: the component classifier is `-> RuitkVNode`, and the schema, TextMate grammar, virtual-document stubs, and language server all classify the `Ruitk*` spellings. Extension IDs, display names, and the `guitkx` language identity are unchanged — nothing to reinstall or reconfigure; run the library's one-command codemod in your project and the extensions pick the new spellings up."
+      ]
+    },
+    {
       "date": "2026-07-25",
       "versions": {
         "editor": "0.10.1"

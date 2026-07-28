@@ -1,3 +1,20 @@
+## [0.13.0] - 2026-07-28
+
+**One family, one name: ReactiveUI is now Reactive UI Toolkit.** The Godot library is now **Reactive UI Toolkit — Godot**, one leg of the Reactive UI Toolkit family (Godot, Unity, Unreal), and the repo moved to **github.com/reactive-ui-toolkit/ruitk-godot** (old links redirect). It's a complete rename — folders AND class prefix — with **zero behavior changes**.
+
+**What renamed:** `addons/reactive_ui` → `addons/reactive_ui_toolkit` (the editor and analyzer folders follow), and every `RUI*` class is now `Ruitk*` — `RUIVNode` → `RuitkVNode`, `ReactiveRoot` → `RuitkRoot`. Components annotate `-> RuitkVNode` now. **`V` and `Hooks` don't change**, and neither do `.guitkx`, the `GUITKX####` codes, or the extension IDs — the language keeps its name.
+
+**One command migrates your whole project** (idempotent; run it after updating the addons):
+```
+godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_13_0.gd
+```
+Then delete the old `addons/reactive_ui*` folders by hand — store updates never delete, and duplicate `class_name` parse errors are the symptom of skipping it. Full guide: **MIGRATION-0.13.md**.
+
+The license rides along as the **Reactive UI Toolkit Community License 1.1** — same terms, new name, credit line now "Made with Reactive UI Toolkit". Everything already released keeps the license and names it shipped with.
+
+Update to **Reactive UI Toolkit 0.13.0** + **Editor 0.11.0** (Godot), and **GUITKX 0.13.0** (VS Code + VS 2022).
+
+---
 ## [0.12.1] - 2026-07-25
 
 **Components can render nothing now — `return null` all the way (React semantics).** A component whose body ends in a top-level `return null` with no markup return is legal from 0.12.1: it renders nothing, exactly like React. The use case is effect-only components — fire a sound, register something, run a `useEffect` — without inventing an empty wrapper element. Conditional guards (`if not ready: return null`) worked before and still do; what's new is that the *whole* component may return null. Totality is still enforced: a body whose only `return null` hides inside a conditional (so some path falls through) still errors, as does a top-level non-markup value return. The formatter, the live editor squiggles, and the unreachable-code dimmer all understand the new shape.

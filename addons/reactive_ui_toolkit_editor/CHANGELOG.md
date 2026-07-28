@@ -7,6 +7,9 @@ shared with the GUITKX IDE extensions) — add entries via `changelog.mjs add --
 editor`, then regenerate this file with `extract`; never edit it by hand. The history
 below the marker line predates the cutover and is preserved verbatim.
 
+## [0.11.0] - 2026-07-28
+- Reactive UI Toolkit rebrand (rides the library 0.13.0 — see MIGRATION-0.13.md): the addon folder is now `addons/reactive_ui_toolkit_editor`, the bundled analyzer folder `addons/reactive_ui_toolkit_analyzer`, its classes are `Ruitk*`-prefixed, and it depends on the renamed `addons/reactive_ui_toolkit` runtime. The display name is "Reactive UI Toolkit — Godot Editor" and the bundled license is retitled Reactive UI Toolkit Community License 1.1 (terms unchanged). Zero behavior changes. After updating, delete the old `addons/reactive_ui_editor` and `addons/reactive_ui_analyzer` folders by hand (store updates never delete — duplicate global class_name parse errors are the symptom), and re-enable the plugin if the rename left it disabled.
+
 ## [0.10.1] - 2026-07-25
 - Null-only components (library 0.12.1, React semantics) ride the compiler into the in-editor tier: a component whose body has a top-level `return null` and no markup return compiles on save, renders nothing at runtime, and the unreachable-code dimmer skips it. A nested-only `return null` (conditional guard with a fall-through path) is still GUITKX2101, unchanged.
 
