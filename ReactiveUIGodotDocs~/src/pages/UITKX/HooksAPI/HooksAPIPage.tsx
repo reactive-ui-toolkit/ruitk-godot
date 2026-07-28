@@ -221,7 +221,7 @@ export const HooksAPIPage: FC = () => (
     </Typography>
     <Typography variant="body1" paragraph>
       Complete reference of every hook exposed by the <code>Hooks</code> class
-      (<code>addons/reactive_ui/core/hooks.gd</code>). In <code>.guitkx</code>{' '}
+      (<code>addons/reactive_ui_toolkit/core/hooks.gd</code>). In <code>.guitkx</code>{' '}
       markup, bare camelCase calls like <code>useState</code> are auto-prefixed
       to <code>Hooks.useState</code>; in plain GDScript they are static
       methods, e.g. <code>Hooks.useState(0)</code>. Hooks return plain GDScript

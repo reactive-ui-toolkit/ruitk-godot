@@ -1,6 +1,6 @@
 // Code samples for the Migrations page.
 
-export const MIGRATE_0_11_CMD = `godot --headless --path . --script res://addons/reactive_ui/dev/migrate_0_11_0.gd`
+export const MIGRATE_0_11_CMD = `godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_11_0.gd`
 
 export const MIGRATE_0_11_BEFORE_AFTER = `# ── score_row.guitkx ──────────────────────────────────────────────
 # BEFORE (0.10 — wrapper keywords; still compile this minor, warning GUITKX2320)
@@ -28,7 +28,7 @@ export module HudUtils {
 
 export fmt(x) -> String { … }`
 
-export const MIGRATE_0_10_CMD = `godot --headless --path . --script res://addons/reactive_ui/dev/migrate_0_10_0.gd`
+export const MIGRATE_0_10_CMD = `godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_10_0.gd`
 
 export const MIGRATE_0_10_BEFORE_AFTER = `# BEFORE (0.9 — implicit cross-file references)
 component Panel() {
@@ -47,9 +47,9 @@ export component Panel() {
 }`
 
 export const MIGRATE_0_9_CMD = `# dry run first (prints what would change, writes nothing):
-godot --headless --path . --script res://addons/reactive_ui/dev/migrate_0_9_0.gd -- --dry-run
+godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_9_0.gd -- --dry-run
 # then for real:
-godot --headless --path . --script res://addons/reactive_ui/dev/migrate_0_9_0.gd`
+godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_9_0.gd`
 
 export const MIGRATE_0_9_EXAMPLES = `<VBox>            ->  <VBoxContainer>
 <RichText>        ->  <RichTextLabel>

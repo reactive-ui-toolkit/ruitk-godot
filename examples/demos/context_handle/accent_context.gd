@@ -7,4 +7,4 @@ extends RefCounted
 ## scan -- where a leaf `class_name` whose static initializer references another global at parse time
 ## can fail to register (only manifested on the CI runner, not local; see demos_test).
 
-static var HANDLE: RUIContext = preload("res://addons/reactive_ui/core/hooks.gd").createContext(Color(0.4, 0.7, 1.0))
+static var HANDLE: RUIContext = preload("res://addons/reactive_ui_toolkit/core/hooks.gd").createContext(Color(0.4, 0.7, 1.0))

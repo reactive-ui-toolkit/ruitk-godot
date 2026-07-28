@@ -5,7 +5,7 @@ extends SceneTree
 ## rewrote them locally -- commit the result. Idempotency itself is pinned by guitkx_test.gd; this
 ## is the CI gate that keeps the tree modernized.
 ##   godot --headless --path . --script res://tests/guitkx_modernize.gd
-const Migrate = preload("res://addons/reactive_ui/guitkx/guitkx_migrate.gd")
+const Migrate = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_migrate.gd")
 
 func _initialize() -> void:
 	var res := Migrate.modernize_all("res://examples")

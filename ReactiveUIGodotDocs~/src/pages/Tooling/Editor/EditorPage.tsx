@@ -28,10 +28,10 @@ const Section: FC<{ title: string; children: React.ReactNode }> = ({ title, chil
 export const EditorPage: FC = () => (
   <Box sx={Styles.root}>
     <Typography variant="h4" component="h1" gutterBottom>
-      In-Godot Editor (reactive_ui_editor)
+      In-Godot Editor (reactive_ui_toolkit_editor)
     </Typography>
     <Typography variant="body1" paragraph>
-      The <strong>reactive_ui_editor</strong> addon puts a full <code>.guitkx</code> editor
+      The <strong>reactive_ui_toolkit_editor</strong> addon puts a full <code>.guitkx</code> editor
       inside Godot itself — a main-screen tab with syntax highlighting, live compiler
       diagnostics, completion, hover, navigation, refactoring, project-wide search, and
       formatting. Double-clicking a <code>.guitkx</code> in the FileSystem dock opens it there.
@@ -41,7 +41,7 @@ export const EditorPage: FC = () => (
     </Typography>
     <Alert severity="info" sx={{ mb: 1 }}>
       The editor addon <em>depends on</em> the runtime addon: enable{' '}
-      <strong>reactive_ui</strong> first, then <strong>reactive_ui_editor</strong>{' '}
+      <strong>reactive_ui_toolkit</strong> first, then <strong>reactive_ui_toolkit_editor</strong>{' '}
       (<strong>Project → Project Settings → Plugins</strong>). With the dependency missing or
       outdated the editor addon disables itself and tells you why, instead of erroring.
     </Alert>
@@ -163,7 +163,7 @@ export const EditorPage: FC = () => (
     <Section title="Settings">
       <Typography variant="body1" paragraph>
         Everything is toggleable under <strong>Project → Project Settings →
-        reactive_ui_editor</strong> (basic settings, no Advanced toggle needed): syntax
+        reactive_ui_toolkit_editor</strong> (basic settings, no Advanced toggle needed): syntax
         highlighting, diagnostics, completion, hover, format-on-save, and whether
         double-clicking a <code>.guitkx</code> opens the in-Godot editor at all (turn{' '}
         <code>open_guitkx_in_editor</code> off if you work exclusively in VS Code). Toggles
@@ -174,7 +174,7 @@ export const EditorPage: FC = () => (
     <Section title="How It Relates to the Watcher">
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<>Saving from the editor writes ONLY the <code>.guitkx</code> text; the <strong>reactive_ui</strong> watcher owns compiling the sibling <code>.gd</code> — the two never fight over the same file, and a running F5 session hot-reloads as usual.</>} />
+          <ListItemText primary={<>Saving from the editor writes ONLY the <code>.guitkx</code> text; the <strong>reactive_ui_toolkit</strong> watcher owns compiling the sibling <code>.gd</code> — the two never fight over the same file, and a running F5 session hot-reloads as usual.</>} />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary={<>Godot&apos;s own save flows are wired in: Save All and the quit-confirmation dialog include unsaved <code>.guitkx</code> buffers, and pressing Play flushes them first so the game runs what&apos;s on screen.</>} />
@@ -215,8 +215,8 @@ export const EditorPage: FC = () => (
             <TableRow>
               <TableCell>Deep expression intelligence</TableCell>
               <TableCell>
-                The editor download <strong>bundles the reactive_ui_analyzer GDExtension</strong>{' '}
-                (it lands at <code>addons/reactive_ui_analyzer/</code>, loads automatically —
+                The editor download <strong>bundles the reactive_ui_toolkit_analyzer GDExtension</strong>{' '}
+                (it lands at <code>addons/reactive_ui_toolkit_analyzer/</code>, loads automatically —
                 nothing to enable), so embedded GDScript gets the full type-aware treatment out
                 of the box: completion on your typed locals, inferred-type hover,{' '}
                 <code>GD:</code> diagnostics at the exact expression, go-to-definition (into the

@@ -1,4 +1,4 @@
-// In-process TypeScript formatter — a faithful port of addons/reactive_ui/guitkx/guitkx_formatter.gd.
+// In-process TypeScript formatter — a faithful port of addons/reactive_ui_toolkit/guitkx/guitkx_formatter.gd.
 // Lets VS Code / VS2022 "Format Document" run instantly, offline, with NO Godot binary (the old path
 // shelled out to headless Godot). Output is kept BYTE-IDENTICAL to the GDScript formatter via a shared
 // golden-fixture corpus asserted on both sides (test-fixtures/formatter-cases.json). AST-driven re-emit

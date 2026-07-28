@@ -24,7 +24,7 @@ body:
     attributes:
       label: Version
       description: "Addon version or extension version"
-      placeholder: "e.g. reactive_ui addon 0.x / vscode guitkx 0.2.4"
+      placeholder: "e.g. reactive_ui_toolkit addon 0.x / vscode guitkx 0.2.4"
     validations:
       required: true
 

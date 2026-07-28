@@ -21,7 +21,7 @@ export const MigrationsPage: FC = () => (
     <Typography variant="body1" paragraph>
       Every breaking release ships a <strong>codemod</strong> that rewrites your project in place —
       run one command, review the diff, done. The codemods ship inside the addon
-      (<code>addons/reactive_ui/dev/</code>), are idempotent (safe to re-run), and never touch your
+      (<code>addons/reactive_ui_toolkit/dev/</code>), are idempotent (safe to re-run), and never touch your
       hand-written <code>.gd</code> scripts&apos; logic. The full step-by-step guides live in the
       repository; this page is the quick path.
     </Typography>

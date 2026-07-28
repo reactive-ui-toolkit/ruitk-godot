@@ -27,8 +27,8 @@ export const UitkxGettingStartedPage: FC = () => (
     <List>
       <ListItem disablePadding>
         <ListItemText
-          primary="From the Asset Library: open the AssetLib tab, search “Reactive UI Toolkit — Godot”, then Download → Install (keep the addons/reactive_ui/ folder). The editor tooling ships as a separate asset — search “Reactive UI Toolkit — Godot Editor” to add it too."
-          secondary="Or, manually: copy the addons/reactive_ui/ folder into your project's res://addons/ directory."
+          primary="From the Asset Library: open the AssetLib tab, search “Reactive UI Toolkit — Godot”, then Download → Install (keep the addons/reactive_ui_toolkit/ folder). The editor tooling ships as a separate asset — search “Reactive UI Toolkit — Godot Editor” to add it too."
+          secondary="Or, manually: copy the addons/reactive_ui_toolkit/ folder into your project's res://addons/ directory."
         />
       </ListItem>
       <ListItem disablePadding>

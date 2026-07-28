@@ -106,7 +106,7 @@ export const StylingPage: FC = () => {
 
     <Alert severity="info" sx={{ mb: 3 }}>
       <code>RUIStyle</code> and <code>RUIStyleSheet</code> are global{' '}
-      <code>class_name</code>s — available anywhere once the <code>reactive_ui</code> addon is
+      <code>class_name</code>s — available anywhere once the <code>reactive_ui_toolkit</code> addon is
       enabled. You rarely call them directly; the <code>style</code> and <code>classes</code> props
       do the work.
     </Alert>

@@ -10,7 +10,7 @@ import path from 'node:path'
 // data: their props/signals come from the bundled ClassDB dump and the guitkx schema
 // that the LSP already ships. This config reads those SAME sources so the docs never
 // drift from the tooling, and injects them as compile-time constants:
-//   __PACKAGE_VERSION__  — addon version from addons/reactive_ui/plugin.cfg
+//   __PACKAGE_VERSION__  — addon version from addons/reactive_ui_toolkit/plugin.cfg
 //   __GODOT_MIN__        — the minimum supported Godot minor (floor)
 //   __HOST_ELEMENTS__    — per host tag: { tag, godotClass, factory, events, props[], signals[] }
 //   __HOST_TAGS__        — ordered list of host tags (nav order = schema order)
@@ -24,7 +24,7 @@ const readJson = (rel: string) =>
 // ── addon version (plugin.cfg: version="0.3.0") ──────────────────────────────
 function readAddonVersion(): string {
   try {
-    const cfg = fs.readFileSync(path.join(repoRoot, 'addons', 'reactive_ui', 'plugin.cfg'), 'utf-8')
+    const cfg = fs.readFileSync(path.join(repoRoot, 'addons', 'reactive_ui_toolkit', 'plugin.cfg'), 'utf-8')
     const m = cfg.match(/version\s*=\s*"([^"]+)"/)
     return m ? m[1] : '0.0.0'
   } catch {

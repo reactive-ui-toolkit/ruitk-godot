@@ -65,4 +65,4 @@ export const EXAMPLE_CONFIG = `{
   "formatter": { "printWidth": 120 }
 }`
 
-export const EXAMPLE_MIGRATE = `godot --headless --path . --script res://addons/reactive_ui/dev/migrate_0_11_0.gd`
+export const EXAMPLE_MIGRATE = `godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_11_0.gd`

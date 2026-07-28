@@ -568,9 +568,9 @@ test("cross-file goto: a Hooks.<hook> reference resolves INTO the library file (
   // uri) with its range in THAT file's text. The server chains a bare `useRef` to this RHS; here we
   // drive both steps.
   const az = new AnalyzerAdapter();
-  const hooksUri = "file:///proj/addons/reactive_ui/core/hooks.gd";
+  const hooksUri = "file:///proj/addons/reactive_ui_toolkit/core/hooks.gd";
   const hooks = "class_name Hooks\nstatic func useRef(initial = null) -> Dictionary:\n\treturn {}\n";
-  az.loadLibrary(hooksUri, hooks, "res://addons/reactive_ui/core/hooks.gd");
+  az.loadLibrary(hooksUri, hooks, "res://addons/reactive_ui_toolkit/core/hooks.gd");
 
   const vUri = "file:///proj/x.__guitkx_virtual.gd";
   const vtext =
@@ -598,7 +598,7 @@ test("cross-file goto: a Hooks.<hook> reference resolves INTO the library file (
 // The wrapper stubs are only sound while their signatures are byte-identical to hooks.gd — drift
 // would surface as false arg-type/arity errors inside virtual docs. This is the drift tripwire.
 test("hook wrapper stubs match hooks.gd declarations byte-for-byte (params, return, @return-tuple)", () => {
-  const hooksGd = readFileSync(join(__dirname, "..", "..", "..", "..", "addons", "reactive_ui", "core", "hooks.gd"), "utf8");
+  const hooksGd = readFileSync(join(__dirname, "..", "..", "..", "..", "addons", "reactive_ui_toolkit", "core", "hooks.gd"), "utf8");
   const decls = new Map<string, { params: string; ret: string; tuple: string | null }>();
   const gdLines = hooksGd.split("\n");
   for (let i = 0; i < gdLines.length; i++) {
@@ -646,9 +646,9 @@ test("hook wrapper stubs match hooks.gd declarations byte-for-byte (params, retu
 // wrapper stub — `s[1]` projects to Callable via constant-index on the tuple.
 test("analyzer e2e: workspace-complete arms UNDEFINED_FUNCTION for a typo'd hook, valid hooks stay silent", () => {
   const az = new AnalyzerAdapter();
-  const hooksUri = "file:///proj/addons/reactive_ui/core/hooks.gd";
-  const hooksGd = readFileSync(join(__dirname, "..", "..", "..", "..", "addons", "reactive_ui", "core", "hooks.gd"), "utf8");
-  az.loadLibrary(hooksUri, hooksGd, "res://addons/reactive_ui/core/hooks.gd");
+  const hooksUri = "file:///proj/addons/reactive_ui_toolkit/core/hooks.gd";
+  const hooksGd = readFileSync(join(__dirname, "..", "..", "..", "..", "addons", "reactive_ui_toolkit", "core", "hooks.gd"), "utf8");
+  az.loadLibrary(hooksUri, hooksGd, "res://addons/reactive_ui_toolkit/core/hooks.gd");
   az.setWorkspaceComplete(true);
 
   const bad = "component X() {\n\tvar s = usseState(0)\n\treturn (<Label text={ str(s) } />)\n}\n";
@@ -717,8 +717,8 @@ test("hook declarations: `-> Hint` survives (like _ret_suffix), tuple-style hint
 // every param read was "undefined". Both fixed at the emitter; this pins them against the real analyzer.
 test("analyzer e2e: module members and hook params never false-flag; a typo in a member still fires", () => {
   const az = new AnalyzerAdapter();
-  const hooksGd = readFileSync(join(__dirname, "..", "..", "..", "..", "addons", "reactive_ui", "core", "hooks.gd"), "utf8");
-  az.loadLibrary("file:///proj/addons/reactive_ui/core/hooks.gd", hooksGd, "res://addons/reactive_ui/core/hooks.gd");
+  const hooksGd = readFileSync(join(__dirname, "..", "..", "..", "..", "addons", "reactive_ui_toolkit", "core", "hooks.gd"), "utf8");
+  az.loadLibrary("file:///proj/addons/reactive_ui_toolkit/core/hooks.gd", hooksGd, "res://addons/reactive_ui_toolkit/core/hooks.gd");
   az.setWorkspaceComplete(true);
 
   const mod = 'module Widgets {\n\tcomponent A() { return (<Label text="a" />) }\n\tcomponent B() {\n\t\tvar s := useState(0)\n\t\treturn (<A />)\n\t}\n}\n';

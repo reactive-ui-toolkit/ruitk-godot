@@ -10,7 +10,7 @@ description: Create a new .guitkx component for Reactive UI Toolkit — Godot �
 - One component per `.guitkx` file, named in snake_case after the component:
   `res://ui/<feature>/<component_name>.guitkx` (any folder works; group by feature).
   Examples of the house style: `examples/demos/counter/counter.guitkx`.
-- Saving the file makes the `reactive_ui` watcher compile a **sibling `.gd`** next to it
+- Saving the file makes the `reactive_ui_toolkit` watcher compile a **sibling `.gd`** next to it
   (`<name>.guitkx` → generated GDScript). You never write or edit that file; renames/moves in the
   FileSystem dock retarget it automatically. The repo gitignores generated siblings — they
   regenerate on open; exported games pick them up from disk.

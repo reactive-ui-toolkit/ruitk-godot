@@ -1,5 +1,5 @@
 // guitkx vocabulary for markup-side completion/hover. The tag NAME set comes from the shared
-// vocabulary.json (T0.3 — a byte-identical copy of addons/reactive_ui/guitkx/vocabulary.json, the
+// vocabulary.json (T0.3 — a byte-identical copy of addons/reactive_ui_toolkit/guitkx/vocabulary.json, the
 // single source of truth guitkx.gd also loads; vocab.test.ts enforces the sync). This file keeps
 // the per-tag METADATA (godotClass, events) and DERIVES alias entries (VBoxContainer,
 // RichTextLabel, …) from the vocabulary, so every tag the compiler accepts gets completion/hover
@@ -156,7 +156,7 @@ export function findTag(name: string): TagInfo | undefined {
   return HOST_TAGS.find((t) => t.tag === name);
 }
 
-// Style-dict keys understood by RUIStyle (addons/reactive_ui/core/style.gd) — offered inside a
+// Style-dict keys understood by RUIStyle (addons/reactive_ui_toolkit/core/style.gd) — offered inside a
 // `style={ {…} }` (or `*_style`) dictionary, where Godot's own LSP has no vocabulary.
 // 0.9.0: every key is the exact Godot property / theme-item / StyleBoxFlat name (mirrors
 // grammar/guitkx-schema.json styleKeys). Any StyleBoxFlat property is additionally accepted

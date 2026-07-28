@@ -50,9 +50,9 @@ gallery — every demo is `.guitkx`).
 **As an addon in your own project:** two ways —
 
 - **From the Asset Library (in-editor):** open the **AssetLib** tab, search **"Reactive UI Toolkit — Godot"**,
-  then **Download → Install** (keep `addons/reactive_ui/`). The editor addon ships as a separate
+  then **Download → Install** (keep `addons/reactive_ui_toolkit/`). The editor addon ships as a separate
   asset — search **"Reactive UI Toolkit — Godot Editor"** to add it too.
-- **Manually:** copy `addons/reactive_ui/` into your project's `res://addons/`.
+- **Manually:** copy `addons/reactive_ui_toolkit/` into your project's `res://addons/`.
 
 Either way, the runtime is plain GDScript with global `class_name`s (`V`, `Hooks`,
 `ReactiveRoot`, ...), so they're available immediately — **no plugin enable required**.
@@ -61,8 +61,8 @@ To actually *write* `.guitkx`, enable the plugin (**Project Settings → Plugins
 it watches the filesystem and compiles each `.guitkx` to a sibling `.gd` on save. Then add editor
 support for the language itself (pick one, or use both):
 
-- **`addons/reactive_ui_editor/`** — a native in-Godot editor tab: syntax highlighting, live
-  diagnostics, completion, and hover, no external tools. Copy it in alongside `reactive_ui` and
+- **`addons/reactive_ui_toolkit_editor/`** — a native in-Godot editor tab: syntax highlighting, live
+  diagnostics, completion, and hover, no external tools. Copy it in alongside `reactive_ui_toolkit` and
   enable it too.
 - **VS Code / Visual Studio 2022 extensions** (`ide-extensions/`) — the same, plus embedded-GDScript
   intelligence inside `{expr}`/setup code (completion, hover, go-to-definition, find-references,
@@ -178,7 +178,7 @@ export Panel(level: int = 1) -> RUIVNode {
   `class_name` scripts alone (they stay ambient, no import needed):
 
   ```bash
-  godot --headless --path . --script res://addons/reactive_ui/dev/migrate_0_11_0.gd
+  godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_11_0.gd
   ```
 
 Import mistakes surface as **`GUITKX2300`–`GUITKX2309`** (unresolved specifier, not exported,
@@ -376,7 +376,7 @@ preserved — no restart:
 Mirrors ReactiveUIToolKit; the design (algorithms) is ported, the code is GDScript.
 
 ```
-addons/reactive_ui/core/
+addons/reactive_ui_toolkit/core/
   vnode.gd / v.gd            RUIVNode / V     — UI description + the ~61 factories (incl. V.comp)
   fiber.gd                   RUIFiber         — persistent tree node; current/WIP alternates; hook store
   hooks.gd                   Hooks            — the 23 hooks
@@ -389,9 +389,9 @@ addons/reactive_ui/core/
   hmr.gd                     RUIHmr           — Fast Refresh runtime (game side)
   router/                    RUIRouter…       — router spine, matcher, ranker, history, location
   reactive_root.gd / reactive_root_node.gd     — mount surfaces
-addons/reactive_ui/guitkx/    RUIGuitkx…       — the .guitkx lexer/parser/codegen/formatter
-addons/reactive_ui/editor/                     — editor-side watcher + Fast Refresh push (hmr_debugger.gd)
-addons/reactive_ui_editor/                     — native in-Godot .guitkx editor tab (separate addon)
+addons/reactive_ui_toolkit/guitkx/    RUIGuitkx…       — the .guitkx lexer/parser/codegen/formatter
+addons/reactive_ui_toolkit/editor/                     — editor-side watcher + Fast Refresh push (hmr_debugger.gd)
+addons/reactive_ui_toolkit_editor/                     — native in-Godot .guitkx editor tab (separate addon)
 ide-extensions/                                — VS Code / VS 2022 extensions + shared language server
 ```
 
@@ -428,7 +428,7 @@ against a copy-pasted or dangling component reference.
 
 Three ways to get `.guitkx` intelligence, and you can mix them:
 
-| | Native (`reactive_ui_editor`) | VS Code / VS 2022 (`ide-extensions/`) |
+| | Native (`reactive_ui_toolkit_editor`) | VS Code / VS 2022 (`ide-extensions/`) |
 |---|---|---|
 | Syntax highlighting | ✅ | ✅ (self-contained TextMate grammar) |
 | Live diagnostics | ✅ | ✅ |
@@ -437,8 +437,8 @@ Three ways to get `.guitkx` intelligence, and you can mix them:
 | Go-to-definition / find-references / rename / signature help | — | ✅ |
 | Formatting | ✅ | ✅ |
 
-The native addon needs nothing but Godot itself — enable `addons/reactive_ui_editor/` alongside
-`reactive_ui`. The external extensions need Node bundled in (already handled by the packaged
+The native addon needs nothing but Godot itself — enable `addons/reactive_ui_toolkit_editor/` alongside
+`reactive_ui_toolkit`. The external extensions need Node bundled in (already handled by the packaged
 `.vsix`) — see `ide-extensions/README.md` for building/publishing. The `.guitkx` toolchain and all
 IDE support are optional in the sense that the runtime works without them, but writing UI by hand as
 raw `V.*`/`Hooks.*` calls is not the intended day-to-day workflow — see
@@ -478,7 +478,7 @@ raw `V.*`/`Hooks.*` calls is not the intended day-to-day workflow — see
 
 - **Markup tags for the remaining `V.*`-only primitives** (`Portal`, `Suspense`, `Router`/`Routes`/
   `Route`, …) so the "escape hatch" list above gets shorter.
-- **Native-editor parity** — embedded-GDScript intelligence for `reactive_ui_editor`, closing the
+- **Native-editor parity** — embedded-GDScript intelligence for `reactive_ui_toolkit_editor`, closing the
   remaining gap with the VS Code/VS 2022 extensions (see `plans/archive/NATIVE_EDITOR_PARITY_PLAN.md`).
 - **Docs site** (`ReactiveUIGodotDocs~/`) — a full guide beyond this README; run it locally with
   `cd ReactiveUIGodotDocs~ && npm ci && npm run dev`.

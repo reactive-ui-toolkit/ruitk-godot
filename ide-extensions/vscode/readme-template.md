@@ -34,7 +34,7 @@ no TCP connection, works fully offline.
   extension's off, to avoid duplicate diagnostics.
 - **Shares its compiler with the in-Godot editor** — the **Reactive UI Toolkit — Godot Editor** addon is a native
   in-Godot `.guitkx` editor with the same language features; both editors share the same compiler,
-  formatter, and diagnostic codes, and the runtime addon (`reactive_ui`) compiles `.guitkx` to
+  formatter, and diagnostic codes, and the runtime addon (`reactive_ui_toolkit`) compiles `.guitkx` to
   plain `.gd` on save with hot reload (Fast Refresh).
 
 ## Requirements

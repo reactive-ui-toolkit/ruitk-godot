@@ -3,8 +3,8 @@ extends SceneTree
 ## (2) an end-to-end runtime test — compile a hook-free component, write the generated .gd,
 ## load it, mount it through the reconciler, and verify the real Godot node tree.
 
-const Codegen = preload("res://addons/reactive_ui/guitkx/guitkx_codegen.gd")
-const GDiag = preload("res://addons/reactive_ui/guitkx/guitkx_diag.gd")
+const Codegen = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_codegen.gd")
+const GDiag = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_diag.gd")
 
 var _failed := false
 
@@ -434,10 +434,10 @@ func _test_t27_diag_ports() -> void:
 func _test_severity_table() -> void:
 	# T3.2: one severity per code, everywhere -- vocabulary.json `severities` is the single source and
 	# this tripwire pins every D.make() literal in the compiler to it.
-	var vocab: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://addons/reactive_ui/guitkx/vocabulary.json"))
+	var vocab: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://addons/reactive_ui_toolkit/guitkx/vocabulary.json"))
 	var sev_table: Dictionary = vocab.get("severities", {})
 	_check_true(not sev_table.is_empty(), "T3.2: severities table present")
-	var src := FileAccess.get_file_as_string("res://addons/reactive_ui/guitkx/guitkx.gd")
+	var src := FileAccess.get_file_as_string("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 	var re := RegEx.new()
 	re.compile("D\\.make\\(\"(GUITKX\\d+)\", D\\.(ERROR|WARNING|HINT)")
 	var names := { "ERROR": "error", "WARNING": "warning", "HINT": "hint" }
@@ -572,7 +572,7 @@ func _test_p2_markup_features() -> void:
 	_check_true("str(n)" in str(re2["gd"]), "T2.4: node-start expr emits interpolation")
 
 	# T2.1+T2.4: formatter round-trips comments and literal-brace text (idempotent, no data loss).
-	const Fmt2 = preload("res://addons/reactive_ui/guitkx/guitkx_formatter.gd")
+	const Fmt2 = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_formatter.gd")
 	var f1: Dictionary = Fmt2.format(src)
 	_check(str(f1["text"]), "// leading note", "T2.1: formatter preserves the leading comment")
 	_check(str(f1["text"]), "{/* attr note */}", "T2.1: formatter preserves the attr comment")
@@ -738,7 +738,7 @@ func _count_labels(node: Node) -> int:
 	return n
 
 func _test_formatter() -> void:
-	const Fmt = preload("res://addons/reactive_ui/guitkx/guitkx_formatter.gd")
+	const Fmt = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_formatter.gd")
 	var src := "component  Foo( name: String = \"x\" )  {\n" + \
 		"  var s = useState(0)\n" + \
 		"  return (\n" + \
@@ -767,7 +767,7 @@ func _test_formatter_options() -> void:
 	# [audit #16] insertSpaceBeforeSelfClose must be honored in the multi-attribute WRAP path, not
 	# only the single-line path. With singleAttributePerLine the element wraps; the close must respect
 	# the option.
-	const Fmt = preload("res://addons/reactive_ui/guitkx/guitkx_formatter.gd")
+	const Fmt = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_formatter.gd")
 	var src := "component W() {\n\treturn ( <Label aaa=\"1\" bbb=\"2\" ccc=\"3\" /> )\n}\n"
 	var no_space: String = Fmt.format(src, { "singleAttributePerLine": true, "insertSpaceBeforeSelfClose": false })["text"]
 	_check_true(no_space.contains("/>") and not no_space.contains(" />"), "wrap path honors insertSpaceBeforeSelfClose=false")
@@ -815,7 +815,7 @@ func _test_vocabulary() -> void:
 		"hook_names() loaded from vocabulary.json (got %d)" % RUIGuitkx.hook_names().size())
 	# …and v_factories must mirror the REAL public V API (reflection tripwire: adding/removing a
 	# static func on core/v.gd without updating vocabulary.json fails here with the exact diff).
-	var v_script: Script = preload("res://addons/reactive_ui/core/v.gd")
+	var v_script: Script = preload("res://addons/reactive_ui_toolkit/core/v.gd")
 	var reflected: Array = []
 	for m in v_script.get_script_method_list():
 		var mname: String = m["name"]
@@ -830,7 +830,7 @@ func _test_vocabulary() -> void:
 func _test_markup_corpus() -> void:
 	# the SHARED markup-AST corpus also asserted by the TS parseMarkup test — proves guitkx_markup.gd
 	# and markup.ts parse identically (incl. `<`/`>` inside {expr}, the structural-fix bug class).
-	const M = preload("res://addons/reactive_ui/guitkx/guitkx_markup.gd")
+	const M = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_markup.gd")
 	var raw := FileAccess.get_file_as_string("res://ide-extensions/lsp-server/test-fixtures/markup-cases.json")
 	var corpus = JSON.parse_string(raw)
 	_check_true(corpus != null and corpus.size() >= 13, "markup corpus loaded")
@@ -843,7 +843,7 @@ func _test_markup_corpus() -> void:
 func _test_formatter_corpus() -> void:
 	# the SHARED golden corpus also asserted by the TS formatGuitkx test — proves the two formatters
 	# are byte-identical. Regression-guards the GDScript side against future drift.
-	const Fmt = preload("res://addons/reactive_ui/guitkx/guitkx_formatter.gd")
+	const Fmt = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_formatter.gd")
 	var raw := FileAccess.get_file_as_string("res://ide-extensions/lsp-server/test-fixtures/formatter-cases.json")
 	var corpus = JSON.parse_string(raw)
 	_check_true(corpus != null and corpus.size() >= 9, "formatter corpus loaded")
@@ -852,7 +852,7 @@ func _test_formatter_corpus() -> void:
 		_check_true(got == c["expected"], "formatter corpus '%s'" % c["name"])
 		_check_true(Fmt.format(got)["text"] == got, "formatter corpus idempotent '%s'" % c["name"])
 	# Unity-style real-file idempotency: format(format(sample)) == format(sample) on every .guitkx.
-	const Codegen = preload("res://addons/reactive_ui/guitkx/guitkx_codegen.gd")
+	const Codegen = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_codegen.gd")
 	for path in Codegen.find_all("res://examples"):
 		var src := FileAccess.get_file_as_string(path)
 		var f1: String = Fmt.format(src)["text"]
@@ -861,7 +861,7 @@ func _test_formatter_corpus() -> void:
 func _test_format_unsafe_str_attr() -> void:
 	# G-05: the parser can't produce a `str` attr value with an embedded `"` today, so this
 	# constructs the AST node directly to prove the safety net itself works if that ever changes.
-	const Fmt = preload("res://addons/reactive_ui/guitkx/guitkx_formatter.gd")
+	const Fmt = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_formatter.gd")
 	var o := { "_unsafe_str_attr": false }
 	Fmt._fmt_attr({ "kind": "str", "name": "text", "value": "safe" }, o)
 	_check_true(bool(o["_unsafe_str_attr"]) == false, "a normal str attr must not flag unsafe")
@@ -870,7 +870,7 @@ func _test_format_unsafe_str_attr() -> void:
 
 func _test_format_fell_back() -> void:
 	# G-06: fell_back distinguishes a parse-error fallback from an already-canonical file.
-	const Fmt = preload("res://addons/reactive_ui/guitkx/guitkx_formatter.gd")
+	const Fmt = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_formatter.gd")
 	var broken := "component Broken {\n  return (\n    <Label text=\"x\"\n  )\n}\n"   # unclosed tag
 	var r1: Dictionary = Fmt.format(broken)
 	_check_true(r1["text"] == broken, "verbatim on parse error")
@@ -886,7 +886,7 @@ func _test_format_fell_back() -> void:
 
 func _test_scanner_fixtures() -> void:
 	# byte-identity cross-test: the SAME corpus the TS scanner.ts asserts on (prevents lexer drift)
-	const L = preload("res://addons/reactive_ui/guitkx/guitkx_lexer.gd")
+	const L = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_lexer.gd")
 	var txt := FileAccess.get_file_as_string("res://ide-extensions/lsp-server/test-fixtures/scanner-cases.json")
 	if txt == "":
 		_fail("scanner fixtures not found / empty")
@@ -1111,7 +1111,7 @@ func _test_m4() -> void:
 ## M6 (0.10.0): the migration CODEMOD -- export-everything + synthesized imports, idempotent, ambient
 ## names left import-free. In-memory (no writes); the whole-tree run is a separate CI step.
 func _test_codemod() -> void:
-	const Migrate := preload("res://addons/reactive_ui/guitkx/guitkx_migrate.gd")
+	const Migrate := preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_migrate.gd")
 	var ref := { "StatusChip": "res://ui/chip.guitkx", "HudHooks": "res://ui/hooks.guitkx", "Panel": "res://ui/panel.guitkx", "Far": "res://other/far.guitkx" }
 	# Panel uses <StatusChip/> (markup tag) + HudHooks.use_x() (qualified) + DoomTypes.X (ambient hand class).
 	var src := "component Panel() {\n\tvar d = HudHooks.use_x()\n\tvar t = DoomTypes.THING\n\treturn ( <StatusChip /> )\n}\n"
@@ -1161,7 +1161,7 @@ func _test_bughunt_fixes() -> void:
 
 	# BH-02: when @class_name != the decl name, the sole component still emits `render`, and the export
 	# tables must ADDRESS it as `render` (not the decl name) -- else a cross-file import mis-targets it.
-	const Resolve := preload("res://addons/reactive_ui/guitkx/guitkx_resolve.gd")
+	const Resolve := preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_resolve.gd")
 	var bh02 := "@class_name Custom\nexport component Widget() {\n\treturn ( <Label /> )\n}\n"
 	_check_true((RUIGuitkx.compile(bh02, "file")["gd"] as String).contains("static func render("), "BH-02: sole component emits render under @class_name override")
 	_check_true(str(Codegen.exports_of(bh02)[0]["func"]) == "render", "BH-02: exports_of addresses the sole component as render (%s)" % str(Codegen.exports_of(bh02)))
@@ -1179,7 +1179,7 @@ func _test_bughunt_fixes() -> void:
 
 	# BH-03: codemod inserts the import block at the decl START, not the keyword -- an already-exported
 	# first decl must not become `export import { … } … component`; and it must stay idempotent.
-	const Migrate := preload("res://addons/reactive_ui/guitkx/guitkx_migrate.gd")
+	const Migrate := preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_migrate.gd")
 	var refc := { "Card": "res://x/card.guitkx" }
 	var m1 := Migrate.migrate_source("res://x/widget.guitkx", "export component Widget() {\n\treturn ( <Card /> )\n}\n", refc)
 	_check_true(not (m1["source"] as String).contains("export import"), "BH-03: no `export import` split (%s)" % (m1["source"] as String).substr(0, 40))
@@ -1392,7 +1392,7 @@ func _test_2107_walk_order() -> void:
 ## Uses a `.gdignore`'d temp dir so the build walker never sees the fixtures; the resolver reaches
 ## them by direct FileAccess. Everything is cleaned up at the end.
 func _test_imports_m3() -> void:
-	const Resolve := preload("res://addons/reactive_ui/guitkx/guitkx_resolve.gd")
+	const Resolve := preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_resolve.gd")
 	var dir := "res://tests/__imp_tmp"
 	DirAccess.make_dir_recursive_absolute(dir)
 	_imp_write(dir + "/.gdignore", "")
@@ -1576,7 +1576,7 @@ func _test_decl_validation() -> void:
 # the mtime-only guard silently skipped such files, so old-compiler output (e.g. an unprefixed
 # useState) persisted after a pull while CI (which recompiles unconditionally) stayed green.
 func _test_codegen_staleness() -> void:
-	var CG := preload("res://addons/reactive_ui/guitkx/guitkx_codegen.gd")
+	var CG := preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_codegen.gd")
 	var fp: String = CG.compiler_fingerprint()
 	_check_true(fp.length() == 8 and fp != "00000000", "compiler fingerprint is a stable non-zero hash (got %s)" % fp)
 	_check_true(fp == CG.compiler_fingerprint(), "compiler fingerprint is deterministic")
@@ -1749,13 +1749,13 @@ func _test_codegen() -> void:
 	# generated demo .gd on a fresh CI clone). The lazy loader then self-heals on the next call.
 	var sidecar_before := FileAccess.get_file_as_string(gx + ".diags.json")
 	RUIGuitkx._VOCAB = {}
-	RUIGuitkx._VOCAB_PATH = "res://addons/reactive_ui/guitkx/__no_such_vocabulary__.json"
+	RUIGuitkx._VOCAB_PATH = "res://addons/reactive_ui_toolkit/guitkx/__no_such_vocabulary__.json"
 	var r_env := Codegen.compile_file(gx)
 	_check_true(not r_env["ok"] and bool(r_env.get("env_error", false)), "unreadable vocabulary is an env_error: " + str(r_env))
 	_check_true(str((r_env["diagnostics"] as Array)[0]["code"]) == "GUITKX2507", "env_error carries GUITKX2507")
 	_check_true(FileAccess.file_exists(gd), "sibling .gd PRESERVED on env_error (never stale-deleted)")
 	_check_true(FileAccess.get_file_as_string(gx + ".diags.json") == sidecar_before, "sidecar untouched on env_error")
-	RUIGuitkx._VOCAB_PATH = "res://addons/reactive_ui/guitkx/vocabulary.json"
+	RUIGuitkx._VOCAB_PATH = "res://addons/reactive_ui_toolkit/guitkx/vocabulary.json"
 	_check_true(Codegen.compile_file(gx)["ok"], "vocabulary self-heals on the next compile (lazy retry)")
 	# T1.1: a file that STOPS compiling must not leave its stale sibling .gd behind (the editor would
 	# keep running code that no longer matches the source). compile_file deletes it.
@@ -1979,8 +1979,8 @@ func _test_cold_open_recovery() -> void:
 	# R0 (0.6.1): the vocabulary the compiler actually uses is the EMBEDDED const projection
 	# (guitkx_vocabulary.gen.gd) -- it must never drift from vocabulary.json, the single source of
 	# truth shared verbatim with the LSP. Regenerate with dev/gen_vocabulary.gd after any change.
-	var gen = preload("res://addons/reactive_ui/guitkx/guitkx_vocabulary.gen.gd")
-	var json_text := FileAccess.get_file_as_string("res://addons/reactive_ui/guitkx/vocabulary.json")
+	var gen = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_vocabulary.gen.gd")
+	var json_text := FileAccess.get_file_as_string("res://addons/reactive_ui_toolkit/guitkx/vocabulary.json")
 	var parsed = JSON.parse_string(json_text)
 	_check_true(parsed is Dictionary, "vocabulary.json parses")
 	_check_true(JSON.stringify(parsed) == JSON.stringify(gen.DATA),
@@ -2013,7 +2013,7 @@ func _test_cold_open_recovery() -> void:
 	if FileAccess.file_exists(marker):
 		DirAccess.remove_absolute(marker)   # -> compiler_changed() == true: the next sweep is FORCED
 	RUIGuitkx._VOCAB = {}
-	RUIGuitkx._VOCAB_PATH = "res://addons/reactive_ui/guitkx/__no_such_vocabulary__.json"
+	RUIGuitkx._VOCAB_PATH = "res://addons/reactive_ui_toolkit/guitkx/__no_such_vocabulary__.json"
 	var held_sweep := Codegen.compile_all(dir)
 	_check_true((held_sweep["compiled"] as Array).is_empty() and (held_sweep["errors"] as Array).is_empty(),
 		"held sweep reports no compiles and NO errors: " + str(held_sweep))
@@ -2296,7 +2296,7 @@ func _test_es_modules_declarations() -> void:
 ## lowering (probe-forced: `const x = preload(gd).static_var` is not a constant expression), and
 ## __RUI_DEFAULT emission. Cross-file fixtures live under the .gdignore'd __bh_tmp root.
 func _test_es_modules_imports() -> void:
-	const Resolve := preload("res://addons/reactive_ui/guitkx/guitkx_resolve.gd")
+	const Resolve := preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_resolve.gd")
 	# Target: a plain-syntax file with values, a util, a hook, components, a default.
 	var hud := "export panel_w: int = 320\n" + \
 		"export accent := { \"modulate\": Color(1, 0, 0) }\n" + \
@@ -2431,7 +2431,7 @@ export Sp(panel_w: int = 1) -> RUIVNode {
 ## `import Def, * as X from` -- ONE declaration carrying the default binding plus the named/
 ## namespace surface) + the unused-import (2304) self-count fix that shipped with them.
 func _test_es_combined_imports() -> void:
-	const Resolve := preload("res://addons/reactive_ui/guitkx/guitkx_resolve.gd")
+	const Resolve := preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_resolve.gd")
 	var utils := "export something := 42\n" + \
 		"export get_something() -> int {\n\treturn something\n}\n" + \
 		"export use_pulse(x: int) -> int {\n\treturn x\n}\n" + \
@@ -2496,7 +2496,7 @@ func _test_es_combined_imports() -> void:
 
 	# Formatter: combined import lines survive byte-for-byte (imports are verbatim preamble) and
 	# the result is idempotent -- the named part must never be dropped on reprint.
-	const Fmt := preload("res://addons/reactive_ui/guitkx/guitkx_formatter.gd")
+	const Fmt := preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_formatter.gd")
 	var fsrc := "import isEven, { get_something } from \"./utils\"\nimport D3, * as U2 from \"./utils\"\n\nexport FC() -> RUIVNode {\n\treturn (\n\t\t<Label />\n\t)\n}\n"
 	var fr: Dictionary = Fmt.format(fsrc, { "indentStyle": "tab" })
 	_check_true((fr["text"] as String).contains("import isEven, { get_something } from \"./utils\""), "fmt: combined named part preserved (got %s)" % str(fr["text"]))
@@ -2616,7 +2616,7 @@ func _test_es_modules_m4_ordering() -> void:
 ## ES-modules formatter coverage (M1.6): plain decls of all four kinds + markers format
 ## canonically and IDEMPOTENTLY; wrapper files keep their shipped formatting byte-stable.
 func _test_es_formatter() -> void:
-	const Fmt := preload("res://addons/reactive_ui/guitkx/guitkx_formatter.gd")
+	const Fmt := preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_formatter.gd")
 	var o := { "indentStyle": "tab" }
 	# Plain component: header keeps the -> RUIVNode annotation (it IS the classification).
 	var pc := "export   Foo( a: int )   -> RUIVNode {\n\tvar b = a\n\treturn (\n\t\t<Label text={str(b)}/>\n\t)\n}\n"

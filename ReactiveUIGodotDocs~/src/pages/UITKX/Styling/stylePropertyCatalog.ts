@@ -1,6 +1,6 @@
 /**
  * Complete catalog of every key understood by the RUIStyle style layer
- * (addons/reactive_ui/core/style.gd). Used by StylingPage to render property cards.
+ * (addons/reactive_ui_toolkit/core/style.gd). Used by StylingPage to render property cards.
  *
  * Godot has no USS/CSS. A `style={ { … } }` Dictionary on any host element is
  * mapped onto Godot Control properties, size flags, and Theme / StyleBox

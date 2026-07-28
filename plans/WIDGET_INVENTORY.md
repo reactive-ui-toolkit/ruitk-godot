@@ -174,5 +174,5 @@ two non-Control nodes the library wraps).
 **Process:** each Batch-1/2 element ships through the component pipeline (factory + tag +
 vocabulary entry → IDE metadata → adapter if item-model → demo/test → docs row), then its row
 moves into "Shipped". The dump script lives with the audit (see also
-`addons/reactive_ui/dev/classdb_dump.gd`, which feeds the IDE's bundled ClassDB); re-run and diff
+`addons/reactive_ui_toolkit/dev/classdb_dump.gd`, which feeds the IDE's bundled ClassDB); re-run and diff
 on every engine bump.

@@ -48,7 +48,7 @@ export const HmrPage: FC = () => (
     <Section title="Quick Start">
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<>Enable the <strong>reactive_ui</strong> editor plugin (<strong>Project → Project Settings → Plugins</strong>) and run your game with <strong>F5</strong> (from the editor — that&apos;s what creates the debugger session).</>} />
+          <ListItemText primary={<>Enable the <strong>reactive_ui_toolkit</strong> editor plugin (<strong>Project → Project Settings → Plugins</strong>) and run your game with <strong>F5</strong> (from the editor — that&apos;s what creates the debugger session).</>} />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary={<>Edit and save any <code>.guitkx</code> — from VS Code, the in-Godot editor, anything that writes the file.</>} />

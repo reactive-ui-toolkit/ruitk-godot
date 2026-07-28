@@ -21,4 +21,4 @@ config/features=PackedStringArray("4.7")
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/reactive_ui/plugin.cfg", "res://addons/reactive_ui_editor/plugin.cfg")
+enabled=PackedStringArray("res://addons/reactive_ui_toolkit/plugin.cfg", "res://addons/reactive_ui_toolkit_editor/plugin.cfg")

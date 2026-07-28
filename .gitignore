@@ -2,7 +2,7 @@
 .godot/
 
 # Generated GUITKX output: each Foo.guitkx compiles to a sibling Foo.gd (the Godot editor plugin
-# and CI's `--editor --quit` step regenerate them — see addons/reactive_ui/plugin.gd). Commit the
+# and CI's `--editor --quit` step regenerate them — see addons/reactive_ui_toolkit/plugin.gd). Commit the
 # .guitkx source, not the build artifact. The hand-written scripts under examples/ are re-included.
 examples/**/*.gd
 !examples/app.gd
@@ -41,4 +41,4 @@ Thumbs.db
 
 # Publishing secrets (extension marketplace tokens) — never commit
 publisher-secrets.json
-addons/reactive_ui_analyzer/
+addons/reactive_ui_toolkit_analyzer/

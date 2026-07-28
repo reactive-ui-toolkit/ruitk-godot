@@ -10,7 +10,7 @@ and what a production-grade fix looks like — so a future fix starts from evide
 
 **Where:** Unity `Shared/Core/Fiber/FiberChildReconciliation.cs:50` (the gate) and
 `CanReuseFiber` at `:249-254` (type-only reuse). Godot analogue: `_any_keyed` at
-`addons/reactive_ui/core/reconciler.gd:1006`.
+`addons/reactive_ui_toolkit/core/reconciler.gd:1006`.
 
 **The defect (Unity).** The decision between keyed and index reconciliation is made **once for the
 whole sibling set by sniffing only the first child's key**:
@@ -73,7 +73,7 @@ Doom perf regression is anticipated, not discovered.
 
 ## TD-02 — `style` key whitelist is a curated subset, not full CanvasItem/Control coverage
 
-**Where:** `addons/reactive_ui/core/style.gd` — the `_apply_key` / `_reset` `match` (the friendly
+**Where:** `addons/reactive_ui_toolkit/core/style.gd` — the `_apply_key` / `_reset` `match` (the friendly
 shorthands) + `BOX_KEYS` + `THEME_CHANNELS`.
 
 **Context (why this is a ledger entry, not a bug).** `style={{…}}` keys are a hand-maintained

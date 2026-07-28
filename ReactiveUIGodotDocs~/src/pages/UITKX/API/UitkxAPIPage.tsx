@@ -10,7 +10,7 @@ export const UitkxAPIPage: FC = () => (
     <Typography variant="body1" paragraph>
       A high-level map of the main global classes (Godot <code>class_name</code>s
       registered by the addon) and where to find things. Everything lives under{' '}
-      <code>addons/reactive_ui/</code>; copy that folder into a project and the{' '}
+      <code>addons/reactive_ui_toolkit/</code>; copy that folder into a project and the{' '}
       <code>V</code>, <code>Hooks</code>, <code>ReactiveRoot</code>, and related
       class names become globally available.
     </Typography>

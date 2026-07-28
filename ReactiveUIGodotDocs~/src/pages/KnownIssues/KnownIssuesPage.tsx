@@ -71,7 +71,7 @@ export const KnownIssuesPage: FC = () => (
       Godot&apos;s script editor is an LSP <em>server</em>, not a client, and cannot be pointed at
       an external language server for a custom language. In-editor <code>.guitkx</code>{' '}
       intelligence therefore ships as the dedicated <strong>Reactive UI Toolkit — Godot Editor</strong> addon
-      (<code>addons/reactive_ui_editor</code>): a main-screen editor with syntax highlighting,
+      (<code>addons/reactive_ui_toolkit_editor</code>): a main-screen editor with syntax highlighting,
       live cross-file compiler diagnostics, completion, hover, go-to-definition, find (plus
       project-wide Search in Files), and data-safety guards. What it does <em>not</em> cover yet
       is intelligence <em>inside</em> embedded GDScript (<code>&#123;expr&#125;</code>/setup

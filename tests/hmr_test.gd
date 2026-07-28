@@ -10,7 +10,7 @@ var _passed := 0
 const DIR := "res://tests/__hmr_tmp"
 ## preload, not the global name: a freshly-added class_name only enters the global cache on the
 ## next editor scan, and this suite must run on a cold checkout (CI clones) regardless.
-const RUIHmr_ = preload("res://addons/reactive_ui/core/hmr.gd")
+const RUIHmr_ = preload("res://addons/reactive_ui_toolkit/core/hmr.gd")
 
 func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(DIR)
@@ -339,7 +339,7 @@ func _test_multi_root() -> void:
 ## script, bump state, recompile with the same hook shape (state preserved), then with an added
 ## hook (deliberate reset via the emitted __RUI_HOOK_SIG).
 func _test_compiled_component_end_to_end() -> void:
-	var Compiler = preload("res://addons/reactive_ui/guitkx/guitkx.gd")
+	var Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 	var gp := DIR + "/e2e.gd"
 	var r1: Dictionary = Compiler.compile(_e2e_guitkx("e1", false), "e2e")
 	_check_true(bool(r1["ok"]), "e2e v1 compiles: " + str(r1.get("diagnostics")))

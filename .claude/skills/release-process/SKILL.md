@@ -7,7 +7,7 @@ description: The Reactive UI Toolkit — Godot release runbook — version bumps
 
 Everything a release needs, in order. The repo holds four independently-versioned
 deliverables; a release touches only the ones whose shipped code changed — check with
-`git diff origin/master --stat` against `addons/reactive_ui/`, `addons/reactive_ui_editor/`,
+`git diff origin/master --stat` against `addons/reactive_ui_toolkit/`, `addons/reactive_ui_toolkit_editor/`,
 and `ide-extensions/` before deciding what bumps.
 
 ## 0. Versioning policy
@@ -19,8 +19,8 @@ silently.
 
 | Artifact | Version lives in |
 |---|---|
-| Runtime addon (`reactive_ui`) | `addons/reactive_ui/plugin.cfg` → `version=` |
-| Editor addon (`reactive_ui_editor`) | `addons/reactive_ui_editor/plugin.cfg` → `version=` |
+| Runtime addon (`reactive_ui_toolkit`) | `addons/reactive_ui_toolkit/plugin.cfg` → `version=` |
+| Editor addon (`reactive_ui_toolkit_editor`) | `addons/reactive_ui_toolkit_editor/plugin.cfg` → `version=` |
 | VS Code extension | `ide-extensions/vscode/package.json` |
 | lsp-server (bundled into both extensions) | `ide-extensions/lsp-server/package.json` |
 | VS2022 extension | `ide-extensions/visual-studio/GuitkxVsix/source.extension.vsixmanifest` (`Version="…"` — keep it equal to the lsp-server version) |
@@ -35,7 +35,7 @@ even if their client code is untouched — repackaging is how server fixes reach
 
 1. Write the new `## [X.Y.Z] — YYYY-MM-DD` section at the top of **root `CHANGELOG.md`**,
    keep-a-changelog style (`### Added` / `### Changed` / `### Fixed`, intro line first).
-2. Mirror it: `cp CHANGELOG.md addons/reactive_ui/CHANGELOG.md` — the copies must be
+2. Mirror it: `cp CHANGELOG.md addons/reactive_ui_toolkit/CHANGELOG.md` — the copies must be
    **byte-identical** (a tripwire in `tests/guitkx_editor_test.gd` enforces this; run it).
 3. Examples/demos are NOT part of the addon package — root-changelog entries cover the
    addon surface (core, guitkx compiler, style, router…), not `examples/`.
@@ -58,7 +58,7 @@ node ide-extensions/scripts/changelog.mjs add --scope editor \
 # 2. Regenerate EVERY target the entries name — this is the step that gets forgotten
 node ide-extensions/scripts/changelog.mjs extract --ide vscode --out ide-extensions/vscode/CHANGELOG.md
 node ide-extensions/scripts/changelog.mjs extract --ide vs2022 --out ide-extensions/visual-studio/CHANGELOG.md
-node ide-extensions/scripts/changelog.mjs extract --ide editor --out addons/reactive_ui_editor/CHANGELOG.md
+node ide-extensions/scripts/changelog.mjs extract --ide editor --out addons/reactive_ui_toolkit_editor/CHANGELOG.md
 
 # 3. Gate locally before pushing — the changelog-sync CI job runs exactly this
 node ide-extensions/scripts/changelog.mjs verify
@@ -108,13 +108,13 @@ It is not posted automatically — paste it into Discord after publishing.
   root↔addon changelog byte-identity tripwire.
 - The affected code suites (per dev-process; typically already green before release prep).
 - Sanity: the editor release body = the top `## [` section of its CHANGELOG.md
-  (`awk '/^## \[/{n++} n==1' addons/reactive_ui_editor/CHANGELOG.md`) — publish.yml
+  (`awk '/^## \[/{n++} n==1' addons/reactive_ui_toolkit_editor/CHANGELOG.md`) — publish.yml
   extracts exactly that, so eyeball it once.
 
 ## 3. Commit, merge, fast-forward
 
 1. Commit the release prep (bumps + changelogs together) on the feature branch; push.
-   Message style: `release: reactive_ui X.Y.Z, editor A.B.C, guitkx extensions D.E.F -- changelogs + version bumps`.
+   Message style: `release: reactive_ui_toolkit X.Y.Z, editor A.B.C, guitkx extensions D.E.F -- changelogs + version bumps`.
 2. PR into `dev` (campaigns are 1 branch / 1 PR; the PR title becomes the squash title).
    Wait for green — the required checks include changelog-sync.
 3. After merge, fast-forward master (master is release-only):

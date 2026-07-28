@@ -3,7 +3,7 @@ extends Control
 ## reactive `Demos.gallery` under this full-rect Control. Press Play to explore.
 ##
 ## NOTE: this and everything in examples/ is NOT part of the shipped library — the addon
-## is entirely self-contained in addons/reactive_ui/. Copy that folder into a project and
+## is entirely self-contained in addons/reactive_ui_toolkit/. Copy that folder into a project and
 ## the V / Hooks / ReactiveRoot class_names are available; the demos do not come along.
 
 var _app: ReactiveRoot

@@ -24,9 +24,9 @@ extends SceneTree
 const FIXTURES := "res://tests/contract/fixtures"
 const GOLDEN := "res://tests/contract/golden"
 
-const L = preload("res://addons/reactive_ui/guitkx/guitkx_lexer.gd")
-const Markup = preload("res://addons/reactive_ui/guitkx/guitkx_markup.gd")
-const Compiler = preload("res://addons/reactive_ui/guitkx/guitkx.gd")
+const L = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_lexer.gd")
+const Markup = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_markup.gd")
+const Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 
 func _initialize() -> void:
 	var check := "--check" in OS.get_cmdline_user_args()

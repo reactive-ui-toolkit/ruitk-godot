@@ -42,8 +42,8 @@ visual-studio/  VS2022 extension (TextMate grammar via .pkgdef + ILanguageClient
   project-wide rename, formatting, semantic highlighting, inlay hints, code actions, and document
   symbols. Coexists with godot-tools (disable one side's `.gd` diagnostics to avoid duplicates).
 
-The same language features also exist **natively inside Godot**: the `reactive_ui_editor` addon
-(`addons/reactive_ui_editor`, outside this folder) is a full in-Godot `.guitkx` editor sharing the
+The same language features also exist **natively inside Godot**: the `reactive_ui_toolkit_editor` addon
+(`addons/reactive_ui_toolkit_editor`, outside this folder) is a full in-Godot `.guitkx` editor sharing the
 compiler/formatter/diagnostic codes, with the analyzer bundled as a GDExtension since editor 0.6.1.
 
 The language server is **TypeScript** (not C#): the embedded language is GDScript and the analyzer

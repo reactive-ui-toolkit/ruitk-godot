@@ -56,10 +56,10 @@ export const RoadmapPage: FC = () => (
         <ListItemText primary={<><Chip label="Done" size="small" color="success" sx={{ mr: 1 }} />Fast Refresh (hot reload) — saving a .guitkx while the game runs under F5 updates the live UI in place, hook state preserved; dev-only, zero footprint in exported builds</>} />
       </ListItem>
       <ListItem disablePadding>
-        <ListItemText primary={<><Chip label="Done" size="small" color="success" sx={{ mr: 1 }} />Native Godot-editor addon (reactive_ui_editor) — a full .guitkx editor inside Godot: highlighting, live diagnostics, completion, hover, signature help, go-to-definition, references, rename, outline, project search, multi-file sessions, formatting</>} />
+        <ListItemText primary={<><Chip label="Done" size="small" color="success" sx={{ mr: 1 }} />Native Godot-editor addon (reactive_ui_toolkit_editor) — a full .guitkx editor inside Godot: highlighting, live diagnostics, completion, hover, signature help, go-to-definition, references, rename, outline, project search, multi-file sessions, formatting</>} />
       </ListItem>
       <ListItem disablePadding>
-        <ListItemText primary={<><Chip label="Done" size="small" color="success" sx={{ mr: 1 }} />Native GDExtension analyzer backend (reactive_ui_analyzer, bundled with the editor addon) — type-aware completion, hover, diagnostics, navigation, rename, and signature help for the GDScript inside .guitkx expressions; feature-detected, in-process, zero config</>} />
+        <ListItemText primary={<><Chip label="Done" size="small" color="success" sx={{ mr: 1 }} />Native GDExtension analyzer backend (reactive_ui_toolkit_analyzer, bundled with the editor addon) — type-aware completion, hover, diagnostics, navigation, rename, and signature help for the GDScript inside .guitkx expressions; feature-detected, in-process, zero config</>} />
       </ListItem>
       <ListItem disablePadding>
         <ListItemText primary={<><Chip label="In progress" size="small" color="info" sx={{ mr: 1 }} />This documentation site (ported from the Unity docs, rewritten for Godot)</>} />

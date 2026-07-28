@@ -80,7 +80,7 @@ declare const __PREAMBLE_DIRECTIVES__: SchemaAttr[]
 // Public API
 // ---------------------------------------------------------------------------
 
-/** The addon version, e.g. "0.2.2" (from addons/reactive_ui/plugin.cfg). */
+/** The addon version, e.g. "0.2.2" (from addons/reactive_ui_toolkit/plugin.cfg). */
 export const PACKAGE_VERSION: string = __PACKAGE_VERSION__
 
 /** Minimum supported Godot minor version, e.g. "4.2". */

@@ -11,13 +11,13 @@
 # needs to ship.
 /** export-ignore
 /addons !export-ignore
-/addons/reactive_ui !export-ignore
-/addons/reactive_ui/** !export-ignore
+/addons/reactive_ui_toolkit !export-ignore
+/addons/reactive_ui_toolkit/** !export-ignore
 
 # The editor addon ships through its OWN Asset Library listing (Custom provider + release
 # zip — a Download Commit can't carry it), so it must stay out of the runtime archive.
 # Dev-only material inside the runtime addon must not reach end users either.
-/addons/reactive_ui_editor export-ignore
-/addons/reactive_ui_editor/** export-ignore
-/addons/reactive_ui/dev export-ignore
-/addons/reactive_ui/dev/** export-ignore
+/addons/reactive_ui_toolkit_editor export-ignore
+/addons/reactive_ui_toolkit_editor/** export-ignore
+/addons/reactive_ui_toolkit/dev export-ignore
+/addons/reactive_ui_toolkit/dev/** export-ignore

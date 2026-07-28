@@ -21,7 +21,7 @@ export const FAQPage: FC = () => (
       interfaces from <strong>function components</strong> and <strong>hooks</strong>, and a
       fiber reconciler diffs a virtual tree against the live Godot <code>Control</code> tree,
       applying only the minimal changes. It ships as a Godot addon whose runtime lives entirely
-      in <code>addons/reactive_ui/</code>.
+      in <code>addons/reactive_ui_toolkit/</code>.
     </Typography>
 
     <Typography variant="body1" sx={Styles.question}>
@@ -184,8 +184,8 @@ export const FAQPage: FC = () => (
       Which editors have <code>.guitkx</code> language support?
     </Typography>
     <Typography variant="body2" paragraph>
-      Godot itself does, out of the box: the <strong>reactive_ui_editor</strong> addon
-      (<code>addons/reactive_ui_editor/</code>) is a native in-editor plugin with syntax
+      Godot itself does, out of the box: the <strong>reactive_ui_toolkit_editor</strong> addon
+      (<code>addons/reactive_ui_toolkit_editor/</code>) is a native in-editor plugin with syntax
       highlighting, live diagnostics, completion, and hover built directly into the Godot
       editor — no external tools required. <strong>VS Code</strong> and{' '}
       <strong>Visual Studio</strong> extensions add the same markup intelligence plus one thing

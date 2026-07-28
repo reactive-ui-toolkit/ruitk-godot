@@ -321,7 +321,7 @@ export const UitkxReferencePage: FC = () => (
         body returns its markup — write{' '}
         <code>return ( {'<markup>'} )</code>&quot;), reported live in the editor and at compile time.
         Migrate a whole project in one shot: <code>godot --headless --path . --script
-        res://addons/reactive_ui/dev/migrate_directive_bodies.gd -- res://&lt;your-ui-dir&gt;</code>.
+        res://addons/reactive_ui_toolkit/dev/migrate_directive_bodies.gd -- res://&lt;your-ui-dir&gt;</code>.
       </Typography>
     </Box>
 

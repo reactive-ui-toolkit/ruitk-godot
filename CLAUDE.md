@@ -15,8 +15,8 @@ release gate (see `.github/workflows/publish.yml`):
 
 | Deliverable | Location | Language | Version source |
 |---|---|---|---|
-| The runtime addon | `addons/reactive_ui/` | GDScript | `plugin.cfg` |
-| The in-Godot-editor `.guitkx` plugin | `addons/reactive_ui_editor/` | GDScript | `plugin.cfg` |
+| The runtime addon | `addons/reactive_ui_toolkit/` | GDScript | `plugin.cfg` |
+| The in-Godot-editor `.guitkx` plugin | `addons/reactive_ui_toolkit_editor/` | GDScript | `plugin.cfg` |
 | VS Code + VS2022 `.guitkx` extensions | `ide-extensions/` | TypeScript / C# | `package.json` / `.vsixmanifest` |
 | Docs site | `ReactiveUIGodotDocs~/` | React + Vite | `package.json` |
 
@@ -74,7 +74,7 @@ cd ReactiveUIGodotDocs~ && npm ci && npm run dev     # or: npm run build / npm r
 
 ## Architecture
 
-### Runtime (`addons/reactive_ui/core/`)
+### Runtime (`addons/reactive_ui_toolkit/core/`)
 
 The library exposes global `class_name`s — **no autoload or plugin-enable is required to use the
 runtime**; the classes are available as soon as the files exist. Enabling the plugin only adds the
@@ -118,7 +118,7 @@ are synchronous. Preserve these behaviors — they're faithful-to-reference, not
 `.guitkx` is a JSX-like markup: **two languages in one file** — markup plus embedded GDScript (setup,
 `{expr}`, `@if`/`@for`). It compiles to a sibling `.gd`.
 
-- **Compiler (`addons/reactive_ui/guitkx/`)** — pure GDScript: `guitkx_lexer.gd` → `guitkx_markup.gd` /
+- **Compiler (`addons/reactive_ui_toolkit/guitkx/`)** — pure GDScript: `guitkx_lexer.gd` → `guitkx_markup.gd` /
   `guitkx_jsx_scan.gd` → `guitkx_codegen.gd` (`RUIGuitkxCodegen`, the entry point:
   `compile_file` / `compile_all` / `find_all`) → `guitkx_formatter.gd`.
 - **Imports (0.10.0):** a file is a SEQUENCE of declarations; `export` marks cross-file visibility;
@@ -130,7 +130,7 @@ are synchronous. Preserve these behaviors — they're faithful-to-reference, not
   (shipped runner: `dev/migrate_0_10_0.gd`). The build/sweep is TWO-PASS (write all `.gd`, then
   parse-check) so value-import preloads never false-fail, and a changed export table re-compiles
   importers in the same sweep (`export_hash` in the `.diags.json` v3 sidecar).
-- **In-Godot-editor plugin (`addons/reactive_ui_editor/`)** — watches the filesystem and recompiles
+- **In-Godot-editor plugin (`addons/reactive_ui_toolkit_editor/`)** — watches the filesystem and recompiles
   each `.guitkx`→`.gd`. It recompiles on **editor focus-in** (not just `filesystem_changed`) because a
   `.guitkx`-only external edit doesn't reliably flip Godot's changed flag; an mtime staleness guard
   keeps that cheap, and diagnostics are de-duplicated (Godot's Errors dock is append-only). Also hosts
@@ -148,7 +148,7 @@ a `guitkx.config.json` walk-up file.
 
 ### Examples
 
-`examples/` is **not shipped** — the addon in `addons/reactive_ui/` is self-contained. `examples/app.gd`
+`examples/` is **not shipped** — the addon in `addons/reactive_ui_toolkit/` is self-contained. `examples/app.gd`
 (→ `examples/main.tscn`, the project's main scene) mounts the demo gallery. Open the project in Godot 4.x
 and press Play to explore.
 
