@@ -454,7 +454,7 @@
       "match": "\\b(true|false|null|var|const|func|return|await|if|elif|else|for|while|match|break|continue|pass|and|or|not|in|is|as|self|super|class|class_name|extends|static|signal|enum|export|void|int|float|bool|String|StringName|NodePath|Array|Dictionary|Vector2|Vector2i|Vector3|Vector3i|Rect2|Color|Callable|Variant|preload|load|range|assert|breakpoint|yield)\\b"
     },
     "gd-type-name": {
-      "comment": "PascalCase type/class names — e.g. RUIVNode, MyComponent, Button",
+      "comment": "PascalCase type/class names — e.g. RuitkVNode, MyComponent, Button",
       "name": "entity.name.type.guitkx",
       "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
     },
@@ -588,9 +588,9 @@
       }
     },
     "plain-component-declaration": {
-      "comment": "E-01 plain component: [export] Name[(params)] -> RUIVNode {  (the annotation IS the classification)",
+      "comment": "E-01 plain component: [export] Name[(params)] -> RuitkVNode {  (the annotation IS the classification)",
       "name": "meta.component.guitkx",
-      "match": "^(\\s*)(?:(export)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s*(\\([^)]*\\))?\\s*(->)\\s*(RUIVNode)\\s*(\\{)?\\s*$",
+      "match": "^(\\s*)(?:(export)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s*(\\([^)]*\\))?\\s*(->)\\s*(RuitkVNode)\\s*(\\{)?\\s*$",
       "captures": {
         "2": {
           "name": "keyword.control.export.guitkx"

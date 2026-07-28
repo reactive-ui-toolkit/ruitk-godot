@@ -1,6 +1,6 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoEffect() -> RUIVNode {
+export DemoEffect() -> RuitkVNode {
   var on = useState(true)
   var log = useRef([])
   var eff = func():

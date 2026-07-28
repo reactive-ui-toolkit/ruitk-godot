@@ -3,7 +3,7 @@ extends SceneTree
 ## (export-everything + explicit `import` lines). Idempotent + re-runnable -- a second run reports 0
 ## changed. Run BEFORE guitkx_build (Gate 2): the sweep must then produce a ZERO-23xx tree.
 ##   godot --headless --path . --script res://tests/guitkx_migrate.gd
-const Migrate = preload("res://addons/reactive_ui/guitkx/guitkx_migrate.gd")
+const Migrate = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_migrate.gd")
 
 func _initialize() -> void:
 	var res := Migrate.migrate_all("res://examples")

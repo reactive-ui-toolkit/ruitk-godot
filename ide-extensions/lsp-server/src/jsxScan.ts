@@ -1,4 +1,4 @@
-// T5.1: byte-discipline port of addons/reactive_ui/guitkx/guitkx_jsx_scan.gd — same function and
+// T5.1: byte-discipline port of addons/reactive_ui_toolkit/guitkx/guitkx_jsx_scan.gd — same function and
 // variable names, same boundary set (incl. T3.5's `or`), same {end:-1} unbalanced contract. Finds
 // markup nested INSIDE an embedded GDScript expression (`cond if c else <A/>`, `is_open and
 // <Panel/>`, `items.map(func(it): return <Row/>)`). Change BOTH files or neither.

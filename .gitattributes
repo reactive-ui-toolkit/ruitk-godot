@@ -11,13 +11,17 @@
 # needs to ship.
 /** export-ignore
 /addons !export-ignore
-/addons/reactive_ui !export-ignore
-/addons/reactive_ui/** !export-ignore
+/addons/reactive_ui_toolkit !export-ignore
+/addons/reactive_ui_toolkit/** !export-ignore
 
 # The editor addon ships through its OWN Asset Library listing (Custom provider + release
 # zip — a Download Commit can't carry it), so it must stay out of the runtime archive.
-# Dev-only material inside the runtime addon must not reach end users either.
-/addons/reactive_ui_editor export-ignore
-/addons/reactive_ui_editor/** export-ignore
-/addons/reactive_ui/dev export-ignore
-/addons/reactive_ui/dev/** export-ignore
+/addons/reactive_ui_toolkit_editor export-ignore
+/addons/reactive_ui_toolkit_editor/** export-ignore
+
+# NOTE: addons/reactive_ui_toolkit/dev/ is deliberately NOT export-ignored. It carries the
+# shipped migration codemods (migrate_0_10_0 / migrate_0_11_0 / migrate_0_13_0), which the
+# READMEs, MIGRATION-0.13.md and the docs site all tell users to run from inside the installed
+# addon. `git archive` honours export-ignore, and the Asset Library's Download Commit provider
+# serves exactly that archive — ignoring dev/ made the 0.13.0 upgrade command unreachable for
+# every AssetLib install.

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Centralized changelog management for the GUITKX tooling family: the VS Code and
- * VS2022 extensions AND the Godot editor addon (`addons/reactive_ui_editor`). The
- * `reactive_ui` runtime library deliberately stays OUT of this system — its changelog
+ * VS2022 extensions AND the Godot editor addon (`addons/reactive_ui_toolkit_editor`). The
+ * `reactive_ui_toolkit` runtime library deliberately stays OUT of this system — its changelog
  * is hand-written keep-a-changelog (root CHANGELOG.md, byte-identically mirrored into
  * the addon; a GDScript test enforces the mirror).
  *
@@ -199,8 +199,8 @@ const HEADERS = {
   editor: [
     '# Changelog',
     '',
-    'All notable changes to the **Reactive UI Editor** Godot addon are documented here.',
-    'This addon versions independently of the `reactive_ui` runtime library. Entries from',
+    'All notable changes to the **Reactive UI Toolkit — Godot Editor** Godot addon are documented here.',
+    'This addon versions independently of the `reactive_ui_toolkit` runtime library. Entries from',
     '0.6.3 onward are generated from `ide-extensions/changelog.json` (the single source',
     'shared with the GUITKX IDE extensions) — add entries via `changelog.mjs add --scope',
     'editor`, then regenerate this file with `extract`; never edit it by hand. The history',
@@ -317,7 +317,7 @@ function cmdExtract(args) {
 const CHANGELOG_FILES = {
   vscode: 'vscode/CHANGELOG.md',
   vs2022: 'visual-studio/CHANGELOG.md',
-  editor: '../addons/reactive_ui_editor/CHANGELOG.md',
+  editor: '../addons/reactive_ui_toolkit_editor/CHANGELOG.md',
 };
 
 /**
@@ -527,9 +527,9 @@ switch (command) {
     console.log(
 `Usage: node ide-extensions/scripts/changelog.mjs <command> [options]
 
-Targets: vscode, vs2022, editor (the Godot editor addon). The reactive_ui runtime
+Targets: vscode, vs2022, editor (the Godot editor addon). The reactive_ui_toolkit runtime
 library is NOT managed here — its changelog is hand-written (root CHANGELOG.md,
-mirrored byte-identically into addons/reactive_ui/).
+mirrored byte-identically into addons/reactive_ui_toolkit/).
 
 Commands:
   add              Add a changelog entry
@@ -545,7 +545,7 @@ Examples:
   add --scope vscode --message "Fix: debounce" --vscode 0.1.1
   add --scope editor --message-file NOTES.txt --editor 0.6.4
   extract --ide vscode --out ide-extensions/vscode/CHANGELOG.md
-  extract --ide editor --out addons/reactive_ui_editor/CHANGELOG.md
+  extract --ide editor --out addons/reactive_ui_toolkit_editor/CHANGELOG.md
   extract-overview --ide vscode --template ide-extensions/vscode/readme-template.md --out ide-extensions/vscode/README.md
   extract-overview --ide vs2022 --template ide-extensions/visual-studio/GuitkxVsix/overview-template.md --out overview.md
   import --ide vscode --file ide-extensions/vscode/CHANGELOG.md

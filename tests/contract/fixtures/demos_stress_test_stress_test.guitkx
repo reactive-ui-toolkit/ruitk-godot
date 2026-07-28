@@ -3,7 +3,7 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 import * as DemoStressHooks from "./stress_test.hooks"
 
-export DemoStress() -> RUIVNode {
+export DemoStress() -> RuitkVNode {
   var box_count = useState(300)
   var duration = useState(10.0)
   var count_text = useState("300")

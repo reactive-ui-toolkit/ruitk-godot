@@ -5,14 +5,14 @@
 			"error": "",
 			"error_at": -1,
 			"error_code": "",
-			"tree": "[{\"at\":158,\"attrs\":[{\"at\":167,\"end\":215,\"kind\":\"str\",\"name\":\"title\",\"value\":\"Signals — shared state, no prop drilling\",\"vat\":174}],\"children\":[{\"at\":223,\"attrs\":[{\"at\":238,\"end\":296,\"kind\":\"str\",\"name\":\"text\",\"value\":\"Two independent components read the SAME RUISignal:\",\"vat\":244},{\"at\":305,\"end\":351,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"font_color\\\": Color(0.7, 0.7, 0.7)}\",\"vat\":313}],\"children\":[],\"line\":7,\"t\":\"el\",\"tag\":\"Label\"},{\"at\":361,\"attrs\":[],\"children\":[],\"line\":10,\"t\":\"el\",\"tag\":\"DemoSignalsDisplay\"},{\"at\":390,\"attrs\":[],\"children\":[],\"line\":11,\"t\":\"el\",\"tag\":\"DemoSignalsDisplay\"},{\"at\":419,\"attrs\":[{\"at\":435,\"end\":465,\"kind\":\"str\",\"name\":\"text\",\"value\":\"Increment shared signal\",\"vat\":441},{\"at\":474,\"end\":549,\"kind\":\"expr\",\"name\":\"onPressed\",\"value\":\"func(): DemoSignalsStore.shared.update(func(v): return v + 1)\",\"vat\":486}],\"children\":[],\"line\":12,\"t\":\"el\",\"tag\":\"Button\"}],\"line\":6,\"t\":\"el\",\"tag\":\"DemoBox\"}]"
+			"tree": "[{\"at\":160,\"attrs\":[{\"at\":169,\"end\":217,\"kind\":\"str\",\"name\":\"title\",\"value\":\"Signals — shared state, no prop drilling\",\"vat\":176}],\"children\":[{\"at\":225,\"attrs\":[{\"at\":240,\"end\":300,\"kind\":\"str\",\"name\":\"text\",\"value\":\"Two independent components read the SAME RuitkSignal:\",\"vat\":246},{\"at\":309,\"end\":355,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"font_color\\\": Color(0.7, 0.7, 0.7)}\",\"vat\":317}],\"children\":[],\"line\":7,\"t\":\"el\",\"tag\":\"Label\"},{\"at\":365,\"attrs\":[],\"children\":[],\"line\":10,\"t\":\"el\",\"tag\":\"DemoSignalsDisplay\"},{\"at\":394,\"attrs\":[],\"children\":[],\"line\":11,\"t\":\"el\",\"tag\":\"DemoSignalsDisplay\"},{\"at\":423,\"attrs\":[{\"at\":439,\"end\":469,\"kind\":\"str\",\"name\":\"text\",\"value\":\"Increment shared signal\",\"vat\":445},{\"at\":478,\"end\":553,\"kind\":\"expr\",\"name\":\"onPressed\",\"value\":\"func(): DemoSignalsStore.shared.update(func(v): return v + 1)\",\"vat\":490}],\"children\":[],\"line\":12,\"t\":\"el\",\"tag\":\"Button\"}],\"line\":6,\"t\":\"el\",\"tag\":\"DemoBox\"}]"
 		}
 	],
 	"ok": true,
 	"windows": [
 		{
-			"end": 570,
-			"start": 153
+			"end": 574,
+			"start": 155
 		}
 	]
 }

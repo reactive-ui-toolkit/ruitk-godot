@@ -1,4 +1,4 @@
-export DemoKeyedTile(id) -> RUIVNode {
+export DemoKeyedTile(id) -> RuitkVNode {
   var col = useRef(null)
   if col["current"] == null:
     col["current"] = Color(randf() * 0.5 + 0.3, randf() * 0.5 + 0.3, randf() * 0.5 + 0.3)

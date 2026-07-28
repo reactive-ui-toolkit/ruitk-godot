@@ -3,7 +3,7 @@ extends SceneTree
 ## compiler diagnostics. Text-level errors (markup/structure) fail the run here; GDScript-level
 ## errors surface when the project is scanned (run demos_test.gd next for the real render check).
 ##   godot --headless --path <project> --script res://tests/guitkx_build.gd
-const Codegen = preload("res://addons/reactive_ui/guitkx/guitkx_codegen.gd")
+const Codegen = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_codegen.gd")
 
 func _initialize() -> void:
 	var errors := 0

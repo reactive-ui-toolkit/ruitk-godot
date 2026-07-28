@@ -4,7 +4,7 @@
 ## inside DemoRouterInner; DemoRouter just provides the router context.
 import { DemoRouterInner } from "./router_inner"
 
-export DemoRouter() -> RUIVNode {
+export DemoRouter() -> RuitkVNode {
   return (
     { V.router({ "initial": "/" }, [V.fc(DemoRouterInner.render)]) }
   )

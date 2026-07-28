@@ -10,7 +10,7 @@ and what a production-grade fix looks like — so a future fix starts from evide
 
 **Where:** Unity `Shared/Core/Fiber/FiberChildReconciliation.cs:50` (the gate) and
 `CanReuseFiber` at `:249-254` (type-only reuse). Godot analogue: `_any_keyed` at
-`addons/reactive_ui/core/reconciler.gd:1006`.
+`addons/reactive_ui_toolkit/core/reconciler.gd:1006`.
 
 **The defect (Unity).** The decision between keyed and index reconciliation is made **once for the
 whole sibling set by sniffing only the first child's key**:
@@ -73,7 +73,7 @@ Doom perf regression is anticipated, not discovered.
 
 ## TD-02 — `style` key whitelist is a curated subset, not full CanvasItem/Control coverage
 
-**Where:** `addons/reactive_ui/core/style.gd` — the `_apply_key` / `_reset` `match` (the friendly
+**Where:** `addons/reactive_ui_toolkit/core/style.gd` — the `_apply_key` / `_reset` `match` (the friendly
 shorthands) + `BOX_KEYS` + `THEME_CHANNELS`.
 
 **Context (why this is a ledger entry, not a bug).** `style={{…}}` keys are a hand-maintained
@@ -119,7 +119,7 @@ The import/export leg (plans/IMPORT_EXPORT_PLAN.md) shipped its runtime + compil
 codemod + strict resolution + HMR + version/changelog release plumbing, all green. Deferred as
 follow-ups (none affect the migrated tree's correctness, the CI matrix, or shippability):
 
-- **Docs site Imports page** (`ReactiveUIGodotDocs~/src/pages/UITKX/`): the grammar/strictness/
+- **Docs site Imports page** (`RuitkGodotDocs~/src/pages/UITKX/`): the grammar/strictness/
   codemod/`~/` narrative page + `CompanionFiles`/`Config`/`Diagnostics` touch-ups. The changelogs
   (root + Discord) and MIGRATION notes cover the release; the site build is green (its `lint` was
   already failing pre-leg on unrelated existing pages — setState-in-effect, unused var, whitespace).

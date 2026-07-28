@@ -1,6 +1,6 @@
-## A first .guitkx example: hooks + an event handler + a conditional. The reactive_ui editor
+## A first .guitkx example: hooks + an event handler + a conditional. The reactive_ui_toolkit editor
 ## plugin compiles this to a sibling Counter.gd (class_name GuitkxCounter) on save / project scan.
-export GuitkxCounter(start: int = 0) -> RUIVNode {
+export GuitkxCounter(start: int = 0) -> RuitkVNode {
   var s = useState(start)
   var count = s[0]
   var set_count = s[1]

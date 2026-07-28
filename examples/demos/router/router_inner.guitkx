@@ -1,7 +1,7 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoRouterInner() -> RUIVNode {
-  var loc = RUIRouter.useLocation()
+export DemoRouterInner() -> RuitkVNode {
+  var loc = RuitkRouter.useLocation()
   var ACTIVE := { "font_color": Color(1.0, 0.85, 0.3) }
   var IDLE := { "font_color": Color(0.7, 0.7, 0.8) }
   var user = func(m): return V.Label({ "text": "👤  User #%s  (from the :id route param)" % str(m.params.get("id")) })

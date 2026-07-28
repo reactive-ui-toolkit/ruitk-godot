@@ -1,6 +1,6 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoTween() -> RUIVNode {
+export DemoTween() -> RuitkVNode {
   var box_ref = useRef(null)
   var n = useState(0)
   useTween(box_ref, "modulate", Color(1, 1, 1, 1), 0.5, [n[0]])

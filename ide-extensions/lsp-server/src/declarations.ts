@@ -201,7 +201,7 @@ export function declarationDiags(src: string): DeclDiag[] {
   // T2.6 naming (Unity 2100/2203) + ES-modules (2320/2321): PascalCase components (both forms);
   // 2203 fires ONLY on deprecated hook wrappers (E-03 -- under E-01 the use_ prefix IS the
   // classification, a helper without it is simply a util); one 2320 deprecation warning per
-  // wrapper decl; 2321 on the use_-prefixed-returns-RUIVNode cross-guard (E-02).
+  // wrapper decl; 2321 on the use_-prefixed-returns-RuitkVNode cross-guard (E-02).
   for (const d of decls) {
     const isComp = d.kind === "component" || (d.kind === "member" && d.kw === "component");
     if (isComp && d.name !== "" && !/^[A-Z]/.test(d.name) && !d.crossGuard) {
@@ -235,7 +235,7 @@ export function declarationDiags(src: string): DeclDiag[] {
         start: d.nameStart,
         end: d.nameEnd,
         code: "GUITKX2321",
-        message: `GUITKX2321: \`${d.name}\` is \`use_\`-prefixed but returns a markup node -- did you mean a component? (components are PascalCase and return RUIVNode)`,
+        message: `GUITKX2321: \`${d.name}\` is \`use_\`-prefixed but returns a markup node -- did you mean a component? (components are PascalCase and return RuitkVNode)`,
       });
     }
   }

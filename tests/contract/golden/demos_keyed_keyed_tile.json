@@ -5,14 +5,14 @@
 			"error": "",
 			"error_at": -1,
 			"error_code": "",
-			"tree": "[{\"at\":198,\"attrs\":[{\"at\":214,\"end\":316,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"bg_color\\\": col[\\\"current\\\"], \\\"corner_radius_all\\\": 6, \\\"custom_minimum_size\\\": Vector2(54, 54)}\",\"vat\":222}],\"children\":[{\"at\":324,\"attrs\":[],\"children\":[{\"at\":350,\"attrs\":[{\"at\":357,\"end\":373,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"str(id)\",\"vat\":364},{\"at\":374,\"end\":428,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"font_size\\\": 22, \\\"font_color\\\": Color.WHITE}\",\"vat\":382}],\"children\":[],\"line\":8,\"t\":\"el\",\"tag\":\"Label\"}],\"line\":7,\"t\":\"el\",\"tag\":\"CenterContainer\"}],\"line\":6,\"t\":\"el\",\"tag\":\"PanelContainer\"}]"
+			"tree": "[{\"at\":200,\"attrs\":[{\"at\":216,\"end\":318,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"bg_color\\\": col[\\\"current\\\"], \\\"corner_radius_all\\\": 6, \\\"custom_minimum_size\\\": Vector2(54, 54)}\",\"vat\":224}],\"children\":[{\"at\":326,\"attrs\":[],\"children\":[{\"at\":352,\"attrs\":[{\"at\":359,\"end\":375,\"kind\":\"expr\",\"name\":\"text\",\"value\":\"str(id)\",\"vat\":366},{\"at\":376,\"end\":430,\"kind\":\"expr\",\"name\":\"style\",\"value\":\"{\\\"font_size\\\": 22, \\\"font_color\\\": Color.WHITE}\",\"vat\":384}],\"children\":[],\"line\":8,\"t\":\"el\",\"tag\":\"Label\"}],\"line\":7,\"t\":\"el\",\"tag\":\"CenterContainer\"}],\"line\":6,\"t\":\"el\",\"tag\":\"PanelContainer\"}]"
 		}
 	],
 	"ok": true,
 	"windows": [
 		{
-			"end": 481,
-			"start": 193
+			"end": 483,
+			"start": 195
 		}
 	]
 }

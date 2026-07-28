@@ -6,7 +6,7 @@ const __RUI_HOOK_SIG := "useReducer"
 
 const __RUI_KIND := "component"
 
-static func render(props: Dictionary, children: Array) -> RUIVNode:
+static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var reducer = func(state, action):
 		match action:
 			"inc": return state + 1

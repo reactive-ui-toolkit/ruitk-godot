@@ -1,7 +1,7 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 import { DemoKeyedTile } from "./keyed_tile"
 
-export DemoKeyed() -> RUIVNode {
+export DemoKeyed() -> RuitkVNode {
   var items = useState(["A", "B", "C", "D", "E"])
   var shuffle = func():
     var arr: Array = items[0].duplicate()

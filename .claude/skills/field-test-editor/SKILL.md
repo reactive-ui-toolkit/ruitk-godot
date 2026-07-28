@@ -1,6 +1,6 @@
 ---
 name: field-test-editor
-description: Run the local field-test loop for the Godot native editor (reactive_ui + reactive_ui_editor + bundled analyzer) — the AI prepares, fixes, verifies, and applies; the user tests in a real Godot editor; repeat until the bug is dead.
+description: Run the local field-test loop for the Godot native editor (reactive_ui_toolkit + reactive_ui_toolkit_editor + bundled analyzer) — the AI prepares, fixes, verifies, and applies; the user tests in a real Godot editor; repeat until the bug is dead.
 ---
 
 # Field-test loop for the native Godot editor
@@ -18,7 +18,7 @@ bandaid.
 - **Godot binary** (not on PATH): `C:\Yanivs\daniela test\Godot_v4.7-stable_win64.exe\Godot_v4.7-stable_win64_console.exe`
   — use the `_console` exe, and ALWAYS redirect output to a file (`cmd /c "...godot... > out.txt 2>&1"`);
   piping through `head`/`Select-Object` block-buffers and hides everything.
-- The analyzer GDExtension lives at `addons/reactive_ui_analyzer/` (gitignored; local dll install).
+- The analyzer GDExtension lives at `addons/reactive_ui_toolkit_analyzer/` (gitignored; local dll install).
   A fresh/changed `.gdextension` is only seen by headless scripts AFTER one
   `--headless --editor --quit` scan (it must enter `.godot/extension_list.cfg`). Moving the folder
   to disable it must move it OUTSIDE the project (a rename inside res:// still gets discovered).
@@ -41,7 +41,7 @@ bandaid.
    no Co-Authored-By).
 4. **Apply locally** so the user can test: if the live tree is clean, `git -C <live> fetch origin
    && git -C <live> checkout <branch>` (ask before switching their checkout); otherwise copy the
-   changed `addons/reactive_ui/**` / `addons/reactive_ui_editor/**` files over. Then tell the user
+   changed `addons/reactive_ui_toolkit/**` / `addons/reactive_ui_toolkit_editor/**` files over. Then tell the user
    to **restart their Godot editor** (plugin scripts don't hot-swap reliably).
 5. **User tests.** Ask for: what they did, what they saw, the Output panel text (they often paste
    it into a scratch file like `<live>\errors` — read it).
@@ -52,8 +52,8 @@ bandaid.
 
 ## Store-zip fidelity test (when the change affects packaging)
 
-Test what a store user gets: download `reactive_ui-<ver>.zip` + `reactive_ui_editor-<ver>.zip`
+Test what a store user gets: download `reactive_ui_toolkit-<ver>.zip` + `reactive_ui_toolkit_editor-<ver>.zip`
 from GitHub releases into a FRESH Godot project (create it, close the editor, unzip so
-`addons/reactive_ui`, `addons/reactive_ui_editor`, `addons/reactive_ui_analyzer` all exist,
-reopen). Enable `reactive_ui` then `reactive_ui_editor` in Project Settings → Plugins. Expect the
+`addons/reactive_ui_toolkit`, `addons/reactive_ui_toolkit_editor`, `addons/reactive_ui_toolkit_analyzer` all exist,
+reopen). Enable `reactive_ui_toolkit` then `reactive_ui_toolkit_editor` in Project Settings → Plugins. Expect the
 green Output banner `native analyzer <ver> detected`; a yellow note means the bundle is broken.

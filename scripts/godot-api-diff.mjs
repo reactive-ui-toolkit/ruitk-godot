@@ -2,10 +2,10 @@
 /**
  * ClassDB API diff between two Godot versions — the Godot analog of the Unity toolkit's
  * `unity-api-diff.ps1` (see AUTOMATION.md). Input: two JSON dumps produced by
- * `addons/reactive_ui/dev/classdb_dump.gd`, one per Godot binary:
+ * `addons/reactive_ui_toolkit/dev/classdb_dump.gd`, one per Godot binary:
  *
- *   <old-godot> --headless --path . --script res://addons/reactive_ui/dev/classdb_dump.gd -- res://old.json
- *   <new-godot> --headless --path . --script res://addons/reactive_ui/dev/classdb_dump.gd -- res://new.json
+ *   <old-godot> --headless --path . --script res://addons/reactive_ui_toolkit/dev/classdb_dump.gd -- res://old.json
+ *   <new-godot> --headless --path . --script res://addons/reactive_ui_toolkit/dev/classdb_dump.gd -- res://new.json
  *   node scripts/godot-api-diff.mjs old.json new.json [--json report.json]
  *
  * Reports, for the Control subtree the library cares about: added/removed CLASSES (new tags —

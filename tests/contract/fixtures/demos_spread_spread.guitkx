@@ -1,6 +1,6 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoSpread() -> RUIVNode {
+export DemoSpread() -> RuitkVNode {
   var n = useState(0)
   var shared = { "custom_minimum_size": Vector2(140, 0), "text": "shared" }
   return (

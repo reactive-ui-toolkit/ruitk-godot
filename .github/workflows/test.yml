@@ -53,7 +53,7 @@ jobs:
 
       # The class-cache scan must run BEFORE the compile step on a fresh clone: guitkx_build's
       # two-pass parse gate reload()s every generated .gd, whose code references global
-      # class_names (V, Hooks, RUIVNode, hand-written DoomTypes, ...) that only resolve once
+      # class_names (V, Hooks, RuitkVNode, hand-written DoomTypes, ...) that only resolve once
       # .godot/global_script_class_cache.cfg exists. This mirrors the real editor lifecycle —
       # the editor always scans before its watcher compiles. (PR #71 CI capture: 49/49
       # "Identifier V not declared" parse fails without it.)
@@ -109,3 +109,6 @@ jobs:
 
       - name: 0.11.0 ES-modules modernization tripwire (tree must already be plain-syntax)
         run: godot --headless --path . --script res://tests/guitkx_modernize.gd
+
+      - name: 0.13.0 rename-migration tripwire (tree must already be renamed)
+        run: godot --headless --path . --script res://tests/guitkx_rename_migrate.gd

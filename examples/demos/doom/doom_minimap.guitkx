@@ -1,7 +1,7 @@
 ## Faithful port of the Unity `DoomMinimap.uitkx` -- top-right automap. Its two
 ## inline @foreach loops are ported to DoomGameScreenLogic.build_minimap_cells /
 ## build_minimap_dots (pure builders); this component just lays out the rects.
-export DoomMinimap(state: DoomTypes.GameState = null) -> RUIVNode {
+export DoomMinimap(state: DoomTypes.GameState = null) -> RuitkVNode {
   var MAP_PX = 160
   var map = state.map
   var mw: int = map.width

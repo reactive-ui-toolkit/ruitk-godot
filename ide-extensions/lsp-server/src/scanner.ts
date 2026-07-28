@@ -1,4 +1,4 @@
-// TypeScript port of the .guitkx GDScript-lexis scanner (addons/reactive_ui/guitkx/guitkx_lexer.gd).
+// TypeScript port of the .guitkx GDScript-lexis scanner (addons/reactive_ui_toolkit/guitkx/guitkx_lexer.gd).
 // Everything that finds balanced regions or extracts embedded-GDScript spans routes through
 // skipNoncode first so braces/quotes/comments inside the embedded code never confuse balancing.
 // GDScript lexis: `#` line comments; "..."/'...'/triple-quoted strings; r"/&"/^" prefixes; no C#.

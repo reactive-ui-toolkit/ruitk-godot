@@ -1,5 +1,5 @@
 
-export DemoEffectOrderRow(idx, append) -> RUIVNode {
+export DemoEffectOrderRow(idx, append) -> RuitkVNode {
   var eff = func():
     append.call("▶ mount row %d" % idx)
     return func(): append.call("■ unmount row %d" % idx)

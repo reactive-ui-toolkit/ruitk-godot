@@ -1,16 +1,16 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoDiagnostics() -> RUIVNode {
-  RUIDiagnostics.enabled = true
+export DemoDiagnostics() -> RuitkVNode {
+  RuitkDiagnostics.enabled = true
   var tick = useState(0)
-  var shown = useState(RUIDiagnostics.report())
+  var shown = useState(RuitkDiagnostics.report())
   var capture = func():
-    shown[1].call(RUIDiagnostics.report())
+    shown[1].call(RuitkDiagnostics.report())
     return Callable()
   useEffect(capture, [tick[0]])
   var do_reset = func():
-    RUIDiagnostics.reset()
-    shown[1].call(RUIDiagnostics.report())
+    RuitkDiagnostics.reset()
+    shown[1].call(RuitkDiagnostics.report())
   var rep: Dictionary = shown[0]
   return (
     <DemoBox title="Diagnostics — render/commit metrics">

@@ -1,18 +1,19 @@
-# Reactive UI — Godot (GDScript)
+# Reactive UI Toolkit — Godot (GDScript)
 
 💬 **[Join the Discord][discord-invite]** — questions, feedback, and release announcements.
 
 A **React-style reactive UI library for Godot 4.x**, written in GDScript, authored through
-**`.guitkx`** — a JSX-like markup that compiles to GDScript. It's the Godot sibling of
-[ReactiveUIToolKit](https://github.com/yanivkalfa/ReactiveUIToolKit) (the C# / Unity UI Toolkit
-library) — same mental model, ported to Godot's retained-mode `Control` tree.
+**`.guitkx`** — a JSX-like markup that compiles to GDScript. It's the Godot leg of the
+[Reactive UI Toolkit family](https://github.com/reactive-ui-toolkit) — sibling of
+[Reactive UI Toolkit — Unity](https://github.com/reactive-ui-toolkit/ruitk-unity) (the C# / Unity
+UI Toolkit library) — same mental model, ported to Godot's retained-mode `Control` tree.
 
 You write **function components** in `.guitkx`; a **fiber reconciler** diffs each render against
 the last and patches only what changed on the real Godot node tree. State lives in **hooks**, and
 saving a `.guitkx` while your game runs under F5 hot-reloads it in place (**Fast Refresh**).
 
 ```
-Counter() -> RUIVNode {
+Counter() -> RuitkVNode {
 	var s = useState(0)
 	return (
 		<VBoxContainer style={ {"separation": 8} }>
@@ -48,20 +49,31 @@ gallery — every demo is `.guitkx`).
 
 **As an addon in your own project:** two ways —
 
-- **From the Asset Library (in-editor):** open the **AssetLib** tab, search **"Reactive UI"**,
-  then **Download → Install** (keep `addons/reactive_ui/`). The editor addon ships as a separate
-  asset — search **"Reactive UI Editor"** to add it too.
-- **Manually:** copy `addons/reactive_ui/` into your project's `res://addons/`.
+- **From the Asset Library (in-editor):** open the **AssetLib** tab, search **"Reactive UI Toolkit — Godot"**,
+  then **Download → Install** (keep `addons/reactive_ui_toolkit/`). The editor addon ships as a separate
+  asset — search **"Reactive UI Toolkit — Godot Editor"** to add it too.
+- **Manually:** copy `addons/reactive_ui_toolkit/` into your project's `res://addons/`.
 
 Either way, the runtime is plain GDScript with global `class_name`s (`V`, `Hooks`,
-`ReactiveRoot`, ...), so they're available immediately — **no plugin enable required**.
+`RuitkRoot`, ...), so they're available immediately — **no plugin enable required**.
 
-To actually *write* `.guitkx`, enable the plugin (**Project Settings → Plugins → Reactive UI**) —
+**Upgrading from 0.12.x or earlier?** 0.13.0 is the *Reactive UI Toolkit* rename — names only,
+zero behavior changes, but a clean break: `addons/reactive_ui*` → `addons/reactive_ui_toolkit*`
+and the `RUI*` class prefix → `Ruitk*`. One idempotent command, shipped inside the addon, rewrites
+a whole project — then delete the old `addons/reactive_ui*` folders by hand:
+
+```bash
+godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_13_0.gd
+```
+
+See **[MIGRATION-0.13.md](MIGRATION-0.13.md)** for the full guide and the 36-name table.
+
+To actually *write* `.guitkx`, enable the plugin (**Project Settings → Plugins → Reactive UI Toolkit — Godot**) —
 it watches the filesystem and compiles each `.guitkx` to a sibling `.gd` on save. Then add editor
 support for the language itself (pick one, or use both):
 
-- **`addons/reactive_ui_editor/`** — a native in-Godot editor tab: syntax highlighting, live
-  diagnostics, completion, and hover, no external tools. Copy it in alongside `reactive_ui` and
+- **`addons/reactive_ui_toolkit_editor/`** — a native in-Godot editor tab: syntax highlighting, live
+  diagnostics, completion, and hover, no external tools. Copy it in alongside `reactive_ui_toolkit` and
   enable it too.
 - **VS Code / Visual Studio 2022 extensions** (`ide-extensions/`) — the same, plus embedded-GDScript
   intelligence inside `{expr}`/setup code (completion, hover, go-to-definition, find-references,
@@ -77,7 +89,7 @@ Requires **Godot 4.4+** (the compiler core uses 4.3+ engine APIs and the editor 
 2. Write your first component as a `.guitkx` file, e.g. `res://ui/counter.guitkx`:
 
 ```
-Counter() -> RUIVNode {
+Counter() -> RuitkVNode {
 	var s = useState(0)
 	return (
 		<VBoxContainer>
@@ -90,7 +102,7 @@ Counter() -> RUIVNode {
 
 Saving it compiles a sibling `res://ui/counter.gd` (git-ignore this — it's generated) with a real
 Godot `class_name` — `Counter`, inferred from the declaration (a component is any callable that
-annotates `-> RUIVNode`; the annotation IS the classification) — so you can reference it like any
+annotates `-> RuitkVNode`; the annotation IS the classification) — so you can reference it like any
 other class. An `@class_name` directive can override that name; it's rarely needed.
 
 3. Mount it from a plain `.gd` script — this one bootstrap point is the only place raw GDScript is
@@ -99,18 +111,18 @@ other class. An `@class_name` directive can override that name; it's rarely need
 ```gdscript
 extends Control
 
-var _app: ReactiveRoot   # keep this referenced for the UI's lifetime!
+var _app: RuitkRoot   # keep this referenced for the UI's lifetime!
 
 func _ready():
-	_app = ReactiveRoot.create(self, V.fc(Counter.render))
+	_app = RuitkRoot.create(self, V.fc(Counter.render))
 
 func _exit_tree():
 	_app.unmount()
 ```
 
-`ReactiveRoot.create(container, root_vnode)` mounts under `container` and renders. **Hold onto the
-returned `ReactiveRoot`** — it owns the reconciler; call `.unmount()` to tear down and run cleanups.
-(A `Control`-based `ReactiveRootNode` is also available if you prefer mounting via a scene node.)
+`RuitkRoot.create(container, root_vnode)` mounts under `container` and renders. **Hold onto the
+returned `RuitkRoot`** — it owns the reconciler; call `.unmount()` to tear down and run cleanups.
+(A `Control`-based `RuitkRootNode` is also available if you prefer mounting via a scene node.)
 
 From here on, edit `counter.guitkx` while the game runs under F5 and watch it update in place — see
 [Fast Refresh](#fast-refresh).
@@ -152,7 +164,7 @@ import line to add (migrating from 0.9? — [MIGRATION-0.10.md](MIGRATION-0.10.m
 import { StatusChip } from "./status_chip"
 import { use_blink } from "~/ui/hud.hooks"
 
-export Panel(level: int = 1) -> RUIVNode {
+export Panel(level: int = 1) -> RuitkVNode {
   var blink = use_blink(0.5)
   return ( <PanelContainer><StatusChip level={level} /></PanelContainer> )
 }
@@ -173,12 +185,15 @@ export Panel(level: int = 1) -> RUIVNode {
 - **Component cycles are legal** (component imports resolve lazily, by path, at first render);
   **value cycles** (hooks/utils/values — eager `const` preloads) are a compile error that prints
   the chain.
-- **Migrating an existing project is one command** — idempotent, re-runnable, leaves hand-written
-  `class_name` scripts alone (they stay ambient, no import needed):
+- **Moving an existing project onto the import model is one command** — idempotent, re-runnable,
+  leaves hand-written `class_name` scripts alone (they stay ambient, no import needed):
 
   ```bash
-  godot --headless --path . --script res://addons/reactive_ui/dev/migrate_0_11_0.gd
+  godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_11_0.gd
   ```
+
+  (That is the *imports* codemod. The separate 0.13.0 **rename** codemod is
+  `migrate_0_13_0.gd` — see [MIGRATION-0.13.md](MIGRATION-0.13.md).)
 
 Import mistakes surface as **`GUITKX2300`–`GUITKX2309`** (unresolved specifier, not exported,
 not declared, duplicate, unused, not imported, value cycle, unexported reference, boundary
@@ -207,8 +222,8 @@ Call hooks **only** at the top of a component, unconditionally, in a stable orde
 
 …plus `useImperativeHandle`, `useSafeArea`, `createContext`/`provideContext`, and the
 stable-callback family — **23 hooks** in all. Bare calls (`useState(...)`) auto-resolve to
-`Hooks.useState(...)`. The [router](#router) adds **17 more**, all on `RUIRouter`
-(`RUIRouter.useNavigate`, `useLocation`, `useParams`, `useSearchParams`, `useBlocker`, …) — router
+`Hooks.useState(...)`. The [router](#router) adds **17 more**, all on `RuitkRouter`
+(`RuitkRouter.useNavigate`, `useLocation`, `useParams`, `useSearchParams`, `useBlocker`, …) — router
 hooks stay explicitly qualified.
 
 ### Control flow
@@ -229,7 +244,7 @@ code plus `return ( <markup> )`**, and nest recursively — the same model as Re
 can also appear **early**, guarding on a condition, not just as the final statement:
 
 ```
-Panel(ready: bool = false) -> RUIVNode {
+Panel(ready: bool = false) -> RuitkVNode {
 	if not ready:
 		return ( <Label text="loading" /> )
 	return ( <VBoxContainer>…</VBoxContainer> )
@@ -239,7 +254,7 @@ Panel(ready: bool = false) -> RUIVNode {
 ### Prop spread & context
 
 ```
-Card() -> RUIVNode {
+Card() -> RuitkVNode {
 	var shared = { "custom_minimum_size": Vector2(140, 0), "text": "shared" }
 	return ( <Button {...shared} onPressed={ handle } /> )
 }
@@ -251,7 +266,7 @@ carries a default value):
 
 ```gdscript
 # accent_context.gd — a module-level handle, shared by every component that imports it
-static var HANDLE: RUIContext = preload("res://.../hooks.gd").createContext(Color(0.4, 0.7, 1.0))
+static var HANDLE: RuitkContext = preload("res://.../hooks.gd").createContext(Color(0.4, 0.7, 1.0))
 ```
 
 ```
@@ -273,7 +288,7 @@ Godot has no CSS/USS — styling is `Control` properties + `Theme` overrides, an
    setters (`corner_radius_all`, `content_margin_all`, …).
 2. **Theme channels** — full `Theme` coverage (colors / constants / fonts / font-sizes / icons /
    styleboxes) plus **per-state `StyleBox` slots** (hover / pressed / focus / disabled / read-only).
-3. **`classes={ [...] }`** — named style sets registered with `RUIStyleSheet` (merged left-to-right;
+3. **`classes={ [...] }`** — named style sets registered with `RuitkStyleSheet` (merged left-to-right;
    inline `style` wins). A userland "USS classes" layer.
 
 ### Keys
@@ -292,7 +307,7 @@ add/remove/reorder instead of rebuild):
 `<ItemList>` / `<Tree>` / `<TabBar>` / `<OptionButton>` / `<PopupMenu>` take a
 declarative `items={ [...] }` prop and reconcile rows **by item identity** (selection/expansion
 preserved across renders). Wire changes with the normal `on*` event props. Register adapters for
-your own controls via `RUIHost.register_item_adapter(...)`.
+your own controls via `RuitkHost.register_item_adapter(...)`.
 
 ### Custom drawing
 
@@ -325,7 +340,7 @@ classes, so they're not tags; you reach them via `V.*` inside an embedded `{ exp
 inside your `.guitkx` file, just not as a `<Tag>`:
 
 ```
-App() -> RUIVNode {
+App() -> RuitkVNode {
 	return (
 		<VBoxContainer>
 			{ V.suspense({ "fallback": V.fc(Spinner.render), "ready_signal": ready }, [V.fc(Content.render)]) }
@@ -345,11 +360,11 @@ A faithful **React-Router-v6-style** component-tree router: nested/layout routes
 `{ V.outlet() }`, ranked first-match, merged `:params`, splat `*`, `basename`, query strings,
 `NavLink`-equivalent active styling, and navigation blockers. The route table itself is configured
 via `V.routes(...)`/`V.route(...)` (see [above](#where-v-still-shows-up)); drive it from markup with
-the router hooks on `RUIRouter`.
+the router hooks on `RuitkRouter`.
 
 ### Signals
 
-A reference-aware `RUISignal` store plus a process-wide, string-keyed `RUISignals` registry —
+A reference-aware `RuitkSignal` store plus a process-wide, string-keyed `RuitkSignals` registry —
 share state across components without prop-drilling. Read it with `useSignal`/`useSignalKey`.
 
 ### Fast Refresh
@@ -375,22 +390,22 @@ preserved — no restart:
 Mirrors ReactiveUIToolKit; the design (algorithms) is ported, the code is GDScript.
 
 ```
-addons/reactive_ui/core/
-  vnode.gd / v.gd            RUIVNode / V     — UI description + the ~61 factories (incl. V.comp)
-  fiber.gd                   RUIFiber         — persistent tree node; current/WIP alternates; hook store
+addons/reactive_ui_toolkit/core/
+  vnode.gd / v.gd            RuitkVNode / V     — UI description + the ~61 factories (incl. V.comp)
+  fiber.gd                   RuitkFiber         — persistent tree node; current/WIP alternates; hook store
   hooks.gd                   Hooks            — the 23 hooks
-  reconciler.gd              RUIReconciler    — render (diff) + two-phase commit; bailout; scheduling
-  host_config.gd             RUIHost          — the Godot adapter: nodes, props, signals, items, custom draw
-  style.gd / style_sheet.gd  RUIStyle / RUIStyleSheet — declarative style -> Control props / Theme
-  signal_store.gd / signal_registry.gd  RUISignal / RUISignals
+  reconciler.gd              RuitkReconciler    — render (diff) + two-phase commit; bailout; scheduling
+  host_config.gd             RuitkHost          — the Godot adapter: nodes, props, signals, items, custom draw
+  style.gd / style_sheet.gd  RuitkStyle / RuitkStyleSheet — declarative style -> Control props / Theme
+  signal_store.gd / signal_registry.gd  RuitkSignal / RuitkSignals
   suspense.gd                                  — V.suspense boundary
   media.gd                                     — useSfx / useAnimate / V.audio / V.video
-  hmr.gd                     RUIHmr           — Fast Refresh runtime (game side)
-  router/                    RUIRouter…       — router spine, matcher, ranker, history, location
+  hmr.gd                     RuitkHmr           — Fast Refresh runtime (game side)
+  router/                    RuitkRouter…       — router spine, matcher, ranker, history, location
   reactive_root.gd / reactive_root_node.gd     — mount surfaces
-addons/reactive_ui/guitkx/    RUIGuitkx…       — the .guitkx lexer/parser/codegen/formatter
-addons/reactive_ui/editor/                     — editor-side watcher + Fast Refresh push (hmr_debugger.gd)
-addons/reactive_ui_editor/                     — native in-Godot .guitkx editor tab (separate addon)
+addons/reactive_ui_toolkit/guitkx/    RuitkGuitkx…       — the .guitkx lexer/parser/codegen/formatter
+addons/reactive_ui_toolkit/editor/                     — editor-side watcher + Fast Refresh push (hmr_debugger.gd)
+addons/reactive_ui_toolkit_editor/                     — native in-Godot .guitkx editor tab (separate addon)
 ide-extensions/                                — VS Code / VS 2022 extensions + shared language server
 ```
 
@@ -427,7 +442,7 @@ against a copy-pasted or dangling component reference.
 
 Three ways to get `.guitkx` intelligence, and you can mix them:
 
-| | Native (`reactive_ui_editor`) | VS Code / VS 2022 (`ide-extensions/`) |
+| | Native (`reactive_ui_toolkit_editor`) | VS Code / VS 2022 (`ide-extensions/`) |
 |---|---|---|
 | Syntax highlighting | ✅ | ✅ (self-contained TextMate grammar) |
 | Live diagnostics | ✅ | ✅ |
@@ -436,8 +451,8 @@ Three ways to get `.guitkx` intelligence, and you can mix them:
 | Go-to-definition / find-references / rename / signature help | — | ✅ |
 | Formatting | ✅ | ✅ |
 
-The native addon needs nothing but Godot itself — enable `addons/reactive_ui_editor/` alongside
-`reactive_ui`. The external extensions need Node bundled in (already handled by the packaged
+The native addon needs nothing but Godot itself — enable `addons/reactive_ui_toolkit_editor/` alongside
+`reactive_ui_toolkit`. The external extensions need Node bundled in (already handled by the packaged
 `.vsix`) — see `ide-extensions/README.md` for building/publishing. The `.guitkx` toolchain and all
 IDE support are optional in the sense that the runtime works without them, but writing UI by hand as
 raw `V.*`/`Hooks.*` calls is not the intended day-to-day workflow — see
@@ -477,18 +492,18 @@ raw `V.*`/`Hooks.*` calls is not the intended day-to-day workflow — see
 
 - **Markup tags for the remaining `V.*`-only primitives** (`Portal`, `Suspense`, `Router`/`Routes`/
   `Route`, …) so the "escape hatch" list above gets shorter.
-- **Native-editor parity** — embedded-GDScript intelligence for `reactive_ui_editor`, closing the
+- **Native-editor parity** — embedded-GDScript intelligence for `reactive_ui_toolkit_editor`, closing the
   remaining gap with the VS Code/VS 2022 extensions (see `plans/archive/NATIVE_EDITOR_PARITY_PLAN.md`).
-- **Docs site** (`ReactiveUIGodotDocs~/`) — a full guide beyond this README; run it locally with
-  `cd ReactiveUIGodotDocs~ && npm ci && npm run dev`.
+- **Docs site** (`RuitkGodotDocs~/`) — a full guide beyond this README; run it locally with
+  `cd RuitkGodotDocs~ && npm ci && npm run dev`.
 - **Re-exports** (`export { X } from "./x"`) — the imports fast-follow, family-wide.
 - **Godot Asset Store / Asset Library distribution** — repo prep (license, icon, export rules) is
   in place; publishing itself is not live yet.
 
 ## License
 
-**Free for almost everyone.** Reactive UI for Godot ships under the
-[ReactiveUI Community License 1.0](LICENSE): use it, modify it, and ship commercial
+**Free for almost everyone.** Reactive UI Toolkit — Godot ships under the
+[Reactive UI Toolkit Community License 1.1](LICENSE): use it, modify it, and ship commercial
 games with it at no cost if your company (plus parents/subsidiaries) earned under
 **US $250,000** in the last 12 months. Development, evaluation, and education are free
 at any company size — the threshold only applies when you *ship*.
@@ -496,17 +511,17 @@ at any company size — the threshold only applies when you *ship*.
 Above the threshold, shipping a product takes a commercial license — **$2,000 per
 title** (one-time, perpetual) or **$2,500 per studio per year**, your pick; see
 [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md). The same terms and prices exist for
-each library in the ReactiveUI family (Godot, Unity, Unreal).
+each library in the Reactive UI Toolkit family (Godot, Unity, Unreal).
 
-Two asks of everyone: put **"Made with ReactiveUI"** in your credits alongside your
+Two asks of everyone: put **"Made with Reactive UI Toolkit"** in your credits alongside your
 other middleware, and don't resell the library itself as a competing product (your
 game is never a competing product). Every previously released version keeps the
 license it shipped with. Contributions require the one-time [CLA](CLA.md).
 Weird case (nonprofit, just-over-the-line, contractor)? Email
-<yanivkalfa@gmail.com> — we'd rather you ship with ReactiveUI than not.
+<yanivkalfa@gmail.com> — we'd rather you ship with Reactive UI Toolkit than not.
 
 <!--
   Single source of truth for the community Discord invite used in this file — update only here.
-  (The docs site has its own single source: ReactiveUIGodotDocs~/src/links.ts.)
+  (The docs site has its own single source: RuitkGodotDocs~/src/links.ts.)
 -->
 [discord-invite]: https://discord.gg/Knedqu4Wyv

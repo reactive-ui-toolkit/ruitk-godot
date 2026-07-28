@@ -117,7 +117,7 @@ that is NOT plain passthrough.
 4. **Item-model controls:** the five adapters intentionally map the *declarative-safe* subset of
    item fields (tables above). Everything else on items is imperative-API-only in Godot
    (`set_item_*`) and is reachable via `ref` — a recorded decision, not a gap. Adapters are
-   user-extensible via `RUIHost.register_item_adapter`.
+   user-extensible via `RuitkHost.register_item_adapter`.
 
 ---
 
@@ -141,7 +141,7 @@ that is NOT plain passthrough.
 |---|---|
 | GraphEdit | node-graph surface — needs a slot/port story (connections, popups); the family's biggest remaining design |
 | GraphNode / GraphFrame / GraphElement | GraphEdit children (GraphElement is their instantiable base) — same design |
-| Window *(Node, not Control)* | true OS/embedded windows — a mount-surface story (`ReactiveRoot`-in-window + portals), like Unreal's `SWindow` SPECIAL row |
+| Window *(Node, not Control)* | true OS/embedded windows — a mount-surface story (`RuitkRoot`-in-window + portals), like Unreal's `SWindow` SPECIAL row |
 | Popup / PopupPanel *(Windows)* | popup surfaces — ride the Window story |
 | AcceptDialog / ConfirmationDialog / FileDialog *(Windows)* | dialog family — declarative open/result props on top of the Window story |
 
@@ -174,5 +174,5 @@ two non-Control nodes the library wraps).
 **Process:** each Batch-1/2 element ships through the component pipeline (factory + tag +
 vocabulary entry → IDE metadata → adapter if item-model → demo/test → docs row), then its row
 moves into "Shipped". The dump script lives with the audit (see also
-`addons/reactive_ui/dev/classdb_dump.gd`, which feeds the IDE's bundled ClassDB); re-run and diff
+`addons/reactive_ui_toolkit/dev/classdb_dump.gd`, which feeds the IDE's bundled ClassDB); re-run and diff
 on every engine bump.

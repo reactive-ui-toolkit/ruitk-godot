@@ -1,6 +1,6 @@
 import { DemoBox } from "~/examples/demos/demo_box"
 
-export DemoTextField() -> RUIVNode {
+export DemoTextField() -> RuitkVNode {
   var s = useState("")
   return (
     <DemoBox title="Text Field — controlled input">

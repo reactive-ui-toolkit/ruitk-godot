@@ -27,8 +27,8 @@ description: The house development methodology for ReactiveUI projects (Godot + 
 
 | Artifact | Changelog | How |
 |---|---|---|
-| RG runtime addon (`addons/reactive_ui`) | `addons/reactive_ui/CHANGELOG.md` | Hand-write; it must stay a **byte-identical mirror** of root `CHANGELOG.md` (a test enforces it) |
-| RG editor addon (`addons/reactive_ui_editor`) | `ide-extensions/changelog.json` (single source, since 0.6.3) | `changelog.mjs add --scope editor --editor X.Y.Z --message-file …` then `extract --ide editor --out addons/reactive_ui_editor/CHANGELOG.md` and **commit both** — pre-0.6.3 history is a frozen verbatim tail below the cutover marker |
+| RG runtime addon (`addons/reactive_ui_toolkit`) | `addons/reactive_ui_toolkit/CHANGELOG.md` | Hand-write; it must stay a **byte-identical mirror** of root `CHANGELOG.md` (a test enforces it) |
+| RG editor addon (`addons/reactive_ui_toolkit_editor`) | `ide-extensions/changelog.json` (single source, since 0.6.3) | `changelog.mjs add --scope editor --editor X.Y.Z --message-file …` then `extract --ide editor --out addons/reactive_ui_toolkit_editor/CHANGELOG.md` and **commit both** — pre-0.6.3 history is a frozen verbatim tail below the cutover marker |
 | VS Code + VS2022 extensions | `ide-extensions/changelog.json` (single source) | `changelog.mjs add --scope <shared\|vscode\|vs2022> --vscode X.Y.Z --vs2022 X.Y.Z --message-file …` then `extract` **each target and commit the regenerated files with the json** — the changelog-sync CI job (`changelog.mjs verify`) fails on drift; never hand-edit a generated `CHANGELOG.md`/`overview.md` |
 | gdscript-analyzer crates | per-crate `crates/*/CHANGELOG.md` | release-plz/git-cliff generates from Conventional Commit PR titles — the squash title IS the changelog line |
 | Unity ReactiveUIToolKit | root `CHANGELOG.md` (+ per-extension under `ide-extensions~`) | `scripts/changelog.mjs`-assisted, same single-source idea |
@@ -39,8 +39,8 @@ description: The house development methodology for ReactiveUI projects (Godot + 
 - **Policy: patch by default** (bump the last digit). Minor only for genuinely additive milestones,
   major/0.x-minor only for breaking. On 0.x, `feat` = patch (analyzer repo enforces this via
   release-plz config).
-- Bump locations per artifact: RG runtime → `addons/reactive_ui/plugin.cfg`; RG editor →
-  `addons/reactive_ui_editor/plugin.cfg`; VS Code ext → `ide-extensions/vscode/package.json`;
+- Bump locations per artifact: RG runtime → `addons/reactive_ui_toolkit/plugin.cfg`; RG editor →
+  `addons/reactive_ui_toolkit_editor/plugin.cfg`; VS Code ext → `ide-extensions/vscode/package.json`;
   VS2022 ext → `GuitkxVsix/source.extension.vsixmanifest` (keep it tracking the bundled
   lsp-server version); lsp-server → `ide-extensions/lsp-server/package.json`; analyzer →
   workspace `Cargo.toml` (release-plz PR does it); Unity package → `package.json`.

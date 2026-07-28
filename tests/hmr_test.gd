@@ -1,6 +1,6 @@
 extends SceneTree
 ## Headless tests for runtime Fast Refresh (Phase H, core/hmr.gd + the reconciler's
-## hmr_refresh). No debugger session needed: RUIHmr_.apply is called directly — exactly what the
+## hmr_refresh). No debugger session needed: RuitkHmr_.apply is called directly — exactly what the
 ## debugger-channel callback does — against components loaded from scratch files, mounted with
 ## the real reconciler. Run: godot --headless --path . --script res://tests/hmr_test.gd
 
@@ -10,7 +10,7 @@ var _passed := 0
 const DIR := "res://tests/__hmr_tmp"
 ## preload, not the global name: a freshly-added class_name only enters the global cache on the
 ## next editor scan, and this suite must run on a cold checkout (CI clones) regardless.
-const RUIHmr_ = preload("res://addons/reactive_ui/core/hmr.gd")
+const RuitkHmr_ = preload("res://addons/reactive_ui_toolkit/core/hmr.gd")
 
 func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(DIR)
@@ -42,28 +42,28 @@ func _initialize() -> void:
 func _test_injector_dedupe() -> void:
 	var bindings := { "HudHooks": "res://x/hud_hooks.gd" }
 	var with_const := "class_name Panel\nextends RefCounted\nconst HudHooks = preload(\"res://x/hud_hooks.gd\")\nstatic func render():\n\tHudHooks.use()\n"
-	_check_true(RUIHmr_._inject_unregistered_bindings(with_const, bindings) == with_const, "injector: skips a name already const-declared (no duplicate const)")
+	_check_true(RuitkHmr_._inject_unregistered_bindings(with_const, bindings) == with_const, "injector: skips a name already const-declared (no duplicate const)")
 	var bare := "class_name Panel\nextends RefCounted\nstatic func render():\n\tHudHooks.use()\n"
-	_check_true(RUIHmr_._inject_unregistered_bindings(bare, bindings).contains("const HudHooks = preload("), "injector: still injects a used, non-global, non-const name")
+	_check_true(RuitkHmr_._inject_unregistered_bindings(bare, bindings).contains("const HudHooks = preload("), "injector: still injects a used, non-global, non-const name")
 	# _has_const_decl is line-anchored: a mid-line mention of the name is NOT a declaration.
-	_check_true(RUIHmr_._has_const_decl("const Foo = 1\n", "Foo"), "injector: _has_const_decl matches a real const line")
-	_check_true(not RUIHmr_._has_const_decl("var x = Foo\n", "Foo"), "injector: _has_const_decl ignores a usage site")
+	_check_true(RuitkHmr_._has_const_decl("const Foo = 1\n", "Foo"), "injector: _has_const_decl matches a real const line")
+	_check_true(not RuitkHmr_._has_const_decl("var x = Foo\n", "Foo"), "injector: _has_const_decl ignores a usage site")
 	# M5.2 (ES-modules leg): generated files now hold `static var <name>` VALUE declarations --
 	# splicing a `const X` above a same-named `static var X` is a duplicate declaration =
 	# reload ERR_PARSE_ERROR. The skip covers both spellings.
-	_check_true(RUIHmr_._has_const_decl("static var Foo := 1\n", "Foo"), "injector: _has_const_decl matches a static var value decl")
+	_check_true(RuitkHmr_._has_const_decl("static var Foo := 1\n", "Foo"), "injector: _has_const_decl matches a static var value decl")
 	var with_static := "class_name Panel\nextends RefCounted\nstatic var HudHooks := 1\nstatic func render():\n\treturn HudHooks\n"
-	_check_true(RUIHmr_._inject_unregistered_bindings(with_static, bindings) == with_static, "M5.2: injector skips a name already static-var-declared (no duplicate)")
+	_check_true(RuitkHmr_._inject_unregistered_bindings(with_static, bindings) == with_static, "M5.2: injector skips a name already static-var-declared (no duplicate)")
 	# ES-modules: a mixed file whose only eager decl is a VALUE (or util) classifies as
 	# module-like for refresh purposes -- its importers consumed it eagerly.
 	var val_mixed := GDScript.new()
 	val_mixed.source_code = "extends RefCounted\nconst __RUI_DECLS := { \"C\": { \"kind\": \"component\", \"sig\": \"\", \"export\": true }, \"w\": { \"kind\": \"value\", \"export\": true } }\nconst __RUI_KIND := \"mixed\"\nconst __RUI_HOOK_SIG := \"\"\nstatic var w := 1\nstatic func render(_p, _c): return null\n"
 	val_mixed.reload()
-	_check_true(RUIHmr_._is_module(val_mixed), "M5.1: a mixed file with a VALUE decl drives importer refresh (kind value)")
+	_check_true(RuitkHmr_._is_module(val_mixed), "M5.1: a mixed file with a VALUE decl drives importer refresh (kind value)")
 	var util_mixed := GDScript.new()
 	util_mixed.source_code = "extends RefCounted\nconst __RUI_DECLS := { \"fmt\": { \"kind\": \"util\", \"export\": true } }\nconst __RUI_KIND := \"mixed\"\nconst __RUI_HOOK_SIG := \"\"\nstatic func fmt(): return 1\n"
 	util_mixed.reload()
-	_check_true(RUIHmr_._is_module(util_mixed), "M5.1: a util-only mixed file drives importer refresh (kind util)")
+	_check_true(RuitkHmr_._is_module(util_mixed), "M5.1: a util-only mixed file drives importer refresh (kind util)")
 
 	# BH-15: a MIXED file (component + a hook/module) is classified _is_module==true (its value decl
 	# drives a global/targeted refresh) YET its render component's __RUI_HOOK_SIG must still be compared
@@ -71,8 +71,8 @@ func _test_injector_dedupe() -> void:
 	var mixed := GDScript.new()
 	mixed.source_code = "extends RefCounted\nconst __RUI_DECLS := { \"C\": { \"kind\": \"component\", \"sig\": \"useState\", \"export\": true }, \"use_h\": { \"kind\": \"hook\", \"export\": true } }\nconst __RUI_KIND := \"mixed\"\nconst __RUI_HOOK_SIG := \"useState\"\nstatic func render(_p, _c): return null\nstatic func use_h(): return 1\n"
 	mixed.reload()
-	_check_true(RUIHmr_._is_module(mixed), "BH-15: a mixed file with a hook is classified as module (drives refresh)")
-	_check_true(RUIHmr_._hook_sig(mixed) == "useState", "BH-15: yet its render component's hook-sig is still readable for the reset compare")
+	_check_true(RuitkHmr_._is_module(mixed), "BH-15: a mixed file with a hook is classified as module (drives refresh)")
+	_check_true(RuitkHmr_._hook_sig(mixed) == "useState", "BH-15: yet its render component's hook-sig is still readable for the reset compare")
 
 # --------------------------------------------------------------------------------- harness ---
 
@@ -114,7 +114,7 @@ func _counter_src(prefix: String, sig: String, hooks: int = 1) -> String:
 		pad += "\tvar _pad%d = Hooks.useState(0)\n" % i
 	return "extends RefCounted\n" \
 		+ "const __RUI_HOOK_SIG := \"" + sig + "\"\n" \
-		+ "static func render(props: Dictionary, children: Array) -> RUIVNode:\n" \
+		+ "static func render(props: Dictionary, children: Array) -> RuitkVNode:\n" \
 		+ "\tvar n = Hooks.useState(0)\n" + pad \
 		+ "\treturn V.VBoxContainer({}, [\n" \
 		+ "\t\tV.Label({ \"text\": \"" + prefix + "-\" + str(n[0]) }),\n" \
@@ -124,13 +124,13 @@ func _counter_src(prefix: String, sig: String, hooks: int = 1) -> String:
 func _sibling_src(prefix: String) -> String:
 	return "extends RefCounted\n" \
 		+ "static var renders := 0\n" \
-		+ "static func render(props: Dictionary, children: Array) -> RUIVNode:\n" \
+		+ "static func render(props: Dictionary, children: Array) -> RuitkVNode:\n" \
 		+ "\trenders += 1\n" \
 		+ "\treturn V.Label({ \"text\": \"" + prefix + "\" })\n"
 
 func _parent_src() -> String:
 	return "extends RefCounted\n" \
-		+ "static func render(props: Dictionary, children: Array) -> RUIVNode:\n" \
+		+ "static func render(props: Dictionary, children: Array) -> RuitkVNode:\n" \
 		+ "\treturn V.VBoxContainer({}, [V.fc(props[\"a\"], {}), V.fc(props[\"b\"], {})])\n"
 
 ## Mount parent(a, b) under a fresh Control; returns { app, root, rec }.
@@ -141,7 +141,7 @@ func _mount(a: GDScript, b: GDScript) -> Dictionary:
 	var parent_scr: GDScript = load(parent_path)
 	var root := Control.new()
 	get_root().add_child(root)
-	var app = ReactiveRoot.create(root, V.fc(Callable(parent_scr, "render"),
+	var app = RuitkRoot.create(root, V.fc(Callable(parent_scr, "render"),
 		{ "a": Callable(a, "render"), "b": Callable(b, "render") }))
 	return { "app": app, "root": root, "rec": app._reconciler }
 
@@ -170,7 +170,7 @@ func _test_fast_refresh_preserves_state() -> void:
 	_check_true("v1-2" in _labels_text(m["root"]), "clicked twice -> v1-2 (got %s)" % str(_labels_text(m["root"])))
 	var sib_renders_before: int = b.renders
 	_write(ap, _counter_src("v2", "useState"))
-	var res: Dictionary = RUIHmr_.apply([ap])
+	var res: Dictionary = RuitkHmr_.apply([ap])
 	_check_true(int(res["reloaded"]) == 1 and int(res["reset"]) == 0 and (res["errors"] as Array).is_empty(),
 		"apply: 1 reloaded, 0 reset, no errors (got %s)" % str(res))
 	_check_true(int(res["refreshed"]) == 1, "exactly ONE fiber refreshed (targeted), got %s" % str(res))
@@ -194,7 +194,7 @@ func _test_signature_change_resets_state() -> void:
 	_click_plus(m["root"], m["rec"])
 	_check_true("s1-1" in _labels_text(m["root"]), "state at 1 before the shape change")
 	_write(ap, _counter_src("s2", "useState|useState", 2))   # hook SHAPE changed
-	var res: Dictionary = RUIHmr_.apply([ap])
+	var res: Dictionary = RuitkHmr_.apply([ap])
 	_check_true(int(res["reset"]) == 1, "signature change counted as a reset (got %s)" % str(res))
 	_check_true("s2-0" in _labels_text(m["root"]),
 		"changed hook shape -> deliberate state RESET: s2-0 (got %s)" % str(_labels_text(m["root"])))
@@ -217,7 +217,7 @@ func _test_module_change_rerenders_globally() -> void:
 	var m := _mount(a, b)
 	var sib_before: int = b.renders
 	_write(mp, "extends RefCounted\nstatic func use_thing() -> int:\n\treturn 2\n")
-	var res: Dictionary = RUIHmr_.apply([mp])
+	var res: Dictionary = RuitkHmr_.apply([mp])
 	_check_true(bool(res["global"]), "module (no render func) classified as global (got %s)" % str(res))
 	_check_true(int(b.renders) == sib_before + 1,
 		"global refresh re-ran the sibling too: %d == %d+1" % [int(b.renders), sib_before])
@@ -253,7 +253,7 @@ const __RUI_KIND := \"mixed\"
 const __RUI_HOOK_SIG := \"\"
 static var w := 2
 ")
-	var res: Dictionary = RUIHmr_.apply([vp])
+	var res: Dictionary = RuitkHmr_.apply([vp])
 	_check_true(bool(res["global"]), "value file with no known importers falls back to global refresh (got %s)" % str(res))
 	_check_true(int(res["reset"]) == 0, "a value edit resets NO hook state (got %s)" % str(res))
 	_check_true(int(b.renders) == sib_before + 1, "consumers re-rendered (%d == %d+1)" % [int(b.renders), sib_before])
@@ -272,7 +272,7 @@ func _test_error_isolation_and_recovery() -> void:
 	# batch: A becomes UNPARSEABLE, B legitimately changes -- B must still swap, A reports
 	_write(ap, "extends RefCounted\nstatic func render(:::broken:::\n")
 	_write(bp, _sibling_src("sib-e2"))
-	var res: Dictionary = RUIHmr_.apply([ap, bp])
+	var res: Dictionary = RuitkHmr_.apply([ap, bp])
 	_check_true((res["errors"] as Array).size() == 1, "broken file reported (got %s)" % str(res["errors"]))
 	_check_true(int(res["reloaded"]) == 1, "healthy file in the same batch still reloaded")
 	_check_true("sib-e2" in _labels_text(m["root"]),
@@ -281,7 +281,7 @@ func _test_error_isolation_and_recovery() -> void:
 		"broken component keeps its last-good UI (got %s)" % str(_labels_text(m["root"])))
 	# repair A -> next apply recovers it, state still intact
 	_write(ap, _counter_src("e2", "useState"))
-	var res2: Dictionary = RUIHmr_.apply([ap])
+	var res2: Dictionary = RuitkHmr_.apply([ap])
 	_check_true((res2["errors"] as Array).is_empty() and int(res2["reloaded"]) == 1, "repaired file reloads clean")
 	_check_true("e2-1" in _labels_text(m["root"]),
 		"recovery: new code + state preserved across the broken interlude (got %s)" % str(_labels_text(m["root"])))
@@ -294,7 +294,7 @@ func _test_empty_read_held() -> void:
 	var m := _mount(a, a)
 	var f := FileAccess.open(ap, FileAccess.WRITE)   # truncate = the editor mid-write race
 	f.close()
-	var res: Dictionary = RUIHmr_.apply([ap])
+	var res: Dictionary = RuitkHmr_.apply([ap])
 	_check_true((res["errors"] as Array).size() == 1 and int(res["reloaded"]) == 0,
 		"empty read held, old code kept (got %s)" % str(res))
 	_check_true("h1-0" in _labels_text(m["root"]), "UI untouched on the empty read")
@@ -303,7 +303,7 @@ func _test_empty_read_held() -> void:
 func _test_uncached_path_skipped() -> void:
 	var p := DIR + "/never_loaded.gd"
 	_write(p, _sibling_src("x"))
-	var res: Dictionary = RUIHmr_.apply([p])
+	var res: Dictionary = RuitkHmr_.apply([p])
 	_check_true(int(res["reloaded"]) == 0 and (res["errors"] as Array).is_empty(),
 		"a never-loaded script is skipped without error (got %s)" % str(res))
 
@@ -314,7 +314,7 @@ func _test_unmount_prunes_registry() -> void:
 	var m := _mount(a, a)
 	_teardown(m)
 	_write(ap, _counter_src("u2", "useState"))
-	var res: Dictionary = RUIHmr_.apply([ap])
+	var res: Dictionary = RuitkHmr_.apply([ap])
 	_check_true(int(res["refreshed"]) == 0, "unmounted root is pruned: nothing refreshed (got %s)" % str(res))
 
 func _test_multi_root() -> void:
@@ -328,7 +328,7 @@ func _test_multi_root() -> void:
 	var m2 := _mount(a, b)
 	_click_plus(m1["root"], m1["rec"])   # roots hold independent state: 1 vs 0
 	_write(ap, _counter_src("m2", "useState"))
-	var res: Dictionary = RUIHmr_.apply([ap])
+	var res: Dictionary = RuitkHmr_.apply([ap])
 	_check_true(int(res["refreshed"]) == 2, "both live roots refreshed (got %s)" % str(res))
 	_check_true("m2-1" in _labels_text(m1["root"]), "root 1: new code, ITS state (m2-1)")
 	_check_true("m2-0" in _labels_text(m2["root"]), "root 2: new code, ITS state (m2-0)")
@@ -339,7 +339,7 @@ func _test_multi_root() -> void:
 ## script, bump state, recompile with the same hook shape (state preserved), then with an added
 ## hook (deliberate reset via the emitted __RUI_HOOK_SIG).
 func _test_compiled_component_end_to_end() -> void:
-	var Compiler = preload("res://addons/reactive_ui/guitkx/guitkx.gd")
+	var Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 	var gp := DIR + "/e2e.gd"
 	var r1: Dictionary = Compiler.compile(_e2e_guitkx("e1", false), "e2e")
 	_check_true(bool(r1["ok"]), "e2e v1 compiles: " + str(r1.get("diagnostics")))
@@ -351,13 +351,13 @@ func _test_compiled_component_end_to_end() -> void:
 	# same hook shape, new text -> Fast Refresh preserves state
 	var r2: Dictionary = Compiler.compile(_e2e_guitkx("e2", false), "e2e")
 	_write(gp, _strip_class_name(str(r2["gd"])))
-	var res2: Dictionary = RUIHmr_.apply([gp])
+	var res2: Dictionary = RuitkHmr_.apply([gp])
 	_check_true(int(res2["reset"]) == 0 and "e2-1" in _labels_text(m["root"]),
 		"recompiled (same shape): new code + preserved state e2-1 (got %s / %s)" % [str(res2), str(_labels_text(m["root"]))])
 	# added hook -> changed __RUI_HOOK_SIG -> deliberate reset
 	var r3: Dictionary = Compiler.compile(_e2e_guitkx("e3", true), "e2e")
 	_write(gp, _strip_class_name(str(r3["gd"])))
-	var res3: Dictionary = RUIHmr_.apply([gp])
+	var res3: Dictionary = RuitkHmr_.apply([gp])
 	_check_true(int(res3["reset"]) == 1 and "e3-0" in _labels_text(m["root"]),
 		"recompiled (added hook): deliberate state reset e3-0 (got %s / %s)" % [str(res3), str(_labels_text(m["root"]))])
 	_teardown(m)
@@ -398,7 +398,7 @@ func _test_mixed_batch_component_and_module() -> void:
 	var sib_before: int = b.renders
 	_write(ap, _counter_src("x2", "useState"))
 	_write(mp, "extends RefCounted\nstatic func use_x() -> int:\n\treturn 2\n")
-	var res: Dictionary = RUIHmr_.apply([ap, mp])
+	var res: Dictionary = RuitkHmr_.apply([ap, mp])
 	_check_true(bool(res["global"]) and int(res["reloaded"]) == 2, "mixed batch: both reloaded, global set (got %s)" % str(res))
 	_check_true("x2-1" in _labels_text(m["root"]), "component code swapped with state kept (x2-1)")
 	_check_true(int(b.renders) == sib_before + 1, "module change re-ran the sibling in the same pass")
@@ -412,8 +412,8 @@ func _test_rapid_resave_idempotent() -> void:
 	var a: GDScript = load(ap)
 	var m := _mount(a, a)
 	_write(ap, _counter_src("r2", "useState"))
-	var res1: Dictionary = RUIHmr_.apply([ap])
-	var res2: Dictionary = RUIHmr_.apply([ap])   # same bytes again
+	var res1: Dictionary = RuitkHmr_.apply([ap])
+	var res2: Dictionary = RuitkHmr_.apply([ap])   # same bytes again
 	_check_true(int(res1["reloaded"]) == 1 and int(res2["reloaded"]) == 0,
 		"identical re-apply skips (got %s then %s)" % [str(res1), str(res2)])
 	_check_true("r2-0" in _labels_text(m["root"]), "UI stable across the idempotent re-apply")
@@ -430,7 +430,7 @@ func _test_reload_with_pending_update() -> void:
 	var btn := _find_first(m["root"], "Button") as Button
 	btn.pressed.emit()   # deliberately NOT pumped -- the update is queued, not committed
 	_write(ap, _counter_src("p2", "useState"))
-	var res: Dictionary = RUIHmr_.apply([ap])
+	var res: Dictionary = RuitkHmr_.apply([ap])
 	_check_true(int(res["reloaded"]) == 1, "reload applied over a pending update")
 	_check_true("p2-1" in _labels_text(m["root"]),
 		"one atomic pass: new code AND the queued click both landed (got %s)" % str(_labels_text(m["root"])))
@@ -448,18 +448,18 @@ func _test_new_component_hot_link() -> void:
 	var m := _mount(a, a)
 	_click_plus(m["root"], m["rec"])
 	var np := DIR + "/new_comp.gd"
-	_write(np, "class_name HmrNewComp\nextends RefCounted\n## AUTO-GENERATED from new_comp.guitkx -- do not edit.\n\nstatic func render(props: Dictionary, children: Array) -> RUIVNode:\n\treturn V.Label({ \"text\": \"fresh!\" })\n")
+	_write(np, "class_name HmrNewComp\nextends RefCounted\n## AUTO-GENERATED from new_comp.guitkx -- do not edit.\n\nstatic func render(props: Dictionary, children: Array) -> RuitkVNode:\n\treturn V.Label({ \"text\": \"fresh!\" })\n")
 	# the edited parent references the new component by GLOBAL NAME, exactly like generated code
-	_write(ap, "extends RefCounted\nconst __RUI_HOOK_SIG := \"useState\"\nstatic func render(props: Dictionary, children: Array) -> RUIVNode:\n\tvar n = Hooks.useState(0)\n\treturn V.VBoxContainer({}, [\n\t\tV.Label({ \"text\": \"n2-\" + str(n[0]) }),\n\t\tV.Button({ \"text\": \"+\", \"onPressed\": func(): n[1].call(n[0] + 1) }),\n\t\tV.fc(HmrNewComp.render, {}),\n\t])\n")
-	var res: Dictionary = RUIHmr_.apply([ap], { "HmrNewComp": np })
+	_write(ap, "extends RefCounted\nconst __RUI_HOOK_SIG := \"useState\"\nstatic func render(props: Dictionary, children: Array) -> RuitkVNode:\n\tvar n = Hooks.useState(0)\n\treturn V.VBoxContainer({}, [\n\t\tV.Label({ \"text\": \"n2-\" + str(n[0]) }),\n\t\tV.Button({ \"text\": \"+\", \"onPressed\": func(): n[1].call(n[0] + 1) }),\n\t\tV.fc(HmrNewComp.render, {}),\n\t])\n")
+	var res: Dictionary = RuitkHmr_.apply([ap], { "HmrNewComp": np })
 	_check_true(int(res.get("linked", 0)) == 1 and (res["errors"] as Array).is_empty(),
 		"parent hot-LINKED the unregistered new component (got %s)" % str(res))
 	var texts := _labels_text(m["root"])
 	_check_true("n2-1" in texts, "parent swapped with state intact: n2-1 (got %s)" % str(texts))
 	_check_true("fresh!" in texts, "the NEW component rendered live (got %s)" % str(texts))
 	# and the linked parent keeps hot-reloading normally afterwards
-	_write(ap, "extends RefCounted\nconst __RUI_HOOK_SIG := \"useState\"\nstatic func render(props: Dictionary, children: Array) -> RUIVNode:\n\tvar n = Hooks.useState(0)\n\treturn V.VBoxContainer({}, [\n\t\tV.Label({ \"text\": \"n3-\" + str(n[0]) }),\n\t\tV.Button({ \"text\": \"+\", \"onPressed\": func(): n[1].call(n[0] + 1) }),\n\t\tV.fc(HmrNewComp.render, {}),\n\t])\n")
-	var res2: Dictionary = RUIHmr_.apply([ap], { "HmrNewComp": np })
+	_write(ap, "extends RefCounted\nconst __RUI_HOOK_SIG := \"useState\"\nstatic func render(props: Dictionary, children: Array) -> RuitkVNode:\n\tvar n = Hooks.useState(0)\n\treturn V.VBoxContainer({}, [\n\t\tV.Label({ \"text\": \"n3-\" + str(n[0]) }),\n\t\tV.Button({ \"text\": \"+\", \"onPressed\": func(): n[1].call(n[0] + 1) }),\n\t\tV.fc(HmrNewComp.render, {}),\n\t])\n")
+	var res2: Dictionary = RuitkHmr_.apply([ap], { "HmrNewComp": np })
 	_check_true(int(res2.get("linked", 0)) == 1 and "n3-1" in _labels_text(m["root"]),
 		"subsequent edits keep hot-linking (n3-1, got %s / %s)" % [str(res2), str(_labels_text(m["root"]))])
 	_teardown(m)

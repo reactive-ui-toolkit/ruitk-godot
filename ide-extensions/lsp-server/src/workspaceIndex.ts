@@ -15,7 +15,7 @@ export interface DeclInfo {
   kind: "component" | "hook" | "module" | "member" | "value" | "util";
   kw: "component" | "hook" | "module" | ""; // the wrapper keyword ("" = plain E-01 declaration)
   deprecated?: boolean; // true = wrapper-keyword form (0.11.0 deprecation window)
-  crossGuard?: boolean; // plain decl: use_-prefixed AND -> RUIVNode (GUITKX2321)
+  crossGuard?: boolean; // plain decl: use_-prefixed AND -> RuitkVNode (GUITKX2321)
   name: string;
   binding: string;
   module?: string;

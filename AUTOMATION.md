@@ -34,8 +34,8 @@ implementation → verification, using the same steps as the human runbook below
    ships in the addon):
 
    ```bash
-   <old-godot> --headless --path . --script res://addons/reactive_ui/dev/classdb_dump.gd -- res://classdb-old.json
-   <new-godot> --headless --path . --script res://addons/reactive_ui/dev/classdb_dump.gd -- res://classdb-new.json
+   <old-godot> --headless --path . --script res://addons/reactive_ui_toolkit/dev/classdb_dump.gd -- res://classdb-old.json
+   <new-godot> --headless --path . --script res://addons/reactive_ui_toolkit/dev/classdb_dump.gd -- res://classdb-new.json
    ```
 
 2. **Diff them** — ClassDB reflection, no web scraping:
@@ -54,23 +54,23 @@ implementation → verification, using the same steps as the human runbook below
 **Always (any new engine version):**
 
 - [ ] Regenerate the bundled LSP ClassDB dump **with the new Godot**:
-      `godot --headless --path . --script res://addons/reactive_ui/dev/classdb_dump.gd`
+      `godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/classdb_dump.gd`
       → `ide-extensions/lsp-server/classdb/godot-control.json` (drives VS Code/VS2022 attribute +
       event completion and `GUITKX0109` validation).
 - [ ] Bump CI: `GODOT_VERSION` in `.github/workflows/test.yml`.
 - [ ] Update the verified-on stamps: root `README.md` ("verified on **X**"),
-      `addons/reactive_ui/README.md` ("tested on X"), `CLAUDE.md`.
+      `addons/reactive_ui_toolkit/README.md` ("tested on X"), `CLAUDE.md`.
 - [ ] Docs site: add the version to `SUPPORTED_VERSIONS` in
-      `ReactiveUIGodotDocs~/src/versionManifest.ts`.
+      `RuitkGodotDocs~/src/versionManifest.ts`.
 - [ ] Run the full verify matrix (`CLAUDE.md` → Commands; all suites + contract + TS + docs).
 
 **Per new Control class (from the diff):**
 
 - [ ] Decide: leave as open-vocabulary (works already), or **curate**. Curating means:
-      `vocabulary.json` `host_tags` (BOTH copies: `addons/reactive_ui/guitkx/` +
+      `vocabulary.json` `host_tags` (BOTH copies: `addons/reactive_ui_toolkit/guitkx/` +
       `ide-extensions/lsp-server/src/`, byte-identical — a test enforces it), regenerate
       `guitkx_vocabulary.gen.gd` (`dev/gen_vocabulary.gd`), the curated schema
-      `guitkx-schema.json` (BOTH copies: `addons/reactive_ui_editor/data/` +
+      `guitkx-schema.json` (BOTH copies: `addons/reactive_ui_toolkit_editor/data/` +
       `ide-extensions/grammar/`), a `V.<ClassName>` factory in `core/v.gd` (the `v_factories`
       reflection tripwire pins the list), and a docs component page + `ELEMENT_VERSIONS` entry
       with `sinceGodot`.
@@ -94,17 +94,17 @@ if it drifts during an engine update, the update is wrong, not the hash.
 | Path | What | Audience |
 |------|------|----------|
 | `.claude/skills/add-godot-version/SKILL.md` | Claude Code skill — full runbook | AI |
-| `addons/reactive_ui/dev/classdb_dump.gd` | ClassDB dump script (run per Godot binary) | Both |
+| `addons/reactive_ui_toolkit/dev/classdb_dump.gd` | ClassDB dump script (run per Godot binary) | Both |
 | `scripts/godot-api-diff.mjs` | Dump differ (added/removed classes, props, signals) | Both |
 | `plans/WIDGET_INVENTORY.md` | The Control-coverage ledger (naming-loyalty audit) | Human |
-| `ReactiveUIGodotDocs~/src/versionManifest.ts` | Docs version manifest (single source of truth) | Both |
+| `RuitkGodotDocs~/src/versionManifest.ts` | Docs version manifest (single source of truth) | Both |
 
 ---
 
 ## Documentation Website Versioning
 
 The docs site has a version-aware system driven by
-`ReactiveUIGodotDocs~/src/versionManifest.ts` (the same design as the Unity docs site):
+`RuitkGodotDocs~/src/versionManifest.ts` (the same design as the Unity docs site):
 
 - `SUPPORTED_VERSIONS` — the version dropdown; first entry = floor, last = latest.
 - `ELEMENT_VERSIONS` / `STYLE_PROPERTY_VERSIONS` / `PAGE_VERSIONS` — `sinceGodot` tags for
@@ -114,4 +114,4 @@ The docs site has a version-aware system driven by
 When adding a new Godot version to docs: add the `SUPPORTED_VERSIONS` entry, tag any new
 elements/style keys/pages with `sinceGodot`, give each new curated element a **full component
 page** (usage example, props, events) — not just a table row — and verify with
-`cd ReactiveUIGodotDocs~ && npm run build && npm run lint`.
+`cd RuitkGodotDocs~ && npm run build && npm run lint`.

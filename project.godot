@@ -14,11 +14,11 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="ReactiveUI-Gadot"
-config/description="React-style reactive UI library for Godot (GDScript)."
+config/name="Reactive UI Toolkit — Godot"
+config/description="Reactive UI Toolkit — Godot: React-style reactive UI library for Godot (GDScript)."
 run/main_scene="res://examples/demos/doom/doom.tscn"
 config/features=PackedStringArray("4.7")
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/reactive_ui/plugin.cfg", "res://addons/reactive_ui_editor/plugin.cfg")
+enabled=PackedStringArray("res://addons/reactive_ui_toolkit/plugin.cfg", "res://addons/reactive_ui_toolkit_editor/plugin.cfg")
