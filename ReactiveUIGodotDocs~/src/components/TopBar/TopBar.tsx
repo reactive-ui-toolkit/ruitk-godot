@@ -22,11 +22,11 @@ export const TopBar: FC<TopBarProps> = ({ onOpenSearch }) => {
             <Box
               component="img"
               src={`${import.meta.env.BASE_URL}logo.png`}
-              alt="ReactiveUI for Godot logo"
+              alt="Reactive UI Toolkit — Godot logo"
               sx={Styles.logo}
             />
             <Typography variant="h6" sx={Styles.title}>
-              ReactiveUI for Godot
+              Reactive UI Toolkit — Godot
             </Typography>
           </Link>
           <Chip label={`v${PACKAGE_VERSION}`} size="small" />

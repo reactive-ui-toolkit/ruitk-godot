@@ -16,10 +16,10 @@ const QUICK_SAMPLE = `CounterCard() -> RUIVNode {
 export const UitkxIntroductionPage: FC = () => (
   <Box sx={Styles.root}>
     <Typography variant="h4" component="h1" gutterBottom>
-      Reactive UI for Godot
+      Reactive UI Toolkit — Godot
     </Typography>
     <Typography variant="body1" paragraph>
-      Reactive UI is a React-style UI framework for Godot 4.x, and <code>.guitkx</code> is its
+      Reactive UI Toolkit is a React-style UI framework for Godot 4.x, and <code>.guitkx</code> is its
       authoring language. You write function-style components in <code>.guitkx</code> files, use
       hooks for state and effects, and the toolkit reconciles the resulting virtual tree onto Godot{' '}
       <code>Control</code> nodes. There is no JavaScript engine or bridge layer — everything is plain

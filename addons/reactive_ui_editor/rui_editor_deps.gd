@@ -31,25 +31,25 @@ static func satisfied() -> Dictionary:
 	if not godot_version_ok():
 		return {
 			"ok": false, "version": "",
-			"reason": "Godot %s is not supported -- Reactive UI Editor needs Godot %s or newer (verified on 4.7)." % [str(Engine.get_version_info()["string"]), MIN_GODOT],
+			"reason": "Godot %s is not supported -- Reactive UI Toolkit — Godot Editor needs Godot %s or newer (verified on 4.7)." % [str(Engine.get_version_info()["string"]), MIN_GODOT],
 		}
 	if not FileAccess.file_exists(_DEP_CFG):
 		return {
 			"ok": false, "version": "",
-			"reason": "The 'Reactive UI' addon (addons/reactive_ui) is not installed. " +
+			"reason": "The 'Reactive UI Toolkit — Godot' addon (addons/reactive_ui) is not installed. " +
 				"Install it from the Godot Asset Store, then re-enable this plugin.",
 		}
 	var ver := installed_version()
 	if ver != "" and _version_lt(ver, MIN_REACTIVE_UI):
 		return {
 			"ok": false, "version": ver,
-			"reason": "Reactive UI %s is installed, but this editor needs %s or newer. Update the 'Reactive UI' addon." % [ver, MIN_REACTIVE_UI],
+			"reason": "Reactive UI Toolkit — Godot %s is installed, but this editor needs %s or newer. Update the 'Reactive UI Toolkit — Godot' addon." % [ver, MIN_REACTIVE_UI],
 		}
 	for p in [_COMPILER, _FORMATTER]:
 		if not FileAccess.file_exists(p):
 			return {
 				"ok": false, "version": ver,
-				"reason": "The 'Reactive UI' addon looks incomplete (missing %s). Reinstall it." % p,
+				"reason": "The 'Reactive UI Toolkit — Godot' addon looks incomplete (missing %s). Reinstall it." % p,
 			}
 	return { "ok": true, "reason": "", "version": ver }
 

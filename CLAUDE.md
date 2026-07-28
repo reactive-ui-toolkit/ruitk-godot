@@ -4,8 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A **React-style reactive UI library for Godot 4.x, written in plain GDScript** — the Godot sibling of
-the C#/Unity [ReactiveUIToolKit](https://github.com/yanivkalfa/ReactiveUIToolKit). Function components
+A **React-style reactive UI library for Godot 4.x, written in plain GDScript** — the Godot leg of the
+**Reactive UI Toolkit** family, sibling of the C#/Unity
+[Reactive UI Toolkit — Unity](https://github.com/reactive-ui-toolkit/ruitk-unity). Function components
 return a virtual tree; a fiber reconciler diffs each render and patches only what changed on the real
 Godot `Control` tree. State lives in hooks.
 
@@ -153,7 +154,7 @@ and press Play to explore.
 
 ## Conventions
 
-- **Faithful port.** Algorithms/behavior mirror ReactiveUIToolKit (the C#/Unity library); the code is
+- **Faithful port.** Algorithms/behavior mirror Reactive UI Toolkit — Unity (the C#/Unity library); the code is
   GDScript. When in doubt about intended semantics, that library is the reference. GDScript divergences
   (no exceptions, fresh fibers per pass) are documented at the top of the relevant core file.
 - Requires Godot **4.4+** (compiler core uses 4.3+ APIs; the editor addon's bundled analyzer GDExtension has `compatibility_minimum = "4.4"` — both plugins gate on `MIN_GODOT`); verified on **4.7**. Standard build — no C#/.NET.

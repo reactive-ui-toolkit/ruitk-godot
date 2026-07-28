@@ -1,4 +1,4 @@
-# Reactive UI Editor
+# Reactive UI Toolkit — Godot Editor
 
 In-editor authoring for `.guitkx` files, right inside the Godot editor: a **main-screen,
 multi-file editor** with syntax highlighting (embedded-expression sub-highlighting included),
@@ -8,15 +8,15 @@ outline, find/replace, session restore, and the data-safety guardrails you'd exp
 editor (per-file dirty tracking, external-change detection, rename/delete follow-up,
 undo-surviving format).
 
-This is the sibling of the **Reactive UI** runtime addon (`addons/reactive_ui`) and **depends on it** —
+This is the sibling of the **Reactive UI Toolkit — Godot** runtime addon (`addons/reactive_ui`) and **depends on it** —
 it reuses that addon's `.guitkx` compiler (`RUIGuitkx`), formatter (`RUIGuitkxFormatter`) and lexer
-primitives (`RUIGuitkxLexer`). Install/enable **Reactive UI first** (0.8.4 or newer — the plugin
+primitives (`RUIGuitkxLexer`). Install/enable **Reactive UI Toolkit — Godot first** (0.8.4 or newer — the plugin
 checks and tells you politely instead of erroring if it's missing or too old).
 
 ## Install
 
 1. Copy both `addons/reactive_ui/` and `addons/reactive_ui_editor/` into your project's `res://addons/`.
-2. Enable both under **Project → Project Settings → Plugins** (Reactive UI, then Reactive UI Editor).
+2. Enable both under **Project → Project Settings → Plugins** (Reactive UI, then Reactive UI Toolkit — Godot Editor).
    In this repository both are already enabled in `project.godot`.
 
 Requires **Godot 4.4+**.
@@ -73,7 +73,7 @@ Requires **Godot 4.4+**.
   or moving files in the FileSystem dock retargets open buffers (Save never resurrects the old
   filename); deleting one marks its buffer detached and Save asks before recreating; failed writes
   raise a dialog, not just a console line.
-- **Save** writes only the `.guitkx`; the Reactive UI addon's own watcher regenerates the sibling `.gd`
+- **Save** writes only the `.guitkx`; the Reactive UI Toolkit — Godot addon's own watcher regenerates the sibling `.gd`
   (and, if a game is running under F5, hot-reloads it in place — see Fast Refresh in the root README).
 - **Format** (button or format-on-save) runs `RUIGuitkxFormatter` — never corrupts (verbatim on parse
   error), applies as **one undoable edit** (Ctrl+Z survives), and honours the nearest

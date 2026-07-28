@@ -10,7 +10,7 @@ export const UitkxDifferencesPage: FC = () => (
       Different from React
     </Typography>
     <Typography variant="body1" paragraph>
-      Reactive UI borrows React's component-and-hooks mental model, but it runs on Godot with a plain
+      Reactive UI Toolkit borrows React's component-and-hooks mental model, but it runs on Godot with a plain
       GDScript runtime. This section covers the places where your mental model should be adjusted
       rather than re-explaining core concepts. It also notes where it differs from the C# / Unity
       sibling, ReactiveUIToolKit.

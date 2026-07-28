@@ -862,13 +862,13 @@ func save_silent() -> bool:
 		if str(path) == "" or not ed.dirty:
 			continue
 		if ed.detached:
-			push_error("[reactive_ui_editor] %s was deleted on disk — not recreating it during an editor save. Save it explicitly in the Reactive UI editor." % ed.file_path)
+			push_error("[reactive_ui_editor] %s was deleted on disk — not recreating it during an editor save. Save it explicitly in the Reactive UI Toolkit editor." % ed.file_path)
 			all_ok = false
 			continue
 		if FileAccess.file_exists(ed.file_path):
 			var disk := FileAccess.get_modified_time(ed.file_path)
 			if ed.loaded_mtime != 0 and disk != ed.loaded_mtime:
-				push_error("[reactive_ui_editor] %s changed on disk — not overwriting during an editor save. Resolve it in the Reactive UI editor." % ed.file_path)
+				push_error("[reactive_ui_editor] %s changed on disk — not overwriting during an editor save. Resolve it in the Reactive UI Toolkit editor." % ed.file_path)
 				all_ok = false
 				continue
 		if not _write_editor(ed):
@@ -951,7 +951,7 @@ func _on_new_pressed() -> void:
 
 func _alert(text: String) -> void:
 	var dlg := AcceptDialog.new()
-	dlg.title = "Reactive UI Editor"
+	dlg.title = "Reactive UI Toolkit — Godot Editor"
 	dlg.dialog_text = text
 	dlg.confirmed.connect(dlg.queue_free)
 	dlg.canceled.connect(dlg.queue_free)
@@ -960,7 +960,7 @@ func _alert(text: String) -> void:
 
 func _confirm_one(text: String, ok_label: String, on_ok: Callable) -> void:
 	var dlg := ConfirmationDialog.new()
-	dlg.title = "Reactive UI Editor"
+	dlg.title = "Reactive UI Toolkit — Godot Editor"
 	dlg.dialog_text = text
 	dlg.ok_button_text = ok_label
 	dlg.confirmed.connect(func():
@@ -972,7 +972,7 @@ func _confirm_one(text: String, ok_label: String, on_ok: Callable) -> void:
 
 func _confirm_two(text: String, ok_label: String, on_ok: Callable, alt_label: String, on_alt: Callable) -> void:
 	var dlg := ConfirmationDialog.new()
-	dlg.title = "Reactive UI Editor"
+	dlg.title = "Reactive UI Toolkit — Godot Editor"
 	dlg.dialog_text = text
 	dlg.ok_button_text = ok_label
 	var alt := dlg.add_button(alt_label, true, "alt")

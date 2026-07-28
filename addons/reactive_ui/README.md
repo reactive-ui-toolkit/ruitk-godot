@@ -1,4 +1,4 @@
-# Reactive UI (React for Godot)
+# Reactive UI Toolkit — Godot
 
 React-style reactive UI for Godot 4, in plain GDScript: function components, hooks
 (`useState` / `useEffect` / `useMemo` / …), a fiber reconciler with keyed reconciliation and
@@ -15,12 +15,12 @@ hook-state preservation).
 ## Install
 
 1. Get the addon, either way:
-   - **From the Asset Library:** open the **AssetLib** tab in the editor, search **"Reactive UI"**,
+   - **From the Asset Library:** open the **AssetLib** tab in the editor, search **"Reactive UI Toolkit — Godot"**,
      then **Download → Install** (keep the `addons/reactive_ui/` folder).
    - **Manually:** copy `addons/reactive_ui/` into your project's `res://addons/`.
-2. Enable **Reactive UI** under *Project → Project Settings → Plugins*.
-3. Optional but recommended: the **Reactive UI Editor** addon (a separate Asset Library entry —
-   search **"Reactive UI Editor"**) adds an in-editor `.guitkx` authoring experience — highlighting,
+2. Enable **Reactive UI Toolkit — Godot** under *Project → Project Settings → Plugins*.
+3. Optional but recommended: the **Reactive UI Toolkit — Godot Editor** addon (a separate Asset Library entry —
+   search **"Reactive UI Toolkit — Godot Editor"**) adds an in-editor `.guitkx` authoring experience — highlighting,
    live diagnostics, completion, hover, go-to-definition. VS Code users get the same (plus
    embedded-GDScript analysis) from the **GUITKX** extension on the marketplace.
 

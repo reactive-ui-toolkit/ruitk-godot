@@ -199,7 +199,7 @@ const HEADERS = {
   editor: [
     '# Changelog',
     '',
-    'All notable changes to the **Reactive UI Editor** Godot addon are documented here.',
+    'All notable changes to the **Reactive UI Toolkit — Godot Editor** Godot addon are documented here.',
     'This addon versions independently of the `reactive_ui` runtime library. Entries from',
     '0.6.3 onward are generated from `ide-extensions/changelog.json` (the single source',
     'shared with the GUITKX IDE extensions) — add entries via `changelog.mjs add --scope',

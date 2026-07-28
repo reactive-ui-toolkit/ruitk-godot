@@ -82,7 +82,7 @@ Every marketplace-visible string has exactly one source; edit the source, never 
 | Changelog tab/section | appended into README.md by extract-overview (embedded inline, not a separate CHANGELOG.md tab) | appended into overview.md by extract-overview |
 
 - Naming scheme (family-wide, 2026-07-16): display name = `GUITKX (Godot - VS Code)` /
-  `GUITKX (Godot - VS2022)`; body H1 = `Reactive UI - Godot - <IDE> (GUITKX)`; body order =
+  `GUITKX (Godot - VS2022)`; body H1 = `Reactive UI Toolkit — Godot - <IDE> (GUITKX)`; body order =
   Title → Description → Features → Requirements → Changelog. Execution details:
   `plans/archive/EXTENSION_LISTING_PLAN.md`.
 - A LISTING-ONLY change still bumps both extensions (patch) + a Lane B entry — shipped bytes change.
@@ -95,7 +95,7 @@ Every marketplace-visible string has exactly one source; edit the source, never 
 ### Discord (community note)
 
 Add an entry at the top of `plans/DISCORD_CHANGELOG.md`, matching the existing entries'
-shape: `## [X.Y.Z] - date`, bold-lead paragraphs, an `Update to **Reactive UI X.Y.Z** …`
+shape: `## [X.Y.Z] - date`, bold-lead paragraphs, an `Update to **Reactive UI Toolkit X.Y.Z** …`
 line, and a `**Tooling:** …` footer for the extension/editor versions. **Hard limit
 ≤ 2000 characters** per entry (Discord message cap) — count it:
 `awk '/^---$/{exit} {n+=length($0)+1} END{print n}' plans/DISCORD_CHANGELOG.md`.

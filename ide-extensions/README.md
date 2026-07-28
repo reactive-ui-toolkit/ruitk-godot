@@ -1,6 +1,6 @@
 # GUITKX IDE tooling
 
-Editor support for `.guitkx` — the JSX-like markup of **ReactiveUI for Godot**. Three layers, one
+Editor support for `.guitkx` — the JSX-like markup of **Reactive UI Toolkit — Godot**. Three layers, one
 shared language server:
 
 ```

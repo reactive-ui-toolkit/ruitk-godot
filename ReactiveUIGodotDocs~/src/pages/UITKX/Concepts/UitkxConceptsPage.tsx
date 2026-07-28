@@ -8,7 +8,7 @@ export const UitkxConceptsPage: FC = () => (
       Concepts & Environment
     </Typography>
     <Typography variant="body1" paragraph>
-      Reactive UI brings a React-like component model to Godot. You write components, use hooks to
+      Reactive UI Toolkit brings a React-like component model to Godot. You write components, use hooks to
       manage state, and a fiber reconciler diffs each render against the last and patches only what
       changed on the real Godot <code>Control</code> tree.
     </Typography>

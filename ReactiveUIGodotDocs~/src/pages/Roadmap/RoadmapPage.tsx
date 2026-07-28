@@ -8,7 +8,7 @@ export const RoadmapPage: FC = () => (
       Roadmap
     </Typography>
     <Typography variant="body1" paragraph>
-      ReactiveUI for Godot is under active development. Below is a high-level view of what is
+      Reactive UI Toolkit — Godot is under active development. Below is a high-level view of what is
       done and what is planned. Priorities may shift based on community feedback.
     </Typography>
 

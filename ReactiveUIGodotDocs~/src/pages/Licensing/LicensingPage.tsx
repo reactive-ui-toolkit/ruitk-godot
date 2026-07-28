@@ -18,9 +18,9 @@ export const LicensingPage: FC = () => (
     </Typography>
 
     <Typography variant="body1" paragraph>
-      <strong>ReactiveUI is free for almost everyone.</strong> If you're a student, a hobbyist, a
+      <strong>Reactive UI Toolkit is free for almost everyone.</strong> If you're a student, a hobbyist, a
       jam team, or an indie studio earning under <strong>$250,000 a year</strong> — everything on
-      this page reduces to: <em>use it, ship your game, credit "Made with ReactiveUI", pay
+      this page reduces to: <em>use it, ship your game, credit "Made with Reactive UI Toolkit", pay
       nothing.</em>
     </Typography>
 
@@ -103,7 +103,7 @@ export const LicensingPage: FC = () => (
         target="_blank"
         rel="noreferrer"
       >
-        ReactiveUI Community License
+        Reactive UI Toolkit Community License
       </a>{' '}
       and{' '}
       <a
@@ -122,12 +122,12 @@ export const LicensingPage: FC = () => (
     </Typography>
 
     <Typography variant="body2" paragraph>
-      1. <strong>Credits.</strong> Put "Made with ReactiveUI" in your game's credits, wherever you
+      1. <strong>Credits.</strong> Put "Made with Reactive UI Toolkit" in your game's credits, wherever you
       credit other middleware. That line is how the project grows.
     </Typography>
     <Typography variant="body2" paragraph>
       2. <strong>Don't resell the library.</strong> You can ship anything you build <em>with</em>{' '}
-      ReactiveUI; you can't repackage ReactiveUI itself as a competing UI framework. (Your game is
+      Reactive UI Toolkit; you can't repackage Reactive UI Toolkit itself as a competing UI framework. (Your game is
       never a "competing product" — this clause exists purely so nobody takes the source and sells
       it out from under the project.)
     </Typography>
@@ -175,7 +175,7 @@ export const LicensingPage: FC = () => (
     </Typography>
     <Typography variant="body2" paragraph>
       Email us — <a href="mailto:yanivkalfa@gmail.com">yanivkalfa@gmail.com</a>. We'd rather you
-      ship with ReactiveUI than not.
+      ship with Reactive UI Toolkit than not.
     </Typography>
 
     <Typography variant="body1" sx={Styles.question}>
@@ -188,7 +188,7 @@ export const LicensingPage: FC = () => (
 
     <Typography variant="body2" paragraph sx={Styles.section}>
       <em>
-        The legally binding texts are the ReactiveUI Community License (the repo's{' '}
+        The legally binding texts are the Reactive UI Toolkit Community License (the repo's{' '}
         <code>LICENSE</code>) and the Commercial License Agreement (
         <code>LICENSE-COMMERCIAL.md</code>). This page summarizes them; where they differ, the
         texts win.

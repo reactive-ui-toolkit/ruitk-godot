@@ -1,11 +1,12 @@
-# Reactive UI — Godot (GDScript)
+# Reactive UI Toolkit — Godot (GDScript)
 
 💬 **[Join the Discord][discord-invite]** — questions, feedback, and release announcements.
 
 A **React-style reactive UI library for Godot 4.x**, written in GDScript, authored through
-**`.guitkx`** — a JSX-like markup that compiles to GDScript. It's the Godot sibling of
-[ReactiveUIToolKit](https://github.com/yanivkalfa/ReactiveUIToolKit) (the C# / Unity UI Toolkit
-library) — same mental model, ported to Godot's retained-mode `Control` tree.
+**`.guitkx`** — a JSX-like markup that compiles to GDScript. It's the Godot leg of the
+[Reactive UI Toolkit family](https://github.com/reactive-ui-toolkit) — sibling of
+[Reactive UI Toolkit — Unity](https://github.com/reactive-ui-toolkit/ruitk-unity) (the C# / Unity
+UI Toolkit library) — same mental model, ported to Godot's retained-mode `Control` tree.
 
 You write **function components** in `.guitkx`; a **fiber reconciler** diffs each render against
 the last and patches only what changed on the real Godot node tree. State lives in **hooks**, and
@@ -48,15 +49,15 @@ gallery — every demo is `.guitkx`).
 
 **As an addon in your own project:** two ways —
 
-- **From the Asset Library (in-editor):** open the **AssetLib** tab, search **"Reactive UI"**,
+- **From the Asset Library (in-editor):** open the **AssetLib** tab, search **"Reactive UI Toolkit — Godot"**,
   then **Download → Install** (keep `addons/reactive_ui/`). The editor addon ships as a separate
-  asset — search **"Reactive UI Editor"** to add it too.
+  asset — search **"Reactive UI Toolkit — Godot Editor"** to add it too.
 - **Manually:** copy `addons/reactive_ui/` into your project's `res://addons/`.
 
 Either way, the runtime is plain GDScript with global `class_name`s (`V`, `Hooks`,
 `ReactiveRoot`, ...), so they're available immediately — **no plugin enable required**.
 
-To actually *write* `.guitkx`, enable the plugin (**Project Settings → Plugins → Reactive UI**) —
+To actually *write* `.guitkx`, enable the plugin (**Project Settings → Plugins → Reactive UI Toolkit — Godot**) —
 it watches the filesystem and compiles each `.guitkx` to a sibling `.gd` on save. Then add editor
 support for the language itself (pick one, or use both):
 
@@ -487,8 +488,8 @@ raw `V.*`/`Hooks.*` calls is not the intended day-to-day workflow — see
 
 ## License
 
-**Free for almost everyone.** Reactive UI for Godot ships under the
-[ReactiveUI Community License 1.0](LICENSE): use it, modify it, and ship commercial
+**Free for almost everyone.** Reactive UI Toolkit — Godot ships under the
+[Reactive UI Toolkit Community License 1.1](LICENSE): use it, modify it, and ship commercial
 games with it at no cost if your company (plus parents/subsidiaries) earned under
 **US $250,000** in the last 12 months. Development, evaluation, and education are free
 at any company size — the threshold only applies when you *ship*.
@@ -496,14 +497,14 @@ at any company size — the threshold only applies when you *ship*.
 Above the threshold, shipping a product takes a commercial license — **$2,000 per
 title** (one-time, perpetual) or **$2,500 per studio per year**, your pick; see
 [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md). The same terms and prices exist for
-each library in the ReactiveUI family (Godot, Unity, Unreal).
+each library in the Reactive UI Toolkit family (Godot, Unity, Unreal).
 
-Two asks of everyone: put **"Made with ReactiveUI"** in your credits alongside your
+Two asks of everyone: put **"Made with Reactive UI Toolkit"** in your credits alongside your
 other middleware, and don't resell the library itself as a competing product (your
 game is never a competing product). Every previously released version keeps the
 license it shipped with. Contributions require the one-time [CLA](CLA.md).
 Weird case (nonprofit, just-over-the-line, contractor)? Email
-<yanivkalfa@gmail.com> — we'd rather you ship with ReactiveUI than not.
+<yanivkalfa@gmail.com> — we'd rather you ship with Reactive UI Toolkit than not.
 
 <!--
   Single source of truth for the community Discord invite used in this file — update only here.

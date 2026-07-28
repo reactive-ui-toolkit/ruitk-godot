@@ -205,7 +205,7 @@ export const UitkxComponentsPage: FC = () => (
       Components Overview
     </Typography>
     <Typography variant="body1" paragraph>
-      Reactive UI wraps every Godot <code>Control</code> as a declarative host element you can use in{' '}
+      Reactive UI Toolkit wraps every Godot <code>Control</code> as a declarative host element you can use in{' '}
       <code>.guitkx</code> markup. From 0.9.0 the element names are <strong>1:1 the official Godot
       class names</strong> — <code>{'<VBoxContainer>'}</code>, <code>{'<Label>'}</code>,{' '}
       <code>{'<PanelContainer>'}</code>. Beyond the curated set,{' '}

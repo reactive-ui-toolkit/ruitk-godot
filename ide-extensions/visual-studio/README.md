@@ -1,6 +1,6 @@
 # GUITKX for Visual Studio 2022
 
-VS2022 extension for `.guitkx` (ReactiveUI for Godot): TextMate colouring via `.pkgdef` +
+VS2022 extension for `.guitkx` (Reactive UI Toolkit — Godot): TextMate colouring via `.pkgdef` +
 `ILanguageClient` driving the same shared language server as the VS Code extension
 (`ide-extensions/lsp-server`), bundled self-contained with a pinned Node runtime
 (`GuitkxVsix/fetch-node.ps1`) so end users need nothing on PATH.

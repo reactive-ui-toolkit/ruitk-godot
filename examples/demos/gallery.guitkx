@@ -24,7 +24,7 @@ export DemoGallery() -> RUIVNode {
         <MarginContainer style={ {"margin_left": 8, "margin_top": 8, "margin_right": 8, "margin_bottom": 8} }>
           <VBoxContainer style={ {"separation": 4, "size_flags_vertical": Control.SIZE_EXPAND_FILL} }>
             <Label
-              text="Reactive UI"
+              text="Reactive UI Toolkit — Godot"
               style={ {"font_size": 22, "font_color": Color(0.0, 0.9, 0.75)} } />
             <Label text="Godot demo gallery" style={ {"font_color": Color(0.6, 0.6, 0.6)} } />
             <HSeparator />

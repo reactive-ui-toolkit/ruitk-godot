@@ -32,7 +32,7 @@ func _enter_tree() -> void:
 	if not _deps_ok:
 		push_error("[reactive_ui_editor] disabled: " + str(check.get("reason", "")))
 		var dlg := AcceptDialog.new()
-		dlg.title = "Reactive UI Editor"
+		dlg.title = "Reactive UI Toolkit — Godot Editor"
 		dlg.dialog_text = str(check.get("reason", ""))
 		dlg.confirmed.connect(dlg.queue_free)
 		dlg.canceled.connect(dlg.queue_free)
@@ -138,7 +138,7 @@ func _get_unsaved_status(for_scene: String) -> String:
 	if for_scene.is_empty() and _view != null:
 		var dirty: Array = _view.dirty_files()
 		if not dirty.is_empty():
-			return "Reactive UI Editor: unsaved changes in %s." % ", ".join(dirty)
+			return "Reactive UI Toolkit — Godot Editor: unsaved changes in %s." % ", ".join(dirty)
 	return ""
 
 ## Session persistence across editor restarts (G17): open files, current tab, carets, zoom, wrap

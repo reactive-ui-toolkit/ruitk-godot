@@ -152,7 +152,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          name: Reactive UI ${{ steps.ver.outputs.version }}
+          name: Reactive UI Toolkit — Godot ${{ steps.ver.outputs.version }}
           generate_release_notes: true
           files: dist/reactive_ui-${{ steps.ver.outputs.version }}.zip
 
@@ -285,7 +285,7 @@ jobs:
         run: |
           awk '/^## \[/{n++} n==1' addons/reactive_ui_editor/CHANGELOG.md > dist/release-body.md
           echo "" >> dist/release-body.md
-          echo "_Requires the [Reactive UI](https://github.com/reactive-ui-toolkit/ruitk-godot) addon (see the release notes for the minimum version)._" >> dist/release-body.md
+          echo "_Requires the [Reactive UI Toolkit — Godot](https://github.com/reactive-ui-toolkit/ruitk-godot) addon (see the release notes for the minimum version)._" >> dist/release-body.md
           echo "" >> dist/release-body.md
           echo "_Bundles the native analyzer (\`addons/reactive_ui_analyzer\`) ${{ steps.analyzer.outputs.version }} — Windows x86_64, Linux x86_64/arm64, macOS universal. Exclude that folder from game export presets; macOS users see its README for the one-line de-quarantine._" >> dist/release-body.md
 
@@ -302,7 +302,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          name: Reactive UI Editor ${{ steps.ver.outputs.version }}
+          name: Reactive UI Toolkit — Godot Editor ${{ steps.ver.outputs.version }}
           body_path: dist/release-body.md
           files: dist/reactive_ui_editor-${{ steps.ver.outputs.version }}.zip
 

@@ -1,4 +1,4 @@
-# ReactiveUI for Godot — documentation site
+# Reactive UI Toolkit — Godot — documentation site
 
 A clone of the ReactiveUIToolKit (Unity) docs site, retargeted to the Godot port. React 19 + Vite
 (rolldown) + MUI v7 + react-router + prism-react-renderer, deployed to GitHub Pages (SPA).
