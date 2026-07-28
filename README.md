@@ -480,8 +480,8 @@ raw `V.*`/`Hooks.*` calls is not the intended day-to-day workflow — see
   `Route`, …) so the "escape hatch" list above gets shorter.
 - **Native-editor parity** — embedded-GDScript intelligence for `reactive_ui_toolkit_editor`, closing the
   remaining gap with the VS Code/VS 2022 extensions (see `plans/archive/NATIVE_EDITOR_PARITY_PLAN.md`).
-- **Docs site** (`ReactiveUIGodotDocs~/`) — a full guide beyond this README; run it locally with
-  `cd ReactiveUIGodotDocs~ && npm ci && npm run dev`.
+- **Docs site** (`RuitkGodotDocs~/`) — a full guide beyond this README; run it locally with
+  `cd RuitkGodotDocs~ && npm ci && npm run dev`.
 - **Re-exports** (`export { X } from "./x"`) — the imports fast-follow, family-wide.
 - **Godot Asset Store / Asset Library distribution** — repo prep (license, icon, export rules) is
   in place; publishing itself is not live yet.
@@ -508,6 +508,6 @@ Weird case (nonprofit, just-over-the-line, contractor)? Email
 
 <!--
   Single source of truth for the community Discord invite used in this file — update only here.
-  (The docs site has its own single source: ReactiveUIGodotDocs~/src/links.ts.)
+  (The docs site has its own single source: RuitkGodotDocs~/src/links.ts.)
 -->
 [discord-invite]: https://discord.gg/Knedqu4Wyv

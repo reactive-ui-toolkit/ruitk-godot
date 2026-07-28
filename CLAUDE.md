@@ -18,9 +18,9 @@ release gate (see `.github/workflows/publish.yml`):
 | The runtime addon | `addons/reactive_ui_toolkit/` | GDScript | `plugin.cfg` |
 | The in-Godot-editor `.guitkx` plugin | `addons/reactive_ui_toolkit_editor/` | GDScript | `plugin.cfg` |
 | VS Code + VS2022 `.guitkx` extensions | `ide-extensions/` | TypeScript / C# | `package.json` / `.vsixmanifest` |
-| Docs site | `ReactiveUIGodotDocs~/` | React + Vite | `package.json` |
+| Docs site | `RuitkGodotDocs~/` | React + Vite | `package.json` |
 
-`ReactiveUIGodotDocs~` is named with a trailing `~` so the Godot importer skips it (it's a Node/Vite
+`RuitkGodotDocs~` is named with a trailing `~` so the Godot importer skips it (it's a Node/Vite
 project, not Godot content).
 
 ## Commands
@@ -69,7 +69,7 @@ language server embeds a native napi addon (`@gdscript-analyzer/core`), so a pac
 ### Docs site
 
 ```bash
-cd ReactiveUIGodotDocs~ && npm ci && npm run dev     # or: npm run build / npm run lint
+cd RuitkGodotDocs~ && npm ci && npm run dev     # or: npm run build / npm run lint
 ```
 
 ## Architecture

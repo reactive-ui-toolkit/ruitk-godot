@@ -119,7 +119,7 @@ The import/export leg (plans/IMPORT_EXPORT_PLAN.md) shipped its runtime + compil
 codemod + strict resolution + HMR + version/changelog release plumbing, all green. Deferred as
 follow-ups (none affect the migrated tree's correctness, the CI matrix, or shippability):
 
-- **Docs site Imports page** (`ReactiveUIGodotDocs~/src/pages/UITKX/`): the grammar/strictness/
+- **Docs site Imports page** (`RuitkGodotDocs~/src/pages/UITKX/`): the grammar/strictness/
   codemod/`~/` narrative page + `CompanionFiles`/`Config`/`Diagnostics` touch-ups. The changelogs
   (root + Discord) and MIGRATION notes cover the release; the site build is green (its `lint` was
   already failing pre-leg on unrelated existing pages — setState-in-effect, unused var, whitespace).

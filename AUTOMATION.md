@@ -61,7 +61,7 @@ implementation → verification, using the same steps as the human runbook below
 - [ ] Update the verified-on stamps: root `README.md` ("verified on **X**"),
       `addons/reactive_ui_toolkit/README.md` ("tested on X"), `CLAUDE.md`.
 - [ ] Docs site: add the version to `SUPPORTED_VERSIONS` in
-      `ReactiveUIGodotDocs~/src/versionManifest.ts`.
+      `RuitkGodotDocs~/src/versionManifest.ts`.
 - [ ] Run the full verify matrix (`CLAUDE.md` → Commands; all suites + contract + TS + docs).
 
 **Per new Control class (from the diff):**
@@ -97,14 +97,14 @@ if it drifts during an engine update, the update is wrong, not the hash.
 | `addons/reactive_ui_toolkit/dev/classdb_dump.gd` | ClassDB dump script (run per Godot binary) | Both |
 | `scripts/godot-api-diff.mjs` | Dump differ (added/removed classes, props, signals) | Both |
 | `plans/WIDGET_INVENTORY.md` | The Control-coverage ledger (naming-loyalty audit) | Human |
-| `ReactiveUIGodotDocs~/src/versionManifest.ts` | Docs version manifest (single source of truth) | Both |
+| `RuitkGodotDocs~/src/versionManifest.ts` | Docs version manifest (single source of truth) | Both |
 
 ---
 
 ## Documentation Website Versioning
 
 The docs site has a version-aware system driven by
-`ReactiveUIGodotDocs~/src/versionManifest.ts` (the same design as the Unity docs site):
+`RuitkGodotDocs~/src/versionManifest.ts` (the same design as the Unity docs site):
 
 - `SUPPORTED_VERSIONS` — the version dropdown; first entry = floor, last = latest.
 - `ELEMENT_VERSIONS` / `STYLE_PROPERTY_VERSIONS` / `PAGE_VERSIONS` — `sinceGodot` tags for
@@ -114,4 +114,4 @@ The docs site has a version-aware system driven by
 When adding a new Godot version to docs: add the `SUPPORTED_VERSIONS` entry, tag any new
 elements/style keys/pages with `sinceGodot`, give each new curated element a **full component
 page** (usage example, props, events) — not just a table row — and verify with
-`cd ReactiveUIGodotDocs~ && npm run build && npm run lint`.
+`cd RuitkGodotDocs~ && npm run build && npm run lint`.
