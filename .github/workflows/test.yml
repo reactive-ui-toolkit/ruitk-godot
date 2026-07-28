@@ -109,3 +109,6 @@ jobs:
 
       - name: 0.11.0 ES-modules modernization tripwire (tree must already be plain-syntax)
         run: godot --headless --path . --script res://tests/guitkx_modernize.gd
+
+      - name: 0.13.0 rename-migration tripwire (tree must already be renamed)
+        run: godot --headless --path . --script res://tests/guitkx_rename_migrate.gd
