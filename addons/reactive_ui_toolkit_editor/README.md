@@ -121,9 +121,15 @@ mis-anchor results.
 Two operational notes: **exclude `addons/reactive_ui_toolkit_analyzer/` from game export presets** (it
 is editor-only tooling — keep the native libraries out of shipped builds), and on **macOS** the
 bundled dylib is unsigned — the analyzer folder's README has the one-line de-quarantine command.
-A newer analyzer can be dropped in at any time by unzipping a `reactive-ui-analyzer-*.zip` from
-[gdscript-analyzer releases](https://github.com/reactive-ui-toolkit/gdscript-analyzer/releases) over the
-same folder.
+A newer analyzer can be dropped in at any time — with one rename. Download a
+`reactive-ui-analyzer-*.zip` from
+[gdscript-analyzer releases](https://github.com/reactive-ui-toolkit/gdscript-analyzer/releases) and
+unzip it somewhere: that repo is a standalone project, deliberately outside the Reactive UI Toolkit
+rename, so its archive still extracts to **`addons/reactive_ui_analyzer/`**. Rename that folder to
+**`addons/reactive_ui_toolkit_analyzer/`** and copy it over the bundled one (release packaging does
+the same `mv`). Unzipping it as-is instead would leave *two* analyzer folders side by side, both
+registering the `GdscriptAnalyzer` class. The GDExtension is relocatable — its library entries are
+folder-relative and detection is `ClassDB.class_exists("GdscriptAnalyzer")` — so the rename is safe.
 
 ## Known limits (vs. the VS Code / VS 2022 extensions)
 

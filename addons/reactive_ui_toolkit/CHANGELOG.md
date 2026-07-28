@@ -26,15 +26,21 @@ changes** and a one-command migration; see **MIGRATION-0.13.md**.
   family-parity authoring surface stays identical across all three engines.
 - **One-command migration (clean break, no compatibility window):**
   `godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_13_0.gd`
-  rewrites a whole project (classes across `.guitkx`/`.gd`, folder paths across
-  `.gd`/`.guitkx`/`.tscn`/`.tres` + `project.godot`'s plugin list; idempotent). Then **delete
-  the old `addons/reactive_ui*` folders by hand** — store updates never delete, and duplicate
-  global `class_name` parse errors are the symptom of skipping that step. Re-save your
+  rewrites a whole project (classes across `.guitkx`/`.gd` and `script_class=` in
+  `.tscn`/`.tres`, folder paths across `.gd`/`.guitkx`/`.tscn`/`.tres` + `project.godot`'s
+  plugin list, and the editor addon's persisted Project Settings section
+  `[reactive_ui_editor]` → `[reactive_ui_toolkit_editor]` so toggles you switched OFF stay off;
+  idempotent). Then **delete the old `addons/reactive_ui*` folders by hand** — store updates
+  never delete. The symptom of skipping that step is a scan full of `UID duplicate detected`
+  warnings (39 in a stock install); the shared global class names resolve *silently* in the new
+  addon's favour, so a clean Errors dock is not evidence the step was done. Re-save your
   `.guitkx` files (or run your build sweep) so generated `.gd` re-emit with the new names.
 - **License retitled:** the ReactiveUI Community License 1.0 is now the
-  **Reactive UI Toolkit Community License 1.1** (credit line: "Made with Reactive UI
-  Toolkit"); terms otherwise unchanged, and every previously released version keeps the
-  license it shipped with.
+  **Reactive UI Toolkit Community License 1.1**. Terms are otherwise unchanged, but the
+  **Attribution** clause is binding and its credit string moved with the product name: shipped
+  products must now credit **"Made with Reactive UI Toolkit"** (or "Reactive UI Toolkit —
+  Godot") — update an existing "Made with ReactiveUI" credits line when you upgrade. Every
+  previously released version keeps the license it shipped with.
 - **Unchanged, deliberately:** the `.guitkx` extension, the `GUITKX####` diagnostic codes,
   the `guitkx` tool/package names, and the IDE extension identities — the language keeps its
   name; only the content under the listings updated.

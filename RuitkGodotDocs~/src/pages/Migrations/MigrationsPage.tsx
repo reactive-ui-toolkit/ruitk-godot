@@ -47,8 +47,12 @@ export const MigrationsPage: FC = () => (
     <CodeBlock language="jsx" code={MIGRATE_0_13_EXAMPLES} />
     <Typography variant="body1" paragraph sx={{ mt: 2 }}>
       Then <strong>delete the old <code>addons/reactive_ui*</code> folders by hand</strong> — store
-      updates never delete, so both folder generations sit side by side and duplicate global{' '}
-      <code>class_name</code> parse errors are the symptom of skipping this — and re-save your{' '}
+      updates never delete, so both folder generations sit side by side. The symptom is a scan full
+      of <code>UID duplicate detected</code> warnings, one per core file (UIDs are preserved across
+      the rename so your <code>uid://</code> references keep resolving; a leftover copy collides
+      with every one of them). The handful of class names the two copies really do share resolve{' '}
+      <em>silently</em> in the new addon&apos;s favour, so a clean Errors dock is <em>not</em>{' '}
+      evidence that you did this step — check that the folders are gone. Finally, re-save your{' '}
       <code>.guitkx</code> files (or run your build sweep) so the generated <code>.gd</code>{' '}
       re-emit with the new names. Full class table and notes:{' '}
       <Link href={`${REPO}/MIGRATION-0.13.md`} target="_blank" rel="noopener">

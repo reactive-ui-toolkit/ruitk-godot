@@ -57,6 +57,17 @@ gallery — every demo is `.guitkx`).
 Either way, the runtime is plain GDScript with global `class_name`s (`V`, `Hooks`,
 `RuitkRoot`, ...), so they're available immediately — **no plugin enable required**.
 
+**Upgrading from 0.12.x or earlier?** 0.13.0 is the *Reactive UI Toolkit* rename — names only,
+zero behavior changes, but a clean break: `addons/reactive_ui*` → `addons/reactive_ui_toolkit*`
+and the `RUI*` class prefix → `Ruitk*`. One idempotent command, shipped inside the addon, rewrites
+a whole project — then delete the old `addons/reactive_ui*` folders by hand:
+
+```bash
+godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_13_0.gd
+```
+
+See **[MIGRATION-0.13.md](MIGRATION-0.13.md)** for the full guide and the 36-name table.
+
 To actually *write* `.guitkx`, enable the plugin (**Project Settings → Plugins → Reactive UI Toolkit — Godot**) —
 it watches the filesystem and compiles each `.guitkx` to a sibling `.gd` on save. Then add editor
 support for the language itself (pick one, or use both):
@@ -174,12 +185,15 @@ export Panel(level: int = 1) -> RuitkVNode {
 - **Component cycles are legal** (component imports resolve lazily, by path, at first render);
   **value cycles** (hooks/utils/values — eager `const` preloads) are a compile error that prints
   the chain.
-- **Migrating an existing project is one command** — idempotent, re-runnable, leaves hand-written
-  `class_name` scripts alone (they stay ambient, no import needed):
+- **Moving an existing project onto the import model is one command** — idempotent, re-runnable,
+  leaves hand-written `class_name` scripts alone (they stay ambient, no import needed):
 
   ```bash
   godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_11_0.gd
   ```
+
+  (That is the *imports* codemod. The separate 0.13.0 **rename** codemod is
+  `migrate_0_13_0.gd` — see [MIGRATION-0.13.md](MIGRATION-0.13.md).)
 
 Import mistakes surface as **`GUITKX2300`–`GUITKX2309`** (unresolved specifier, not exported,
 not declared, duplicate, unused, not imported, value cycle, unexported reference, boundary
