@@ -1,5 +1,15 @@
 // Code samples for the Migrations page.
 
+export const MIGRATE_0_13_CMD = `# update the addons first, then (whole-project, idempotent):
+godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_13_0.gd`
+
+export const MIGRATE_0_13_EXAMPLES = `addons/reactive_ui         ->  addons/reactive_ui_toolkit        (editor + analyzer folders follow)
+RUIVNode                   ->  RuitkVNode                        (components annotate -> RuitkVNode)
+RUIRouter / RUIStyle / …   ->  RuitkRouter / RuitkStyle / …      (all 34 RUI* classes, whole-word)
+ReactiveRoot.create(…)     ->  RuitkRoot.create(…)
+ReactiveRootNode           ->  RuitkRootNode
+V, Hooks, .guitkx, GUITKX#### codes  ->  unchanged`
+
 export const MIGRATE_0_11_CMD = `godot --headless --path . --script res://addons/reactive_ui_toolkit/dev/migrate_0_11_0.gd`
 
 export const MIGRATE_0_11_BEFORE_AFTER = `# ── score_row.guitkx ──────────────────────────────────────────────

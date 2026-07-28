@@ -10,7 +10,7 @@ undo-surviving format).
 
 This is the sibling of the **Reactive UI Toolkit — Godot** runtime addon (`addons/reactive_ui_toolkit`) and **depends on it** —
 it reuses that addon's `.guitkx` compiler (`RuitkGuitkx`), formatter (`RuitkGuitkxFormatter`) and lexer
-primitives (`RuitkGuitkxLexer`). Install/enable **Reactive UI Toolkit — Godot first** (0.8.4 or newer — the plugin
+primitives (`RuitkGuitkxLexer`). Install/enable **Reactive UI Toolkit — Godot first** (0.13.0 or newer — the plugin
 checks and tells you politely instead of erroring if it's missing or too old).
 
 ## Install

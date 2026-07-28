@@ -8,10 +8,11 @@ extends RefCounted
 ## failure — so plugin.gd checks HERE first and only then loads the editor scripts (which may use
 ## the RuitkGuitkx* classes directly). This file itself must never name them.
 
-## Oldest reactive_ui_toolkit this editor is tested against. 0.5.0 pairs with 0.8.4: the Problems panel's
-## project scope and the sidecar overlay read the sweep's refs/2106/2107 verdicts, and mixed-version
-## reports are not worth debugging — the two assets release together.
-const MIN_REACTIVE_UI := "0.8.4"
+## Oldest reactive_ui_toolkit this editor is tested against. 0.13.0 is the rebrand floor: it is
+## the first release at the `addons/reactive_ui_toolkit` path with the `Ruitk*` class names this
+## editor consumes, so nothing older can ever be found here — and mixed-version reports are not
+## worth debugging; the two assets release together.
+const MIN_REACTIVE_UI := "0.13.0"
 
 ## Oldest Godot this editor addon supports: the bundled native analyzer is a GDExtension with
 ## `compatibility_minimum = "4.4"` (it will not even load below), and the runtime sibling's

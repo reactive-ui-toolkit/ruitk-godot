@@ -3,6 +3,8 @@ import { Box, Link, Typography } from '@mui/material'
 import { CodeBlock } from '../../components/CodeBlock/CodeBlock'
 import Styles from '../GettingStarted/GettingStartedPage.style'
 import {
+  MIGRATE_0_13_CMD,
+  MIGRATE_0_13_EXAMPLES,
   MIGRATE_0_11_CMD,
   MIGRATE_0_11_BEFORE_AFTER,
   MIGRATE_0_10_CMD,
@@ -24,6 +26,35 @@ export const MigrationsPage: FC = () => (
       (<code>addons/reactive_ui_toolkit/dev/</code>), are idempotent (safe to re-run), and never touch your
       hand-written <code>.gd</code> scripts&apos; logic. The full step-by-step guides live in the
       repository; this page is the quick path.
+    </Typography>
+
+    {/* ── 0.12 → 0.13 ────────────────────────────────────────────────── */}
+    <Typography variant="h5" component="h2" gutterBottom sx={{ mt: 3 }}>
+      0.12 → 0.13 — the Reactive UI Toolkit rename
+    </Typography>
+    <Typography variant="body1" paragraph>
+      0.13 is the family umbrella rebrand — a <strong>complete rename with zero behavior
+      changes</strong>. The addon folders rename (<code>addons/reactive_ui</code> →{' '}
+      <code>addons/reactive_ui_toolkit</code>; the editor and analyzer folders follow), and every{' '}
+      <code>RUI*</code> global class becomes <code>Ruitk*</code> — 36 whole-word renames including
+      the mount surfaces <code>ReactiveRoot</code> → <code>RuitkRoot</code> and{' '}
+      <code>ReactiveRootNode</code> → <code>RuitkRootNode</code> — so the component classifier
+      annotation is <code>{'-> RuitkVNode'}</code>. <code>V</code> and <code>Hooks</code> are
+      unchanged (the family-parity authoring surface), and so are <code>.guitkx</code> and the{' '}
+      <code>GUITKX####</code> diagnostic codes. The codemod is whole-project and idempotent:
+    </Typography>
+    <CodeBlock language="bash" code={MIGRATE_0_13_CMD} />
+    <CodeBlock language="jsx" code={MIGRATE_0_13_EXAMPLES} />
+    <Typography variant="body1" paragraph sx={{ mt: 2 }}>
+      Then <strong>delete the old <code>addons/reactive_ui*</code> folders by hand</strong> — store
+      updates never delete, so both folder generations sit side by side and duplicate global{' '}
+      <code>class_name</code> parse errors are the symptom of skipping this — and re-save your{' '}
+      <code>.guitkx</code> files (or run your build sweep) so the generated <code>.gd</code>{' '}
+      re-emit with the new names. Full class table and notes:{' '}
+      <Link href={`${REPO}/MIGRATION-0.13.md`} target="_blank" rel="noopener">
+        MIGRATION-0.13.md
+      </Link>
+      .
     </Typography>
 
     {/* ── 0.10 → 0.11 ────────────────────────────────────────────────── */}
@@ -100,7 +131,8 @@ export const MigrationsPage: FC = () => (
     </Typography>
 
     <Typography variant="body2" paragraph sx={{ mt: 2 }}>
-      Upgrading across several? Run the codemods in order: 0.9 first, then 0.10, then 0.11.
+      Upgrading across several? Run the codemods in order: 0.9 first, then 0.10, then 0.11, then
+      0.13.
     </Typography>
   </Box>
 )
