@@ -4,14 +4,22 @@ All notable changes to **Reactive UI Toolkit — Godot** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.14.0] — 2026-07-31
+
+The settings + family-parity release, one wave: every runtime tunable is now a native
+Project Setting with one settings dialog in the Godot editor, and the runtime adopts the
+family-canonical reconciler semantics — the render scheduler, defer-don't-restart, a real
+(cooperative) error boundary, strict mode, the trace ladder, the environment label — with
+one headline behavior change: **update renders are now time-sliced by default**. The ten
+family knobs now ship with identical semantics and defaults across the Unity, Godot, and
+Unreal legs (two diagnostics extras stay Godot-only).
 
 ### Changed — BEHAVIOR: update renders are now time-sliced by default
 
-The Godot leg of the **family parity campaign**: the Unity leg's render scheduler and
-defer semantics plus the Unreal leg's strict mode and error-boundary latch, ported
-faithfully. Every new knob lands off/auto/none — the one default that flips, and the only
-behavior an untouched project sees, is the first bullet below.
+The parity half of the wave ports the Unity leg's render scheduler and defer semantics
+plus the Unreal leg's strict mode and error-boundary latch, faithfully. Every new knob
+lands off/auto/none — the one default that flips, and the only behavior an untouched
+project sees, is the first bullet below.
 
 - **`RuitkConfig.time_slicing` now defaults to `true`.** State-driven re-renders are
   chunked into `time_slice_ms` (2.0 ms) quanta and scheduled on the new four-lane
@@ -25,14 +33,15 @@ behavior an untouched project sees, is the first bullet below.
   `RuitkConfig.time_slicing = false` — or the `reactive_ui_toolkit/runtime/time_slicing`
   Project Setting — to restore the classic synchronous single-pass render per update (the
   sync path itself is untouched by this release).
-- **`reactive_ui_toolkit/runtime/frame_budget_ms` re-scoped: default 8.0 → 4.0, new
-  meaning.** The key keeps its name but now sets the *scheduler's* per-frame budget —
-  cumulative across all lanes in one frame (a 2 ms slice can run twice inside it) — instead
-  of the old single-render park budget; the render quantum is the new
-  `runtime/time_slice_ms` (2.0). No stored key is written, moved, or deleted: Godot only
-  persists values you changed, so an untouched project simply gets the new 4.0 default,
-  while a hand-tuned value carries forward under the new (cumulative) meaning — re-check it
-  if you had tightened the old 8.0 budget deliberately.
+- **`RuitkConfig.frame_budget_ms` re-scoped: default 8.0 → 4.0, new meaning.** The knob
+  keeps its name but now sets the *scheduler's* per-frame budget — cumulative across all
+  lanes in one frame (a 2 ms slice can run twice inside it) — instead of the old
+  single-render park budget; the render quantum is the new `runtime/time_slice_ms` (2.0).
+  The `reactive_ui_toolkit/runtime/frame_budget_ms` Project Setting (new in this release)
+  carries the new meaning from day one, and only values you *changed* are ever applied — so
+  an untouched project simply gets the new 4.0 default, while a value you had assigned from
+  code against the old 8.0 park budget now reads as the (cumulative) scheduler budget —
+  re-check it if you had tightened it deliberately.
 - **Bench** (`tests/bench.gd`, keyed-list stress, ms/frame medians of 3, headless, at
   N=300/750/1500/2000/3000): new defaults **6.898 / 6.896 / 6.850 / 9.321 / 14.666** —
   per-frame cost now sits at/near the 4 ms budget floor (N=1500 drops 12.2 → 6.9, N=3000
@@ -43,6 +52,37 @@ behavior an untouched project sees, is the first bullet below.
 
 ### Added
 
+- **Unified settings: the runtime's tunables are now native Project Settings.** Every
+  `RuitkConfig` / `RuitkDiagnostics` knob — the long-standing tunables and this release's
+  new ones alike — appears under **Project → Project Settings → Reactive Ui Toolkit**
+  (family-wide campaign; the Unity and Unreal legs ship the same surface in their engines'
+  native settings): `reactive_ui_toolkit/runtime/time_slicing`, `runtime/time_slice_ms`,
+  `runtime/frame_budget_ms`, `runtime/host_node_pool`, `runtime/hook_validation`,
+  `runtime/strict_diagnostics`, `runtime/strict_mode`, `runtime/environment`, and
+  `reactive_ui_toolkit/diagnostics/enabled`, `diagnostics/capture`,
+  `diagnostics/trace_level`, `diagnostics/diff_tracing` — twelve keys, each with its real
+  vocabulary: the two validators are `auto`/`enabled`/`disabled` tri-states (`auto` keeps
+  the compiled `OS.is_debug_build()` behavior), `trace_level` is `none`/`basic`/`verbose`,
+  and `environment` is `auto`/`development`/`production`. Settings load once at first mount
+  (`RuitkRoot.create`), work in exported games, and only user-*changed* values apply — so
+  assigning the statics directly from code (`RuitkConfig.time_slicing = false`) keeps
+  working exactly as before. Both plugins register the group (idempotent), `override.cfg`
+  gives per-machine overrides for free, and the two leg-specific extras
+  (`diagnostics/enabled`, `diagnostics/capture`) are marked **(Godot-only)** in the dialog
+  tooltips and the docs. New suite: `tests/settings_test.gd`.
+- **One settings dialog in the Godot editor.** With the editor addon enabled, a top-level
+  **Reactive UI Toolkit** menu in the editor's main menu bar (**Settings...**; degrades
+  automatically to **Project ▸ Tools ▸ Reactive UI Toolkit Settings...** if the menu bar
+  cannot be injected) — or the **Settings** button in the ReactiveUITK main-screen
+  toolbar — opens a single dialog (family design: one settings screen per leg, on the
+  plugin's own menu surface): a **Runtime** section with the twelve `reactive_ui_toolkit/*`
+  keys above — enum-valued keys as dropdowns with the vocabularies listed, the two
+  Godot-only keys marked in their tooltips — and an **Editor** section with the six
+  `reactive_ui_toolkit_editor/*` toggles. It is now the primary settings UI; storage is
+  unchanged — the dialog reads and writes the same Project Settings keys (saving only when
+  a value actually changed), so the native Project Settings dialog remains a mirror and
+  `override.cfg` overrides keep working. With the runtime addon absent the dialog degrades
+  to the Editor section alone.
 - **Four-lane render scheduler (`RuitkScheduler`).** A faithful port of the Unity leg's
   RenderScheduler: High/Normal/Low/Idle lanes with per-lane Callable dedup; the Low queue
   is cancelled (dropped and counted) when High work exists at frame start; Normal runs only
@@ -90,42 +130,6 @@ behavior an untouched project sees, is the first bullet below.
   read-only surface for *user* components: `RuitkConfig.environment_resolved()` returns
   `"development"` or `"production"` (`auto` resolves off `OS.is_debug_build()`) — e.g. to
   gate a debug overlay. The library itself never branches on it.
-- **Settings surface for all of the above.** New keys `runtime/time_slice_ms`,
-  `runtime/strict_mode`, `runtime/environment`, `diagnostics/trace_level`, and
-  `diagnostics/diff_tracing` join the `reactive_ui_toolkit/*` group — with proper enum
-  vocabularies in both the settings dialog and the native Project Settings — and the two
-  leg-specific extras (`diagnostics/enabled`, `diagnostics/capture`) are now marked
-  **(Godot-only)** in the dialog tooltips and the docs. As before, only values you
-  *changed* are applied, so assigning the statics directly from code keeps working.
-
-## [0.14.0] — 2026-07-31
-
-### Added
-
-- **Unified settings: the runtime's tunables are now native Project Settings.** The existing
-  `RuitkConfig` / `RuitkDiagnostics` knobs appear under **Project → Project Settings →
-  Reactive Ui Toolkit** (family-wide campaign; the Unity and Unreal legs ship the same surface
-  in their engines' native settings): `reactive_ui_toolkit/runtime/time_slicing`,
-  `runtime/frame_budget_ms`, `runtime/host_node_pool`, `runtime/hook_validation`,
-  `runtime/strict_diagnostics`, `reactive_ui_toolkit/diagnostics/enabled`, and
-  `diagnostics/capture`. The two validators are `auto`/`enabled`/`disabled` tri-states —
-  `auto` keeps the compiled `OS.is_debug_build()` behavior. Settings load once at first mount
-  (`RuitkRoot.create`), work in exported games, and only user-*changed* values apply — so
-  assigning the statics directly from code (`RuitkConfig.time_slicing = true`) keeps working
-  exactly as before. Both plugins register the group (idempotent), and `override.cfg` gives
-  per-machine overrides for free. New suite: `tests/settings_test.gd`.
-- **One settings dialog in the Godot editor.** With the editor addon enabled, a top-level
-  **Reactive UI Toolkit** menu in the editor's main menu bar (**Settings...**; degrades
-  automatically to **Project ▸ Tools ▸ Reactive UI Toolkit Settings...** if the menu bar cannot
-  be injected) — or the **Settings** button in the
-  ReactiveUITK main-screen toolbar — opens a single dialog (family design: one settings screen
-  per leg, on the plugin's own menu surface): a **Runtime** section with the seven
-  `reactive_ui_toolkit/*` keys above and an **Editor** section with the six
-  `reactive_ui_toolkit_editor/*` toggles. It is now the primary settings UI; storage is
-  unchanged — the dialog reads and writes the same Project Settings keys (saving only when a
-  value actually changed), so the native Project Settings dialog remains a mirror and
-  `override.cfg` overrides keep working. With the runtime addon absent the dialog degrades to
-  the Editor section alone.
 
 ## [0.13.0] — 2026-07-28
 

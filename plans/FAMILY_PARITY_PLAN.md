@@ -1070,6 +1070,51 @@ GO-03's dated correction says "the 0.14 default flip". Re-verified: guitkx_build
 2 pre-existing warnings), core 161/0, settings 103/0, demos 31/0, doom 179/0, docs
 build+lint, machine-path gate, mirror byte-identical.
 
+### Release staging — DONE (2026-07-31) — FOLDED INTO 0.14.0 (the owner's fold ruling)
+
+The parity wave folds INTO the staged-unpublished runtime **0.14.0** / editor **0.12.0** —
+NO new version numbers (both plugin.cfg files verified untouched at 0.14.0 / 0.12.0; the
+Unreal leg's `[0.16.0]` fold is the family precedent). Executed:
+
+- **Lane A:** root `CHANGELOG.md` `[Unreleased]` merged INTO `[0.14.0] — 2026-07-31` as ONE
+  settings+parity wave: a new wave intro ("The settings + family-parity release, one
+  wave"), the loud "### Changed — BEHAVIOR" flip block leading (flip bullet + P6 bench
+  medians verbatim; the frame_budget_ms re-scope bullet re-anchored on
+  `RuitkConfig.frame_budget_ms` — under the fold the Project Setting key debuts in this
+  same release, so the carry-forward story now speaks to code-assigned values, not stored
+  keys); the merged "### Added" leads with the two settings-wave bullets evolved to the
+  twelve-key surface (enum vocabularies + (Godot-only) marks; the superseded "Settings
+  surface for all of the above" parity bullet folded into them), then the parity feature
+  bullets unchanged; the emptied `[Unreleased]` heading deleted. Mirror resynced via `cp`,
+  `cmp` byte-identical.
+- **Lane B:** the staged editor-0.12.0 `changelog.json` entry evolved (seven → twelve keys;
+  "unified-settings wave" → "settings + family-parity wave") + a second bullet for the
+  campaign's dialog coverage: per-key HINTS enum dropdowns (`trace_level`
+  none/basic/verbose, `environment` auto/development/production; graceful tri-state
+  degradation against a hint-less older runtime), the time_slice_ms / strict_mode /
+  diff_tracing rows, and the "(Godot-only)" tooltip marks. `extract --ide editor` re-run;
+  `changelog.mjs verify` green.
+- **Lane C:** the staged Discord `[0.14.0]` entry REPLACED to cover the full wave
+  (settings, the flip w/ opt-out + bench proof, scheduler, defer + depth guard, real error
+  boundaries, strict mode, trace ladder, environment, new keys) — **1995 chars** by the
+  house awk counter (≤2000 cap).
+- **Version-mention sweep:** shipped surfaces KEEP their neutral P7-addendum phrasings
+  (grep confirms zero explicit "0.14" mentions beside them — nothing reads awkwardly; no
+  churn). The P7-flagged `plans/archive/FINAL_AUDIT_GODOT_OPTIMIZATIONS.md` GO-03 "0.14
+  default flip" mention is now CORRECT under the fold — confirmed, left as-is. Dating: the
+  `[0.14.0]` heading keeps 2026-07-31 (the staging date, per convention).
+
+Acceptance (after the changelog edits, ordered headless sequence from scan): guitkx_build
+49/0 (2 pre-existing warnings) · core 161/0 · settings 103/0 · scheduler 56/0 ·
+strict_boundary 59/0 · style 42/0 · router_match 18/0 · router_spine 37/0 · update PASSED ·
+demos 31/0 · doom 179/0 · guitkx PASSED · hmr PASSED (55) · guitkx_editor **440/0** (mirror
+tripwire green) · guitkx_lsp 39/0 · contract 66/66 · migrate 0 · `changelog.mjs verify`
+green · machine-path gate green · corpus-hash green · mirror `cmp` byte-identical. NO
+version-number changes anywhere; NO Publish (owner-gated).
+
+**CAMPAIGN COMPLETE — ready for the owner's merge review.** Remaining owner touchpoints:
+merge PR #95 into dev → fast-forward master → the Publish button → paste the Discord entry.
+
 ## 9. Risks / watch-list / STOP-AND-ASK
 
 - **Headless timing flakiness** (scheduler budgets are wall-clock): design scheduler tests
