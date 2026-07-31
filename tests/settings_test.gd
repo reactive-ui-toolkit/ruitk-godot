@@ -29,6 +29,9 @@ func _run() -> void:
 		"strict_mode": RuitkConfig.strict_mode,
 		"enable_hook_validation": RuitkConfig.enable_hook_validation,
 		"enable_strict_diagnostics": RuitkConfig.enable_strict_diagnostics,
+		"environment": RuitkConfig.environment,
+		"trace_level": RuitkDiagnostics.trace_level,
+		"diff_tracing": RuitkDiagnostics.diff_tracing,
 		"diag_enabled": RuitkDiagnostics.enabled,
 		"diag_capture": RuitkDiagnostics.capture,
 	}
@@ -40,6 +43,7 @@ func _run() -> void:
 	_test_apply_changed_keys()
 	_test_default_value_does_not_clobber()
 	_test_tri_state_hook_validation()
+	_test_enum_knobs()
 	_test_one_shot_guard()
 	_cleanup_keys()
 	print("\n[settings_test] %d passed, %d failed" % [_passes, _fails])
@@ -53,6 +57,9 @@ func _restore_statics() -> void:
 	RuitkConfig.strict_mode = _orig["strict_mode"]
 	RuitkConfig.enable_hook_validation = _orig["enable_hook_validation"]
 	RuitkConfig.enable_strict_diagnostics = _orig["enable_strict_diagnostics"]
+	RuitkConfig.environment = _orig["environment"]
+	RuitkDiagnostics.trace_level = _orig["trace_level"]
+	RuitkDiagnostics.diff_tracing = _orig["diff_tracing"]
 	RuitkDiagnostics.enabled = _orig["diag_enabled"]
 	RuitkDiagnostics.capture = _orig["diag_capture"]
 
@@ -70,6 +77,9 @@ func _test_apply_no_keys_is_noop() -> void:
 	_ok(RuitkConfig.strict_mode == _orig["strict_mode"], "no keys: strict_mode untouched")
 	_ok(RuitkConfig.enable_hook_validation == _orig["enable_hook_validation"], "no keys: enable_hook_validation untouched")
 	_ok(RuitkConfig.enable_strict_diagnostics == _orig["enable_strict_diagnostics"], "no keys: enable_strict_diagnostics untouched")
+	_ok(RuitkConfig.environment == _orig["environment"], "no keys: environment untouched")
+	_ok(RuitkDiagnostics.trace_level == _orig["trace_level"], "no keys: trace_level untouched")
+	_ok(RuitkDiagnostics.diff_tracing == _orig["diff_tracing"], "no keys: diff_tracing untouched")
 	_ok(RuitkDiagnostics.enabled == _orig["diag_enabled"], "no keys: RuitkDiagnostics.enabled untouched")
 	_ok(RuitkDiagnostics.capture == _orig["diag_capture"], "no keys: RuitkDiagnostics.capture untouched")
 
@@ -98,6 +108,21 @@ func _test_register_idempotent() -> void:
 	_ok(int(tsm.get("type", -1)) == TYPE_FLOAT, "time_slice_ms registered as a float")
 	var sm: Dictionary = infos.get(Settings.KEY_STRICT_MODE, {})
 	_ok(int(sm.get("type", -1)) == TYPE_BOOL, "strict_mode registered as a bool")
+	# The two non-tri-state String enums carry their OWN vocabulary via HINTS (§4).
+	var tl: Dictionary = infos.get(Settings.KEY_TRACE_LEVEL, {})
+	_ok(int(tl.get("type", -1)) == TYPE_STRING and int(tl.get("hint", -1)) == PROPERTY_HINT_ENUM,
+		"trace_level is a String enum setting")
+	_ok(str(tl.get("hint_string", "")) == Settings.HINTS[Settings.KEY_TRACE_LEVEL]
+		and str(tl.get("hint_string", "")) == "none,basic,verbose",
+		"trace_level enum is exactly 'none,basic,verbose' (HINTS)")
+	var env: Dictionary = infos.get(Settings.KEY_ENVIRONMENT, {})
+	_ok(int(env.get("type", -1)) == TYPE_STRING and int(env.get("hint", -1)) == PROPERTY_HINT_ENUM,
+		"environment is a String enum setting")
+	_ok(str(env.get("hint_string", "")) == Settings.HINTS[Settings.KEY_ENVIRONMENT]
+		and str(env.get("hint_string", "")) == "auto,development,production",
+		"environment enum is exactly 'auto,development,production' (HINTS)")
+	var dt: Dictionary = infos.get(Settings.KEY_DIFF_TRACING, {})
+	_ok(int(dt.get("type", -1)) == TYPE_BOOL, "diff_tracing registered as a bool")
 	# register() must never overwrite a value the user already changed (keys all exist now, so
 	# this cannot dirty -> save).
 	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, true)
@@ -113,6 +138,9 @@ func _test_apply_changed_keys() -> void:
 	ProjectSettings.set_setting(Settings.KEY_FRAME_BUDGET_MS, 6.0)   # ≠ the 4.0 default (L-02 re-scope)
 	ProjectSettings.set_setting(Settings.KEY_HOST_NODE_POOL, false)
 	ProjectSettings.set_setting(Settings.KEY_STRICT_MODE, true)
+	ProjectSettings.set_setting(Settings.KEY_ENVIRONMENT, "production")
+	ProjectSettings.set_setting(Settings.KEY_TRACE_LEVEL, "basic")
+	ProjectSettings.set_setting(Settings.KEY_DIFF_TRACING, true)
 	ProjectSettings.set_setting(Settings.KEY_DIAG_ENABLED, true)
 	ProjectSettings.set_setting(Settings.KEY_DIAG_CAPTURE, true)
 	Settings.reapply()
@@ -121,10 +149,14 @@ func _test_apply_changed_keys() -> void:
 	_ok(RuitkConfig.frame_budget_ms == 6.0, "changed key applies: frame_budget_ms -> 6.0")
 	_ok(RuitkConfig.host_node_pool == false, "changed key applies: host_node_pool -> false")
 	_ok(RuitkConfig.strict_mode == true, "changed key applies: strict_mode -> true (the static round-trips; force-off lives at the READ site)")
+	_ok(RuitkConfig.environment == "production", "changed key applies: environment -> 'production'")
+	_ok(RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.BASIC, "changed key applies: trace_level 'basic' -> TraceLevel.BASIC")
+	_ok(RuitkDiagnostics.diff_tracing == true, "changed key applies: diff_tracing -> true")
 	_ok(RuitkDiagnostics.enabled == true, "changed key applies: diagnostics/enabled -> true")
 	_ok(RuitkDiagnostics.capture == true, "changed key applies: diagnostics/capture -> true")
 	for key in [Settings.KEY_TIME_SLICING, Settings.KEY_TIME_SLICE_MS, Settings.KEY_FRAME_BUDGET_MS,
-			Settings.KEY_HOST_NODE_POOL, Settings.KEY_STRICT_MODE, Settings.KEY_DIAG_ENABLED, Settings.KEY_DIAG_CAPTURE]:
+			Settings.KEY_HOST_NODE_POOL, Settings.KEY_STRICT_MODE, Settings.KEY_ENVIRONMENT,
+			Settings.KEY_TRACE_LEVEL, Settings.KEY_DIFF_TRACING, Settings.KEY_DIAG_ENABLED, Settings.KEY_DIAG_CAPTURE]:
 		ProjectSettings.set_setting(key, Settings.DEFAULTS[key])
 	_restore_statics()
 
@@ -169,6 +201,42 @@ func _test_tri_state_hook_validation() -> void:
 	_ok(RuitkConfig.enable_strict_diagnostics == false, "tri-state 'disabled' forces strict_diagnostics OFF")
 	ProjectSettings.set_setting(Settings.KEY_HOOK_VALIDATION, Settings.DEFAULTS[Settings.KEY_HOOK_VALIDATION])
 	ProjectSettings.set_setting(Settings.KEY_STRICT_DIAGNOSTICS, Settings.DEFAULTS[Settings.KEY_STRICT_DIAGNOSTICS])
+	_restore_statics()
+
+## The two non-tri-state String enums (P5): value -> static mapping, unknown-value
+## degradation (a skewed dialog writing tri-state vocabulary must be harmless), and the
+## environment read surface (RuitkConfig.environment_resolved()).
+func _test_enum_knobs() -> void:
+	# trace_level maps its strings onto the RuitkDiagnostics.TraceLevel ints.
+	ProjectSettings.set_setting(Settings.KEY_TRACE_LEVEL, "verbose")
+	Settings.reapply()
+	_ok(RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE, "trace_level 'verbose' -> TraceLevel.VERBOSE")
+	ProjectSettings.set_setting(Settings.KEY_TRACE_LEVEL, "basic")
+	Settings.reapply()
+	_ok(RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.BASIC, "trace_level 'basic' -> TraceLevel.BASIC")
+	RuitkDiagnostics.trace_level = RuitkDiagnostics.TraceLevel.NONE
+	ProjectSettings.set_setting(Settings.KEY_TRACE_LEVEL, "enabled")   # tri-state vocabulary = unknown here
+	Settings.reapply()
+	_ok(RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.NONE, "unknown trace_level value leaves the static alone")
+	# environment passes explicit labels through and ignores junk.
+	ProjectSettings.set_setting(Settings.KEY_ENVIRONMENT, "development")
+	Settings.reapply()
+	_ok(RuitkConfig.environment == "development", "environment 'development' applies")
+	_ok(RuitkConfig.environment_resolved() == "development", "resolved(): explicit 'development' passes through")
+	RuitkConfig.environment = "auto"
+	ProjectSettings.set_setting(Settings.KEY_ENVIRONMENT, "junk")
+	Settings.reapply()
+	_ok(RuitkConfig.environment == "auto", "unknown environment value leaves the static alone")
+	# The read surface: "auto" (and any unrecognized static) resolves off the build type;
+	# explicit labels win. Never hardcode the auto arm — it is OS.is_debug_build()-dependent.
+	var auto_resolved := "development" if OS.is_debug_build() else "production"
+	_ok(RuitkConfig.environment_resolved() == auto_resolved, "resolved(): 'auto' follows OS.is_debug_build()")
+	RuitkConfig.environment = "production"
+	_ok(RuitkConfig.environment_resolved() == "production", "resolved(): explicit 'production' passes through")
+	RuitkConfig.environment = "weird"
+	_ok(RuitkConfig.environment_resolved() == auto_resolved, "resolved(): unrecognized static resolves like 'auto'")
+	ProjectSettings.set_setting(Settings.KEY_TRACE_LEVEL, Settings.DEFAULTS[Settings.KEY_TRACE_LEVEL])
+	ProjectSettings.set_setting(Settings.KEY_ENVIRONMENT, Settings.DEFAULTS[Settings.KEY_ENVIRONMENT])
 	_restore_statics()
 
 ## apply() is one-shot (RuitkRoot.create calls it on every mount): after the first call it must

@@ -41,6 +41,24 @@ static var strict_mode := false
 static func strict_mode_effective() -> bool:
 	return strict_mode and OS.is_debug_build()
 
+## Environment label (family knob 10; default "auto"). "auto" resolves to "development"
+## in the editor and debug builds and "production" in exported release builds;
+## "development"/"production" pass through explicitly. This is a READ-ONLY surface for
+## USER components (`RuitkConfig.environment_resolved()` — e.g. gate a debug overlay);
+## the library itself NEVER branches on it (§0 knob 10 — enforced by grep in review).
+## The Unity analog surfaces the same label through the host context (RootRenderer's
+## Environment["env"]).
+static var environment := "auto"
+
+## The resolved label: always "development" or "production". Unrecognized stored
+## values resolve like "auto" (the settings bridge's unknown-value precedent).
+static func environment_resolved() -> String:
+	match environment:
+		"development", "production":
+			return environment
+		_:
+			return "development" if OS.is_debug_build() else "production"
+
 ## Dev diagnostics (Phase 7.0). Default ON in debug builds, OFF in exported games — they
 ## push_warning/push_error to surface misuse loudly while developing, and degrade silently
 ## in release (the port never throws catchable exceptions; GDScript can't).

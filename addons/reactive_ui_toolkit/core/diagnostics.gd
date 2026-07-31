@@ -18,6 +18,34 @@ static func emit(msg: String) -> void:
 static func clear_messages() -> void:
 	messages.clear()
 
+## Trace ladder (family knob 8; mirrors the Unity leg's DiagnosticsConfig.TraceLevel).
+## NONE emits nothing; BASIC = STRUCTURAL events only (placements, deletions, node
+## replacements, commit summaries); VERBOSE = Basic + per-element/per-hook detail
+## (updates, portal retargets, component render entries, hook slots).
+enum TraceLevel { NONE, BASIC, VERBOSE }
+static var trace_level := TraceLevel.NONE
+
+## Independent diff-tracing switch (family knob 9): reconciler diff-DECISION logs
+## (bailout taken/skipped, reuse-vs-replace, keyed-list match decisions). OR
+## semantics — the legacy-Unity contract: a diff site fires when
+## `diff_tracing or trace_level == TraceLevel.VERBOSE` (Verbose alone lights it;
+## diff_tracing alone lights it with the structural channel dark).
+##
+## Gates, spelled inline at every emitting site (hot-path discipline — the cheap
+## enum/bool compare comes FIRST, message formatting only after):
+##   structural = trace_level != TraceLevel.NONE
+##   detail     = trace_level == TraceLevel.VERBOSE
+##   diff       = diff_tracing or trace_level == TraceLevel.VERBOSE
+static var diff_tracing := false
+
+## Trace-channel emission: prints (the Debug.Log analog) and mirrors into `messages`
+## when `capture` is on so headless tests can assert trace output. Callers gate BEFORE
+## formatting the message — this helper never checks the level itself.
+static func trace(msg: String) -> void:
+	print(msg)
+	if capture:
+		messages.append(msg)
+
 static var renders := 0       ## component render-fn invocations (excludes bailouts)
 static var commits := 0       ## commit passes
 static var placements := 0    ## host nodes inserted

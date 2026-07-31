@@ -74,6 +74,7 @@ var _in_component_render := false     ## a component's render fn is on the stack
 var _deferred_render_phase := false   ## the in-flight pass deferred >= 1 update FROM INSIDE a render fn (depth-guard accounting; external updates deferred while parked are legitimate load and never count)
 var _render_depth := 0                ## CONSECUTIVE commits whose render fns deferred updates (setState-in-render loops)
 var _warned_detached := false
+var _commit_seq := 0                  ## monotonic commit number for the trace ladder's commit summary ("[Fiber] Commit #n")
 const _MAX_RENDER_DEPTH := 25         ## FiberFunctionComponent.cs:18 (MaxRenderDepth)
 const _MAX_ERROR_RESTARTS := 25       ## RuitkReconciler.h MaxErrorRestarts (error-boundary rebuild cap)
 
@@ -410,6 +411,9 @@ func _begin_function(fiber: RuitkFiber) -> RuitkFiber:
 	var children_same: bool = _vnode_list_equal(alt.input_children if alt != null else [], fiber.input_children)
 	var can_bail: bool = (not fiber.has_pending_update) and context_ok and props_equal and children_same
 
+	# Diff-decision channel (OR gate — diff_tracing alone or Verbose alone lights it).
+	if RuitkDiagnostics.diff_tracing or RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:
+		RuitkDiagnostics.trace("[Diff] bailout %s '%s'" % ["taken" if (can_bail and fiber.state != null) else "skipped", _trace_desc(fiber)])
 	var out: Array
 	if can_bail and fiber.state != null:
 		out = fiber.state.last_output     # reuse cached output; don't re-run the render fn
@@ -424,6 +428,8 @@ func _begin_function(fiber: RuitkFiber) -> RuitkFiber:
 
 func _render_component(fiber: RuitkFiber) -> Array:
 	var state: RuitkComponentState = fiber.state
+	if RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:   # render entry (once per pass, strict double-invoke included)
+		RuitkDiagnostics.trace("[Fiber] Render '%s'" % _trace_desc(fiber))
 	var result = _invoke_render(fiber, state)
 	# Strict mode (family parity P4): double-invoke with the FIRST result discarded — the
 	# impure-render flusher (Unreal RuitkReconciler.cpp RenderComponent's second RunOnce).
@@ -552,6 +558,8 @@ func _reconcile(parent_fiber: RuitkFiber, old_fiber: RuitkFiber, vnode: RuitkVNo
 	var reuse: bool = old_fiber != null and old_fiber.matches(vnode)
 	var fiber: RuitkFiber
 	if reuse:
+		if RuitkDiagnostics.diff_tracing or RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:
+			RuitkDiagnostics.trace("[Diff] reuse '%s'" % _trace_desc(old_fiber))
 		fiber = old_fiber.alternate
 		if fiber == null:
 			fiber = F.new()
@@ -561,6 +569,11 @@ func _reconcile(parent_fiber: RuitkFiber, old_fiber: RuitkFiber, vnode: RuitkVNo
 		fiber = F.new()
 		fiber.alternate = null
 		if old_fiber != null:
+			# Node replacement — a STRUCTURAL event (Basic trace) AND a diff decision.
+			if RuitkDiagnostics.trace_level != RuitkDiagnostics.TraceLevel.NONE:
+				RuitkDiagnostics.trace("[Fiber] Replace %s -> %s" % [_trace_desc(old_fiber), _trace_vnode_desc(vnode)])
+			if RuitkDiagnostics.diff_tracing or RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:
+				RuitkDiagnostics.trace("[Diff] replace '%s' -> '%s'" % [_trace_desc(old_fiber), _trace_vnode_desc(vnode)])
 			_delete_fiber(parent_fiber, old_fiber)
 
 	# --- render-scoped fields (reset every render, since the buddy holds stale data) ---
@@ -689,6 +702,9 @@ func _reconcile_children(parent_fiber: RuitkFiber, old_first: RuitkFiber, child_
 		# Unity's [ThreadStatic] s_childMap + mark-and-sweep. Behavior is identical, incl.
 		# duplicate user keys (the flag is per-fiber, so both duplicates are swept correctly).
 		_key_map.clear()
+		# Diff-decision channel gate, hoisted once per keyed pass (this path is off the
+		# stable/fast routes already; the per-child cost at off is one local bool test).
+		var trace_keyed: bool = RuitkDiagnostics.diff_tracing or RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE
 		var ock := old_first
 		while ock != null:
 			_key_map[_fiber_key(ock)] = ock
@@ -703,8 +719,12 @@ func _reconcile_children(parent_fiber: RuitkFiber, old_first: RuitkFiber, child_
 				old_match.matched_pass = true
 				if old_match.index != i:
 					structural = true   # moved
+					if trace_keyed:
+						RuitkDiagnostics.trace("[Diff] keyed move key=%s %d -> %d" % [str(_vnode_key(vn, i)), old_match.index, i])
 			else:
 				structural = true       # new placement
+				if trace_keyed:
+					RuitkDiagnostics.trace("[Diff] keyed place key=%s at %d" % [str(_vnode_key(vn, i)), i])
 			var cf := _reconcile(parent_fiber, old_match, vn, i)
 			if prev == null: parent_fiber.child = cf
 			else: prev.sibling = cf
@@ -713,6 +733,8 @@ func _reconcile_children(parent_fiber: RuitkFiber, old_first: RuitkFiber, child_
 		while ocd != null:
 			var nxtd := ocd.sibling
 			if not ocd.matched_pass:
+				if trace_keyed:
+					RuitkDiagnostics.trace("[Diff] keyed remove key=%s" % str(_fiber_key(ocd)))
 				_delete_fiber(parent_fiber, ocd)
 			ocd = nxtd
 		_key_map.clear()
@@ -881,7 +903,17 @@ func _complete_work(fiber: RuitkFiber) -> void:
 
 func _commit_root() -> void:
 	_is_committing = true
+	_commit_seq += 1
 	RuitkDiagnostics.on_commit()
+	# Structural trace: count the effect list BEFORE the commit loop consumes it (next_effect
+	# links are nulled below); the summary line itself is emitted commit-end, Unity M5 shape.
+	var trace_structural: bool = RuitkDiagnostics.trace_level != RuitkDiagnostics.TraceLevel.NONE
+	var trace_effect_count := 0
+	if trace_structural:
+		var tf := _first_effect
+		while tf != null:
+			trace_effect_count += 1
+			tf = tf.next_effect
 
 	for d in _deletions:
 		_commit_deletion(d)
@@ -901,6 +933,9 @@ func _commit_root() -> void:
 
 	for hp in _reorder_set.keys():
 		_enforce_child_order(hp)
+
+	if trace_structural:
+		RuitkDiagnostics.trace("[Fiber] Commit #%d effects=%d" % [_commit_seq, trace_effect_count])
 
 	_root_current = _wip_root
 	_pending_eb_activations.clear()   # activations that never found their boundary are stale now
@@ -943,6 +978,8 @@ func _commit_placement(fiber: RuitkFiber) -> void:
 	if parent_node != null and is_instance_valid(parent_node) and fiber.node.get_parent() != parent_node:
 		parent_node.add_child(fiber.node)
 		RuitkDiagnostics.on_placement()
+		if RuitkDiagnostics.trace_level != RuitkDiagnostics.TraceLevel.NONE:
+			RuitkDiagnostics.trace("[Fiber] Place %s" % fiber.type)
 
 func _commit_update(fiber: RuitkFiber) -> void:
 	if fiber.node == null or not is_instance_valid(fiber.node):
@@ -973,6 +1010,8 @@ func _commit_update(fiber: RuitkFiber) -> void:
 				RuitkHost._set_prop(node, k, val)
 	fiber.props = new_props
 	if RuitkDiagnostics.enabled: RuitkDiagnostics.on_update()
+	if RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:   # per-element detail
+		RuitkDiagnostics.trace("[Fiber] Update %s" % fiber.type)
 
 ## Classify a host element's props ONCE: plain prop keys (diffed+written each frame) vs
 ## "special" (events / ref / style / item-model -> needs the generic apply). apply_special is
@@ -994,6 +1033,9 @@ func _build_apply_plan(fiber: RuitkFiber, props: Dictionary) -> void:
 
 func _commit_deletion(old_fiber: RuitkFiber) -> void:
 	RuitkDiagnostics.on_deletion()
+	if RuitkDiagnostics.trace_level != RuitkDiagnostics.TraceLevel.NONE:
+		# One line per removed SUBTREE (top-level only) — the legacy [ReplaceNode] granularity.
+		RuitkDiagnostics.trace("[Fiber] Delete %s" % _trace_desc(old_fiber))
 	_null_refs_recursive(old_fiber)
 	_run_cleanups_recursive(old_fiber)
 	_free_host_nodes(old_fiber)
@@ -1023,6 +1065,8 @@ func _commit_portal_retarget(fiber: RuitkFiber) -> void:
 			if nd.get_parent() != null:
 				nd.get_parent().remove_child(nd)
 			fiber.portal_target.add_child(nd)
+	if RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:   # per-element detail
+		RuitkDiagnostics.trace("[Fiber] PortalRetarget %d node(s) -> %s" % [ordered.size(), fiber.portal_target.name])
 
 # --------------------------------------------------------------------------
 # Effects
@@ -1254,6 +1298,29 @@ func _fiber_key(f: RuitkFiber):
 
 func _vnode_key(vn: RuitkVNode, idx: int):
 	return vn.key if vn.key != null else "idx%d" % idx
+
+# --------------------------------------------------------------------------
+# Trace ladder (RuitkDiagnostics.trace_level / diff_tracing) — describe helpers.
+# Called ONLY inside a trace gate; never on the ungated hot path.
+# --------------------------------------------------------------------------
+
+## Human label for a fiber in trace output: host class name, component method, or tag name.
+func _trace_desc(fiber: RuitkFiber) -> String:
+	if fiber.type != "":
+		return fiber.type
+	if fiber.tag == F.Tag.FUNCTION and fiber.component.is_valid():
+		var m := fiber.component.get_method()
+		return m if m != "" else "<anonymous>"
+	return str(F.Tag.keys()[fiber.tag])
+
+## Same, for a vnode (the incoming side of a replacement).
+func _trace_vnode_desc(vnode: RuitkVNode) -> String:
+	if vnode.type != "":
+		return vnode.type
+	if vnode.kind == RuitkVNode.Kind.FUNCTION and vnode.component.is_valid():
+		var m := vnode.component.get_method()
+		return m if m != "" else "<anonymous>"
+	return str(RuitkVNode.Kind.keys()[vnode.kind])
 
 # --------------------------------------------------------------------------
 # Tree lifecycle / teardown (break RefCounted cycles; shared state survives)

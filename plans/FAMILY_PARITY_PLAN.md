@@ -881,6 +881,81 @@ commit-cadence probe (N=2000, 100 update frames) pinned renders=100/commits=100 
 the sync path still commits every frame; the absolute delta vs round 1 is machine
 state, not semantics.
 
+### P5 — missing-deps + trace ladder + diff_tracing + environment — DONE (2026-07-31)
+
+Shipped (defaults unchanged — the new knobs land off/auto/none):
+
+- **Reference drift, verified by reading the LIVE Unity tree:** its own campaign moved
+  mid-flight (M4 `9bb83c0c`, M5 `a574c922`). M4 re-prefixed the strict family
+  `[Hooks][StrictMode]` → `[Hooks][Strict]` (Hooks.cs 160/573/607) — per the drift rule the
+  NEW prefix is matched family-wide, which the two existing Godot messages AND
+  core_test:420 already carry, so **L-10 resolves to a verified no-op** (the reference
+  converged onto Godot's spelling; nothing to re-prefix). M5 pinned the trace gates
+  inline — structural `!= None`, detail `== Verbose`, diff `diff_tracing OR == Verbose` —
+  ported exactly, plus its message shapes (`[Fiber] Delete <type>`,
+  `[Fiber] Commit #n effects=m`).
+- **Missing-deps warnings:** `Hooks._warn_missing_deps` ports WarnMissingDependencies —
+  family key `"missing-deps:%s:%d"`, message text verbatim, gated on
+  `enable_strict_diagnostics`, deduped per component per (hook, slot) through the existing
+  `_warn_once`. Mapping per plan: useEffect/useLayoutEffect/useDeferredValue warn on
+  `null` deps ONLY (`[]` stays a legitimate run-once); the memo trio warns on EMPTY too
+  (treatEmptyAsMissing — the Unity params-empty shape). The delegation trap is closed by a
+  new `_memo_impl(factory, deps, hook_name)`: useMemo/useCallback/useImperativeHandle each
+  warn under their OWN public name while the recorded hook-order kind stays `"memo"` for
+  all three (signatures unchanged — no behavioral drift for the order validator).
+- **Call-site sweep:** every first-party memo-trio/effect-family call in `examples/` +
+  `addons/` already passes real deps — zero fixes; demos_test output carries ZERO
+  `[Hooks][Strict]` lines. The one bare `useDeferredValue` (core_test
+  `_test_deferred_value`) deliberately exercises value-comparison mode — strict
+  diagnostics silenced locally with the rationale inline; the warn itself is pinned in
+  `_test_missing_deps`. The risk-list "legit empty-deps memo" case never materialized.
+- **Trace ladder (L-03):** `RuitkDiagnostics.TraceLevel { NONE, BASIC, VERBOSE }` +
+  `trace_level` + `diff_tracing` + a capture-aware `trace()` (print + `messages`).
+  Basic/structural sites: placements (`_commit_placement`), deletions
+  (`_commit_deletion` — one line per removed subtree), replacements (`_reconcile`'s
+  non-match branch), commit summary (new `_commit_seq`; effects counted BEFORE the commit
+  loop consumes the chain, emitted commit-end — the M5 shape). Verbose adds per-element
+  updates, portal retargets, component render entries (once per pass, outside the strict
+  double-invoke), and per-hook detail in `Hooks._record` (logs per strict invoke — two
+  captures happened, the Unity comment's ruling). Diff channel (OR): bailout
+  taken/skipped, reuse-vs-replace, keyed move/place/remove (gate hoisted once per keyed
+  pass; move/place/remove print the effective reconciliation key). Every site gates on
+  the cheap compare FIRST; formatting only after.
+- **Environment (knob 10):** `RuitkConfig.environment := "auto"` +
+  `environment_resolved()` — explicit labels pass through, auto/unknown resolve off
+  `OS.is_debug_build()`. Read-only component surface; grep-proof holds (`environment`
+  inside the addon names only config.gd/settings.gd — remaining hits are the unrelated
+  "compiler environment" prose in guitkx/plugin).
+- **Settings lockstep ×3 keys** (§4): `runtime/environment`, `diagnostics/trace_level`,
+  `diagnostics/diff_tracing` (KEY_ + DEFAULTS + `_apply_now` + `_property_info`); NEW
+  per-key `HINTS` const (`"none,basic,verbose"` / `"auto,development,production"`) with
+  the TRI_STATE_HINT fallback; `_apply_now` maps trace strings onto the enum ints with
+  unknown-value `_: pass` arms (a skewed dialog writing tri-state vocabulary is
+  harmless). Dialog: per-key hint pass-through via `_hint_for` reading the script
+  CONSTANT MAP, so an old runtime without HINTS degrades to the tri-state options — the
+  risk-list posture, pinned in guitkx_editor_test with an in-memory stub script.
+- **Tests:** settings_test 71 → 103 (capture/restore + no-keys + property-info + apply
+  rows for all three knobs; `_test_enum_knobs`: string→enum mapping, unknown-value
+  degradation for both enums, `environment_resolved()` all four shapes). core_test
+  133 → 161 (`_test_missing_deps`: six warns under their own names, family text, `[]`
+  vs `null` split, per-component dedupe, off-gate; `_test_trace_ladder`: NONE silent,
+  BASIC mount/keyed-removal/type-swap structural-only, VERBOSE superset + hook detail +
+  render entries + the OR's verbose side, diff_tracing-alone independence — diff lines
+  with ZERO structural). guitkx_editor_test 428 → 437 (both enum rows' vocabulary +
+  populate, diff_tracing CheckBox, `_hint_for` HINTS read + no-HINTS fallback).
+- Bughunt find (fixed pre-commit): the keyed-move diff line printed `str(vn.key)` —
+  "<null>" for unkeyed children matched positionally; now the effective reconciliation
+  key (`_vnode_key`), consistent with the place/remove lines.
+
+Acceptance: full §7 verify green — core 161/0 · settings 103/0 · scheduler 56/0 ·
+strict_boundary 59/0 · style 42/0 · router_match 18/0 · router_spine 37/0 ·
+update PASSED · demos 31/0 (zero strict-warn spam) · doom 179/0 · guitkx PASSED ·
+hmr PASSED (55) · guitkx_editor 437/0 · guitkx_lsp 39/0 · contract 66/66 · migrate 0 ·
+machine-path gate green · guitkx_build 49/0 (2 warnings pre-existing on 2d307eb,
+verified). Bench at defaults, same-session medians vs 2d307eb (ms/frame):
+6.897/6.893/12.151/17.425/26.481 vs 6.897/6.893/12.602/17.178/27.896 — inside the
+observed noise band in both directions (N≥1500 swings ±5% run-to-run this session).
+
 ## 9. Risks / watch-list / STOP-AND-ASK
 
 - **Headless timing flakiness** (scheduler budgets are wall-clock): design scheduler tests

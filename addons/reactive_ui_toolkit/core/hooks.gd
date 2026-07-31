@@ -43,10 +43,14 @@ static func _end() -> void:
 # All gated behind RuitkConfig flags (default debug-only); push_error/warning + degrade.
 # --------------------------------------------------------------------------
 
-## Record a hook call's kind in render order (no-op unless validation is on).
+## Record a hook call's kind in render order (no-op unless validation is on). Also the
+## Verbose trace ladder's per-hook detail site (independent of validation — gate first,
+## format after).
 static func _record(state: RuitkComponentState, kind: String) -> void:
 	if RuitkConfig.enable_hook_validation:
 		state.hook_log.append(kind)
+	if RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:
+		RuitkDiagnostics.trace("[Hooks] %s in '%s'" % [kind, _comp_label(state)])
 
 ## Compare this render's hook order to the primed signature; push_error on first divergence.
 static func _check_hook_order(state: RuitkComponentState) -> void:
@@ -78,6 +82,23 @@ static func _warn_once(state: RuitkComponentState, key: String, msg: String) -> 
 	state.diag_warned[key] = true
 	RuitkDiagnostics.emit(msg)
 	push_warning(msg)
+
+## Missing-dependency-array warning (strict_diagnostics canonical pair (b); ports the
+## Unity leg's WarnMissingDependencies — key format, message text, and per-hook
+## `treatEmptyAsMissing` mapping are family-frozen). `deps == null` is always missing;
+## an EMPTY deps array counts as missing only for the memo trio (useMemo/useCallback/
+## useImperativeHandle — the "no deps passed" shape, where React's linter would demand
+## real dependencies), NOT for the effect family (`[]` = run-once-on-mount is a
+## legitimate, explicit choice there; `null` = re-runs every render, exactly the
+## message's claim). Deduped once per component per (hook, slot) via `_warn_once`.
+static func _warn_missing_deps(state: RuitkComponentState, hook_name: String, index: int, deps, treat_empty_as_missing := false) -> void:
+	if not RuitkConfig.enable_strict_diagnostics:
+		return
+	var missing: bool = deps == null or (treat_empty_as_missing and deps is Array and (deps as Array).is_empty())
+	if not missing:
+		return
+	_warn_once(state, "missing-deps:%s:%d" % [hook_name, index],
+		"[Hooks][Strict] %s in component '%s' was invoked without a dependency array; it will re-run every render. Provide explicit dependencies or refactor the logic." % [hook_name, _comp_label(state)])
 
 # --------------------------------------------------------------------------
 # State
@@ -161,10 +182,27 @@ static func useRef(initial = null) -> Dictionary:
 
 ## useMemo(factory, deps) -> cached value, recomputed only when deps change (shallow).
 static func useMemo(factory: Callable, deps: Array = []) -> Variant:
+	return _memo_impl(factory, deps, "useMemo")
+
+## useCallback(cb, deps) -> a stable Callable while deps are unchanged.
+static func useCallback(cb: Callable, deps: Array = []) -> Callable:
+	return _memo_impl(func(): return cb, deps, "useCallback")
+
+## useImperativeHandle(factory, deps) -> handle, recomputed only when deps change.
+static func useImperativeHandle(factory: Callable, deps: Array = []) -> Variant:
+	return _memo_impl(factory, deps, "useImperativeHandle")
+
+## Shared memo core. `hook_name` exists so the missing-deps warning names the PUBLIC
+## hook the user actually called — useCallback/useImperativeHandle delegate here, and
+## warning as "useMemo" for those would send the user to the wrong line. The recorded
+## hook-order kind stays "memo" for all three (the delegation has always made them
+## interchangeable positions to the order validator — preserved).
+static func _memo_impl(factory: Callable, deps: Array, hook_name: String) -> Variant:
 	var s := _cur
 	_record(s, "memo")
 	var i := s.hook_index
 	s.hook_index += 1
+	_warn_missing_deps(s, hook_name, i, deps, true)   # empty deps = missing for the memo trio
 	if i >= s.hooks.size():
 		var v = factory.call()
 		s.hooks.append({ "kind": "memo", "value": v, "deps": deps.duplicate() })
@@ -174,14 +212,6 @@ static func useMemo(factory: Callable, deps: Array = []) -> Variant:
 		slot["value"] = factory.call()
 		slot["deps"] = deps.duplicate()
 	return slot["value"]
-
-## useCallback(cb, deps) -> a stable Callable while deps are unchanged.
-static func useCallback(cb: Callable, deps: Array = []) -> Callable:
-	return useMemo(func(): return cb, deps)
-
-## useImperativeHandle(factory, deps) -> handle, recomputed only when deps change.
-static func useImperativeHandle(factory: Callable, deps: Array = []) -> Variant:
-	return useMemo(factory, deps)
 
 # --------------------------------------------------------------------------
 # Effects (recorded during render, run during commit)
@@ -195,6 +225,7 @@ static func useEffect(effect: Callable, deps = null) -> void:
 	_record(s, "effect")
 	var i := s.effect_index
 	s.effect_index += 1
+	_warn_missing_deps(s, "useEffect", i, deps)
 	if i >= s.effects.size():
 		s.effects.append({ "factory": effect, "deps": deps, "last_deps": null, "cleanup": null })
 	else:
@@ -208,6 +239,7 @@ static func useLayoutEffect(effect: Callable, deps = null) -> void:
 	_record(s, "layout_effect")
 	var i := s.layout_index
 	s.layout_index += 1
+	_warn_missing_deps(s, "useLayoutEffect", i, deps)
 	if i >= s.layout_effects.size():
 		s.layout_effects.append({ "factory": effect, "deps": deps, "last_deps": null, "cleanup": null })
 	else:
@@ -305,6 +337,7 @@ static func useDeferredValue(value, deps = null):
 	_record(s, "deferred")
 	var i := s.hook_index
 	s.hook_index += 1
+	_warn_missing_deps(s, "useDeferredValue", i, deps)
 	if i >= s.hooks.size():
 		s.hooks.append({ "kind": "deferred", "value": value, "target": value, "deps": deps, "pending": false })
 		return value

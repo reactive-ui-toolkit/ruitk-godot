@@ -53,7 +53,7 @@ func rebuild() -> void:
 	if runtime != null:
 		var grid := _add_section("Runtime")
 		for key in runtime.DEFAULTS:
-			_add_row(grid, key, runtime.DEFAULTS[key], str(runtime.GROUP), str(runtime.TRI_STATE_HINT))
+			_add_row(grid, key, runtime.DEFAULTS[key], str(runtime.GROUP), _hint_for(runtime, key, str(runtime.TRI_STATE_HINT)))
 	else:
 		var missing := Label.new()
 		missing.text = "Runtime settings appear here when the Reactive UI Toolkit runtime addon (addons/reactive_ui_toolkit) is installed."
@@ -81,6 +81,17 @@ func _runtime_settings() -> GDScript:
 	if not FileAccess.file_exists(runtime_settings_path):
 		return null
 	return load(runtime_settings_path) as GDScript
+
+## Per-key enum hint for a String key: the runtime's HINTS map when it has one, else the
+## tri-state fallback. Reached through the script CONSTANT MAP (not a direct property read)
+## so a runtime addon predating HINTS degrades to the fallback instead of erroring — the
+## documented version-skew posture (§4 / risk list).
+func _hint_for(runtime: GDScript, key: String, fallback: String) -> String:
+	var consts: Dictionary = runtime.get_script_constant_map()
+	var hints = consts.get("HINTS")
+	if hints is Dictionary and hints.has(key):
+		return str(hints[key])
+	return fallback
 
 func _add_section(header: String) -> GridContainer:
 	if not _sections.is_empty():

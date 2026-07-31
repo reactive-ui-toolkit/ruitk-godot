@@ -393,6 +393,34 @@ func _test_settings_dialog() -> void:
 	_ok(ob.get_item_text(ob.selected) == str(ProjectSettings.get_setting(RtSettings.KEY_HOOK_VALIDATION, "auto")),
 		"tri-state populates the OptionButton")
 
+	# The two non-tri-state String enums (P5) get their OWN vocabulary via RuitkSettings.HINTS
+	# (per-key hint pass-through, §4) instead of the tri-state fallback.
+	var ob_tl: OptionButton = d._controls[RtSettings.KEY_TRACE_LEVEL]
+	_ok(ob_tl.item_count == 3, "trace_level offers three options")
+	_ok(ob_tl.get_item_text(0) == "none" and ob_tl.get_item_text(1) == "basic" and ob_tl.get_item_text(2) == "verbose",
+		"trace_level options are none/basic/verbose (HINTS vocabulary)")
+	_ok(ob_tl.get_item_text(ob_tl.selected) == str(ProjectSettings.get_setting(RtSettings.KEY_TRACE_LEVEL, "none")),
+		"trace_level populates from the stored value")
+	var ob_env: OptionButton = d._controls[RtSettings.KEY_ENVIRONMENT]
+	_ok(ob_env.item_count == 3, "environment offers three options")
+	_ok(ob_env.get_item_text(0) == "auto" and ob_env.get_item_text(1) == "development" and ob_env.get_item_text(2) == "production",
+		"environment options are auto/development/production (HINTS vocabulary)")
+	_ok(ob_env.get_item_text(ob_env.selected) == str(ProjectSettings.get_setting(RtSettings.KEY_ENVIRONMENT, "auto")),
+		"environment populates from the stored value")
+	# diff_tracing rides the existing bool row machinery.
+	_ok(d._controls[RtSettings.KEY_DIFF_TRACING] is CheckBox, "diff_tracing builds a CheckBox row")
+
+	# Version-skew degradation (risk list): _hint_for reaches HINTS through the script
+	# constant map, so a runtime addon PREDATING the HINTS const yields the tri-state
+	# fallback — a working control, not a crash.
+	_ok(d._hint_for(RtSettings, RtSettings.KEY_TRACE_LEVEL, "fallback") == "none,basic,verbose",
+		"_hint_for reads the per-key HINTS vocabulary")
+	var stub := GDScript.new()
+	stub.source_code = "extends RefCounted\n"   # no HINTS const — the pre-P5 runtime shape
+	stub.reload()
+	_ok(d._hint_for(stub, RtSettings.KEY_TRACE_LEVEL, "auto,enabled,disabled") == "auto,enabled,disabled",
+		"_hint_for degrades to the tri-state fallback when the runtime has no HINTS")
+
 	# A stored non-default value populates after rebuild (the about_to_popup refresh path).
 	# 6.0 ≠ the 4.0 default (frame_budget_ms was re-scoped to 4.0 by the parity campaign, L-02).
 	ProjectSettings.set_setting(RtSettings.KEY_FRAME_BUDGET_MS, 6.0)
