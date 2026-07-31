@@ -23,6 +23,8 @@ func _initialize() -> void:
 		["intelligence", _test_intelligence_wiring],
 		["find_bar", _test_find_bar],
 		["deps", _test_deps_handshake],
+		["settings_dialog", _test_settings_dialog],
+		["main_menu_helper", _test_main_menu_helper],
 		["schema_sync", _test_schema_sync],
 		["scan_diags", _test_scan_diags],
 		["rich_hover", _test_rich_hover],
@@ -67,6 +69,7 @@ func _test_parses() -> void:
 		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_editor_view.gd",
 		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_code_edit.gd",
 		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_find_bar.gd",
+		"res://addons/reactive_ui_toolkit_editor/editor/ruitk_settings_dialog.gd",
 		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_diagnostics_renderer.gd",
 		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_problems_panel.gd",
 		"res://addons/reactive_ui_toolkit_editor/editor/guitkx_references_panel.gd",
@@ -354,6 +357,154 @@ func _test_deps_handshake() -> void:
 	const RtPlugin := preload("res://addons/reactive_ui_toolkit/plugin.gd")
 	_ok(str(RtPlugin.MIN_GODOT) == str(Deps.MIN_GODOT), "gate: runtime and editor addons claim the SAME floor")
 	_ok(RtPlugin.godot_supported() and not RtPlugin.godot_supported("4.3.2") and RtPlugin.godot_supported("4.4.0"), "gate: runtime godot_supported matches")
+
+# The one-settings-screen dialog (family design): sections populate from ProjectSettings, a
+# simulated control change writes through with register_all's only-save-when-dirty discipline,
+# and the W5 arm (runtime addon absent) degrades to the Editor section alone. Every key this
+# test touches is flipped back / cleared, and project.godot must end BYTE-IDENTICAL to how it
+# started (the settings_test.gd no-residue promise).
+func _test_settings_dialog() -> void:
+	const DialogScript := preload("res://addons/reactive_ui_toolkit_editor/editor/ruitk_settings_dialog.gd")
+	const EdSettings := preload("res://addons/reactive_ui_toolkit_editor/editor/ruitk_editor_settings.gd")
+	var RtSettings: GDScript = load("res://addons/reactive_ui_toolkit/core/settings.gd")
+
+	# Register both groups first (settings_test.gd's no-residue order): any first-registration
+	# save happens while every key still equals its initial value, so nothing persists.
+	EdSettings.register_all()
+	RtSettings.register()
+	var project_before := FileAccess.get_file_as_string("res://project.godot")
+
+	var d: Window = DialogScript.new()
+	_ok(Array(d._sections) == ["Runtime", "Editor"], "both sections built (runtime addon present)")
+	_ok(d._controls.size() == RtSettings.DEFAULTS.size() + EdSettings.DEFAULTS.size(),
+		"one control per settings key (got %d)" % d._controls.size())
+
+	# Populate: bools -> CheckBox, the float -> SpinBox, tri-states -> OptionButton, all read
+	# through ProjectSettings with the owning class's defaults as fallback.
+	var cb: CheckBox = d._controls[EdSettings.KEY_FORMAT_ON_SAVE]
+	_ok(cb.button_pressed == bool(ProjectSettings.get_setting(EdSettings.KEY_FORMAT_ON_SAVE, true)),
+		"editor bool populates from the stored value")
+	var sb: SpinBox = d._controls[RtSettings.KEY_FRAME_BUDGET_MS]
+	_ok(sb.value == float(ProjectSettings.get_setting(RtSettings.KEY_FRAME_BUDGET_MS, 8.0)),
+		"frame_budget_ms populates the SpinBox")
+	var ob: OptionButton = d._controls[RtSettings.KEY_HOOK_VALIDATION]
+	_ok(ob.item_count == 3, "tri-state offers auto/enabled/disabled")
+	_ok(ob.get_item_text(ob.selected) == str(ProjectSettings.get_setting(RtSettings.KEY_HOOK_VALIDATION, "auto")),
+		"tri-state populates the OptionButton")
+
+	# A stored non-default value populates after rebuild (the about_to_popup refresh path).
+	ProjectSettings.set_setting(RtSettings.KEY_FRAME_BUDGET_MS, 4.0)
+	d.rebuild()
+	_ok((d._controls[RtSettings.KEY_FRAME_BUDGET_MS] as SpinBox).value == 4.0,
+		"rebuild re-reads a value changed in the native dialog")
+	ProjectSettings.set_setting(RtSettings.KEY_FRAME_BUDGET_MS, RtSettings.DEFAULTS[RtSettings.KEY_FRAME_BUDGET_MS])
+	d.rebuild()
+
+	# Simulated toggle: flipping the CheckBox writes the key AND saves; flipping back restores
+	# project.godot byte-identically (the value equals its initial value again -> omitted).
+	cb = d._controls[EdSettings.KEY_FORMAT_ON_SAVE]
+	var orig: bool = cb.button_pressed
+	cb.button_pressed = not orig   # the setter emits toggled -> the dialog writes + saves
+	_ok(bool(ProjectSettings.get_setting(EdSettings.KEY_FORMAT_ON_SAVE, true)) == (not orig),
+		"toggle writes through to ProjectSettings")
+	_ok(FileAccess.get_file_as_string("res://project.godot") != project_before,
+		"changed value is persisted (save() ran)")
+	cb.button_pressed = orig
+	_ok(FileAccess.get_file_as_string("res://project.godot") == project_before,
+		"flipping back restores project.godot byte-identically")
+
+	# Save discipline: writing the unchanged value is a no-op (no set_setting, no save).
+	d._write(EdSettings.KEY_FORMAT_ON_SAVE, orig, EdSettings.DEFAULTS[EdSettings.KEY_FORMAT_ON_SAVE])
+	_ok(FileAccess.get_file_as_string("res://project.godot") == project_before,
+		"unchanged value never dirties project.godot")
+
+	# SpinBox write path. 4.7 Range gotcha (observed headless): value_changed only self-emits
+	# while the control is INSIDE the tree — the popped-up dialog always is, but out-of-tree
+	# test nodes must emit like the UI would (the OptionButton pattern below).
+	sb = d._controls[RtSettings.KEY_FRAME_BUDGET_MS]
+	sb.value = 4.0
+	sb.value_changed.emit(sb.value)
+	_ok(float(ProjectSettings.get_setting(RtSettings.KEY_FRAME_BUDGET_MS, 8.0)) == 4.0,
+		"SpinBox change writes the float")
+	sb.value = float(RtSettings.DEFAULTS[RtSettings.KEY_FRAME_BUDGET_MS])
+	sb.value_changed.emit(sb.value)
+
+	# Tri-state write path: select() alone never emits, so emit like the UI would.
+	ob = d._controls[RtSettings.KEY_HOOK_VALIDATION]
+	ob.select(1)
+	ob.item_selected.emit(1)
+	_ok(str(ProjectSettings.get_setting(RtSettings.KEY_HOOK_VALIDATION, "auto")) == "enabled",
+		"tri-state selection writes the enum string")
+	ob.select(0)
+	ob.item_selected.emit(0)
+	_ok(FileAccess.get_file_as_string("res://project.godot") == project_before,
+		"all runtime keys restored -> project.godot byte-identical")
+	d.free()
+
+	# W5: runtime addon absent -> the Editor section alone (the dialog reaches RuitkSettings
+	# only via load() behind a file_exists guard, so a missing path degrades, never errors).
+	var d2: Window = DialogScript.new()
+	d2.runtime_settings_path = "res://addons/__absent__/core/settings.gd"
+	d2.rebuild()
+	_ok(Array(d2._sections) == ["Editor"], "W5: missing runtime addon -> Editor section only")
+	_ok(d2._controls.size() == EdSettings.DEFAULTS.size(), "W5: only the editor keys remain")
+	_ok(not d2._controls.has(RtSettings.KEY_TIME_SLICING), "W5: no runtime controls built")
+	d2.free()
+
+	# Leave nothing behind (the settings_test.gd cleanup discipline: set_setting(null)).
+	for key in RtSettings.DEFAULTS:
+		ProjectSettings.set_setting(key, null)
+	for key in EdSettings.DEFAULTS:
+		ProjectSettings.set_setting(key, null)
+	_ok(FileAccess.get_file_as_string("res://project.godot") == project_before,
+		"suite leaves project.godot untouched")
+
+# The top-level "Reactive UI Toolkit" menu injects a PopupMenu into the editor's MenuBar; the
+# only editor-internals dependency is FINDING that bar, done by plugin.gd's static, depth-capped
+# find_menu_bar — which is exactly what a synthetic tree can exercise headless. The fallback
+# (Project > Tools via add_tool_menu_item) engages precisely when this helper returns null.
+func _test_main_menu_helper() -> void:
+	var PluginScript: GDScript = load("res://addons/reactive_ui_toolkit_editor/plugin.gd")
+	_ok(PluginScript != null and PluginScript.can_instantiate(), "plugin.gd compiles")
+
+	# Shallow synthetic editor shape: base -> title strip -> MenuBar. Found within budget.
+	var base := Control.new()
+	var strip := HBoxContainer.new()
+	var bar := MenuBar.new()
+	base.add_child(strip)
+	strip.add_child(bar)
+	_ok(PluginScript.find_menu_bar(base, 8) == bar, "MenuBar found through a shallow tree")
+	_ok(PluginScript.find_menu_bar(bar, 8) == bar, "a MenuBar root returns itself")
+
+	# Depth cap honored: a bar buried deeper than the budget is deliberately NOT found (the
+	# fallback path is the tested, safe behavior on a restructured editor).
+	var deep_root := Control.new()
+	var cursor: Control = deep_root
+	for _i in range(3):
+		var next := Control.new()
+		cursor.add_child(next)
+		cursor = next
+	var deep_bar := MenuBar.new()
+	cursor.add_child(deep_bar)
+	_ok(PluginScript.find_menu_bar(deep_root, 2) == null, "depth budget stops the search short")
+	_ok(PluginScript.find_menu_bar(deep_root, 8) == deep_bar, "same tree resolves with real budget")
+
+	# No MenuBar anywhere -> null, never an error.
+	var empty := Control.new()
+	empty.add_child(Control.new())
+	_ok(PluginScript.find_menu_bar(empty, 8) == null, "menubar-less tree returns null")
+
+	# MenuBar contract sanity (the official half of the technique): a child PopupMenu becomes a
+	# titled top-level menu.
+	var popup := PopupMenu.new()
+	popup.name = "Reactive UI Toolkit"
+	bar.add_child(popup)
+	_ok(bar.get_menu_count() == 1 and bar.get_menu_title(0) == "Reactive UI Toolkit",
+		"child PopupMenu surfaces as a titled top-level menu")
+
+	base.free()
+	deep_root.free()
+	empty.free()
 
 # W6/F8/F12 — the bundled schema is a hand-synced copy with no generator; these tripwires turn
 # silent drift (between the two shipping editors, and against the compiler's tag universe) into

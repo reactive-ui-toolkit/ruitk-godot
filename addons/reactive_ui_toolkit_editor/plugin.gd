@@ -11,6 +11,13 @@ extends EditorPlugin
 ## here is torn down in _exit_tree so a disable/re-enable cycle leaves no orphans.
 
 const PLUGIN_NAME := "ReactiveUITK"
+# The Project > Tools item that opens the settings dialog (family design: ONE settings screen
+# per leg, opened from the plugin's own menu surface). Same string for add/remove.
+const SETTINGS_MENU := "Reactive UI Toolkit Settings..."
+const MAIN_MENU_TITLE := "Reactive UI Toolkit"
+# The editor's main menu is a MenuBar close under the base control; the cap keeps the search from
+# ever crawling the whole editor tree if the layout changes (in which case we fall back anyway).
+const _MENU_BAR_SEARCH_DEPTH := 8
 # Preload (own addon, dependency-free): fresh class_names are absent from cold class caches.
 const Deps := preload("res://addons/reactive_ui_toolkit_editor/ruitk_editor_deps.gd")
 
@@ -23,6 +30,9 @@ var _problems_button: Button
 var _references: Control
 var _search: Control
 var _fs_debounce: Timer
+var _settings_dialog: AcceptDialog  # lazy; shared by the menu entries and the toolbar button
+var _main_menu: PopupMenu = null  # top-level "Reactive UI Toolkit" menu; null when on the fallback
+var _tools_fallback := false  # true when the Project > Tools item was registered instead
 var _deps_ok := false
 
 func _enter_tree() -> void:
@@ -41,7 +51,27 @@ func _enter_tree() -> void:
 		return
 
 	RuitkEditorSettings.register_all()
+	# Also seed the RUNTIME addon's reactive_ui_toolkit/* settings — many users enable only this
+	# editor plugin; registration is idempotent so double-registration with the runtime plugin is
+	# harmless. load()-indirected (never naming RuitkSettings here): plugin.gd must stay compilable
+	# with the reactive_ui_toolkit addon absent so the W5 dependency dialog can show, and an older
+	# runtime without core/settings.gd is tolerated via the file_exists guard.
+	if Engine.is_editor_hint() and FileAccess.file_exists("res://addons/reactive_ui_toolkit/core/settings.gd"):
+		var runtime_settings: GDScript = load("res://addons/reactive_ui_toolkit/core/settings.gd")
+		if runtime_settings != null:
+			runtime_settings.register()
 	_register_searchable_extension()
+
+	# ONE settings screen per leg (family design), reachable from a top-level "Reactive UI
+	# Toolkit" menu in the editor's main menu bar — the same surface the Unity and Unreal legs
+	# use. Godot has no official API for a top-level menu, so this injects a PopupMenu into the
+	# editor's MenuBar (a documented MenuBar behavior; only FINDING the bar relies on editor
+	# internals). If the bar isn't found the entry degrades to Project > Tools — the worst case
+	# on any future Godot is "the menu moved", never "the menu is gone". The main-screen
+	# toolbar's Settings button (connected below) opens the SAME dialog instance either way.
+	# The dialog itself is sectioned per addon: Runtime (from the reactive_ui_toolkit addon,
+	# when installed) and Editor (this addon), so settings come from both without requiring both.
+	_register_settings_menu()
 
 	# M3: announce the native analyzer once per session — embedded-GDScript intelligence
 	# (type-aware completion/hover/diagnostics inside {expr} and setup code) turns on when the
@@ -55,6 +85,7 @@ func _enter_tree() -> void:
 		print_rich("[color=yellow][reactive_ui_toolkit_editor] native analyzer not loaded — embedded-GDScript intelligence off; markup features are unaffected. The editor download bundles it at addons/reactive_ui_toolkit_analyzer; if that folder exists, your platform may lack a prebuilt binary (see its README).[/color]")
 
 	_view = load("res://addons/reactive_ui_toolkit_editor/editor/guitkx_editor_view.gd").new()
+	_view.settings_requested.connect(_open_settings_dialog)
 	EditorInterface.get_editor_main_screen().add_child(_view)
 	_make_visible(false)
 
@@ -103,6 +134,15 @@ func _enter_tree() -> void:
 func _exit_tree() -> void:
 	if not _deps_ok:
 		return
+	if _tools_fallback:
+		remove_tool_menu_item(SETTINGS_MENU)
+		_tools_fallback = false
+	if _main_menu != null:
+		_main_menu.queue_free()  # detaches from the MenuBar; disabling the plugin removes the menu
+		_main_menu = null
+	if _settings_dialog != null:
+		_settings_dialog.queue_free()
+		_settings_dialog = null
 	var efs := EditorInterface.get_resource_filesystem()
 	if efs.filesystem_changed.is_connected(_on_fs_changed):
 		efs.filesystem_changed.disconnect(_on_fs_changed)
@@ -131,6 +171,49 @@ func _exit_tree() -> void:
 	if _view != null:
 		_view.queue_free()
 		_view = null
+
+## Lazy singleton behind both entry points (the Tools menu item and the toolbar's Settings
+## button). load()-by-path — the dialog carries no class_name, so the file needs no class-cache
+## rescan; the dialog itself rebuilds from ProjectSettings on every about_to_popup.
+func _open_settings_dialog() -> void:
+	if _settings_dialog == null:
+		_settings_dialog = load("res://addons/reactive_ui_toolkit_editor/editor/ruitk_settings_dialog.gd").new()
+		EditorInterface.get_base_control().add_child(_settings_dialog)
+	_settings_dialog.popup_centered()
+
+## Top-level "Reactive UI Toolkit" menu, with the Project > Tools item as the automatic fallback
+## (see the _enter_tree comment for the design + risk rationale).
+func _register_settings_menu() -> void:
+	var bar := find_menu_bar(EditorInterface.get_base_control(), _MENU_BAR_SEARCH_DEPTH)
+	if bar == null:
+		add_tool_menu_item(SETTINGS_MENU, _open_settings_dialog)
+		_tools_fallback = true
+		print_rich("[color=yellow][reactive_ui_toolkit_editor] main menu bar not found — Settings lives under Project > Tools on this Godot build.[/color]")
+		return
+	_main_menu = PopupMenu.new()
+	# MenuBar renders each child PopupMenu as a top-level menu titled by its node name.
+	_main_menu.name = MAIN_MENU_TITLE
+	_main_menu.add_item("Settings...", 0)
+	_main_menu.id_pressed.connect(_on_main_menu_pressed)
+	bar.add_child(_main_menu)
+
+func _on_main_menu_pressed(id: int) -> void:
+	if id == 0:
+		_open_settings_dialog()
+
+## Breadth-limited search for the editor's main MenuBar. Static and depth-capped on purpose:
+## testable headless with a synthetic tree, and it can never crawl the whole editor UI — if the
+## bar is not shallow where we expect it, we WANT the null so the Tools fallback engages.
+static func find_menu_bar(node: Node, depth_budget: int) -> MenuBar:
+	if node is MenuBar:
+		return node
+	if depth_budget <= 0:
+		return null
+	for child in node.get_children():
+		var found := find_menu_bar(child, depth_budget - 1)
+		if found != null:
+			return found
+	return null
 
 ## Godot asks every plugin for unsaved state before quitting: a non-empty string joins the editor's
 ## own quit-confirmation dialog (parity plan L4 — without this, quit silently drops buffers).

@@ -29,7 +29,92 @@ export const UitkxConfigPage: FC = () => (
       Configuration Reference
     </Typography>
     <Typography variant="body1" paragraph>
-      All configuration options for the GUITKX editor extension and formatter.
+      All configuration options for the Reactive UI Toolkit runtime, the GUITKX
+      editor extension, and the formatter.
+    </Typography>
+
+    {/* ── Runtime settings (Godot Project Settings) ─────────────────────── */}
+    <Typography variant="h5" component="h2" sx={Styles.section}>
+      Runtime Settings (Project Settings)
+    </Typography>
+    <Typography variant="body2" paragraph>
+      The runtime&apos;s tunables are native Godot Project Settings. The primary
+      way to edit them is the <strong>Reactive UI Toolkit Settings</strong> dialog
+      — the top-level <strong>Reactive UI Toolkit ▸ Settings...</strong> menu (with an
+      automatic <strong>Project ▸ Tools</strong> fallback) or the{' '}
+      <strong>Settings</strong> toolbar button in the ReactiveUITK main screen
+      (editor addon) — which reads and writes the same keys; the native{' '}
+      <strong>Project → Project Settings</strong> dialog (group{' '}
+      <strong>Reactive Ui Toolkit</strong>, either addon registers it) remains a
+      mirror of the same storage. Values load once at first mount
+      (<code>RuitkRoot.create</code>) and are readable in exported games. Only
+      settings you <em>changed</em> are applied, so assigning the{' '}
+      <code>RuitkConfig</code> / <code>RuitkDiagnostics</code> statics directly
+      from code still works and is never clobbered. For per-machine overrides,
+      put the keys in an <code>override.cfg</code> beside{' '}
+      <code>project.godot</code>.
+    </Typography>
+    <TableContainer>
+      <Table size="small" sx={Styles.table}>
+        <TableHead>
+          <TableRow>
+            <TableCell>Setting</TableCell>
+            <TableCell>Type</TableCell>
+            <TableCell>Default</TableCell>
+            <TableCell>Applies to</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          <TableRow>
+            <TableCell><code>reactive_ui_toolkit/runtime/time_slicing</code></TableCell>
+            <TableCell>boolean</TableCell>
+            <TableCell><code>false</code></TableCell>
+            <TableCell><code>RuitkConfig.time_slicing</code> — chunk the render phase across frames for very large trees.</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell><code>reactive_ui_toolkit/runtime/frame_budget_ms</code></TableCell>
+            <TableCell>float</TableCell>
+            <TableCell><code>8.0</code></TableCell>
+            <TableCell><code>RuitkConfig.frame_budget_ms</code> — render work per frame before parking until the next one.</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell><code>reactive_ui_toolkit/runtime/host_node_pool</code></TableCell>
+            <TableCell>boolean</TableCell>
+            <TableCell><code>true</code></TableCell>
+            <TableCell><code>RuitkConfig.host_node_pool</code> — recycle leaf Controls across keyed-list churn.</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell><code>reactive_ui_toolkit/runtime/hook_validation</code></TableCell>
+            <TableCell>enum</TableCell>
+            <TableCell><code>auto</code></TableCell>
+            <TableCell><code>RuitkConfig.enable_hook_validation</code> — rules-of-hooks checks.</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell><code>reactive_ui_toolkit/runtime/strict_diagnostics</code></TableCell>
+            <TableCell>enum</TableCell>
+            <TableCell><code>auto</code></TableCell>
+            <TableCell><code>RuitkConfig.enable_strict_diagnostics</code> — state-update-during-render warnings.</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell><code>reactive_ui_toolkit/diagnostics/enabled</code></TableCell>
+            <TableCell>boolean</TableCell>
+            <TableCell><code>false</code></TableCell>
+            <TableCell><code>RuitkDiagnostics.enabled</code> — count renders, commits, placements, updates, deletions.</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell><code>reactive_ui_toolkit/diagnostics/capture</code></TableCell>
+            <TableCell>boolean</TableCell>
+            <TableCell><code>false</code></TableCell>
+            <TableCell><code>RuitkDiagnostics.capture</code> — record diagnostic messages for tests / overlays.</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </TableContainer>
+    <Typography variant="body2" paragraph>
+      The two <code>enum</code> settings are tri-states: <code>auto</code> keeps
+      the compiled <code>OS.is_debug_build()</code> default (on while developing,
+      off in exported release builds); <code>enabled</code> / <code>disabled</code>{' '}
+      force the flag regardless of build type.
     </Typography>
 
     {/* ── VS Code / editor settings ─────────────────────────────────────── */}
