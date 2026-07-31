@@ -17,6 +17,9 @@ var _reconciler: RuitkReconciler
 ## Create a root, mount `root_vnode` (usually `V.fc(...)`) under `container`, and do
 ## the initial render.
 static func create(container: Node, root_vnode: RuitkVNode) -> RuitkRoot:
+	# Load user-changed reactive_ui_toolkit/* Project Settings onto the RuitkConfig /
+	# RuitkDiagnostics statics before the first render. One-shot — free after the first call.
+	RuitkSettings.apply()
 	var r := RuitkRoot.new()
 	r._reconciler = RuitkReconciler.new(container)
 	r._reconciler.render(root_vnode)

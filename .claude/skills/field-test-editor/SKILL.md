@@ -11,13 +11,23 @@ bandaid.
 
 ## Environment facts (verify, don't assume, if anything fails)
 
-- **Live tree** (where the user tests): `C:\Yanivs\GameDev\ReactiveUI\ReactiveUI-Gadot`. NEVER
-  edit it while the user's Godot is open without telling them; NEVER kill their Godot process.
-- **Work tree** (where you develop): `C:\Yanivs\GameDev\ReactiveUI\RG-work` (a worktree of the
-  same repo). All branches/commits happen here. Base branches on `origin/dev`.
-- **Godot binary** (not on PATH): `C:\Yanivs\daniela test\Godot_v4.7-stable_win64.exe\Godot_v4.7-stable_win64_console.exe`
-  — use the `_console` exe, and ALWAYS redirect output to a file (`cmd /c "...godot... > out.txt 2>&1"`);
-  piping through `head`/`Select-Object` block-buffers and hides everything.
+- **Live tree** `<live>` (where the user tests): **the repo checkout you are in** — the user's Godot
+  editor has this folder open. NEVER edit it while their Godot is open without telling them; NEVER
+  kill their Godot process.
+- **Work tree** `<work>` (where you develop): a second worktree of this same repo. Get it from
+  `git worktree list` — it is the entry whose path is not `<live>`. If there is none, create one as a
+  sibling of the checkout: `git worktree add ../<checkout-name>-work -b <branch> origin/dev`. All
+  branches/commits happen in `<work>`, and branches are based on `origin/dev`.
+- **Godot binary** `<godot>` — resolve in this order, first hit wins, and re-resolve rather than
+  remembering a path across sessions:
+  1. `$GODOT_BIN`;
+  2. `godotBin` in `.ruitk-local.json` at the repo root (gitignored — copy it from
+     `.ruitk-local.example.json`);
+  3. `godot` on PATH.
+  If all three miss, STOP and ask the user to set one — do **not** guess an install location. Prefer
+  the `_console` exe on Windows (the plain `.exe` detaches and prints nothing), and ALWAYS redirect
+  output to a file (`cmd /c "<godot> ... > out.txt 2>&1"`); piping through `head`/`Select-Object`
+  block-buffers and hides everything.
 - The analyzer GDExtension lives at `addons/reactive_ui_toolkit_analyzer/` (gitignored; local dll install).
   A fresh/changed `.gdextension` is only seen by headless scripts AFTER one
   `--headless --editor --quit` scan (it must enter `.godot/extension_list.cfg`). Moving the folder
@@ -25,16 +35,16 @@ bandaid.
 
 ## The loop
 
-1. **Reproduce & fix** (in RG-work, on a feature branch off `origin/dev`):
+1. **Reproduce & fix** (in `<work>`, on a feature branch off `origin/dev`):
    research the root cause first; write/extend a test that catches it when possible
    (`tests/guitkx_editor_test.gd` sections print per-section markers — keep that so hangs name
    their culprit).
 2. **Verify before handing over** — all of:
    ```
-   godot --headless --path . --script res://tests/guitkx_build.gd
-   godot --headless --path . --editor --quit          (boot check — plugins actually load)
-   godot --headless --path . --script res://tests/guitkx_lsp_test.gd
-   godot --headless --path . --script res://tests/guitkx_editor_test.gd   (382 with analyzer / 364 without)
+   <godot> --headless --path . --script res://tests/guitkx_build.gd
+   <godot> --headless --path . --editor --quit        (boot check — plugins actually load)
+   <godot> --headless --path . --script res://tests/guitkx_lsp_test.gd
+   <godot> --headless --path . --script res://tests/guitkx_editor_test.gd  (382 with analyzer / 364 without)
    ```
    Suites do NOT run `_enter_tree` — the boot check is not optional.
 3. **Commit** on the feature branch (the loop is a standing ask to commit; author is the user —

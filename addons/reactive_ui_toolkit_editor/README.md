@@ -80,7 +80,16 @@ Requires **Godot 4.4+**.
   **`guitkx.config.json`** (printWidth, indentStyle, indentSize, singleAttributePerLine,
   insertSpaceBeforeSelfClose) so a project formats identically here and in VS Code.
 
-## Settings (Project → Project Settings → `reactive_ui_toolkit_editor/`)
+## Settings
+
+The top-level **Reactive UI Toolkit ▸ Settings...** menu (added to the editor's main menu bar;
+falls back automatically to **Project ▸ Tools ▸ Reactive UI Toolkit Settings...** if the menu bar
+cannot be injected) — or the **Settings** button in the
+ReactiveUITK main-screen toolbar — opens the settings dialog, the primary UI: an **Editor**
+section with the toggles below, plus a **Runtime** section for the runtime addon's
+`reactive_ui_toolkit/*` tunables (see the root README's Settings section; it appears whenever
+the runtime addon is installed). Storage is native Project Settings, so **Project → Project
+Settings → `reactive_ui_toolkit_editor/`** keeps working as a mirror of the same keys.
 
 All default **on**; toggle any off. Highlighting, completion, hover, diagnostics and format-on-save
 apply **live**. `open_guitkx_in_editor` is structural (it registers a resource loader that reroutes the

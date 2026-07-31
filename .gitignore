@@ -42,3 +42,20 @@ Thumbs.db
 # Publishing secrets (extension marketplace tokens) — never commit
 publisher-secrets.json
 addons/reactive_ui_toolkit_analyzer/
+
+# This machine's irreducible values (currently just the Godot binary). The family invariant is that
+# no TRACKED file names a path existing on only one machine — so the one file that must name them is
+# untracked. Copy .ruitk-local.example.json to start; nothing requires the file (see CLAUDE.md
+# "Machine-local paths"). Enforced by scripts/check-machine-paths.mjs.
+.ruitk-local.json
+
+# Per-machine Claude Code permissions/state: written by the tool, differs per developer, and would
+# conflict on every pull. The checked-in .claude/skills/ is shared; this is not.
+.claude/settings.local.json
+
+# .vscode/: launch.json + tasks.json ARE tracked (the shared F5 wiring — see .vscode/launch.json).
+# Only the machine-generated members are ignored: compile databases and C/C++ properties point at
+# this machine's toolchain, and a .code-workspace is one person's window layout.
+.vscode/compileCommands_*
+.vscode/c_cpp_properties.json
+*.code-workspace

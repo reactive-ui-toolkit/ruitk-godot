@@ -73,6 +73,27 @@ export Screen() -> RuitkVNode {
 }
 ```
 
+## Settings
+
+The runtime's tunables live in *Project → Project Settings* under the **Reactive Ui Toolkit**
+group (registered by either plugin, shown as basic settings):
+
+| Key | Default | Applies to |
+|---|---|---|
+| `reactive_ui_toolkit/runtime/time_slicing` | `false` | `RuitkConfig.time_slicing` |
+| `reactive_ui_toolkit/runtime/frame_budget_ms` | `8.0` | `RuitkConfig.frame_budget_ms` |
+| `reactive_ui_toolkit/runtime/host_node_pool` | `true` | `RuitkConfig.host_node_pool` |
+| `reactive_ui_toolkit/runtime/hook_validation` | `auto` | `RuitkConfig.enable_hook_validation` |
+| `reactive_ui_toolkit/runtime/strict_diagnostics` | `auto` | `RuitkConfig.enable_strict_diagnostics` |
+| `reactive_ui_toolkit/diagnostics/enabled` | `false` | `RuitkDiagnostics.enabled` |
+| `reactive_ui_toolkit/diagnostics/capture` | `false` | `RuitkDiagnostics.capture` |
+
+The two validators are tri-states: **`auto`** keeps the compiled default (`OS.is_debug_build()` —
+on while developing, off in exported games), `enabled`/`disabled` force them. Settings are read
+once at first mount and work in exported games; only values you *changed* apply, so assigning the
+statics directly from code (`RuitkConfig.time_slicing = true` in a `_ready`) still works exactly
+as documented. An `override.cfg` next to `project.godot` gives per-machine overrides.
+
 ## Upgrading
 
 **From 0.12.x or earlier — read this first.** 0.13.0 is the *Reactive UI Toolkit* rename: names

@@ -77,8 +77,16 @@ export const UitkxConceptsPage: FC = () => (
         Diagnostics & configuration
       </Typography>
       <Typography variant="body2" paragraph>
-        Two static classes control runtime behavior and tracing. Set their fields from code (for
-        example in an autoload or <code>_ready</code>) — there are no compile-time defines in Godot.
+        Two static classes control runtime behavior and tracing. The primary way to set them is
+        the <strong>Reactive UI Toolkit Settings</strong> dialog (the top-level{' '}
+        <strong>Reactive UI Toolkit</strong> menu — <strong>Project ▸ Tools</strong> as fallback —
+        with the editor addon enabled) — the same{' '}
+        <code>reactive_ui_toolkit/runtime/*</code> and{' '}
+        <code>reactive_ui_toolkit/diagnostics/*</code> keys stay editable natively under{' '}
+        <strong>Project → Project Settings → Reactive Ui Toolkit</strong> (see the Configuration
+        Reference), loaded once at first mount and readable in exported games. Setting the fields
+        from code (for example in an autoload or <code>_ready</code>) still works — only settings
+        you <em>changed</em> are applied, so a direct assignment is never clobbered.
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
@@ -97,6 +105,12 @@ export const UitkxConceptsPage: FC = () => (
           <ListItemText primary={<><code>RuitkDiagnostics.capture = true</code> — collect emitted messages into <code>RuitkDiagnostics.messages</code> for inspection in tests or an overlay.</>} />
         </ListItem>
       </List>
+      <Typography variant="body2" paragraph>
+        In Project Settings the two validation flags are tri-states (<code>auto</code> /{' '}
+        <code>enabled</code> / <code>disabled</code>): <code>auto</code> keeps the compiled{' '}
+        <code>OS.is_debug_build()</code> default; the other two force the flag regardless of build
+        type.
+      </Typography>
     </Box>
 
     <Box sx={Styles.section}>

@@ -91,6 +91,10 @@ var _last_compile_ms := 0.0     # drives the adaptive debounce (P1)
 var _format_fallback_warned: Dictionary = {}
 
 
+## Toolbar Settings button -> the plugin pops the shared settings dialog (the same instance the
+## Project > Tools menu item opens; the view never owns the dialog).
+signal settings_requested
+
 func _init() -> void:
 	name = "ReactiveUITK"
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -133,6 +137,9 @@ func _init() -> void:
 	_wrap_toggle.tooltip_text = "Soft-wrap long lines (E15)"
 	_wrap_toggle.toggled.connect(_on_wrap_toggled)
 	toolbar.add_child(_wrap_toggle)
+	var settings_btn := _make_button("Settings", _on_settings_pressed)
+	settings_btn.tooltip_text = "Reactive UI Toolkit settings (also: Project > Tools)"
+	toolbar.add_child(settings_btn)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(spacer)
@@ -1186,3 +1193,6 @@ func _make_button(text: String, cb: Callable) -> Button:
 	b.text = text
 	b.pressed.connect(cb)
 	return b
+
+func _on_settings_pressed() -> void:
+	settings_requested.emit()

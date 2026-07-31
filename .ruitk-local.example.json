@@ -1,0 +1,4 @@
+{
+	"_comment": "Copy this file to .ruitk-local.json and fill in the values for YOUR machine; that copy is gitignored and is the ONLY place a machine-local path belongs. Nothing in this repo requires the file: every consumer probes $GODOT_BIN first, then this file, then `godot` on PATH. See the 'Machine-local paths' section of CLAUDE.md.",
+	"godotBin": ""
+}

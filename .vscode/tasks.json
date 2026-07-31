@@ -1,0 +1,53 @@
+{
+	// npm runs through `cmd /d /c`, not PowerShell — on stock Windows, `npm` resolves to npm.ps1
+	// and ExecutionPolicy blocks it (Unreal/Unity-sibling scar; their tasks.json wrap identically).
+	// Order matters: the server builds FIRST, the client second, then bundle-server.js copies
+	// lsp-server/out + this machine's native @gdscript-analyzer addon into ide-extensions/vscode/server.
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build GUITKX Language Server",
+			"type": "shell",
+			"command": "npm run build",
+			"options": {
+				"cwd": "${workspaceFolder}/ide-extensions/lsp-server",
+				"shell": { "executable": "cmd.exe", "args": ["/d", "/c"] }
+			},
+			"presentation": { "reveal": "silent", "panel": "shared" },
+			"problemMatcher": "$tsc"
+		},
+		{
+			"label": "Build GUITKX Extension Client",
+			"type": "shell",
+			"command": "npm run build",
+			"options": {
+				"cwd": "${workspaceFolder}/ide-extensions/vscode",
+				"shell": { "executable": "cmd.exe", "args": ["/d", "/c"] }
+			},
+			"presentation": { "reveal": "silent", "panel": "shared" },
+			"problemMatcher": "$tsc"
+		},
+		{
+			"label": "Bundle GUITKX Server",
+			"type": "shell",
+			"command": "node scripts/bundle-server.js",
+			"options": {
+				"cwd": "${workspaceFolder}/ide-extensions/vscode",
+				"shell": { "executable": "cmd.exe", "args": ["/d", "/c"] }
+			},
+			"presentation": { "reveal": "silent", "panel": "shared" },
+			"problemMatcher": []
+		},
+		{
+			"label": "Build GUITKX Extension",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"Build GUITKX Language Server",
+				"Build GUITKX Extension Client",
+				"Bundle GUITKX Server"
+			],
+			"group": "build",
+			"problemMatcher": []
+		}
+	]
+}

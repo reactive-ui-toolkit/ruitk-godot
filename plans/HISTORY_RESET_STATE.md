@@ -40,18 +40,27 @@ taken first — nothing is lost.
   snapshot under a valid license — its deletion is voluntary.
 - **Also done during the op:** stray server ref `refs/remotes/origin/feat/phase5-completion`
   deleted (2026-07-21); full `git ls-remote` verified no non-standard refs remain.
-- **Local leftovers (this machine), deliberately kept:** worktree
-  `C:\Yanivs\GameDev\ReactiveUI\RG-work` (pins old branch `docs/ide-extensions-refresh`)
-  and 4 old stashes. Harmless; delete whenever.
+- **Local leftovers (this machine), deliberately kept:** a second worktree pinning the old branch
+  `docs/ide-extensions-refresh` (`git worktree list` names it) and 4 old stashes. Harmless; delete
+  whenever.
 
 ## Backups (the undo button — keep forever)
 
-- `C:\Yanivs\GameDev\ReactiveUI\blackout-backups\2026-07-18\` — full `--mirror` clone +
-  verified `.bundle` of the complete pre-reset remote (43 branches, 209 tags, 81 PR refs),
-  plus equivalents for the Unreal and Unity repos (which were **never reset** — they keep
-  full history and need nothing from this document).
+> **Placeholders.** The backups live OUTSIDE any repo, so this runbook names them as
+> `<placeholders>` rather than committing one machine's layout (see CLAUDE.md
+> "Machine-local paths"). Substitute before running anything:
+> `<backupsDir>` = the blackout-backups directory, `<licensingInternal>` = the private
+> licensing-notes directory. Both are optional keys you can park in your gitignored
+> `.ruitk-local.json` (`backupsDir`, `licensingInternal`) so they are written down once,
+> on your own disk, instead of here. Nothing reads them automatically — this document is
+> the only consumer.
+
+- `<backupsDir>/2026-07-18/` — full `--mirror` clone + verified `.bundle` of the complete
+  pre-reset remote (43 branches, 209 tags, 81 PR refs), plus equivalents for the Unreal and
+  Unity repos (which were **never reset** — they keep full history and need nothing from this
+  document).
 - The same folder zipped on the owner's Google Drive.
-- Fuller operational notes: `C:\Yanivs\GameDev\ReactiveUI\licensing-internal\BLACKOUT_STATE.md`.
+- Fuller operational notes: `<licensingInternal>/BLACKOUT_STATE.md`.
 
 ## Path A — completing the purge later
 
@@ -73,7 +82,8 @@ From the mirror (or the Drive zip, unzipped). Restores every branch and tag with
 SHAs; PR pages re-light automatically since the objects were never gc'd:
 
 ```bash
-cd C:/Yanivs/GameDev/ReactiveUI/blackout-backups/2026-07-18/ReactiveUI-Godot.git
+# <backupsDir> per the Backups section above — substitute your own path.
+cd "<backupsDir>/2026-07-18/ReactiveUI-Godot.git"
 # 1. All branches (force — overwrites master/dev; repo-admin ruleset bypass carries it)
 git push --force https://github.com/reactive-ui-toolkit/ruitk-godot.git "refs/heads/*:refs/heads/*"
 # 2. All 209 old tags (the v0.12.0-wave tags are untouched; no name collisions)

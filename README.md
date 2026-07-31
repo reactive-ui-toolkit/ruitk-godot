@@ -426,6 +426,38 @@ keep the classic `Foo.render` form.
 
 ---
 
+## Settings
+
+**One settings screen:** with the editor addon enabled, a top-level **Reactive UI Toolkit** menu
+in the editor's main menu bar (**Reactive UI Toolkit ▸ Settings...**; on a Godot build where the
+menu bar can't be injected it falls back automatically to **Project ▸ Tools ▸ Reactive UI Toolkit
+Settings...**) — or the **Settings** button in the ReactiveUITK main-screen toolbar — opens a
+single dialog with a **Runtime** and an **Editor** section; that dialog is the primary place to
+edit everything below. Storage is untouched: the dialog reads and writes the same native
+Project Settings keys, so *Project → Project Settings*, group **Reactive Ui Toolkit**, keeps
+working as a mirror of the same values (either addon registers them; shown without the
+Advanced toggle):
+
+| Key | Default | Applies to |
+|---|---|---|
+| `reactive_ui_toolkit/runtime/time_slicing` | `false` | `RuitkConfig.time_slicing` |
+| `reactive_ui_toolkit/runtime/frame_budget_ms` | `8.0` | `RuitkConfig.frame_budget_ms` |
+| `reactive_ui_toolkit/runtime/host_node_pool` | `true` | `RuitkConfig.host_node_pool` |
+| `reactive_ui_toolkit/runtime/hook_validation` | `auto` | `RuitkConfig.enable_hook_validation` |
+| `reactive_ui_toolkit/runtime/strict_diagnostics` | `auto` | `RuitkConfig.enable_strict_diagnostics` |
+| `reactive_ui_toolkit/diagnostics/enabled` | `false` | `RuitkDiagnostics.enabled` |
+| `reactive_ui_toolkit/diagnostics/capture` | `false` | `RuitkDiagnostics.capture` |
+
+The two validators are **tri-states**: `auto` keeps the compiled default
+(`OS.is_debug_build()` — on while developing, off in exported release builds); `enabled`/
+`disabled` force them either way. Values load once at first mount (`RuitkRoot.create`) and are
+readable in exported games. Only settings you *changed* are applied, so assigning the statics
+directly from code (`RuitkConfig.time_slicing = true` before mounting) keeps working exactly as
+before — the statics stay the live source of truth. For per-machine overrides, drop the keys in
+an `override.cfg` beside `project.godot`.
+
+---
+
 ## Diagnostics
 
 The compiler validates as it goes — rules of hooks, duplicate/unstable keys, unknown elements,

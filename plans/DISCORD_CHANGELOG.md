@@ -1,3 +1,12 @@
+## [0.14.0] - 2026-07-31
+
+**Your settings now live where Godot settings live.** The runtime's tunables — time slicing, frame budget, the host-node pool, hook validation, strict diagnostics, and the diagnostics counters — are now native Project Settings under **Project → Project Settings → Reactive Ui Toolkit** (`reactive_ui_toolkit/runtime/*` + `diagnostics/*`). They load once at first mount, work in exported games, and only values you *changed* apply — assigning the `RuitkConfig` / `RuitkDiagnostics` statics from code keeps working exactly as before. The two validators are tri-states: `auto` keeps the debug-build default, `enabled`/`disabled` force them either way.
+
+**One settings dialog, on its own menu.** With the editor addon enabled, a top-level **Reactive UI Toolkit** menu in the editor's main menu bar (**Settings...** — with an automatic **Project ▸ Tools** fallback) or the **Settings** button in the ReactiveUITK toolbar opens a single dialog: a **Runtime** and an **Editor** section covering both addons' keys. Storage is unchanged — the native Project Settings dialog stays a mirror, and `override.cfg` per-machine overrides keep working. Family design: one settings screen per leg, and the Unity and Unreal legs ship the same surface in their engines' native settings.
+
+Update to **Reactive UI Toolkit 0.14.0** + **Editor 0.12.0** (Godot). The GUITKX extensions (VS Code + VS 2022) are unchanged at 0.13.0.
+
+---
 ## [0.13.0] - 2026-07-28
 
 **One family, one name: ReactiveUI is now Reactive UI Toolkit.** The Godot library is now **Reactive UI Toolkit — Godot**, one leg of the Reactive UI Toolkit family (Godot, Unity, Unreal), and the repo moved to **github.com/reactive-ui-toolkit/ruitk-godot** (old links redirect). It's a complete rename — folders AND class prefix — with **zero behavior changes**.
