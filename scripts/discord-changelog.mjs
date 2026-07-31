@@ -293,7 +293,9 @@ async function post(version, dryRun) {
 		{
 			method: 'POST',
 			headers: { ...headers, 'Content-Type': 'application/json' },
-			body: JSON.stringify({ content: e.body }),
+			// flags 4096 = SUPPRESS_NOTIFICATIONS (an '@silent' message): release notes appear
+			// in the channel normally but never push-notify anyone -- changelogs inform, not interrupt.
+			body: JSON.stringify({ content: e.body, flags: 4096 }),
 		},
 		'posting the release note'
 	);
