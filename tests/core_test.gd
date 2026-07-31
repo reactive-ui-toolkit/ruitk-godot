@@ -28,6 +28,8 @@ func _run() -> void:
 	await _test_tween()
 	await _test_diagnostics()
 	await _test_hook_diagnostics()
+	await _test_missing_deps()
+	await _test_trace_ladder()
 	await _test_item_list()
 	await _test_root_node()
 	await _test_tree()
@@ -410,14 +412,26 @@ func _test_hook_diagnostics() -> void:
 	Hooks._begin(st); Hooks.useState(0); Hooks.useEffect(func(): return null, []); Hooks._end()
 	_ok(RuitkDiagnostics.messages.any(func(m): return "[Hooks][order]" in m), "hook-order mismatch detected, got %s" % str(RuitkDiagnostics.messages))
 
-	# state-update-during-render guard
+	# state-update-during-render guard — key + text family-frozen (Hooks.cs:159-160/:606-607:
+	# same "state-update-during-render" key and same message at the setter AND dispatch sites)
 	RuitkDiagnostics.clear_messages()
 	var st2 := RuitkComponentState.new()
 	Hooks._begin(st2)
 	var sv: Array = Hooks.useState(0)
+	var rd: Array = Hooks.useReducer(func(s, _a): return s + 1, 0)
 	sv[1].call(1)   # setter invoked while is_rendering -> strict warning
 	Hooks._end()
-	_ok(RuitkDiagnostics.messages.any(func(m): return "[Hooks][Strict]" in m), "state-set-in-render warned, got %s" % str(RuitkDiagnostics.messages))
+	_ok(RuitkDiagnostics.messages.any(func(m): return "[Hooks][Strict] State update scheduled during render of" in m and "Move this set call to an effect or event handler." in m),
+		"state-set-in-render warned with the reference text, got %s" % str(RuitkDiagnostics.messages))
+	# dispatch path: SAME dedup key -> a dispatch-in-render on the same component adds nothing
+	var msg_count: int = RuitkDiagnostics.messages.size()
+	Hooks._begin(st2)
+	Hooks.useState(0)
+	rd = Hooks.useReducer(func(s, _a): return s + 1, 0)
+	rd[1].call(null)   # dispatch invoked while is_rendering -> deduped by the shared key
+	Hooks._end()
+	_ok(RuitkDiagnostics.messages.size() == msg_count,
+		"dispatch-in-render shares the setter's dedup key (no second warning), got %s" % str(RuitkDiagnostics.messages))
 
 	# silence when the flags are off (a different hook order must NOT warn)
 	RuitkConfig.enable_hook_validation = false
@@ -430,6 +444,162 @@ func _test_hook_diagnostics() -> void:
 	RuitkDiagnostics.capture = false
 	RuitkConfig.enable_hook_validation = _hv
 	RuitkConfig.enable_strict_diagnostics = _sd
+
+func _test_missing_deps() -> void:
+	# P5 strict-diagnostics canonical pair (b): missing dependency arrays — Unity
+	# WarnMissingDependencies parity. `null` deps are always missing; an EMPTY array counts
+	# as missing only for the memo trio (treatEmptyAsMissing — Hooks.cs UseMemo/UseCallback/
+	# UseImperativeHandle) and stays a legitimate run-once for the effect family; each public
+	# hook warns under its OWN name (the useCallback->useMemo delegation routes through
+	# _memo_impl); deduped once per component per (hook, slot) with the family key/text.
+	var _sd := RuitkConfig.enable_strict_diagnostics
+	var _hv := RuitkConfig.enable_hook_validation
+	RuitkConfig.enable_strict_diagnostics = true
+	RuitkConfig.enable_hook_validation = false   # isolate: no hook-order noise in `messages`
+	RuitkDiagnostics.capture = true
+	RuitkDiagnostics.clear_messages()
+	var st := RuitkComponentState.new()
+	var render := func():
+		Hooks._begin(st)
+		Hooks.useEffect(func(): return null)                    # null deps -> warns
+		Hooks.useEffect(func(): return null, [])                # [] = run-once, legit -> silent
+		Hooks.useLayoutEffect(func(): return null)              # null deps -> warns
+		Hooks.useDeferredValue(1)                               # null deps -> warns
+		Hooks.useMemo(func(): return 1)                         # empty counts as missing -> warns
+		Hooks.useMemo(func(): return 2, [1])                    # real deps -> silent
+		Hooks.useCallback(func(): return 3)                     # warns under "useCallback"
+		Hooks.useImperativeHandle(func(): return 4)             # warns under "useImperativeHandle"
+		Hooks._end()
+	render.call()
+	var msgs: Array = RuitkDiagnostics.messages.duplicate()
+	_ok(msgs.size() == 6, "six missing-deps warnings on first render, got %d: %s" % [msgs.size(), str(msgs)])
+	for hook_name in ["useEffect", "useLayoutEffect", "useDeferredValue", "useMemo", "useCallback", "useImperativeHandle"]:
+		var expected: String = "[Hooks][Strict] %s in component" % hook_name
+		_ok(msgs.any(func(m): return expected in m), "%s warned under its own name" % hook_name)
+	_ok(msgs.all(func(m): return "was invoked without a dependency array" in m),
+		"warnings carry the family message text (Hooks.cs WarnMissingDependencies)")
+	# Dedupe: re-rendering the SAME component adds nothing.
+	render.call()
+	_ok(RuitkDiagnostics.messages.size() == 6,
+		"re-render adds no duplicate warnings (per-component-per-key dedupe), got %d" % RuitkDiagnostics.messages.size())
+	# A DIFFERENT component instance warns independently (dedupe is per component).
+	var st2 := RuitkComponentState.new()
+	Hooks._begin(st2); Hooks.useMemo(func(): return 5); Hooks._end()
+	_ok(RuitkDiagnostics.messages.size() == 7,
+		"a second component warns independently, got %d" % RuitkDiagnostics.messages.size())
+	# Gate: strict_diagnostics off -> fully silent.
+	RuitkConfig.enable_strict_diagnostics = false
+	var st3 := RuitkComponentState.new()
+	Hooks._begin(st3); Hooks.useEffect(func(): return null); Hooks.useMemo(func(): return 6); Hooks._end()
+	_ok(RuitkDiagnostics.messages.size() == 7, "no warnings when strict_diagnostics is off")
+	RuitkDiagnostics.capture = false
+	RuitkDiagnostics.clear_messages()
+	RuitkConfig.enable_strict_diagnostics = _sd
+	RuitkConfig.enable_hook_validation = _hv
+
+## Await until a captured trace message satisfies `pred` (bounded). Needed because trace
+## print()s are slow on the headless console: under VERBOSE a 2 ms slice quantum expires
+## after a handful of units, so a sliced update render can park across MANY frames — await
+## settlement, never force sync (the campaign's stabilization rule). Level-gated ABSENCE
+## claims (e.g. "no [Diff] at BASIC") are safe at any time; only presence needs settling.
+func _await_trace_msg(prefix: String, frames := 120) -> void:
+	for i in frames:
+		if RuitkDiagnostics.messages.any(func(s): return s.begins_with(prefix)):
+			return
+		await process_frame
+
+func _test_trace_ladder() -> void:
+	# P5 trace ladder (family knobs 8+9): NONE emits nothing; BASIC = structural events only
+	# (placements, deletions, replacements, commit summaries); VERBOSE adds per-element/
+	# per-hook detail; diff_tracing is an INDEPENDENT switch OR'd with Verbose. Asserted via
+	# RuitkDiagnostics.capture (trace() mirrors into `messages`).
+	var _tl := RuitkDiagnostics.trace_level
+	var _dt := RuitkDiagnostics.diff_tracing
+	var ctrl := { "set": null }
+	var comp := func(_p, _c):
+		var st := Hooks.useState({ "n": 3, "swap": false, "t": "a" })
+		ctrl["set"] = st[1]
+		var v: Dictionary = st[0]
+		var kids: Array = []
+		for i in v["n"]:
+			kids.append(V.ColorRect({ "key": "k%d" % i }))
+		var head = V.Button({ "text": v["t"] }) if v["swap"] else V.Label({ "text": v["t"] })
+		return V.VBoxContainer({}, [head, V.HBoxContainer({}, kids)])
+
+	# NONE + diff off (the defaults): fully silent across mount, update, and unmount.
+	RuitkDiagnostics.trace_level = RuitkDiagnostics.TraceLevel.NONE
+	RuitkDiagnostics.diff_tracing = false
+	RuitkDiagnostics.capture = true
+	RuitkDiagnostics.clear_messages()
+	var m := _mount(comp)
+	await process_frame
+	ctrl["set"].call({ "n": 2, "swap": false, "t": "a" })
+	await process_frame
+	await process_frame
+	m[1].unmount()
+	m[0].queue_free()
+	_ok(RuitkDiagnostics.messages.is_empty(), "NONE + diff off emits nothing, got %s" % str(RuitkDiagnostics.messages))
+
+	# BASIC on a mount: placements + commit summary; NO update/diff/hook-detail lines.
+	RuitkDiagnostics.trace_level = RuitkDiagnostics.TraceLevel.BASIC
+	RuitkDiagnostics.clear_messages()
+	var m2 := _mount(comp)
+	await process_frame
+	var msgs: Array = RuitkDiagnostics.messages
+	_ok(msgs.any(func(s): return s.begins_with("[Fiber] Place ")), "BASIC mount emits placement lines, got %s" % str(msgs))
+	_ok(msgs.any(func(s): return s.begins_with("[Fiber] Commit #")), "BASIC mount emits the commit summary")
+	_ok(not msgs.any(func(s): return s.begins_with("[Fiber] Update")), "BASIC has no per-element update lines")
+	_ok(not msgs.any(func(s): return s.begins_with("[Diff]")), "BASIC alone lights no diff lines")
+	_ok(not msgs.any(func(s): return s.begins_with("[Hooks] ")), "BASIC has no per-hook detail")
+	_ok(not msgs.any(func(s): return s.begins_with("[Fiber] Render ")), "BASIC has no component render entries")
+
+	# BASIC on a keyed removal: a Delete line (one per removed subtree).
+	RuitkDiagnostics.clear_messages()
+	ctrl["set"].call({ "n": 2, "swap": false, "t": "a" })
+	await _await_trace_msg("[Fiber] Commit #")
+	_ok(RuitkDiagnostics.messages.any(func(s): return s.begins_with("[Fiber] Delete ")),
+		"BASIC keyed removal emits a Delete line, got %s" % str(RuitkDiagnostics.messages))
+
+	# BASIC on a type swap: a Replace line (the structural replacement site).
+	RuitkDiagnostics.clear_messages()
+	ctrl["set"].call({ "n": 2, "swap": true, "t": "a" })
+	await _await_trace_msg("[Fiber] Commit #")
+	_ok(RuitkDiagnostics.messages.any(func(s): return s.begins_with("[Fiber] Replace ")),
+		"BASIC type swap emits a Replace line, got %s" % str(RuitkDiagnostics.messages))
+
+	# VERBOSE ⊇ Basic, plus per-element updates, per-hook detail, render entries, and the
+	# diff channel (the OR's verbose side — diff_tracing itself still false). Settle on the
+	# commit summary: it is the LAST line of a pass, so every other family is in by then.
+	RuitkDiagnostics.trace_level = RuitkDiagnostics.TraceLevel.VERBOSE
+	RuitkDiagnostics.clear_messages()
+	ctrl["set"].call({ "n": 2, "swap": true, "t": "b" })
+	await _await_trace_msg("[Fiber] Commit #")
+	var vmsgs: Array = RuitkDiagnostics.messages
+	_ok(vmsgs.any(func(s): return s.begins_with("[Fiber] Update ")), "VERBOSE emits per-element update lines, got %s" % str(vmsgs))
+	_ok(vmsgs.any(func(s): return s.begins_with("[Fiber] Commit #")), "VERBOSE keeps the Basic structural lines")
+	_ok(vmsgs.any(func(s): return s.begins_with("[Hooks] ")), "VERBOSE emits per-hook detail")
+	_ok(vmsgs.any(func(s): return s.begins_with("[Fiber] Render '")), "VERBOSE emits component render entries")
+	_ok(vmsgs.any(func(s): return s.begins_with("[Diff] ")), "VERBOSE lights the diff channel (OR, verbose side)")
+
+	# diff_tracing ALONE (trace NONE): diff-decision lines and ZERO structural lines. The
+	# structural/hook ABSENCE is level-gated (holds at any point in the pass); presence of
+	# diff lines settles on the bailout entry, emitted as the component render begins.
+	RuitkDiagnostics.trace_level = RuitkDiagnostics.TraceLevel.NONE
+	RuitkDiagnostics.diff_tracing = true
+	RuitkDiagnostics.clear_messages()
+	ctrl["set"].call({ "n": 2, "swap": true, "t": "c" })
+	await _await_trace_msg("[Diff] ")
+	var dmsgs: Array = RuitkDiagnostics.messages
+	_ok(dmsgs.any(func(s): return s.begins_with("[Diff] ")), "diff_tracing alone emits diff-decision lines, got %s" % str(dmsgs))
+	_ok(not dmsgs.any(func(s): return s.begins_with("[Fiber]")), "diff_tracing alone emits no structural lines (independence)")
+	_ok(not dmsgs.any(func(s): return s.begins_with("[Hooks] ")), "diff_tracing alone emits no per-hook detail")
+
+	m2[1].unmount()
+	m2[0].queue_free()
+	RuitkDiagnostics.trace_level = _tl
+	RuitkDiagnostics.diff_tracing = _dt
+	RuitkDiagnostics.capture = false
+	RuitkDiagnostics.clear_messages()
 
 func _test_effects() -> void:
 	var log: Array = []
@@ -807,6 +977,10 @@ func _test_tree() -> void:
 	m[0].queue_free()
 
 func _test_time_slicing() -> void:
+	# Capture-and-restore (P6): slicing is the default now, and this test also jams the
+	# frame budget — restoring hard-coded values would leak state into later tests.
+	var _ts := RuitkConfig.time_slicing
+	var _fb := RuitkConfig.frame_budget_ms
 	RuitkConfig.time_slicing = true
 	RuitkConfig.frame_budget_ms = 0.0   # park after every unit of work
 	var ctrl := { "set": null }
@@ -827,7 +1001,8 @@ func _test_time_slicing() -> void:
 		await process_frame
 	_ok(vbox.get_child(0).text == "item 0-1", "sliced update completed, got '%s'" % vbox.get_child(0).text)
 	_ok(vbox.get_child(7).text == "item 7-1", "sliced update reached last item, got '%s'" % vbox.get_child(7).text)
-	RuitkConfig.time_slicing = false
+	RuitkConfig.time_slicing = _ts
+	RuitkConfig.frame_budget_ms = _fb
 	m[1].unmount()
 	m[0].queue_free()
 
@@ -906,6 +1081,11 @@ func _test_router_context_split() -> void:
 func _test_deferred_value() -> void:
 	# Phase 7.10: useDeferredValue returns the previous value on the render where it changes,
 	# then commits the new value on a low-priority next-frame tick.
+	# Value-comparison mode (deps omitted) is DELIBERATE here — that is the mode under test —
+	# so silence the P5 missing-deps warning for this mount; the warning itself is pinned in
+	# _test_missing_deps.
+	var _sd := RuitkConfig.enable_strict_diagnostics
+	RuitkConfig.enable_strict_diagnostics = false
 	var ctl := { "set": null }
 	var seen := { "now": -1, "deferred": -1 }
 	var comp := func(_p, _c):
@@ -926,6 +1106,7 @@ func _test_deferred_value() -> void:
 	_ok(seen["deferred"] == 5, "deferred catches up to 5, got %d" % seen["deferred"])
 	m[1].unmount()
 	m[0].queue_free()
+	RuitkConfig.enable_strict_diagnostics = _sd
 
 func _test_item_model_adapters() -> void:
 	# Phase 7.11: TabBar + OptionButton via the generalized item-model registry, with selection

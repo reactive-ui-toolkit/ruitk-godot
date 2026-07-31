@@ -23,6 +23,15 @@ const EditorSettingsScript := preload("res://addons/reactive_ui_toolkit_editor/e
 ## it at a nonexistent path and pin the W5 degradation without uninstalling the addon.
 var runtime_settings_path := "res://addons/reactive_ui_toolkit/core/settings.gd"
 
+## Leg-specific extras (family parity §4): the two diagnostics keys exist only on the Godot
+## leg — their tooltips carry the literal "(Godot-only)" suffix, matching the docs/README
+## table rows. Literal key strings (not runtime constants) so the marking survives any
+## runtime-addon version skew the same way the rest of this dialog does.
+const _GODOT_ONLY_KEYS: Array[String] = [
+	"reactive_ui_toolkit/diagnostics/enabled",
+	"reactive_ui_toolkit/diagnostics/capture",
+]
+
 # key -> its editing Control (CheckBox / SpinBox / OptionButton); rebuilt by rebuild().
 var _controls: Dictionary = {}
 # Section headers actually built, in order ("Runtime", "Editor") — the W5 test pins this.
@@ -53,7 +62,7 @@ func rebuild() -> void:
 	if runtime != null:
 		var grid := _add_section("Runtime")
 		for key in runtime.DEFAULTS:
-			_add_row(grid, key, runtime.DEFAULTS[key], str(runtime.GROUP), str(runtime.TRI_STATE_HINT))
+			_add_row(grid, key, runtime.DEFAULTS[key], str(runtime.GROUP), _hint_for(runtime, key, str(runtime.TRI_STATE_HINT)))
 	else:
 		var missing := Label.new()
 		missing.text = "Runtime settings appear here when the Reactive UI Toolkit runtime addon (addons/reactive_ui_toolkit) is installed."
@@ -82,6 +91,17 @@ func _runtime_settings() -> GDScript:
 		return null
 	return load(runtime_settings_path) as GDScript
 
+## Per-key enum hint for a String key: the runtime's HINTS map when it has one, else the
+## tri-state fallback. Reached through the script CONSTANT MAP (not a direct property read)
+## so a runtime addon predating HINTS degrades to the fallback instead of erroring — the
+## documented version-skew posture (§4 / risk list).
+func _hint_for(runtime: GDScript, key: String, fallback: String) -> String:
+	var consts: Dictionary = runtime.get_script_constant_map()
+	var hints = consts.get("HINTS")
+	if hints is Dictionary and hints.has(key):
+		return str(hints[key])
+	return fallback
+
 func _add_section(header: String) -> GridContainer:
 	if not _sections.is_empty():
 		_vbox.add_child(HSeparator.new())
@@ -101,9 +121,10 @@ func _add_section(header: String) -> GridContainer:
 ## owning class's default as fallback; populate uses the no-signal setters, and _write's
 ## unchanged-guard makes any populate-time signal echo harmless either way.
 func _add_row(grid: GridContainer, key: String, default_value: Variant, group: String, tri_hint: String) -> void:
+	var tooltip := (key + " (Godot-only)") if key in _GODOT_ONLY_KEYS else key
 	var label := Label.new()
 	label.text = _pretty_name(key, group)
-	label.tooltip_text = key
+	label.tooltip_text = tooltip
 	label.mouse_filter = Control.MOUSE_FILTER_STOP  # labels swallow tooltips otherwise
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_child(label)
@@ -137,7 +158,7 @@ func _add_row(grid: GridContainer, key: String, default_value: Variant, group: S
 		ob.select(maxi(idx, 0))
 		ob.item_selected.connect(_on_tri_selected.bind(ob, key, default_value))
 		control = ob
-	control.tooltip_text = key
+	control.tooltip_text = tooltip
 	control.size_flags_horizontal = Control.SIZE_SHRINK_END
 	grid.add_child(control)
 	_controls[key] = control

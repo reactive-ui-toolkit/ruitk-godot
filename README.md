@@ -440,21 +440,41 @@ Advanced toggle):
 
 | Key | Default | Applies to |
 |---|---|---|
-| `reactive_ui_toolkit/runtime/time_slicing` | `false` | `RuitkConfig.time_slicing` |
-| `reactive_ui_toolkit/runtime/frame_budget_ms` | `8.0` | `RuitkConfig.frame_budget_ms` |
+| `reactive_ui_toolkit/runtime/time_slicing` | `true` | `RuitkConfig.time_slicing` |
+| `reactive_ui_toolkit/runtime/time_slice_ms` | `2.0` | `RuitkConfig.time_slice_ms` |
+| `reactive_ui_toolkit/runtime/frame_budget_ms` | `4.0` | `RuitkConfig.frame_budget_ms` |
 | `reactive_ui_toolkit/runtime/host_node_pool` | `true` | `RuitkConfig.host_node_pool` |
+| `reactive_ui_toolkit/runtime/strict_mode` | `false` | `RuitkConfig.strict_mode` |
 | `reactive_ui_toolkit/runtime/hook_validation` | `auto` | `RuitkConfig.enable_hook_validation` |
 | `reactive_ui_toolkit/runtime/strict_diagnostics` | `auto` | `RuitkConfig.enable_strict_diagnostics` |
-| `reactive_ui_toolkit/diagnostics/enabled` | `false` | `RuitkDiagnostics.enabled` |
-| `reactive_ui_toolkit/diagnostics/capture` | `false` | `RuitkDiagnostics.capture` |
+| `reactive_ui_toolkit/runtime/environment` | `auto` | `RuitkConfig.environment` |
+| `reactive_ui_toolkit/diagnostics/trace_level` | `none` | `RuitkDiagnostics.trace_level` |
+| `reactive_ui_toolkit/diagnostics/diff_tracing` | `false` | `RuitkDiagnostics.diff_tracing` |
+| `reactive_ui_toolkit/diagnostics/enabled` | `false` | `RuitkDiagnostics.enabled` *(Godot-only)* |
+| `reactive_ui_toolkit/diagnostics/capture` | `false` | `RuitkDiagnostics.capture` *(Godot-only)* |
+
+**Time-slicing is ON by default**: update renders are chunked into `time_slice_ms`
+quanta scheduled under the cumulative per-frame `frame_budget_ms`, so one big update can't stall
+a frame — the commit stays atomic and the initial mount is always synchronous. Set
+`time_slicing = false` (key or static) to opt back into the classic synchronous single-pass
+render per update.
 
 The two validators are **tri-states**: `auto` keeps the compiled default
 (`OS.is_debug_build()` — on while developing, off in exported release builds); `enabled`/
-`disabled` force them either way. Values load once at first mount (`RuitkRoot.create`) and are
-readable in exported games. Only settings you *changed* are applied, so assigning the statics
-directly from code (`RuitkConfig.time_slicing = true` before mounting) keeps working exactly as
-before — the statics stay the live source of truth. For per-machine overrides, drop the keys in
-an `override.cfg` beside `project.godot`.
+`disabled` force them either way. `strict_mode` opt-in runs every component render fn twice
+per pass with the first result discarded (effects still run once) and is **forced off in
+exported release builds** — read it via `RuitkConfig.strict_mode_effective()`. `environment`
+is a read-only label for *your* components (`RuitkConfig.environment_resolved()` →
+`"development"`/`"production"`; `auto` follows the build type) — the library never branches on
+it. `trace_level` (`none`/`basic`/`verbose`) logs structural events at `basic` and per-element/
+per-hook detail at `verbose`; `diff_tracing` independently logs reconciler diff decisions (it
+also lights up whenever `trace_level` is `verbose`). The two *(Godot-only)* keys are
+leg-specific extras (the runtime render/commit counters and message capture) — the other
+family legs don't have them. Values load once at first mount (`RuitkRoot.create`) and are readable in exported games.
+Only settings you *changed* are applied, so assigning the statics directly from code
+(`RuitkConfig.time_slicing = false` before mounting) keeps working exactly as before — the
+statics stay the live source of truth. For per-machine overrides, drop the keys in an
+`override.cfg` beside `project.godot`.
 
 ---
 
@@ -500,8 +520,11 @@ raw `V.*`/`Hooks.*` calls is not the intended day-to-day workflow — see
   tracked in `plans/`.
 - **Removed plain props don't reset to defaults** between renders (style keys, events, refs, and
   custom draw *do* reset). Keep props consistent or set explicit defaults.
-- **Error boundaries are structural** — GDScript has no `try`/`catch`, so a boundary can't
-  auto-catch a child render crash; it shows its fallback on an imperative toggle / `reset_key`.
+- **Error boundaries are cooperative, not automatic** — GDScript has no `try`/`catch`, so a
+  boundary can't auto-catch a hard child render crash (bad index, call on null). A failing
+  render instead *calls* `RuitkFail.render(reason)` and returns early: the nearest
+  `V.error_boundary` shows its `fallback` in the same commit and receives the reason via
+  `on_error`. Imperative toggling (`"active": true`) and `reset_key` recovery also work.
 - **`useTransition`/`useDeferredValue` are synchronous** (no concurrent renderer) — faithful to the
   Unity reference, but not "true" concurrency.
 - **Fast Refresh is dev-only** (gated on an attached debugger session) and does not migrate

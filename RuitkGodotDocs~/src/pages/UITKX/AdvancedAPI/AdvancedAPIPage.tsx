@@ -195,9 +195,13 @@ export const AdvancedAPIPage: FC = () => (
       <Typography variant="body1" paragraph>
         <code>V.error_boundary</code> shows a <code>fallback</code> and resets
         when its <code>reset_key</code> changes. Because GDScript has no
-        try/catch, it cannot <strong>auto-catch</strong> a render-time crash —
-        it activates imperatively (or when a child requests it). This is a
-        documented parity limitation.
+        try/catch, it cannot <strong>auto-catch</strong> a hard render-time
+        crash (bad index, call on null) — that documented parity limitation
+        survives. The cooperative path: a failing render{' '}
+        <em>calls</em> <code>RuitkFail.render(reason)</code> and returns early —
+        the nearest boundary shows its fallback in the same commit and receives
+        the reason via <code>on_error</code>. Imperative activation
+        (<code>&quot;active&quot;: true</code>) also works.
       </Typography>
       <CodeBlock language="jsx" code={ERROR_PATTERNS_EXAMPLE} />
     </Box>
@@ -208,10 +212,12 @@ export const AdvancedAPIPage: FC = () => (
         Render depth guard
       </Typography>
       <Typography variant="body1" paragraph>
-        The reconciler tracks how many times a single render restarts. If it
-        exceeds <strong>25</strong> in a row — usually caused by calling a setter
-        unconditionally in a component&apos;s setup body — the guard stops the
-        infinite loop instead of freezing the editor or game.
+        A state update made <em>during</em> a render is deferred and replayed
+        after commit as one follow-up render. The reconciler counts consecutive
+        follow-ups; past <strong>25</strong> — usually caused by calling a setter
+        unconditionally in a component&apos;s setup body — the guard drops the
+        queued updates and keeps the committed UI instead of freezing the editor
+        or game (&quot;Too many re-renders (setState during render?)&quot;).
       </Typography>
       <CodeBlock language="jsx" code={DEPTH_GUARD_EXAMPLE} />
     </Box>

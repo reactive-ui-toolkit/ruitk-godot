@@ -47,7 +47,9 @@ godot --headless --path . --script res://tests/core_test.gd
 build-then-scan habit still works — the strict order only matters on a fresh clone / CI.)
 
 The suites: `core_test.gd` (reconciler/hooks/effects/bailout/context/keyed), `settings_test.gd`
-(the `reactive_ui_toolkit/*` Project Settings bridge), `style_test.gd`,
+(the `reactive_ui_toolkit/*` Project Settings bridge), `scheduler_test.gd` (the four-lane
+`RuitkScheduler` — lanes/budgets/batching — plus sliced-render integration),
+`strict_boundary_test.gd` (the cooperative `RuitkFail` error-boundary latch + strict mode), `style_test.gd`,
 `router_match_test.gd` + `router_spine_test.gd`, `update_test.gd` (diff), `demos_test.gd` (renders
 every demo — the real check that generated `.gd` render without error), `doom_game_test.gd` (the
 Doom demo end-to-end), `guitkx_test.gd` (compiler + codegen + imports/resolver/codemod),
@@ -89,15 +91,27 @@ runtime**; the classes are available as soon as the files exist. Enabling the pl
   Godot property/theme/StyleBoxFlat names. Only structural factories are lowercase — `V.fc` is
   the function-component factory (GDScript reserves `func`, so it's not `V.func`).
 - **`hooks.gd` (`Hooks`)** — the 23 hooks. Call only at the top of a render, in a stable order.
-- **`reconciler.gd` (`RuitkReconciler`)** — the fiber reconciler. Synchronous (non-time-sliced) work
-  loop: **render phase** (`begin_work` reconciles children + runs components descending, `complete_work`
-  diffs/creates host nodes + builds the post-order effect list ascending) → **commit phase** (deletions
-  → placement/update/layout effects → enforce child order → swap current↔wip → passive effects). A hook
-  setter calls `request_update()`, which **coalesces to one re-render per frame**. Bailout skips
-  re-running a component whose props/state/context/children are unchanged.
+- **`reconciler.gd` (`RuitkReconciler`)** — the fiber reconciler. **Render phase** (`begin_work`
+  reconciles children + runs components descending, `complete_work` diffs/creates host nodes + builds
+  the post-order effect list ascending) → **commit phase** (deletions → placement/update/layout effects
+  → enforce child order → swap current↔wip → passive effects). Update renders are **time-sliced by
+  default** (family parity): the loop yields on the `RuitkConfig.time_slice_ms` quantum and continues as a
+  self-re-enqueueing `RuitkScheduler` Normal-lane slice under the cumulative `frame_budget_ms` budget;
+  `time_slicing = false` opts back into the synchronous single pass. Mounts and HMR flushes are always
+  synchronous; the commit is atomic either way. A hook setter calls `request_update()`, which
+  **coalesces to one re-render per frame**; updates arriving mid-pass are **deferred and replayed after
+  commit as one follow-up render** (never a restart — only a `RuitkFail` render failure restarts a
+  pass; setState-in-render loops cap at depth 25). Bailout skips re-running a component whose
+  props/state/context/children are unchanged.
 - **`fiber.gd` (`RuitkFiber`)** — persistent tree node carrying the per-fiber `hooks` array (how hook
-  state survives across renders). Fresh fibers are built each pass (no C#-style double-buffer reuse);
-  cycles are severed explicitly for GC.
+  state survives across renders). Fibers are double-buffered (each pass reuses the committed tree's
+  ping-pong `alternate` buddies); cycles are severed explicitly for GC.
+- **`scheduler.gd` (`RuitkScheduler`)** — the four-lane (High/Normal/Low/Idle) frame scheduler behind
+  sliced renders (per-lane Callable dedup, Low-cancel under High pressure, Idle only on quiet frames,
+  unbudgeted batched-effects flush). Lazy per-`SceneTree`, pumped from `process_frame` — no autoload.
+- **`fail.gd` (`RuitkFail`)** — the cooperative render-failure latch: a failing render calls
+  `RuitkFail.render(reason)` (GDScript can't throw) and the reconciler unwinds to the nearest error
+  boundary.
 - **`host_config.gd` (`RuitkHost`) + `style.gd`/`style_sheet.gd`** — **the only files that touch concrete
   Godot APIs.** This is the engine-boundary seam (the same one that lets React point a reconciler at
   react-dom vs react-native). `RuitkHost` maps props→node properties, `on<Pascal>`/`on_<signal>`→Godot
@@ -110,8 +124,9 @@ runtime**; the classes are available as soon as the files exist. Enabling the pl
   returned object for the UI's lifetime; `.unmount()` runs cleanups) and `reactive_root_node.gd`.
 
 **Known runtime constraints** (see README "Notes & limitations"): removed *plain* props don't reset to
-defaults between renders (style/events/refs/draw *do* reset); error boundaries are structural (no
-try/catch in GDScript, so they can't auto-catch a child render crash); `useTransition`/`useDeferredValue`
+defaults between renders (style/events/refs/draw *do* reset); error boundaries are cooperative (no
+try/catch in GDScript — a failing render *calls* `RuitkFail.render(reason)` to reach the nearest
+boundary; a hard GDScript crash still can't be auto-caught); `useTransition`/`useDeferredValue`
 are synchronous. Preserve these behaviors — they're faithful-to-reference, not bugs.
 
 ### `.guitkx` toolchain
@@ -157,7 +172,8 @@ and press Play to explore.
 
 - **Faithful port.** Algorithms/behavior mirror Reactive UI Toolkit — Unity (the C#/Unity library); the code is
   GDScript. When in doubt about intended semantics, that library is the reference. GDScript divergences
-  (no exceptions, fresh fibers per pass) are documented at the top of the relevant core file.
+  (no exceptions — the `RuitkFail` latch is the substitute) are documented at the top of the relevant
+  core file.
 - Requires Godot **4.4+** (compiler core uses 4.3+ APIs; the editor addon's bundled analyzer GDExtension has `compatibility_minimum = "4.4"` — both plugins gate on `MIN_GODOT`); verified on **4.7**. Standard build — no C#/.NET.
 - `plans/` holds design/porting docs; `research/` holds background notes. `CHANGELOG.md` (runtime) and
   `ide-extensions/changelog.json` (the source of truth for extension changelogs) track releases.

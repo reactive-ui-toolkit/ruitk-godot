@@ -120,18 +120,21 @@ export const UitkxDifferencesPage: FC = () => (
         Rendering model
       </Typography>
       <Typography variant="body1" paragraph>
-        The fiber reconciler runs synchronously and coalesces all updates scheduled in a frame into
-        one re-render. There is no React 18-style concurrent rendering.
+        The fiber reconciler coalesces all updates scheduled in a frame into one re-render, and —
+        by default — <strong>time-slices</strong> that render phase across frames on a
+        four-lane scheduler (React-18-style cooperative slicing). The commit is always atomic and
+        the initial mount is always synchronous. There is still no priority-based preemption of a
+        render in flight.
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary="All updates scheduled in a frame are processed together; there is no preemption between high- and low-priority updates." />
+          <ListItemText primary="All updates scheduled in a frame are processed together in one pass; an update arriving while a pass is in flight is deferred and replayed after commit as one follow-up render — a pass is never restarted or preempted by priority." />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary="useTransition and useDeferredValue exist for API parity but are synchronous — they don't provide true concurrency." />
         </ListItem>
         <ListItem disablePadding>
-          <ListItemText primary="Optional cooperative render slicing can be enabled via RuitkConfig.time_slicing / RuitkConfig.frame_budget_ms, within Godot's runtime constraints." />
+          <ListItemText primary="Cooperative render slicing is ON by default: RuitkConfig.time_slice_ms sets the render quantum and RuitkConfig.frame_budget_ms the scheduler's cumulative per-frame budget; RuitkConfig.time_slicing = false opts back into the synchronous single-pass render per update." />
         </ListItem>
       </List>
     </Box>

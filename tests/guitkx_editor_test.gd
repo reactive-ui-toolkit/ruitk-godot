@@ -385,17 +385,56 @@ func _test_settings_dialog() -> void:
 	_ok(cb.button_pressed == bool(ProjectSettings.get_setting(EdSettings.KEY_FORMAT_ON_SAVE, true)),
 		"editor bool populates from the stored value")
 	var sb: SpinBox = d._controls[RtSettings.KEY_FRAME_BUDGET_MS]
-	_ok(sb.value == float(ProjectSettings.get_setting(RtSettings.KEY_FRAME_BUDGET_MS, 8.0)),
+	_ok(sb.value == float(ProjectSettings.get_setting(RtSettings.KEY_FRAME_BUDGET_MS,
+			RtSettings.DEFAULTS[RtSettings.KEY_FRAME_BUDGET_MS])),
 		"frame_budget_ms populates the SpinBox")
 	var ob: OptionButton = d._controls[RtSettings.KEY_HOOK_VALIDATION]
 	_ok(ob.item_count == 3, "tri-state offers auto/enabled/disabled")
 	_ok(ob.get_item_text(ob.selected) == str(ProjectSettings.get_setting(RtSettings.KEY_HOOK_VALIDATION, "auto")),
 		"tri-state populates the OptionButton")
 
+	# The two non-tri-state String enums (P5) get their OWN vocabulary via RuitkSettings.HINTS
+	# (per-key hint pass-through, §4) instead of the tri-state fallback.
+	var ob_tl: OptionButton = d._controls[RtSettings.KEY_TRACE_LEVEL]
+	_ok(ob_tl.item_count == 3, "trace_level offers three options")
+	_ok(ob_tl.get_item_text(0) == "none" and ob_tl.get_item_text(1) == "basic" and ob_tl.get_item_text(2) == "verbose",
+		"trace_level options are none/basic/verbose (HINTS vocabulary)")
+	_ok(ob_tl.get_item_text(ob_tl.selected) == str(ProjectSettings.get_setting(RtSettings.KEY_TRACE_LEVEL, "none")),
+		"trace_level populates from the stored value")
+	var ob_env: OptionButton = d._controls[RtSettings.KEY_ENVIRONMENT]
+	_ok(ob_env.item_count == 3, "environment offers three options")
+	_ok(ob_env.get_item_text(0) == "auto" and ob_env.get_item_text(1) == "development" and ob_env.get_item_text(2) == "production",
+		"environment options are auto/development/production (HINTS vocabulary)")
+	_ok(ob_env.get_item_text(ob_env.selected) == str(ProjectSettings.get_setting(RtSettings.KEY_ENVIRONMENT, "auto")),
+		"environment populates from the stored value")
+	# diff_tracing rides the existing bool row machinery.
+	_ok(d._controls[RtSettings.KEY_DIFF_TRACING] is CheckBox, "diff_tracing builds a CheckBox row")
+
+	# (Godot-only) marking (family parity §4 / P7): the two leg-specific diagnostics extras
+	# carry the literal suffix in their tooltips; canonical family keys stay unmarked.
+	_ok((d._controls[RtSettings.KEY_DIAG_ENABLED] as Control).tooltip_text.ends_with("(Godot-only)"),
+		"diagnostics/enabled tooltip carries the (Godot-only) mark")
+	_ok((d._controls[RtSettings.KEY_DIAG_CAPTURE] as Control).tooltip_text.ends_with("(Godot-only)"),
+		"diagnostics/capture tooltip carries the (Godot-only) mark")
+	_ok(not (d._controls[RtSettings.KEY_TIME_SLICING] as Control).tooltip_text.contains("Godot-only"),
+		"canonical keys are not marked (Godot-only)")
+
+	# Version-skew degradation (risk list): _hint_for reaches HINTS through the script
+	# constant map, so a runtime addon PREDATING the HINTS const yields the tri-state
+	# fallback — a working control, not a crash.
+	_ok(d._hint_for(RtSettings, RtSettings.KEY_TRACE_LEVEL, "fallback") == "none,basic,verbose",
+		"_hint_for reads the per-key HINTS vocabulary")
+	var stub := GDScript.new()
+	stub.source_code = "extends RefCounted\n"   # no HINTS const — the pre-P5 runtime shape
+	stub.reload()
+	_ok(d._hint_for(stub, RtSettings.KEY_TRACE_LEVEL, "auto,enabled,disabled") == "auto,enabled,disabled",
+		"_hint_for degrades to the tri-state fallback when the runtime has no HINTS")
+
 	# A stored non-default value populates after rebuild (the about_to_popup refresh path).
-	ProjectSettings.set_setting(RtSettings.KEY_FRAME_BUDGET_MS, 4.0)
+	# 6.0 ≠ the 4.0 default (frame_budget_ms was re-scoped to 4.0 by the parity campaign, L-02).
+	ProjectSettings.set_setting(RtSettings.KEY_FRAME_BUDGET_MS, 6.0)
 	d.rebuild()
-	_ok((d._controls[RtSettings.KEY_FRAME_BUDGET_MS] as SpinBox).value == 4.0,
+	_ok((d._controls[RtSettings.KEY_FRAME_BUDGET_MS] as SpinBox).value == 6.0,
 		"rebuild re-reads a value changed in the native dialog")
 	ProjectSettings.set_setting(RtSettings.KEY_FRAME_BUDGET_MS, RtSettings.DEFAULTS[RtSettings.KEY_FRAME_BUDGET_MS])
 	d.rebuild()
@@ -422,9 +461,10 @@ func _test_settings_dialog() -> void:
 	# while the control is INSIDE the tree — the popped-up dialog always is, but out-of-tree
 	# test nodes must emit like the UI would (the OptionButton pattern below).
 	sb = d._controls[RtSettings.KEY_FRAME_BUDGET_MS]
-	sb.value = 4.0
+	sb.value = 6.0
 	sb.value_changed.emit(sb.value)
-	_ok(float(ProjectSettings.get_setting(RtSettings.KEY_FRAME_BUDGET_MS, 8.0)) == 4.0,
+	_ok(float(ProjectSettings.get_setting(RtSettings.KEY_FRAME_BUDGET_MS,
+			RtSettings.DEFAULTS[RtSettings.KEY_FRAME_BUDGET_MS])) == 6.0,
 		"SpinBox change writes the float")
 	sb.value = float(RtSettings.DEFAULTS[RtSettings.KEY_FRAME_BUDGET_MS])
 	sb.value_changed.emit(sb.value)

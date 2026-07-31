@@ -90,11 +90,20 @@ export const FLUSHSYNC_EXAMPLE = `SearchForm() -> RuitkVNode {
 }`
 
 // Error boundary patterns (repurposed slot: ERROR_PATTERNS_EXAMPLE)
-export const ERROR_PATTERNS_EXAMPLE = `# NOTE: GDScript has no try/catch, so the boundary can't AUTO-catch a render crash.
-# It shows 'fallback' when activated imperatively (or by a child) and RESETS when
-# 'reset_key' changes. Structural parity with React's ErrorBoundary.
+export const ERROR_PATTERNS_EXAMPLE = `# NOTE: GDScript has no try/catch, so the boundary can't AUTO-catch a hard render
+# crash. The cooperative substitute: a failing render CALLS RuitkFail.render(reason)
+# and returns early — the nearest boundary shows 'fallback' (same commit) and gets
+# the reason via 'on_error'. Imperative activation and 'reset_key' RESETS also work.
 
-# Pattern 1: fallback + on_error handler
+# Pattern 1: fallback + on_error handler; the child signals failure cooperatively
+RiskyContent() -> RuitkVNode {
+  var data = load_data()
+  if data == null:
+    RuitkFail.render("data failed to load")   # latch the failure...
+    return null                               # ...and return early (null is fine)
+  return (<Label text={ str(data) } />)
+}
+
 SafeApp() -> RuitkVNode {
   return V.error_boundary({
     "fallback": V.Label({ "text": "Something went wrong" }),
@@ -118,10 +127,11 @@ RecoverablePanel() -> RuitkVNode {
 }`
 
 // Render depth guard (repurposed slot: DEPTH_GUARD_EXAMPLE)
-export const DEPTH_GUARD_EXAMPLE = `# The reconciler guards against runaway re-render loops. If a single render
-# restarts more than 25 times in a row — usually because a setter is called
-# UNCONDITIONALLY in the component's setup body (not in an effect/handler) —
-# the guard stops the loop instead of freezing the editor/game.
+export const DEPTH_GUARD_EXAMPLE = `# The reconciler guards against runaway re-render loops. A setState during a
+# render is deferred and replayed after commit as ONE follow-up render; after 25
+# CONSECUTIVE follow-ups — usually because a setter is called UNCONDITIONALLY in
+# the component's setup body (not in an effect/handler) — the guard drops the
+# queued updates and keeps the committed UI instead of freezing the editor/game.
 #
 # BAD — sets state on every render, looping forever:
 #   Broken() -> RuitkVNode {

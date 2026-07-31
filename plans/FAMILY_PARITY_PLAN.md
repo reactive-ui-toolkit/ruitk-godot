@@ -656,6 +656,505 @@ godot --headless --path . --script res://tests/bench.gd                 # 3x, re
 - Do NOT relitigate §0. Ambiguity between this plan and the reference sources = read the
   reference again; still ambiguous = STOP AND ASK.
 
+---
+
+## 10. Execution log (append-only; one entry per phase, written with that phase's commit)
+
+### P0 — baseline — DONE (2026-07-31)
+
+Tree at start: `feat/family-parity` == `origin/dev` == 7b38f41 (the unified-settings campaign
+landed and was released — runtime 0.14.0, editor 0.12.0 — so §2's "uncommitted" framing is now
+"committed"; all anchors re-verified by reading, minor line drift only, shapes unchanged).
+Godot 4.7-stable (console binary via `.ruitk-local.json`); no editor held the project, so the
+ordered scan steps ran normally.
+
+§7 verify list, untouched tree — ALL GREEN:
+core 133/0 · settings 56/0 · style 42/0 · router_match 18/0 · router_spine 37/0 ·
+update ALL PASSED · demos 31/0 · doom 179/0 · guitkx ALL PASSED · hmr ALL PASSED (55) ·
+guitkx_editor 428/0 · guitkx_lsp 39/0 · contract 66/66 · migrate "migrated 0" ·
+machine-path gate green · guitkx_build 49 files, 0 errors.
+
+`tests/bench.gd` 3× at defaults (sync path) — ms/frame (median of 3):
+
+| N | run1 | run2 | run3 | median |
+|---|---|---|---|---|
+| 300 | 6.897 | 6.899 | 6.897 | 6.897 |
+| 750 | 6.936 | 6.893 | 6.893 | 6.893 |
+| 1500 | 17.408 | 17.254 | 17.906 | 17.408 |
+| 2000 | 37.814 | 37.118 | 38.294 | 37.814 |
+| 3000 | 57.219 | 58.254 | 56.635 | 57.219 |
+
+N=300/750 sit on the headless frame-pacing floor (~6.9 ms/frame, ~145 fps) — only N≥1500 rows
+are informative for regression comparison. Context run, `time_slicing = true` (today's 8.0
+single-budget park loop, temp edit reverted): 6.897 / 6.893 / 12.932 / 17.366 / 26.678 —
+NOT comparable 1:1 to sync (a parked pass spreads across frames; fps counts frames, not
+commits). Recorded for before/after context only.
+
+### P1 — scheduler + quantum/budget split — DONE (2026-07-31)
+
+Shipped (defaults unchanged — `time_slicing` still false):
+
+- **`core/scheduler.gd` (NEW, `class_name RuitkScheduler`)** — the full RenderScheduler.cs
+  port: four Array-backed lanes + per-lane Callable-keyed dedup trackers, batch
+  begin/end deferral of non-High enqueues, the exact `LateUpdate` frame flow (Low-cancel
+  when High+Low non-empty at frame start, Normal gated on High drained w/ escalation
+  count, Idle only on quiet frames under budget/2 with a budget/2 sub-budget), shared
+  frame-start cumulative budget in `_execute_queue` (budget 0 disables the check, the
+  reference `budgetLimit > 0f` quirk), unbudgeted batched-effects flush, `pump_now`,
+  `get_metrics()`. Budget reads `RuitkConfig.frame_budget_ms` live. L-09 wiring: lazy
+  per-SceneTree instance via `for_tree()` connected to `process_frame`; a `time_source`
+  Callable seam lets tests drive a fake clock. GDScript divergences (documented in-file):
+  no per-action try/catch (invalid Callables are skipped-but-counted, the analog of the
+  caught C# exception); the effects flush snapshot-swaps (the reference's live-list
+  foreach makes reentrant adds a hard error).
+- **Quantum/budget split:** `RuitkConfig.time_slice_ms := 2.0` (NEW), `frame_budget_ms`
+  8.0 → 4.0 (L-02 re-scope; inert while slicing is off), `_tick`'s slice loop now yields
+  on the quantum (usec clock — the 2 ms default is finer than get_ticks_msec's grain).
+- **Sliced path through the scheduler:** `_ensure_tick`/`_park` enqueue a
+  `_scheduled_slice` Normal-lane action (self-re-enqueueing slice, ScheduleRootWork
+  parity) when slicing is on; `_cancel_pending_tick` clears `_tick_pending`, which makes
+  any stale queued slice a no-op (`_scheduled_slice` guard — the analog of the reference
+  slice's `_nextUnitOfWork == null` early return). Sync path byte-identical
+  (call_deferred single pass); mount still synchronous + cancels parked continuations;
+  HMR forced-sync untouched.
+- **Settings lockstep:** `runtime/time_slice_ms` key (KEY_ const + DEFAULTS + `_apply_now`
+  + float `_property_info` row) + the 4.0 frame_budget default; settings_test gains
+  capture/restore + apply + no-clobber rows (56 → 64 asserts) and its
+  frame-budget "changed" values move off the new default (6.0); guitkx_editor_test float
+  rows read defaults from `DEFAULTS` instead of hardcoding 8.0 (dialog itself needed NO
+  change — the new float row appears automatically with the `_ms` SpinBox suffix).
+- **NEW suite `tests/scheduler_test.gd`** (40 asserts): lane order, per-lane dedup,
+  Low-cancel + counters, escalation, cumulative budget, idle sub-budget, batch deferral,
+  unbudgeted effects flush, slice self-re-enqueue ("three 2 ms slices fit one 4 ms pump"
+  pinned with the fake clock), pump_now, metrics; integration: sliced update commits
+  across pumps (quantum 0 + generous budget — no wall-clock asserts), mount never sliced,
+  unmount neutralizes a parked slice, sync path commits in one frame. CI step added after
+  settings_test in test.yml; CLAUDE.md suite list updated (15 suites; 16 at P3).
+
+Acceptance: full §7 verify green — core 133/0 · settings 64/0 · **scheduler 40/0 (NEW)** ·
+style 42/0 · router_match 18/0 · router_spine 37/0 · update PASSED · demos 31/0 ·
+doom 179/0 · guitkx PASSED · hmr PASSED (55) · guitkx_editor 428/0 · guitkx_lsp 39/0 ·
+contract 66/66 · migrate 0 · machine-path gate green. Bench at unchanged defaults vs P0
+(ms/frame medians): 6.897/6.893/16.395/36.992/55.939 vs 6.897/6.893/17.408/37.814/57.219
+— every N at-or-below baseline (≤ noise; the sync path gained one branch). `.uid`
+sidecars for the two new `.gd` generated by the editor scan and committed.
+
+### P2 — defer-don't-restart + render-depth guard — DONE (2026-07-31)
+
+Shipped (defaults still unchanged):
+
+- **`schedule_update_on_fiber` rework:** the `_restart = true` mid-render branch is gone.
+  The function now walks up marking `subtree_has_updates` while finding the target's root
+  (FiberReconciler.cs:215-234), then: (a) **superseded-tree redirect** — a target whose
+  root is `_root_current.alternate` re-marks its live `alternate` twin + chain (the flag
+  would otherwise be clobbered by `_reconcile`'s `has_pending_update` carry from the live
+  buddy, :254-281); (b) **detached bail** — unknown root warns once and ignores
+  (:282-289); (c) commit-phase defer unchanged; (d) **in-flight defer** — while
+  `_work_active or _next_unit != null` and not replaying, append to `_deferred_updates`
+  and return (the reference comment's starvation/leak reasoning ported verbatim,
+  :311-325).
+- **Coalesced replay:** `_commit_root`'s tail drains the queue with
+  `_is_replaying_deferred` set (re-marks flags; re-deferral suppressed) — the follow-up
+  render coalesces to ONE tick via `_ensure_tick`'s tick-pending guard (:884-909; sliced
+  mode lets the still-queued slice action pick the work up, exactly the reference's
+  "async mode: do nothing").
+- **Render-depth-25 guard** (`_MAX_RENDER_DEPTH`, FiberFunctionComponent.cs:16-18):
+  counts CONSECUTIVE commits whose render FNS deferred updates; trip = the existing
+  cap-25 push_error text + queued updates dropped + committed UI kept.
+  **Bughunt find (fixed):** the first cut counted ANY defer captured while the pass was
+  in flight — an external per-frame setState storm on a parked sliced pass (legitimate
+  load) tripped the guard and dropped real updates. Fix: `_in_component_render` flag set
+  around the component call in `_render_component`; only setState-in-RENDER defers count.
+  The storm test now asserts `_render_depth == 0` after 90 frames of sustained load.
+- `_restart`/`_restart_count`/cap-25 machinery kept but now DORMANT — the P3 failure path
+  (L-05). `_begin_render`'s effect-list reset verified as the stale-effect-list invariant
+  (mirrors FiberReconciler.cs:349-358) — no change needed.
+- **Tests** (scheduler_test 40 → 56): reentrant setState-in-render defers + N setStates
+  coalesce to exactly ONE follow-up (renders==3 pinned); commit-phase (layout-effect)
+  setState same; depth guard terminates an unconditional loop at exactly 26 renders with
+  stable UI; sustained-storm starvation case (fake-clock jam holds the pass to one unit
+  per frame, setState every frame — commits mid-storm, final value lands, depth stays 0);
+  the P2.3 superseded-redirect pin (defer lands in the carry-already-passed window, the
+  bailing component still re-renders after redirect); detached-fiber bail (white-box
+  orphan fiber → warn + ignore).
+
+Acceptance: full §7 verify green — core 133/0 · settings 64/0 · scheduler 56/0 ·
+style 42/0 · router_match 18/0 · router_spine 37/0 · update PASSED · demos 31/0 ·
+doom 179/0 · guitkx PASSED · hmr PASSED (55) · guitkx_editor 428/0 · guitkx_lsp 39/0 ·
+contract 66/66 · migrate 0 · machine-path gate green. Bench at defaults vs P0 (ms/frame
+medians, 5 runs on the noisy N=1500 row): 6.897/6.893/17.595/37.561/57.120 vs
+6.897/6.893/17.408/37.814/57.219 — ≤1.1% everywhere (within the observed noise band;
+N=2000/3000 ±0.2%). No test forces sync to pass — the sliced tests await settlement.
+
+### P3 — error-boundary latch (RuitkFail) — DONE (2026-07-31)
+
+Shipped (defaults unchanged):
+
+- **`core/fail.gd` (NEW, `class_name RuitkFail`)** — the cooperative latch per L-06:
+  `static render(reason)` first-failure-wins + internal `_consume()`, doc'd as the
+  no-throw path (RuitkCoreMisc.h/.cpp).
+- **Reference drift, verified by reading:** the Unreal latch machinery moved past this
+  plan's anchors (now RuitkReconciler.cpp:717-844) — `bRestart` became `bPassPoisoned`,
+  consumed INSIDE the work loop with an IMMEDIATE `BeginRender()` rebuild (fallback lands
+  in the SAME commit, mount and update alike), bounded by a per-pass `ErrorRestarts`
+  counter against `MaxErrorRestarts = 25` (RuitkReconciler.h:234), plus abandoned-WIP
+  slab reclaim in BeginRender and a dedicated cap message. Ported THAT shape (per the
+  §8 ambiguity rule: the reference wins) onto the dormant `_restart`/`_restart_count`
+  fields — still their only use (L-05): both work loops (mount `render()` + `_tick`)
+  consume the poison via `_consume_error_restart()`. DEVIATION from L-05's message note:
+  the cap error is the reference's current dedicated text ("Too many error-boundary
+  rebuilds (25). Abandoning the pass.") — the old cap-25 text now belongs to the P2
+  depth guard and would mislead ("setState during render?") on the error path.
+- **`_handle_render_failure`** — consume-after-every-component-render in
+  `_render_component` (output discarded, `on_render` still counts); walk WIP parents for
+  the nearest NON-ACTIVE boundary (captured-boundary rule); set `eb_active`+`eb_last_error`
+  on the fiber AND its committed twin; mount-pass boundaries (no twin) record a pending
+  activation by key-path, re-adopted in `_begin_error_boundary` (adopt-first, then the
+  mount-vs-reset rule — `reset_requested` now REQUIRES an alternate, fixing the
+  `alt == null`-counts-as-reset bug the plan names); `eb_handler` invoked; no boundary →
+  push_error and continue. `_reconcile` reuse now carries `eb_last_error` (Unreal :961);
+  pendings clear at commit tail + unmount.
+- **`_reclaim_abandoned_wip`** — the BeginRender slab-reclaim analog: severs fibers the
+  abandoned walk newly allocated (cycle-breaking + fresh-state dispose) and pools/frees
+  their never-placed nodes. **Bughunt find P3-1 (fixed + pinned):** `_try_fast_leaf_list`
+  stitches LIVE fibers (in-place reuse, `alternate == null`, committed nodes) into the
+  WIP chain — the first reclaim cut severed them, corrupting the live sibling chain. The
+  guard skips any fiber whose node is in-tree (or invalid — conservative). The pin is an
+  IDENTITY assert (same node instances survive the poisoned pass) because the node pool
+  masks a count-only assert — verified red-with-guard-off / green-with-guard-on.
+- v.gd + reconciler-header boundary comments rewritten to the latch reality (still no
+  auto-catch of a hard GDScript crash).
+- **NEW suite `tests/strict_boundary_test.gd` (41 asserts):** latch API first-wins;
+  mount-pass pending activation (fallback lands synchronously in the mount commit);
+  nearest-boundary + sibling/outer isolation + `on_error` + white-box eb fields;
+  first-failure-wins (second failing child never renders); active-boundary escalation
+  (failing fallback captured by the NEXT boundary up); reset_key recovery (clears
+  eb_active/eb_last_error); no-boundary path (failed component renders empty, siblings
+  stay, later renders recover); adopt-miss loop capped at exactly 26 renders/26 on_error
+  with nothing committed and clean unmount; the latch under time_slicing true (sliced
+  pass rebuild) and false; the P3-1 fast-list identity pin. CI step added after
+  demos_test in test.yml; CLAUDE.md suite list now 16.
+
+Acceptance: full §7 verify green — core 133/0 · settings 64/0 · scheduler 56/0 ·
+**strict_boundary 41/0 (NEW)** · style 42/0 · router_match 18/0 · router_spine 37/0 ·
+update PASSED · demos 31/0 · doom 179/0 · guitkx PASSED · hmr PASSED (55) ·
+guitkx_editor 428/0 · guitkx_lsp 39/0 · contract 66/66 · migrate 0 · machine-path gate
+green · guitkx_build 49/0.
+
+### P4 — strict mode — DONE (2026-07-31)
+
+Shipped (default OFF — opt-in, per §0 knob 7):
+
+- **`RuitkConfig.strict_mode := false` + `strict_mode_effective()`** (L-04): the static
+  round-trips untouched; the READ gates on `OS.is_debug_build()` — the exact
+  IsStrictModeEnabled shipping-force-false shape (doc comments cite it).
+- **Double-invoke in `_render_component`:** the render call extracted to
+  `_invoke_render(fiber, state)` with full `Hooks._begin`/`_end` bracketing per invoke;
+  when effective, invoke 2 runs and its result replaces invoke 1's (first discarded,
+  RuitkReconciler.cpp RenderComponent's second RunOnce). `RuitkDiagnostics.on_render()`
+  stays ONCE per pass after both invokes. Effects register once (verified against
+  hooks.gd's slot model: mount appends on invoke 1, invoke 2 re-walks `i < size` in
+  place) and run once per commit. Interaction guards: a failure latched by invoke 1
+  short-circuits invoke 2 via the new `RuitkFail._pending()` (consumed once);
+  set-in-render warns dedupe through `_warn_once` as before.
+- **Settings lockstep (§4):** `runtime/strict_mode` — KEY_ const + DEFAULTS false +
+  `_apply_now` bool branch + auto bool `_property_info`/dialog row; settings_test 64 → 71
+  (capture/restore map, no-keys row, bool property-info row, apply row asserting the
+  static round-trips with force-off at the read site). guitkx_editor_test dialog row
+  count self-adjusted (no edit).
+- **Tests (strict_boundary_test 41 → 59):** effective() shape both ways; mount+update
+  double-invoke pin (probe 2 calls/pass, effects 1x + cleanup 1x, `renders` 1x/pass,
+  state survives, committed output = invoke 2's); strict-off single-invoke control;
+  latch short-circuit (1 call, boundary captures, on_error once); hook-order validation
+  accelerated to the FIRST render (impure hook-count component: silent on mount without
+  strict, `[Hooks][order] hook count changed` captured on mount with strict).
+
+Acceptance: full §7 verify green — core 133/0 · settings 71/0 · scheduler 56/0 ·
+strict_boundary 59/0 · style 42/0 · router_match 18/0 · router_spine 37/0 ·
+update PASSED · demos 31/0 · doom 179/0 · guitkx PASSED · hmr PASSED (55) ·
+guitkx_editor 428/0 · guitkx_lsp 39/0 · contract 66/66 · migrate 0 · machine-path gate
+green. Bench at defaults (strict off): the machine session ran ~2x faster than round 1's
+absolute numbers, so the P2 commit was re-benched in a throwaway worktree the SAME
+session for an honest baseline — P2 medians 6.897/6.893/12.99/17.74/27.29 vs P3+P4
+6.896/6.893/12.56/16.92/26.42 ms/frame: at-or-below baseline at every N (≤ noise). A
+commit-cadence probe (N=2000, 100 update frames) pinned renders=100/commits=100 —
+the sync path still commits every frame; the absolute delta vs round 1 is machine
+state, not semantics.
+
+### P5 — missing-deps + trace ladder + diff_tracing + environment — DONE (2026-07-31)
+
+Shipped (defaults unchanged — the new knobs land off/auto/none):
+
+- **Reference drift, verified by reading the LIVE Unity tree:** its own campaign moved
+  mid-flight (M4 `9bb83c0c`, M5 `a574c922`). M4 re-prefixed the strict family
+  `[Hooks][StrictMode]` → `[Hooks][Strict]` (Hooks.cs 160/573/607) — per the drift rule the
+  NEW prefix is matched family-wide, which the two existing Godot messages AND
+  core_test:420 already carry, so **L-10 resolves to a verified no-op** (the reference
+  converged onto Godot's spelling; nothing to re-prefix). M5 pinned the trace gates
+  inline — structural `!= None`, detail `== Verbose`, diff `diff_tracing OR == Verbose` —
+  ported exactly, plus its message shapes (`[Fiber] Delete <type>`,
+  `[Fiber] Commit #n effects=m`).
+- **Missing-deps warnings:** `Hooks._warn_missing_deps` ports WarnMissingDependencies —
+  family key `"missing-deps:%s:%d"`, message text verbatim, gated on
+  `enable_strict_diagnostics`, deduped per component per (hook, slot) through the existing
+  `_warn_once`. Mapping per plan: useEffect/useLayoutEffect/useDeferredValue warn on
+  `null` deps ONLY (`[]` stays a legitimate run-once); the memo trio warns on EMPTY too
+  (treatEmptyAsMissing — the Unity params-empty shape). The delegation trap is closed by a
+  new `_memo_impl(factory, deps, hook_name)`: useMemo/useCallback/useImperativeHandle each
+  warn under their OWN public name while the recorded hook-order kind stays `"memo"` for
+  all three (signatures unchanged — no behavioral drift for the order validator).
+- **Call-site sweep:** every first-party memo-trio/effect-family call in `examples/` +
+  `addons/` already passes real deps — zero fixes; demos_test output carries ZERO
+  `[Hooks][Strict]` lines. The one bare `useDeferredValue` (core_test
+  `_test_deferred_value`) deliberately exercises value-comparison mode — strict
+  diagnostics silenced locally with the rationale inline; the warn itself is pinned in
+  `_test_missing_deps`. The risk-list "legit empty-deps memo" case never materialized.
+- **Trace ladder (L-03):** `RuitkDiagnostics.TraceLevel { NONE, BASIC, VERBOSE }` +
+  `trace_level` + `diff_tracing` + a capture-aware `trace()` (print + `messages`).
+  Basic/structural sites: placements (`_commit_placement`), deletions
+  (`_commit_deletion` — one line per removed subtree), replacements (`_reconcile`'s
+  non-match branch), commit summary (new `_commit_seq`; effects counted BEFORE the commit
+  loop consumes the chain, emitted commit-end — the M5 shape). Verbose adds per-element
+  updates, portal retargets, component render entries (once per pass, outside the strict
+  double-invoke), and per-hook detail in `Hooks._record` (logs per strict invoke — two
+  captures happened, the Unity comment's ruling). Diff channel (OR): bailout
+  taken/skipped, reuse-vs-replace, keyed move/place/remove (gate hoisted once per keyed
+  pass; move/place/remove print the effective reconciliation key). Every site gates on
+  the cheap compare FIRST; formatting only after.
+- **Environment (knob 10):** `RuitkConfig.environment := "auto"` +
+  `environment_resolved()` — explicit labels pass through, auto/unknown resolve off
+  `OS.is_debug_build()`. Read-only component surface; grep-proof holds (`environment`
+  inside the addon names only config.gd/settings.gd — remaining hits are the unrelated
+  "compiler environment" prose in guitkx/plugin).
+- **Settings lockstep ×3 keys** (§4): `runtime/environment`, `diagnostics/trace_level`,
+  `diagnostics/diff_tracing` (KEY_ + DEFAULTS + `_apply_now` + `_property_info`); NEW
+  per-key `HINTS` const (`"none,basic,verbose"` / `"auto,development,production"`) with
+  the TRI_STATE_HINT fallback; `_apply_now` maps trace strings onto the enum ints with
+  unknown-value `_: pass` arms (a skewed dialog writing tri-state vocabulary is
+  harmless). Dialog: per-key hint pass-through via `_hint_for` reading the script
+  CONSTANT MAP, so an old runtime without HINTS degrades to the tri-state options — the
+  risk-list posture, pinned in guitkx_editor_test with an in-memory stub script.
+- **Tests:** settings_test 71 → 103 (capture/restore + no-keys + property-info + apply
+  rows for all three knobs; `_test_enum_knobs`: string→enum mapping, unknown-value
+  degradation for both enums, `environment_resolved()` all four shapes). core_test
+  133 → 161 (`_test_missing_deps`: six warns under their own names, family text, `[]`
+  vs `null` split, per-component dedupe, off-gate; `_test_trace_ladder`: NONE silent,
+  BASIC mount/keyed-removal/type-swap structural-only, VERBOSE superset + hook detail +
+  render entries + the OR's verbose side, diff_tracing-alone independence — diff lines
+  with ZERO structural). guitkx_editor_test 428 → 437 (both enum rows' vocabulary +
+  populate, diff_tracing CheckBox, `_hint_for` HINTS read + no-HINTS fallback).
+- Bughunt find (fixed pre-commit): the keyed-move diff line printed `str(vn.key)` —
+  "<null>" for unkeyed children matched positionally; now the effective reconciliation
+  key (`_vnode_key`), consistent with the place/remove lines.
+
+Acceptance: full §7 verify green — core 161/0 · settings 103/0 · scheduler 56/0 ·
+strict_boundary 59/0 · style 42/0 · router_match 18/0 · router_spine 37/0 ·
+update PASSED · demos 31/0 (zero strict-warn spam) · doom 179/0 · guitkx PASSED ·
+hmr PASSED (55) · guitkx_editor 437/0 · guitkx_lsp 39/0 · contract 66/66 · migrate 0 ·
+machine-path gate green · guitkx_build 49/0 (2 warnings pre-existing on 2d307eb,
+verified). Bench at defaults, same-session medians vs 2d307eb (ms/frame):
+6.897/6.893/12.151/17.425/26.481 vs 6.897/6.893/12.602/17.178/27.896 — inside the
+observed noise band in both directions (N≥1500 swings ±5% run-to-run this session).
+
+### P6 — THE FLIP + coupling fixes + bench proof — DONE (2026-07-31)
+
+Shipped (the behavior change: `time_slicing` defaults ON):
+
+- **The flip:** `config.gd` `time_slicing := true` + the doc comment reframed (slicing is
+  the default; `false` is the sync opt-out; mount stays always-synchronous);
+  `settings.gd` `DEFAULTS[KEY_TIME_SLICING]: true`.
+- **settings_test flipped expectations:** the three hand-written tests whose true/false
+  literals inverted meaning — `_test_apply_changed_keys` (changed value is now FALSE),
+  `_test_default_value_does_not_clobber` (key true = default; a pre-assigned `false`
+  static survives), `_test_one_shot_guard` (reapply applies FALSE) — plus the mechanical
+  `_orig`/DEFAULTS loops, which adapted unchanged. 103/0.
+- **Coupling fix — doom (L-07):** `doom_game_screen.guitkx` gains the sync-pin effect —
+  FIRST hook deliberately, so its post-mount-commit setup runs before
+  `use_doom_game`'s mount effect ever schedules a follow-up render: saves
+  `RuitkConfig.time_slicing`, forces false, restores on unmount cleanup. The GO-03
+  allocator-safety comment (`doom_types.gd`) now states the ACTUAL invariant (pin ↔
+  allocator, remove neither without the other; a parked sliced render would read rewound
+  pool records); `plans/archive/FINAL_AUDIT_GODOT_OPTIMIZATIONS.md` GO-03 got the dated
+  correction. doom_game_test 179/0 and the demos doom smoke prove the pin post-flip.
+- **Coupling fix — tests:** `demos_test` captures `time_slicing` at `_run()` start and
+  restores THAT (not hard-coded false); `core_test._test_time_slicing` captures/restores
+  BOTH statics it touches — the sweep found it also leaked `frame_budget_ms = 0.0` for
+  the rest of the suite (inert pre-flip, real leak post-flip; fixed). Sweep confirms
+  scheduler/strict_boundary/settings suites already capture-restore.
+- **Suite stabilization — ONE fix, await-settlement, no force-sync:** the P5 trace-ladder
+  test asserted two frames after a sliced update, but trace print()s are slow on the
+  headless console — under VERBOSE the 2 ms quantum expires after a handful of units and
+  the pass parks across MANY frames. New `_await_trace_msg` settle helper (bounded 120
+  frames; settles on the commit summary — the LAST line of a pass — or on the first
+  `[Diff]` line for the trace-NONE arm; level-gated ABSENCE claims stay safe at any
+  time). Every other suite passed the flip untouched (HMR forced-sync included).
+- **Slicing demo:** NO edit (reads the live static; its label reflects ON at launch);
+  contract goldens verified unmoved (66/66).
+- **Bench proof** (same session as the P5 numbers): NEW defaults (sliced), medians of 3
+  — 6.898/6.896/6.850/9.321/14.666 ms/frame: the per-frame cost now sits at/near the
+  4 ms budget floor (N=1500 drops 12.2→6.9, N=3000 26.5→14.7) with commits spread
+  across frames — the feature, not a like-for-like speedup (fps counts frames, not
+  commits; the P0 context-run caveat). Sync opt-out arm (temp edit, reverted), medians
+  of 3 — 6.897/6.893/12.055/16.734/26.223 vs P5-at-sync 6.897/6.893/12.151/17.425/26.481
+  and P0 6.897/6.893/17.408/37.814/57.219 (different machine state; P5 is the honest
+  same-session baseline): within noise — the sync path is untouched by the flip.
+  `recon_bench`/`apply_bench` sanity runs normal.
+
+Acceptance: full §7 verify green under the flipped default — core 161/0 ·
+settings 103/0 · scheduler 56/0 · strict_boundary 59/0 · style 42/0 · router_match 18/0 ·
+router_spine 37/0 · update PASSED · demos 31/0 · doom 179/0 · guitkx PASSED · hmr PASSED
+(55) · guitkx_editor 437/0 · guitkx_lsp 39/0 · contract 66/66 · migrate 0 · machine-path
+gate green · guitkx_build 49/0. Mounts remain synchronous everywhere (scheduler_test's
+mount-never-sliced pin; every suite's mount asserts unchanged).
+
+### P7 — docs, dialog polish, changelog, stale claims — DONE (2026-07-31) — CAMPAIGN CLOSED
+
+Shipped (docs/metadata only — zero runtime-behavior changes; the one code edit is dialog
+tooltip text):
+
+- **Changelog:** root `CHANGELOG.md` gains `## [Unreleased]` (no version — owner-gated at
+  release staging): the loud "### Changed — BEHAVIOR: update renders are now time-sliced by
+  default" block (flip + what stays the same + the opt-out, the L-02 frame_budget_ms
+  re-scope migration story, the P6 bench medians verbatim) plus "### Added" entries for
+  scheduler / defer+depth-guard / RuitkFail latch / strict mode / missing-deps / trace
+  ladder+diff_tracing / environment / the settings surface. Mirrored byte-identical via
+  `cp` (tripwire green).
+- **READMEs (root + addon):** settings tables now carry all 12 keys with the flipped/new
+  defaults and *(Godot-only)* marks on the two diagnostics extras; a "Time-slicing is ON by
+  default" note with the opt-out; prose for strict_mode (release force-off via
+  `strict_mode_effective()`), environment (read-only, `environment_resolved()`),
+  trace_level/diff_tracing; the Notes & limitations error-boundary bullet rewritten to the
+  cooperative-latch reality (hard-crash no-auto-catch limitation kept, as are the
+  useTransition/useDeferredValue-are-synchronous notes).
+- **Stale claims:** `reconciler.gd` header rewritten — no longer "synchronous
+  (non-time-sliced)"; describes quantum/budget/slice-re-enqueue, defer-don't-restart +
+  depth-25, the failure-only restart, and the double-buffer reality (fresh-fibers bullet
+  DELETED; no-exceptions bullet kept, RuitkFail-phrased). CLAUDE.md: reconciler bullet
+  rewritten the same way, fiber bullet now says double-buffered, NEW scheduler.gd/fail.gd
+  bullets, Known-constraints + Conventions divergence wording updated (suite list was
+  already 16 from P1/P3).
+- **Docs site:** Config page — full §4 table (12 rows, types/defaults, the two enum
+  vocabularies, (Godot-only) marks) + new "Strict mode" / "Environment label" / "Trace
+  ladder & diff tracing" subsections; Concepts — knob list updated (slicing on-by-default
+  with the 2.0/4.0 split, strict_mode, environment, trace bullets); Differences —
+  rendering-model section now says time-sliced by default + defer-not-restart (no
+  priority preemption claim kept); FAQ — overhead answer updated + the depth-guard Q&A
+  now quotes the real error text; AdvancedAPI error-boundary + depth-guard sections and
+  examples rewritten to the latch/defer reality (the early-`return null` .guitkx shape in
+  the new example verified by compiling a scratch file — valid grammar, then removed);
+  Components table ErrorBoundary desc; docs.tsx search-index lines for all four pages.
+  `npm ci && npm run build && npm run lint` green.
+- **Dialog polish (deferred from P5):** the two Godot-only diagnostics keys' tooltips get
+  the literal " (Godot-only)" suffix (`_GODOT_ONLY_KEYS` literal strings — skew-safe);
+  guitkx_editor_test pins both marks + a canonical-key non-mark (437 → 440).
+- **Fresh-clone-order sanity:** `.godot` deleted, the CLAUDE.md ordered sequence re-run
+  from scratch — scan → guitkx_build 49/0 → rescan → suites; the two-pass order holds
+  post-campaign.
+
+Acceptance: full §7 verify green — core 161/0 · settings 103/0 · scheduler 56/0 ·
+strict_boundary 59/0 · style 42/0 · router_match 18/0 · router_spine 37/0 ·
+update PASSED · demos 31/0 · doom 179/0 · guitkx PASSED · hmr PASSED (55) ·
+guitkx_editor **440/0** · guitkx_lsp 39/0 · contract 66/66 · migrate 0 · machine-path
+gate green · guitkx_build 49/0 (2 pre-existing warnings) · docs `npm run build` +
+`npm run lint` green · `changelog.mjs verify` green (extension lane untouched) ·
+CHANGELOG mirror byte-identical. NO version bumps (owner-gated at release staging).
+
+**P7 addendum (same day, review follow-up):** every "0.14" the campaign had hard-coded into
+shipped surfaces (docs pages, both READMEs, CLAUDE.md, reconciler.gd/config.gd doc comments,
+doom_types.gd + doom_game_screen.guitkx P6 comments) is neutralized to "family parity" /
+"by default" wording — the flip's version number is exactly the owner's pending fold-vs-bump
+ruling, so nothing user-visible may pre-announce it; release staging stamps the real number.
+The CHANGELOG `[Unreleased]` section was already version-neutral. Internal-only mention left
+as-is (flagged for the release sweep): `plans/archive/FINAL_AUDIT_GODOT_OPTIMIZATIONS.md`
+GO-03's dated correction says "the 0.14 default flip". Re-verified: guitkx_build 49/0 (same
+2 pre-existing warnings), core 161/0, settings 103/0, demos 31/0, doom 179/0, docs
+build+lint, machine-path gate, mirror byte-identical.
+
+### Release staging — DONE (2026-07-31) — FOLDED INTO 0.14.0 (the owner's fold ruling)
+
+The parity wave folds INTO the staged-unpublished runtime **0.14.0** / editor **0.12.0** —
+NO new version numbers (both plugin.cfg files verified untouched at 0.14.0 / 0.12.0; the
+Unreal leg's `[0.16.0]` fold is the family precedent). Executed:
+
+- **Lane A:** root `CHANGELOG.md` `[Unreleased]` merged INTO `[0.14.0] — 2026-07-31` as ONE
+  settings+parity wave: a new wave intro ("The settings + family-parity release, one
+  wave"), the loud "### Changed — BEHAVIOR" flip block leading (flip bullet + P6 bench
+  medians verbatim; the frame_budget_ms re-scope bullet re-anchored on
+  `RuitkConfig.frame_budget_ms` — under the fold the Project Setting key debuts in this
+  same release, so the carry-forward story now speaks to code-assigned values, not stored
+  keys); the merged "### Added" leads with the two settings-wave bullets evolved to the
+  twelve-key surface (enum vocabularies + (Godot-only) marks; the superseded "Settings
+  surface for all of the above" parity bullet folded into them), then the parity feature
+  bullets unchanged; the emptied `[Unreleased]` heading deleted. Mirror resynced via `cp`,
+  `cmp` byte-identical.
+- **Lane B:** the staged editor-0.12.0 `changelog.json` entry evolved (seven → twelve keys;
+  "unified-settings wave" → "settings + family-parity wave") + a second bullet for the
+  campaign's dialog coverage: per-key HINTS enum dropdowns (`trace_level`
+  none/basic/verbose, `environment` auto/development/production; graceful tri-state
+  degradation against a hint-less older runtime), the time_slice_ms / strict_mode /
+  diff_tracing rows, and the "(Godot-only)" tooltip marks. `extract --ide editor` re-run;
+  `changelog.mjs verify` green.
+- **Lane C:** the staged Discord `[0.14.0]` entry REPLACED to cover the full wave
+  (settings, the flip w/ opt-out + bench proof, scheduler, defer + depth guard, real error
+  boundaries, strict mode, trace ladder, environment, new keys) — **1995 chars** by the
+  house awk counter (≤2000 cap).
+- **Version-mention sweep:** shipped surfaces KEEP their neutral P7-addendum phrasings
+  (grep confirms zero explicit "0.14" mentions beside them — nothing reads awkwardly; no
+  churn). The P7-flagged `plans/archive/FINAL_AUDIT_GODOT_OPTIMIZATIONS.md` GO-03 "0.14
+  default flip" mention is now CORRECT under the fold — confirmed, left as-is. Dating: the
+  `[0.14.0]` heading keeps 2026-07-31 (the staging date, per convention).
+
+Acceptance (after the changelog edits, ordered headless sequence from scan): guitkx_build
+49/0 (2 pre-existing warnings) · core 161/0 · settings 103/0 · scheduler 56/0 ·
+strict_boundary 59/0 · style 42/0 · router_match 18/0 · router_spine 37/0 · update PASSED ·
+demos 31/0 · doom 179/0 · guitkx PASSED · hmr PASSED (55) · guitkx_editor **440/0** (mirror
+tripwire green) · guitkx_lsp 39/0 · contract 66/66 · migrate 0 · `changelog.mjs verify`
+green · machine-path gate green · corpus-hash green · mirror `cmp` byte-identical. NO
+version-number changes anywhere; NO Publish (owner-gated).
+
+**CAMPAIGN COMPLETE — ready for the owner's merge review.** Remaining owner touchpoints:
+merge PR #95 into dev → fast-forward master → the Publish button → paste the Discord entry.
+
+### Cross-leg conformance (2026-07-31) — post-campaign addendum
+
+The cross-leg conformance pass compared the three shipped campaigns knob-by-knob and
+behavior-by-behavior against the Unity reference. **Defaults verified identical ×10×3**:
+all ten family knobs (`time_slicing`, `time_slice_ms`, `frame_budget_ms`, `strict_mode`,
+`strict_diagnostics`, `hook_validation`, `trace_level`, `diff_tracing`, `environment`,
+plus the leg-local pool knob) carry the same default in all three legs. Blessed as-is for
+this leg (supervisor rulings): the engine-native **key namespaces** stay per-leg spellings
+of one canonical name set; the **tri-state vocabulary** (`auto`/`on`/`off` and the
+`auto = resolve-by-environment` rule) is family-frozen; **`auto` = leave-static-alone**
+(an `auto` value never rewrites a user's persisted explicit setting); and this leg's
+**budgeted `pump_now`** (cumulative budget still applied inside each drained lane) matches
+the reference and stays.
+
+Conformance fixes landed in this commit:
+
+- **C3 (real port gap)** — `schedule_update_on_fiber`'s root walk-up omitted the
+  reference's deletion check: an update targeting a fiber inside a subtree already tagged
+  `EFFECT_DELETION` (the reconcile→commit window) must bail SILENTLY
+  (FiberReconciler.cs:217-221, :236-239), before the detached-fiber warn path can be
+  reached. Ported 1:1 (`reconciler.gd` walk-up now checks the tag at every step); pinned by
+  `scheduler_test.gd::_test_deleted_subtree_silent_bail` (tag on the target + tag on an
+  ancestor: nothing scheduled, no re-render).
+- **C5 (warning text + key)** — the state-update-during-render strict warning now carries
+  the reference's exact text ("State update scheduled during render of '%s'. Move this set
+  call to an effect or event handler.") and the reference's dedup key
+  `"state-update-during-render"` at BOTH sites (useState setter + useReducer dispatch) —
+  supervisor ruling: Unity uses the same key and same text for both paths
+  (Hooks.cs:159-160, :606-607), so the two sites share one per-component dedup, replacing
+  the old divergent `set_in_render` texts. core_test pins the text and the shared-key dedup.
+- **C7 (warning cardinality)** — the detached-fiber warning's warn-once guard
+  (`_warned_detached`) removed: the reference warns on EVERY attempt
+  (FiberReconciler.cs:285-287).
+- **C6 (doc-mark only)** — `scheduler.gd pump_now` doc-commented as currently
+  tests-only (no production caller in this leg; the Unreal FlushSync analog serves surfaces
+  this leg doesn't have). API and behavior unchanged, kept for family parity.
+
+Pre-release internal corrections to the unpublished 0.14.0 wave — no changelog entry, no
+version changes.
+
 ## 9. Risks / watch-list / STOP-AND-ASK
 
 - **Headless timing flakiness** (scheduler budgets are wall-clock): design scheduler tests

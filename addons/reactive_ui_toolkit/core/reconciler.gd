@@ -1,7 +1,6 @@
 class_name RuitkReconciler
 extends RefCounted
-## The fiber reconciler. Ports ReactiveUIToolKit's FiberReconciler to a synchronous
-## (non-time-sliced) work loop:
+## The fiber reconciler. Ports ReactiveUIToolKit's FiberReconciler:
 ##
 ##   render phase   -> begin_work (reconcile children, run components) descending, then
 ##                     complete_work (create/diff host nodes, build the effect list) on
@@ -10,19 +9,33 @@ extends RefCounted
 ##                     enforce child order -> swap current<->wip -> two-pass passive
 ##                     effects -> release the old tree -> replay deferred updates.
 ##
-## Updates are coalesced (a hook setter schedules one deferred render per frame). Bailout
+## Update renders are TIME-SLICED by default (family parity): the work loop yields
+## after `RuitkConfig.time_slice_ms` (the quantum, checked AFTER each completed unit — no
+## preemption) and continues as a self-re-enqueueing RuitkScheduler Normal-lane slice under
+## the scheduler's cumulative `frame_budget_ms`; `RuitkConfig.time_slicing = false` opts
+## back into the synchronous single-pass render per update. The initial mount (`render()`)
+## and HMR flushes are ALWAYS synchronous; the commit is atomic either way. An update
+## arriving while a pass is in flight or parked is DEFERRED and replayed after commit,
+## coalesced into ONE follow-up render (defer-don't-restart; setState-in-render loops
+## terminate via the render-depth-25 guard). A render FAILURE (the `RuitkFail` latch) is
+## the only thing that restarts a pass — the boundary fallback lands in the same commit,
+## capped at `_MAX_ERROR_RESTARTS` rebuilds.
+##
+## Updates are coalesced (a hook setter schedules one render pass per frame). Bailout
 ## skips re-running a component's render fn when its props/state/context/children are
-## unchanged (reusing the cached output); the fiber tree is still rebuilt each pass —
-## true O(changed) subtree carry-over is a later perf optimization (see PORTING_PLAN 1.9).
+## unchanged (reusing the cached output); fibers are double-buffered — each pass reuses
+## the committed tree's ping-pong buddies instead of allocating fresh ones, and same-shape
+## host children are reused IN PLACE via the fast-leaf-list path.
 ##
 ## GDScript divergences vs the C# original:
-##   - No exceptions: error boundaries render a fallback on demand but cannot auto-catch
-##     a render-time crash (GDScript has no try/catch). See `_begin_error_boundary`.
-##   - Fresh fibers each pass (no 2-object double-buffer reuse) — simpler lifecycle, GC'd
-##     via explicit cycle-severing.
+##   - No exceptions: a failing render cooperatively CALLS `RuitkFail.render(reason)` (it
+##     cannot throw); the latch is consumed after each component render and unwinds to the
+##     nearest error boundary (`_handle_render_failure`). A real GDScript crash (bad index,
+##     call on null) still cannot be auto-caught — that limitation survives.
 
 const F = preload("res://addons/reactive_ui_toolkit/core/fiber.gd")
 const Hmr = preload("res://addons/reactive_ui_toolkit/core/hmr.gd")
+const Scheduler = preload("res://addons/reactive_ui_toolkit/core/scheduler.gd")
 
 ## --- Fast Refresh registry (Phase H) ---------------------------------------------------------
 ## Live reconcilers. Registration is unconditional (one WeakRef append per root — negligible,
@@ -62,9 +75,17 @@ var _has_deletions := false
 var _is_committing := false
 var _deferred_updates: Array = []
 var _work_active := false      ## a render is in progress (possibly parked between frames)
-var _restart := false          ## update arrived mid-render -> rebuild from root (clears effect list)
-var _tick_pending := false     ## a _tick is scheduled (call_deferred or process_frame)
-var _restart_count := 0
+var _restart := false          ## the pass is POISONED: a render failure activated a boundary — the work loop abandons the WIP and rebuilds from root (the render-FAILURE path ONLY; updates DEFER instead — family parity P2/P3, L-05)
+var _tick_pending := false     ## a _tick is scheduled (call_deferred or scheduler slice)
+var _restart_count := 0        ## consecutive error rebuilds within the current pass (cap _MAX_ERROR_RESTARTS; reset at pass start and on commit)
+var _pending_eb_activations: Array = []   ## mount-pass boundary activations recorded by key-path, re-adopted by the rebuilt pass (Unreal PendingEbActivations); stale entries clear at commit/unmount
+var _is_replaying_deferred := false   ## _commit_root is draining _deferred_updates — replayed updates must re-mark and schedule, never re-defer (FiberReconciler.cs:23)
+var _in_component_render := false     ## a component's render fn is on the stack (setState-in-render discriminator)
+var _deferred_render_phase := false   ## the in-flight pass deferred >= 1 update FROM INSIDE a render fn (depth-guard accounting; external updates deferred while parked are legitimate load and never count)
+var _render_depth := 0                ## CONSECUTIVE commits whose render fns deferred updates (setState-in-render loops)
+var _commit_seq := 0                  ## monotonic commit number for the trace ladder's commit summary ("[Fiber] Commit #n")
+const _MAX_RENDER_DEPTH := 25         ## FiberFunctionComponent.cs:18 (MaxRenderDepth)
+const _MAX_ERROR_RESTARTS := 25       ## RuitkReconciler.h MaxErrorRestarts (error-boundary rebuild cap)
 
 func _init(container: Node) -> void:
 	_container = container
@@ -82,22 +103,26 @@ func _init(container: Node) -> void:
 
 func render(vnode: RuitkVNode) -> void:
 	# Initial / top-level mount is always synchronous (no time-slicing) to avoid an empty
-	# first frame. Cancel any parked sliced render first so its process_frame tick can't fire
-	# after us, and mark `_work_active` so a setState during render restarts coherently. [M7/M8]
+	# first frame. Cancel any parked sliced render first so its continuation (scheduler slice
+	# or deferred tick) can't fire after us, and mark `_work_active` so a setState during
+	# render defers coherently (replayed after this mount's commit). [M7/M8]
 	if _root_current == null:
 		return   # torn down by unmount() — a render after teardown is a no-op, not a crash [audit]
 	_cancel_pending_tick()
 	_root_vnode = vnode
 	_root_current.has_pending_update = true
 	_work_active = true
+	_restart_count = 0
 	_begin_render()
 	while _next_unit != null:
 		_next_unit = _perform_unit(_next_unit)
+		if _restart and not _consume_error_restart():
+			return   # abandoned at the rebuild cap: nothing commits, the container keeps its prior state
 	_work_active = false
-	_restart = false
+	_restart_count = 0
 	_commit_root()
 
-## Mark a fiber dirty and (unless we're mid-commit) schedule a coalesced render.
+## Mark a fiber dirty and (unless a pass or commit is in flight) schedule a coalesced render.
 func schedule_update_on_fiber(fiber: RuitkFiber, vnode) -> void:
 	if _root_current == null:
 		return   # torn down by unmount() — ignore late setState/effect callbacks [audit]
@@ -105,15 +130,60 @@ func schedule_update_on_fiber(fiber: RuitkFiber, vnode) -> void:
 		_root_vnode = vnode
 	var target := fiber if fiber != null else _root_current
 	target.has_pending_update = true
-	var p := target.parent
-	while p != null:
-		p.subtree_has_updates = true
-		p = p.parent
+	# Walk up marking subtree_has_updates and find this fiber's root. A deletion tag anywhere
+	# on the walk means the target sits in a subtree already scheduled for removal (the window
+	# between reconcile and commit — e.g. a cleanup/effect setting state on its own dying
+	# subtree): bail SILENTLY, per the reference (FiberReconciler.cs:215-239) — unlike the
+	# detached case below, which warns.
+	var top := target
+	while true:
+		if top.effect_tag & F.EFFECT_DELETION:
+			return
+		if top.parent == null:
+			break
+		top.parent.subtree_has_updates = true
+		top = top.parent
+	if top != _root_current and top != _wip_root:
+		if _root_current.alternate != null and top == _root_current.alternate:
+			# Superseded-tree redirect (FiberReconciler.cs:254-281): the target belongs to the
+			# tree the last commit superseded — the typical case for deferred updates captured
+			# mid-pass and replayed after commit. Its flags would be CLOBBERED when the next
+			# pass reuses that fiber as the WIP buddy (the `has_pending_update` carry in
+			# _reconcile reads from the LIVE fiber), so re-mark the live `alternate` twin and
+			# its chain — the render then cannot bail out past the updated component.
+			var live: RuitkFiber = target.alternate if target.alternate != null else target
+			live.has_pending_update = true
+			var wu := live
+			while wu.parent != null:
+				wu.parent.subtree_has_updates = true
+				wu = wu.parent
+			target = live
+		else:
+			# Detached fiber (already-committed deletion — its links were severed by
+			# _release): ignore, warning EVERY time — the reference warns unconditionally
+			# on each attempt (FiberReconciler.cs:282-289).
+			push_warning("[reactive_ui_toolkit] Attempted update on a detached fiber. Ignoring (component unmounted?).")
+			return
 	if _is_committing:
+		# Mid-commit (a layout effect set state): resetting the tree now would corrupt the
+		# commit — defer and replay from _commit_root's tail (FiberReconciler.cs:302-309).
 		_deferred_updates.append([target, vnode])
 		return
-	if _work_active:
-		_restart = true   # update mid-render -> rebuild from root next tick (resets effect list)
+	if (_work_active or _next_unit != null) and not _is_replaying_deferred:
+		# A pass is in flight (parked between time slices, or a reentrant setState during a
+		# synchronous work loop): DEFER instead of discarding the pass. Restarting on every
+		# update starves large trees under sustained per-frame updates (signals ticking every
+		# frame): the pass never reaches commit, and hosts already created by the aborted
+		# walk leak. The deferred update replays from _commit_root's tail, coalescing
+		# everything that arrived during the pass into ONE follow-up render.
+		# (FiberReconciler.cs:311-325)
+		_deferred_updates.append([target, vnode])
+		if _in_component_render:
+			# Only setState-in-RENDER counts toward the runaway guard; external updates
+			# arriving while the pass is parked are exactly the sustained load the defer
+			# model exists to serve.
+			_deferred_render_phase = true
+		return
 	_ensure_tick()
 
 func request_update() -> void:
@@ -123,45 +193,56 @@ func _ensure_tick() -> void:
 	if _tick_pending:
 		return
 	_tick_pending = true
+	if RuitkConfig.time_slicing:
+		var tree := _get_tree_safe()
+		if tree != null:
+			Scheduler.for_tree(tree).enqueue(_scheduled_slice, Scheduler.Priority.NORMAL)
+			return
 	call_deferred("_tick")
 
+## Scheduler-lane slice action (time-slicing only): the Normal-lane, self-re-enqueueing
+## render slice (FiberReconciler.cs ScheduleRootWork/Slice, :405-424). A cancelled tick
+## (render()/unmount() pre-empted a parked render) leaves a stale entry in the scheduler
+## queue — the `_tick_pending` guard makes it a no-op, mirroring the reference slice's
+## early return when `_nextUnitOfWork` is null.
+func _scheduled_slice() -> void:
+	if not _tick_pending:
+		return
+	_tick()
+
 ## One work pass. Runs the whole render at once unless time-slicing is on, in which case
-## it processes until the frame budget is hit, then parks until the next frame. An update
-## arriving mid-render sets `_restart`, which rebuilds from the root (clearing the effect
-## list) — the invariant that prevents stale Placement effects re-committing.
+## it processes until the render quantum (`RuitkConfig.time_slice_ms`) is hit, then
+## re-enqueues itself on the scheduler's Normal lane (the scheduler's cumulative
+## `frame_budget_ms` decides how many slices fit in one frame). A render FAILURE poisons
+## the pass (`_restart`): the loop abandons the WIP and rebuilds from the root immediately,
+## so the newly-activated boundary's fallback lands in THIS pass's commit — see
+## `_consume_error_restart` (updates arriving mid-render DEFER — see
+## schedule_update_on_fiber; the failure rebuild is the restart machinery's ONLY use, L-05).
 func _tick() -> void:
 	_tick_pending = false
 	if _root_vnode == null or not is_instance_valid(_container):
 		_work_active = false
 		return
-	if not _work_active or _restart:
-		if _restart:
-			_restart_count += 1
-			if _restart_count > 25:
-				push_error("[reactive_ui_toolkit] Too many re-renders (setState during render?). Aborting pass.")
-				_work_active = false
-				_restart = false
-				_restart_count = 0
-				return
-		else:
-			_restart_count = 0
+	if not _work_active:
+		_restart_count = 0
 		_begin_render()
-		_restart = false
 		_work_active = true
 
-	var start := Time.get_ticks_msec()
+	# Quantum check AFTER each completed unit — a long single unit overruns (no preemption);
+	# FiberReconciler.cs ProcessWorkUntilDeadline (:444-455). usec clock: the 2 ms default
+	# quantum is finer than get_ticks_msec's integer grain.
 	var sliced: bool = RuitkConfig.time_slicing
-	var budget: float = RuitkConfig.frame_budget_ms
+	var quantum: float = RuitkConfig.time_slice_ms
+	var start_ms: float = float(Time.get_ticks_usec()) / 1000.0
 	while _next_unit != null:
 		_next_unit = _perform_unit(_next_unit)
 		if _restart:
-			break
-		if sliced and float(Time.get_ticks_msec() - start) >= budget:
+			if not _consume_error_restart():
+				return   # abandoned at the rebuild cap; committed UI stays
+			continue     # rebuilt: keep working (the quantum check resumes next unit)
+		if sliced and (float(Time.get_ticks_usec()) / 1000.0) - start_ms >= quantum:
 			break
 
-	if _restart:
-		_ensure_tick()
-		return
 	if _next_unit == null:
 		_work_active = false
 		_restart_count = 0
@@ -169,24 +250,91 @@ func _tick() -> void:
 	else:
 		_park()
 
-## Resume the parked render on the next frame (time-slicing only).
+## Consume the pass-poison flag set by `_handle_render_failure`: a render failure activated
+## an error boundary, so abandon the poisoned WIP (its walk already reconciled the FAILING
+## children under the boundary) and rebuild from the root NOW — the fallback then lands in
+## THIS commit, mount and update alike (Unreal RuitkReconciler.cpp DoWork's bPassPoisoned
+## consume). Bounded: a rebuild only happens when a boundary NEWLY activates (an active one
+## can't re-capture — the captured-boundary rule), and `_restart_count` caps the mount-path
+## adopt-miss loop. Returns false when the cap is exceeded: the pass is abandoned (committed
+## UI stays) after reclaiming the WIP's never-committed nodes.
+func _consume_error_restart() -> bool:
+	_restart = false
+	_restart_count += 1
+	_reclaim_abandoned_wip(_wip_root)
+	if _restart_count > _MAX_ERROR_RESTARTS:
+		push_error("[reactive_ui_toolkit] Too many error-boundary rebuilds (%d). Abandoning the pass." % _MAX_ERROR_RESTARTS)
+		_work_active = false
+		_next_unit = null
+		_restart_count = 0
+		return false
+	_begin_render()
+	return true
+
+## Release what an abandoned (error-poisoned) pass created before the rebuild orphans it —
+## the analog of the reference's abandoned-WIP slab reclaim in BeginRender
+## (RuitkReconciler.cpp:418-426). Fibers NEWLY allocated by the abandoned walk
+## (alternate == null; a reused fiber is the live tree's ping-pong buddy and is left for
+## the next pass to re-reuse) sever their links and fresh component state so the RefCounted
+## cycles collect, and a fresh host node that never entered the scene is recycled or freed.
+func _reclaim_abandoned_wip(fiber: RuitkFiber) -> void:
+	var c := fiber.child
+	while c != null:
+		var nxt := c.sibling
+		_reclaim_abandoned_wip(c)
+		c = nxt
+	if fiber == _wip_root:
+		return
+	if fiber.alternate == null:
+		# CAREFUL: a stable leaf list is reused IN PLACE by _try_fast_leaf_list — its LIVE
+		# fibers (committed in-tree nodes, no buddy) sit directly in the WIP child chain and
+		# also match `alternate == null`. They are NOT this pass's allocations: severing
+		# their sibling/parent links would corrupt the live tree (bughunt P3-1). A node that
+		# exists but is invalid is skipped the same way (conservative: never corrupt).
+		if fiber.node != null and (not is_instance_valid(fiber.node) or fiber.node.is_inside_tree()):
+			return
+		# Newly allocated this pass: nothing else references it. Its node (if _complete_work
+		# already created one) was never placed — pool it like a deleted leaf, or free it.
+		if fiber.node != null:
+			if RuitkConfig.host_node_pool and fiber.node.get_child_count() == 0:
+				_recycle_node(fiber.node, fiber.props if fiber.props != null else {})
+			else:
+				fiber.node.queue_free()
+		_dispose_fiber_state(fiber)
+		fiber.parent = null
+		fiber.child = null
+		fiber.sibling = null
+		fiber.next_effect = null
+		fiber.node = null
+		fiber.deletions = []
+	else:
+		# Reused buddy: detach it from the abandoned chain; the rebuilt pass's _reconcile
+		# resets every render-scoped field when it re-reuses the fiber.
+		fiber.child = null
+		fiber.next_effect = null
+
+## Park the sliced render by re-enqueueing the slice action on the scheduler's Normal lane
+## (the self-re-enqueueing slice, FiberReconciler.cs:405-424). The scheduler pump keeps
+## running queued slices while its cumulative frame budget lasts, so a short quantum can run
+## more than one slice per frame; when the budget is spent, the remainder waits for the next
+## frame's pump. Fallback when the container is not in a tree: next-idle call_deferred,
+## like the sync path.
 func _park() -> void:
 	if _tick_pending:
 		return
 	_tick_pending = true
 	var tree := _get_tree_safe()
 	if tree != null:
-		tree.process_frame.connect(_tick, CONNECT_ONE_SHOT)
+		Scheduler.for_tree(tree).enqueue(_scheduled_slice, Scheduler.Priority.NORMAL)
 	else:
 		call_deferred("_tick")
 
-## Sever a parked process_frame continuation (when render()/unmount() pre-empts a sliced
-## render still in flight), so a stale tick can't fire on a torn-down/replaced tree. [M7]
+## Sever a parked continuation (when render()/unmount() pre-empts a sliced render still in
+## flight), so a stale tick can't fire on a torn-down/replaced tree. [M7] A slice entry
+## already sitting in the scheduler queue cannot be unqueued — clearing `_tick_pending`
+## makes it a no-op instead (see _scheduled_slice).
 func _cancel_pending_tick() -> void:
 	_tick_pending = false
-	var tree := _get_tree_safe()
-	if tree != null and tree.process_frame.is_connected(_tick):
-		tree.process_frame.disconnect(_tick)
 
 ## Get the container's SceneTree, or null — without erroring when it's not in the tree.
 func _get_tree_safe() -> SceneTree:
@@ -279,6 +427,9 @@ func _begin_function(fiber: RuitkFiber) -> RuitkFiber:
 	var children_same: bool = _vnode_list_equal(alt.input_children if alt != null else [], fiber.input_children)
 	var can_bail: bool = (not fiber.has_pending_update) and context_ok and props_equal and children_same
 
+	# Diff-decision channel (OR gate — diff_tracing alone or Verbose alone lights it).
+	if RuitkDiagnostics.diff_tracing or RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:
+		RuitkDiagnostics.trace("[Diff] bailout %s '%s'" % ["taken" if (can_bail and fiber.state != null) else "skipped", _trace_desc(fiber)])
 	var out: Array
 	if can_bail and fiber.state != null:
 		out = fiber.state.last_output     # reuse cached output; don't re-run the render fn
@@ -293,10 +444,23 @@ func _begin_function(fiber: RuitkFiber) -> RuitkFiber:
 
 func _render_component(fiber: RuitkFiber) -> Array:
 	var state: RuitkComponentState = fiber.state
-	Hooks._begin(state)
-	var result = fiber.component.call(fiber.pending_props, fiber.input_children)
-	Hooks._end()
-	RuitkDiagnostics.on_render()
+	if RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:   # render entry (once per pass, strict double-invoke included)
+		RuitkDiagnostics.trace("[Fiber] Render '%s'" % _trace_desc(fiber))
+	var result = _invoke_render(fiber, state)
+	# Strict mode (family parity P4): double-invoke with the FIRST result discarded — the
+	# impure-render flusher (Unreal RuitkReconciler.cpp RenderComponent's second RunOnce).
+	# A failure latched by invoke 1 short-circuits invoke 2 (consumed once, below).
+	if RuitkConfig.strict_mode_effective() and not RuitkFail._pending():
+		result = _invoke_render(fiber, state)
+	# Cooperative error latch (family parity P3; Unreal D-10): a failing render CALLED
+	# RuitkFail.render(...). Consume per component, immediately — the failed output is
+	# discarded and the pass unwinds to the nearest boundary (the WIP is abandoned
+	# pre-commit, so the committed tree stays intact until the rebuilt pass commits).
+	var failure = RuitkFail._consume()
+	if failure != null:
+		_handle_render_failure(fiber, failure)
+		result = null
+	RuitkDiagnostics.on_render()   # ONCE per pass, after both strict invokes (family rule)
 	state.last_output = _to_vnode_array(result)
 	if not state.effects.is_empty():
 		fiber.effect_tag |= F.EFFECT_PASSIVE
@@ -304,24 +468,98 @@ func _render_component(fiber: RuitkFiber) -> Array:
 		fiber.effect_tag |= F.EFFECT_LAYOUT
 	return state.last_output
 
+## One render-fn invocation with full hook bracketing. `Hooks._begin`/`_end` wrap EACH
+## strict-mode invoke: the second `_begin` resets the cursors, so the invoke re-walks the
+## existing hook slots IN PLACE — state persists, effects register once (mount appends on
+## invoke 1; invoke 2 sees `i < size` and updates the slot), and `_end`'s hook-order
+## validation compares invoke 2 against invoke 1 (impure hook order surfaces on the FIRST
+## render when validation is on).
+func _invoke_render(fiber: RuitkFiber, state: RuitkComponentState):
+	Hooks._begin(state)
+	_in_component_render = true
+	var result = fiber.component.call(fiber.pending_props, fiber.input_children)
+	_in_component_render = false
+	Hooks._end()
+	return result
+
 func _begin_error_boundary(fiber: RuitkFiber) -> RuitkFiber:
-	# NOTE: GDScript has no try/catch, so this cannot auto-catch a child render crash.
-	# It renders the fallback when `eb_active` is set (toggled imperatively) and clears it
-	# when `reset_key` changes. Structural parity; auto-catch is a documented limitation.
+	# A mount-pass failure recorded its activation by key-path (the WIP fiber that carried
+	# it was abandoned with that pass) — re-adopt it before deciding what to render.
+	if not _pending_eb_activations.is_empty():
+		_adopt_pending_eb_activation(fiber)
+	# Structural boundary (family shape, Unreal BeginErrorBoundary): renders `fallback`
+	# while active; a `reset_key` change clears. Activation is cooperative — a failing
+	# descendant render calls RuitkFail.render and _handle_render_failure latches the
+	# boundary (GDScript has no exceptions, so a hard crash is still not auto-caught).
+	# A missing alternate is a MOUNT, not a reset: there is nothing to clear, and a
+	# just-adopted mount-pass activation must survive.
 	var alt := fiber.alternate
-	var reset_requested: bool = alt == null or alt.eb_reset_key != fiber.eb_reset_key
+	var reset_requested: bool = alt != null and alt.eb_reset_key != fiber.eb_reset_key
 	if reset_requested:
 		fiber.eb_active = false
-		fiber.eb_showing_fallback = false
 		fiber.eb_last_error = null
+	fiber.eb_showing_fallback = fiber.eb_active and not reset_requested
 	var children: Array
-	if fiber.eb_active and not reset_requested:
+	if fiber.eb_showing_fallback:
 		children = [fiber.eb_fallback] if fiber.eb_fallback != null else []
 	else:
 		children = fiber.eb_children
 	if _reconcile_children(fiber, _old_first(alt), children):
 		return null
 	return fiber.child
+
+## Unwind a failed render to the nearest error boundary (Unreal HandleRenderFailure).
+## Walks the WIP parent chain — pre-commit, safe. An ALREADY-ACTIVE boundary can't capture
+## again this pass (its fallback is what just failed) — skip upward, or the failure loops
+## forever (React's captured-boundary rule).
+func _handle_render_failure(failed_fiber: RuitkFiber, reason: String) -> void:
+	var f := failed_fiber
+	while f != null:
+		if f.tag == F.Tag.ERROR_BOUNDARY and not f.eb_active:
+			f.eb_active = true
+			f.eb_last_error = reason
+			if f.alternate != null:
+				# The committed twin carries the activation into the rebuilt pass (the
+				# rebuild's _reconcile reuse copies eb_* from the live fiber).
+				f.alternate.eb_active = true
+				f.alternate.eb_last_error = reason
+			else:
+				# Mount-pass boundary: this WIP fiber is abandoned with the pass and has no
+				# committed twin, so record the activation by key-path for the rebuilt pass
+				# to re-adopt (_begin_error_boundary). If an ancestor renders differently
+				# and the path misses, the child just fails again and re-records —
+				# self-healing, bounded by the error-restart cap.
+				_pending_eb_activations.append({ "path": _eb_key_path(f), "reason": reason })
+			if f.eb_handler.is_valid():
+				f.eb_handler.call(reason)
+			# Poison the pass: the work loop abandons the WIP (never committed) and rebuilds
+			# from the root so the boundary renders its fallback — the ERROR path's rebuild
+			# only; setState never poisons a pass (defer-don't-restart, L-05).
+			_restart = true
+			push_error("[reactive_ui_toolkit] render failed: %s (caught by error boundary)" % reason)
+			return
+		f = f.parent
+	push_error("[reactive_ui_toolkit] render failed with no error boundary above: %s" % reason)
+
+## Root-to-boundary identity for a mount-pass activation: the fiber key at each level from
+## the boundary up to (excluding) the root — stable across the abandoned and rebuilt passes
+## as long as the ancestors render the same shape (Unreal AdoptPendingEbActivation).
+func _eb_key_path(fiber: RuitkFiber) -> Array:
+	var path: Array = []
+	var p := fiber
+	while p != null and p.tag != F.Tag.ROOT:
+		path.append(_fiber_key(p))
+		p = p.parent
+	return path
+
+func _adopt_pending_eb_activation(fiber: RuitkFiber) -> void:
+	var path := _eb_key_path(fiber)
+	for i in _pending_eb_activations.size():
+		if _pending_eb_activations[i]["path"] == path:
+			fiber.eb_active = true
+			fiber.eb_last_error = _pending_eb_activations[i]["reason"]
+			_pending_eb_activations.remove_at(i)
+			return
 
 # --------------------------------------------------------------------------
 # Reconciliation
@@ -336,6 +574,8 @@ func _reconcile(parent_fiber: RuitkFiber, old_fiber: RuitkFiber, vnode: RuitkVNo
 	var reuse: bool = old_fiber != null and old_fiber.matches(vnode)
 	var fiber: RuitkFiber
 	if reuse:
+		if RuitkDiagnostics.diff_tracing or RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:
+			RuitkDiagnostics.trace("[Diff] reuse '%s'" % _trace_desc(old_fiber))
 		fiber = old_fiber.alternate
 		if fiber == null:
 			fiber = F.new()
@@ -345,6 +585,11 @@ func _reconcile(parent_fiber: RuitkFiber, old_fiber: RuitkFiber, vnode: RuitkVNo
 		fiber = F.new()
 		fiber.alternate = null
 		if old_fiber != null:
+			# Node replacement — a STRUCTURAL event (Basic trace) AND a diff decision.
+			if RuitkDiagnostics.trace_level != RuitkDiagnostics.TraceLevel.NONE:
+				RuitkDiagnostics.trace("[Fiber] Replace %s -> %s" % [_trace_desc(old_fiber), _trace_vnode_desc(vnode)])
+			if RuitkDiagnostics.diff_tracing or RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:
+				RuitkDiagnostics.trace("[Diff] replace '%s' -> '%s'" % [_trace_desc(old_fiber), _trace_vnode_desc(vnode)])
 			_delete_fiber(parent_fiber, old_fiber)
 
 	# --- render-scoped fields (reset every render, since the buddy holds stale data) ---
@@ -392,6 +637,7 @@ func _reconcile(parent_fiber: RuitkFiber, old_fiber: RuitkFiber, vnode: RuitkVNo
 		if fiber.tag == F.Tag.ERROR_BOUNDARY:   # inlined is_error_boundary() [perf]
 			fiber.eb_active = old_fiber.eb_active
 			fiber.eb_showing_fallback = old_fiber.eb_showing_fallback
+			fiber.eb_last_error = old_fiber.eb_last_error
 		# carry the cached apply plan (the size guard rebuilds it if the prop shape changed) [perf]
 		fiber.apply_size = old_fiber.apply_size
 		fiber.apply_special = old_fiber.apply_special
@@ -472,6 +718,9 @@ func _reconcile_children(parent_fiber: RuitkFiber, old_first: RuitkFiber, child_
 		# Unity's [ThreadStatic] s_childMap + mark-and-sweep. Behavior is identical, incl.
 		# duplicate user keys (the flag is per-fiber, so both duplicates are swept correctly).
 		_key_map.clear()
+		# Diff-decision channel gate, hoisted once per keyed pass (this path is off the
+		# stable/fast routes already; the per-child cost at off is one local bool test).
+		var trace_keyed: bool = RuitkDiagnostics.diff_tracing or RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE
 		var ock := old_first
 		while ock != null:
 			_key_map[_fiber_key(ock)] = ock
@@ -486,8 +735,12 @@ func _reconcile_children(parent_fiber: RuitkFiber, old_first: RuitkFiber, child_
 				old_match.matched_pass = true
 				if old_match.index != i:
 					structural = true   # moved
+					if trace_keyed:
+						RuitkDiagnostics.trace("[Diff] keyed move key=%s %d -> %d" % [str(_vnode_key(vn, i)), old_match.index, i])
 			else:
 				structural = true       # new placement
+				if trace_keyed:
+					RuitkDiagnostics.trace("[Diff] keyed place key=%s at %d" % [str(_vnode_key(vn, i)), i])
 			var cf := _reconcile(parent_fiber, old_match, vn, i)
 			if prev == null: parent_fiber.child = cf
 			else: prev.sibling = cf
@@ -496,6 +749,8 @@ func _reconcile_children(parent_fiber: RuitkFiber, old_first: RuitkFiber, child_
 		while ocd != null:
 			var nxtd := ocd.sibling
 			if not ocd.matched_pass:
+				if trace_keyed:
+					RuitkDiagnostics.trace("[Diff] keyed remove key=%s" % str(_fiber_key(ocd)))
 				_delete_fiber(parent_fiber, ocd)
 			ocd = nxtd
 		_key_map.clear()
@@ -664,7 +919,17 @@ func _complete_work(fiber: RuitkFiber) -> void:
 
 func _commit_root() -> void:
 	_is_committing = true
+	_commit_seq += 1
 	RuitkDiagnostics.on_commit()
+	# Structural trace: count the effect list BEFORE the commit loop consumes it (next_effect
+	# links are nulled below); the summary line itself is emitted commit-end, Unity M5 shape.
+	var trace_structural: bool = RuitkDiagnostics.trace_level != RuitkDiagnostics.TraceLevel.NONE
+	var trace_effect_count := 0
+	if trace_structural:
+		var tf := _first_effect
+		while tf != null:
+			trace_effect_count += 1
+			tf = tf.next_effect
 
 	for d in _deletions:
 		_commit_deletion(d)
@@ -685,18 +950,42 @@ func _commit_root() -> void:
 	for hp in _reorder_set.keys():
 		_enforce_child_order(hp)
 
+	if trace_structural:
+		RuitkDiagnostics.trace("[Fiber] Commit #%d effects=%d" % [_commit_seq, trace_effect_count])
+
 	_root_current = _wip_root
+	_pending_eb_activations.clear()   # activations that never found their boundary are stale now
 	_is_committing = false
 
 	_flush_passive()
 	# No per-frame tree-sever: the old current tree IS next frame's reusable buddy pool
 	# (double-buffering). Only genuinely-deleted subtrees are released (in _commit_deletion). [perf #1]
 
+	# Render-depth runaway guard (FiberFunctionComponent.cs:16-18, :140-155 — adapted to the
+	# defer model): count CONSECUTIVE commits whose render FNS deferred further updates
+	# (an unconditional setState-in-render loops forever otherwise); any commit that didn't
+	# resets the streak. Commit-phase defers (layout effects) and external updates deferred
+	# while the pass was parked don't count.
+	if _deferred_render_phase:
+		_render_depth += 1
+	else:
+		_render_depth = 0
+	_deferred_render_phase = false
+	if _render_depth > _MAX_RENDER_DEPTH:
+		push_error("[reactive_ui_toolkit] Too many re-renders (setState during render?). Aborting pass.")
+		_deferred_updates.clear()
+		_render_depth = 0
+		return   # drop the queued updates; the committed UI stays
+	# Replay updates deferred during the pass/commit: re-mark flags (with re-deferral
+	# suppressed), coalescing into ONE follow-up render via _ensure_tick's tick-pending
+	# guard (FiberReconciler.cs:884-909 — sync mode restarts the loop once; sliced mode
+	# lets the still-queued slice action pick the work up automatically).
 	if not _deferred_updates.is_empty():
-		var deferred := _deferred_updates
-		_deferred_updates = []
-		for entry in deferred:
+		_is_replaying_deferred = true
+		while not _deferred_updates.is_empty():
+			var entry: Array = _deferred_updates.pop_front()
 			schedule_update_on_fiber(entry[0], entry[1])
+		_is_replaying_deferred = false
 
 func _commit_placement(fiber: RuitkFiber) -> void:
 	if fiber.node == null or not is_instance_valid(fiber.node):
@@ -705,6 +994,8 @@ func _commit_placement(fiber: RuitkFiber) -> void:
 	if parent_node != null and is_instance_valid(parent_node) and fiber.node.get_parent() != parent_node:
 		parent_node.add_child(fiber.node)
 		RuitkDiagnostics.on_placement()
+		if RuitkDiagnostics.trace_level != RuitkDiagnostics.TraceLevel.NONE:
+			RuitkDiagnostics.trace("[Fiber] Place %s" % fiber.type)
 
 func _commit_update(fiber: RuitkFiber) -> void:
 	if fiber.node == null or not is_instance_valid(fiber.node):
@@ -735,6 +1026,8 @@ func _commit_update(fiber: RuitkFiber) -> void:
 				RuitkHost._set_prop(node, k, val)
 	fiber.props = new_props
 	if RuitkDiagnostics.enabled: RuitkDiagnostics.on_update()
+	if RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:   # per-element detail
+		RuitkDiagnostics.trace("[Fiber] Update %s" % fiber.type)
 
 ## Classify a host element's props ONCE: plain prop keys (diffed+written each frame) vs
 ## "special" (events / ref / style / item-model -> needs the generic apply). apply_special is
@@ -756,6 +1049,9 @@ func _build_apply_plan(fiber: RuitkFiber, props: Dictionary) -> void:
 
 func _commit_deletion(old_fiber: RuitkFiber) -> void:
 	RuitkDiagnostics.on_deletion()
+	if RuitkDiagnostics.trace_level != RuitkDiagnostics.TraceLevel.NONE:
+		# One line per removed SUBTREE (top-level only) — the legacy [ReplaceNode] granularity.
+		RuitkDiagnostics.trace("[Fiber] Delete %s" % _trace_desc(old_fiber))
 	_null_refs_recursive(old_fiber)
 	_run_cleanups_recursive(old_fiber)
 	_free_host_nodes(old_fiber)
@@ -785,6 +1081,8 @@ func _commit_portal_retarget(fiber: RuitkFiber) -> void:
 			if nd.get_parent() != null:
 				nd.get_parent().remove_child(nd)
 			fiber.portal_target.add_child(nd)
+	if RuitkDiagnostics.trace_level == RuitkDiagnostics.TraceLevel.VERBOSE:   # per-element detail
+		RuitkDiagnostics.trace("[Fiber] PortalRetarget %d node(s) -> %s" % [ordered.size(), fiber.portal_target.name])
 
 # --------------------------------------------------------------------------
 # Effects
@@ -1018,6 +1316,29 @@ func _vnode_key(vn: RuitkVNode, idx: int):
 	return vn.key if vn.key != null else "idx%d" % idx
 
 # --------------------------------------------------------------------------
+# Trace ladder (RuitkDiagnostics.trace_level / diff_tracing) — describe helpers.
+# Called ONLY inside a trace gate; never on the ungated hot path.
+# --------------------------------------------------------------------------
+
+## Human label for a fiber in trace output: host class name, component method, or tag name.
+func _trace_desc(fiber: RuitkFiber) -> String:
+	if fiber.type != "":
+		return fiber.type
+	if fiber.tag == F.Tag.FUNCTION and fiber.component.is_valid():
+		var m := fiber.component.get_method()
+		return m if m != "" else "<anonymous>"
+	return str(F.Tag.keys()[fiber.tag])
+
+## Same, for a vnode (the incoming side of a replacement).
+func _trace_vnode_desc(vnode: RuitkVNode) -> String:
+	if vnode.type != "":
+		return vnode.type
+	if vnode.kind == RuitkVNode.Kind.FUNCTION and vnode.component.is_valid():
+		var m := vnode.component.get_method()
+		return m if m != "" else "<anonymous>"
+	return str(RuitkVNode.Kind.keys()[vnode.kind])
+
+# --------------------------------------------------------------------------
 # Tree lifecycle / teardown (break RefCounted cycles; shared state survives)
 # --------------------------------------------------------------------------
 
@@ -1054,6 +1375,7 @@ func _release(fiber: RuitkFiber) -> void:
 
 func unmount() -> void:
 	_cancel_pending_tick()
+	_pending_eb_activations.clear()
 	if not _hmr_live.is_empty():   # drop our Fast Refresh registration (and any dead refs with it)
 		var kept: Array = []
 		for wr in _hmr_live:

@@ -10,6 +10,10 @@ func _initialize() -> void:
 	_run()
 
 func _run() -> void:
+	# Demos may toggle globals (the slicing demo flips RuitkConfig.time_slicing; doom pins
+	# it off for its lifetime): capture-and-restore rather than hard-coding a value, so this
+	# suite tracks whatever the shipped default is (P6 flipped it to true).
+	var orig_time_slicing := RuitkConfig.time_slicing
 	for entry in DemoGalleryTable.entries():
 		await _smoke(entry["title"], entry["fn"])
 	await _smoke("Gallery shell", DemoGallery.render)
@@ -20,7 +24,7 @@ func _run() -> void:
 	await _test_root_fills()
 	await _test_diagnostics_buttons()
 	RuitkDiagnostics.enabled = false   # demos may have toggled these
-	RuitkConfig.time_slicing = false
+	RuitkConfig.time_slicing = orig_time_slicing
 	print("\n[demos_test] %d passed, %d failed" % [_passes, _fails])
 	quit(1 if _fails > 0 else 0)
 

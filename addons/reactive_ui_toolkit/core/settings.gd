@@ -14,10 +14,15 @@ extends RefCounted
 const GROUP := "reactive_ui_toolkit/"
 
 const KEY_TIME_SLICING := GROUP + "runtime/time_slicing"
+const KEY_TIME_SLICE_MS := GROUP + "runtime/time_slice_ms"
 const KEY_FRAME_BUDGET_MS := GROUP + "runtime/frame_budget_ms"
 const KEY_HOST_NODE_POOL := GROUP + "runtime/host_node_pool"
+const KEY_STRICT_MODE := GROUP + "runtime/strict_mode"
 const KEY_HOOK_VALIDATION := GROUP + "runtime/hook_validation"
 const KEY_STRICT_DIAGNOSTICS := GROUP + "runtime/strict_diagnostics"
+const KEY_ENVIRONMENT := GROUP + "runtime/environment"
+const KEY_TRACE_LEVEL := GROUP + "diagnostics/trace_level"
+const KEY_DIFF_TRACING := GROUP + "diagnostics/diff_tracing"
 const KEY_DIAG_ENABLED := GROUP + "diagnostics/enabled"
 const KEY_DIAG_CAPTURE := GROUP + "diagnostics/capture"
 
@@ -26,15 +31,31 @@ const KEY_DIAG_CAPTURE := GROUP + "diagnostics/capture"
 ## "enabled"/"disabled" force it on/off regardless of build type.
 const TRI_STATE_HINT := "auto,enabled,disabled"
 
+## Per-key enum hints for the String keys whose vocabulary is NOT the tri-state's; every other
+## String key falls back to TRI_STATE_HINT. The settings dialog reads this same map (via the
+## script constant map, so an older dialog against a newer runtime degrades to the tri-state
+## options instead of crashing — and `_apply_now`'s unknown-value `_: pass` arms make a
+## wrong-vocabulary write harmless).
+const HINTS := {
+	KEY_TRACE_LEVEL: "none,basic,verbose",
+	KEY_ENVIRONMENT: "auto,development,production",
+}
+
 # key -> compiled default. These mirror the statics' own initializers (config.gd /
 # diagnostics.gd); the two tri-states default to "auto" because their statics' compiled
-# default is the non-constant `OS.is_debug_build()`.
+# default is the non-constant `OS.is_debug_build()`. trace_level's String default maps to
+# the RuitkDiagnostics.TraceLevel enum in _apply_now.
 const DEFAULTS := {
-	KEY_TIME_SLICING: false,
-	KEY_FRAME_BUDGET_MS: 8.0,
+	KEY_TIME_SLICING: true,
+	KEY_TIME_SLICE_MS: 2.0,
+	KEY_FRAME_BUDGET_MS: 4.0,
 	KEY_HOST_NODE_POOL: true,
+	KEY_STRICT_MODE: false,
 	KEY_HOOK_VALIDATION: "auto",
 	KEY_STRICT_DIAGNOSTICS: "auto",
+	KEY_ENVIRONMENT: "auto",
+	KEY_TRACE_LEVEL: "none",
+	KEY_DIFF_TRACING: false,
 	KEY_DIAG_ENABLED: false,
 	KEY_DIAG_CAPTURE: false,
 }
@@ -86,10 +107,16 @@ static func reapply() -> void:
 static func _apply_now() -> void:
 	if _changed(KEY_TIME_SLICING):
 		RuitkConfig.time_slicing = bool(ProjectSettings.get_setting(KEY_TIME_SLICING))
+	if _changed(KEY_TIME_SLICE_MS):
+		RuitkConfig.time_slice_ms = float(ProjectSettings.get_setting(KEY_TIME_SLICE_MS))
 	if _changed(KEY_FRAME_BUDGET_MS):
 		RuitkConfig.frame_budget_ms = float(ProjectSettings.get_setting(KEY_FRAME_BUDGET_MS))
 	if _changed(KEY_HOST_NODE_POOL):
 		RuitkConfig.host_node_pool = bool(ProjectSettings.get_setting(KEY_HOST_NODE_POOL))
+	if _changed(KEY_STRICT_MODE):
+		# The stored value round-trips onto the static untouched; the release force-off
+		# lives at the READ site (RuitkConfig.strict_mode_effective(), L-04).
+		RuitkConfig.strict_mode = bool(ProjectSettings.get_setting(KEY_STRICT_MODE))
 	if _changed(KEY_HOOK_VALIDATION):
 		match str(ProjectSettings.get_setting(KEY_HOOK_VALIDATION)):
 			"enabled": RuitkConfig.enable_hook_validation = true
@@ -100,6 +127,18 @@ static func _apply_now() -> void:
 			"enabled": RuitkConfig.enable_strict_diagnostics = true
 			"disabled": RuitkConfig.enable_strict_diagnostics = false
 			_: pass
+	if _changed(KEY_ENVIRONMENT):
+		match str(ProjectSettings.get_setting(KEY_ENVIRONMENT)):
+			"development": RuitkConfig.environment = "development"
+			"production": RuitkConfig.environment = "production"
+			_: pass   # unrecognized value: treat as "auto", leave the static alone
+	if _changed(KEY_TRACE_LEVEL):
+		match str(ProjectSettings.get_setting(KEY_TRACE_LEVEL)):
+			"basic": RuitkDiagnostics.trace_level = RuitkDiagnostics.TraceLevel.BASIC
+			"verbose": RuitkDiagnostics.trace_level = RuitkDiagnostics.TraceLevel.VERBOSE
+			_: pass   # unrecognized value: leave the static alone ("none" cannot reach here — it IS the default)
+	if _changed(KEY_DIFF_TRACING):
+		RuitkDiagnostics.diff_tracing = bool(ProjectSettings.get_setting(KEY_DIFF_TRACING))
 	if _changed(KEY_DIAG_ENABLED):
 		RuitkDiagnostics.enabled = bool(ProjectSettings.get_setting(KEY_DIAG_ENABLED))
 	if _changed(KEY_DIAG_CAPTURE):
@@ -111,7 +150,8 @@ static func _changed(key: String) -> bool:
 		return false
 	return ProjectSettings.get_setting(key) != DEFAULTS[key]
 
-# Editor metadata per key: the tri-states are String enums, everything else is typed off its default.
+# Editor metadata per key: String keys are enums (per-key HINTS vocabulary, tri-state
+# fallback), everything else is typed off its default.
 static func _property_info(key: String) -> Dictionary:
 	var default_value = DEFAULTS[key]
 	if default_value is String:
@@ -119,7 +159,7 @@ static func _property_info(key: String) -> Dictionary:
 			"name": key,
 			"type": TYPE_STRING,
 			"hint": PROPERTY_HINT_ENUM,
-			"hint_string": TRI_STATE_HINT,
+			"hint_string": HINTS.get(key, TRI_STATE_HINT),
 		}
 	return {
 		"name": key,

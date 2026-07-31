@@ -2,21 +2,65 @@ class_name RuitkConfig
 extends RefCounted
 ## Global reactive-UI configuration.
 ##
-## Time-slicing is OFF by default — synchronous renders are simplest and fast for normal
-## UIs. Turn it on for very large trees that would otherwise stutter on a big update: the
-## render phase is then chunked across frames (commit stays atomic). Ports the frame-budget
-## idea from ReactiveUIToolKit's RenderScheduler.
+## Time-slicing is ON by default (family parity): update renders are chunked into
+## quantum-sized slices driven by the four-lane RuitkScheduler, so one big update can't
+## stutter a frame past the budget. Commit stays atomic and the initial mount is ALWAYS
+## synchronous (never sliced), so a fresh scene still paints whole on its first frame.
+## Set `time_slicing = false` to opt back into the classic synchronous single-pass render
+## per update (simplest; also what per-frame linear allocators like the doom demo's
+## require — it pins this off for its own lifetime). Two knobs, ported from the Unity leg
+## (FiberReconciler.TimeSliceMs + RenderScheduler.frameBudgetMs):
 ##
-##   RuitkConfig.time_slicing = true
-##   RuitkConfig.frame_budget_ms = 8.0   # work per frame before parking until the next one
+##   time_slice_ms   — the render-phase QUANTUM: the work loop checks elapsed time AFTER
+##                     each completed unit (one fiber) and yields past this; a long single
+##                     unit overruns (cooperative — no preemption).
+##   frame_budget_ms — the SCHEDULER's per-frame budget, cumulative across all lanes in
+##                     one frame pump; a 2 ms slice can run twice inside a 4 ms budget.
+##                     `false` time_slicing bypasses the scheduler entirely, making this
+##                     inert on the sync opt-out path.
+##
+##   RuitkConfig.time_slicing = false   # opt out (or the reactive_ui_toolkit/runtime/time_slicing setting)
 
-static var time_slicing := false
-static var frame_budget_ms := 8.0
+static var time_slicing := true
+static var time_slice_ms := 2.0
+static var frame_budget_ms := 4.0
 
 ## Host-node pool (GO-05): recycle childless leaf Controls across keyed-list churn instead of
 ## queue_free + ClassDB.instantiate. On by default — pure win for churn-heavy dynamic lists,
 ## and a no-op for static UIs (nothing churns). Exposed so it can be A/B-measured or disabled.
 static var host_node_pool := true
+
+## Strict mode (family knob; default OFF, explicit opt-in). When effective, every component
+## render fn runs TWICE per pass with the FIRST result discarded — the React-StrictMode
+## impure-render flusher (hidden state in a render body surfaces as a visible double
+## effect). Effects are NOT double-invoked (the hook slots re-walk in place on the second
+## invoke) and diagnostics count the render ONCE. Read via `strict_mode_effective()`.
+static var strict_mode := false
+
+## The read side of `strict_mode`: forced OFF in exported release builds regardless of the
+## stored setting — the family contract's release force-off, the exact shape of the Unreal
+## leg's IsStrictModeEnabled ("never in shipping, regardless of the CVar",
+## RuitkCoreMisc.cpp). The stored setting/static round-trips untouched; only the read gates.
+static func strict_mode_effective() -> bool:
+	return strict_mode and OS.is_debug_build()
+
+## Environment label (family knob 10; default "auto"). "auto" resolves to "development"
+## in the editor and debug builds and "production" in exported release builds;
+## "development"/"production" pass through explicitly. This is a READ-ONLY surface for
+## USER components (`RuitkConfig.environment_resolved()` — e.g. gate a debug overlay);
+## the library itself NEVER branches on it (§0 knob 10 — enforced by grep in review).
+## The Unity analog surfaces the same label through the host context (RootRenderer's
+## Environment["env"]).
+static var environment := "auto"
+
+## The resolved label: always "development" or "production". Unrecognized stored
+## values resolve like "auto" (the settings bridge's unknown-value precedent).
+static func environment_resolved() -> String:
+	match environment:
+		"development", "production":
+			return environment
+		_:
+			return "development" if OS.is_debug_build() else "production"
 
 ## Dev diagnostics (Phase 7.0). Default ON in debug builds, OFF in exported games — they
 ## push_warning/push_error to surface misuse loudly while developing, and degrade silently

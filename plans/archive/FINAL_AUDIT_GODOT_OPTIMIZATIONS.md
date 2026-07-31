@@ -253,7 +253,11 @@ byte-identical to a fresh one. `cast_frame` calls `reset_pools()` at the top; th
 pool sizes from level-1 spawn: 160 wallseg + 1203 floorband + 1005 ceilband (~2368 band
 records/frame now recycled). All 144 doom tests + demos/core suites still green (behavior-
 preserving). Safe because the reconciler's render (call_deferred `_tick`) fully consumes a
-frame before the next tick, and `time_slicing` is off. **Still open:** `ColumnInfo` itself
+frame before the next tick, and `time_slicing` is off. *(Correction 2026-07-31: the 0.14
+family-parity campaign flipped the global `time_slicing` default to ON, invalidating the
+"off by default" leg of this proof; DoomGameScreen now pins `time_slicing = false` for its
+own lifetime — the L-07 sync-pin effect in `doom_game_screen.guitkx` — which restores the
+invariant.)* **Still open:** `ColumnInfo` itself
 (1/column = 160/frame) is deliberately NOT pooled yet — its many return sites each set
 different subsets of fields, so fill-in-place carries more risk for less gain; revisit if a
 heavier level needs it. Original notes below kept for context.

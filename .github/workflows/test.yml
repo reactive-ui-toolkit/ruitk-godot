@@ -71,6 +71,13 @@ jobs:
         # silently fell 14 versions behind. This step fails loudly, with a diff, on every push/PR.
         run: node ide-extensions/scripts/changelog.mjs verify
 
+      - name: discord changelog (format + caps)
+        # Family gate, mirrored in the Unity/Unreal siblings: every plans/DISCORD_CHANGELOG.md
+        # entry must fit Discord's 2000-char message cap, carry no masked [text](url) links (they
+        # do not render in plain Discord messages), and keep its `## [<version>]` header unique —
+        # that header is also publish.yml's discord-job dedup key against the channel history.
+        run: node scripts/discord-changelog.mjs verify
+
   tests:
     name: tests
     runs-on: ubuntu-latest
@@ -110,6 +117,9 @@ jobs:
       - name: Project Settings bridge tests (reactive_ui_toolkit/* -> RuitkConfig/RuitkDiagnostics)
         run: godot --headless --path . --script res://tests/settings_test.gd
 
+      - name: Render scheduler tests (four-lane RuitkScheduler + sliced-render integration)
+        run: godot --headless --path . --script res://tests/scheduler_test.gd
+
       - name: Style + elements tests
         run: godot --headless --path . --script res://tests/style_test.gd
 
@@ -124,6 +134,9 @@ jobs:
 
       - name: Demo smoke tests
         run: godot --headless --path . --script res://tests/demos_test.gd
+
+      - name: Error-boundary latch + strict-mode tests (RuitkFail, _handle_render_failure)
+        run: godot --headless --path . --script res://tests/strict_boundary_test.gd
 
       - name: GUITKX compiler tests (.guitkx -> .gd + codegen mechanism)
         run: godot --headless --path . --script res://tests/guitkx_test.gd
