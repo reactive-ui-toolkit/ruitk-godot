@@ -71,6 +71,13 @@ jobs:
         # silently fell 14 versions behind. This step fails loudly, with a diff, on every push/PR.
         run: node ide-extensions/scripts/changelog.mjs verify
 
+      - name: discord changelog (format + caps)
+        # Family gate, mirrored in the Unity/Unreal siblings: every plans/DISCORD_CHANGELOG.md
+        # entry must fit Discord's 2000-char message cap, carry no masked [text](url) links (they
+        # do not render in plain Discord messages), and keep its `## [<version>]` header unique —
+        # that header is also publish.yml's discord-job dedup key against the channel history.
+        run: node scripts/discord-changelog.mjs verify
+
   tests:
     name: tests
     runs-on: ubuntu-latest

@@ -200,6 +200,39 @@ jobs:
         run: echo "::notice title=Godot Asset Store::Classic AL edit posted for ${{ needs.release-addon.outputs.tag }}. The NEW store (store.godotengine.org) still needs its manual version-add in the publisher dashboard."
 
   # ════════════════════════════════════════════════════════════════════════════
+  # Discord release note — posts the [<version>] entry from plans/DISCORD_CHANGELOG.md to the
+  # family Discord's Godot channel, gated exactly like the release itself (runs only when
+  # release-addon tagged a NEW version this dispatch). Deliberately downstream-only: no release
+  # job depends on it, so a red discord job can never block artifact publication — and it is
+  # idempotent by design (the channel history is the ledger; the `[<version>]` header is the
+  # dedup key), so re-running just this job after a failure is always safe.
+  # INERT until armed: set the DISCORD_BOT_TOKEN repo secret (a bot with View Channel +
+  # Read Message History + Send Messages on the channel).
+  # ════════════════════════════════════════════════════════════════════════════
+  discord:
+    name: Discord release note (idempotent)
+    needs: release-addon
+    if: needs.release-addon.outputs.exists == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Post the release entry (skips if already posted; inert until the secret is set)
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+        run: |
+          if [ -z "$DISCORD_BOT_TOKEN" ]; then
+            echo "::notice title=Discord::DISCORD_BOT_TOKEN not set — Discord release note skipped (add the repo secret to arm this job)."
+            exit 0
+          fi
+          node scripts/discord-changelog.mjs post "${{ needs.release-addon.outputs.version }}"
+
+  # ════════════════════════════════════════════════════════════════════════════
   # Godot EDITOR addon (reactive_ui_toolkit_editor) — zip + GitHub release, tag editor-v<ver>.
   # Independent versioning from the runtime addon; the zip carries its own LICENSE. Since 0.6.1
   # the zip BUNDLES the reactive_ui_toolkit_analyzer GDExtension (fetched, version-pinned, from the
