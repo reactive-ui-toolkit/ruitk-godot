@@ -38,6 +38,16 @@ jobs:
         # siblings. Re-pin with `node scripts/corpus-hash.mjs --write` after an intentional change.
         run: node scripts/corpus-hash.mjs --check
 
+      - name: machine-local path gate (no tracked path may exist on only one machine)
+        # Family invariant, mirrored in the Unreal/Unity siblings. The 0.13.0 rename wave rewrote a
+        # repo-folder segment INSIDE a hardcoded absolute path in .vscode/launch.json and silently
+        # broke F5 for every clone whose folder name differs; three audits read that line and moved
+        # on. Repo locations must be derived (VS Code's workspace-folder variable, the script's
+        # `..`, `git worktree list`) and tools probed ($GODOT_BIN → .ruitk-local.json → PATH). Read a
+        # failure with `node scripts/check-machine-paths.mjs --list`; see CLAUDE.md
+        # "Machine-local paths".
+        run: node scripts/check-machine-paths.mjs
+
   headless-tests:
     name: Headless GDScript tests
     runs-on: ubuntu-latest

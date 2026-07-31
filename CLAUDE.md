@@ -46,7 +46,8 @@ godot --headless --path . --script res://tests/core_test.gd
 (On a working tree that already has a `.godot` cache, step 1 is a no-op and the old
 build-then-scan habit still works — the strict order only matters on a fresh clone / CI.)
 
-The suites: `core_test.gd` (reconciler/hooks/effects/bailout/context/keyed), `style_test.gd`,
+The suites: `core_test.gd` (reconciler/hooks/effects/bailout/context/keyed), `settings_test.gd`
+(the `reactive_ui_toolkit/*` Project Settings bridge), `style_test.gd`,
 `router_match_test.gd` + `router_spine_test.gd`, `update_test.gd` (diff), `demos_test.gd` (renders
 every demo — the real check that generated `.gd` render without error), `doom_game_test.gd` (the
 Doom demo end-to-end), `guitkx_test.gd` (compiler + codegen + imports/resolver/codemod),
@@ -160,3 +161,18 @@ and press Play to explore.
 - Requires Godot **4.4+** (compiler core uses 4.3+ APIs; the editor addon's bundled analyzer GDExtension has `compatibility_minimum = "4.4"` — both plugins gate on `MIN_GODOT`); verified on **4.7**. Standard build — no C#/.NET.
 - `plans/` holds design/porting docs; `research/` holds background notes. `CHANGELOG.md` (runtime) and
   `ide-extensions/changelog.json` (the source of truth for extension changelogs) track releases.
+
+## Machine-local paths
+
+No tracked file names a path that exists only on one machine; the gate
+`node scripts/check-machine-paths.mjs` enforces it in the engine-free gates job.
+
+- **Repo locations are derived, never written down** — `${workspaceFolder}` in VS Code configs, the
+  script's own `..` in Node tooling, `git worktree list` for worktrees. A committed absolute path
+  breaks every clone whose folder name differs, which is exactly how the 0.13.0 wave broke F5.
+- **Tools are probed, then overridden** — resolution order `$ENV_VAR` → `.ruitk-local.json` → PATH +
+  standard install roots → an error naming all three. Standard roots (`C:\Program Files\…`, `/usr/…`)
+  MAY appear in discovery code and CI workflows: they mean the same thing on every machine of that
+  kind, and the gate allows them.
+- **`.ruitk-local.json`** holds this machine's irreducible values (here: the Godot binary), is
+  gitignored, and is copied from `.ruitk-local.example.json`.

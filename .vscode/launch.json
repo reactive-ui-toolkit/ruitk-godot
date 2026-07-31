@@ -1,0 +1,32 @@
+{
+	// F5 from the repo root = test the GUITKX VS Code extension (parity with the Unreal/Unity
+	// siblings, which both carry this config). The preLaunchTask rebuilds the language server, the
+	// client, and re-bundles the server (+ this machine's native @gdscript-analyzer addon) into
+	// ide-extensions/vscode/server. An Extension Development Host then opens on examples/ — every
+	// .guitkx demo is right there to poke for colors, completion, hover, diagnostics, formatting.
+	// One-time prep on a fresh clone: `npm ci` in ide-extensions/lsp-server AND ide-extensions/vscode.
+	//
+	// Paths are ${workspaceFolder}-relative on purpose: an absolute file-uri breaks for every clone
+	// whose folder name differs from the author's. Both sibling repos shipped exactly that bug — a
+	// rename sweep rewrote the repo-folder segment inside their hardcoded launch paths and F5 opened
+	// a workspace that did not exist. scripts/check-machine-paths.mjs now fails the build on it.
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Run GUITKX Extension",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				// Clean host: only the dev extension loads. Without this, installed extensions
+				// spam the Debug Console with red stderr that reads like OUR extension failing.
+				"--disable-extensions",
+				"--extensionDevelopmentPath=${workspaceFolder}/ide-extensions/vscode",
+				// A SUBfolder, not the repo root: the root is already open in the main window, and
+				// one folder cannot restore UI state into two windows.
+				"${workspaceFolder}/examples"
+			],
+			"outFiles": ["${workspaceFolder}/ide-extensions/vscode/out/**/*.js"],
+			"preLaunchTask": "Build GUITKX Extension"
+		}
+	]
+}

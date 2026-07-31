@@ -1,6 +1,6 @@
 # Bugs found after the "Reactive UI Toolkit" rename
 
-Audit of branch `rebrand/umbrella` @ `2601bf4` (worktree `C:/Yanivs/GameDev/ReactiveUI/wave-godot`),
+Audit of branch `rebrand/umbrella` @ `2601bf4` (audited in a worktree of this repo at that sha),
 against `6b0db56` (pre-rebrand merge-base). **Findings only — nothing was fixed or committed.**
 
 The already-green battery (49/0 build, all GD suites, 402 editor, 55 hmr, 66/66 contract, 194/194
