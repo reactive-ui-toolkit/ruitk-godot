@@ -84,6 +84,9 @@ jobs:
       - name: Core reconciler / hooks tests
         run: godot --headless --path . --script res://tests/core_test.gd
 
+      - name: Project Settings bridge tests (reactive_ui_toolkit/* -> RuitkConfig/RuitkDiagnostics)
+        run: godot --headless --path . --script res://tests/settings_test.gd
+
       - name: Style + elements tests
         run: godot --headless --path . --script res://tests/style_test.gd
 

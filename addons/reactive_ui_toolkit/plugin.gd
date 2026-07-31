@@ -20,6 +20,7 @@ extends EditorPlugin
 const Codegen = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_codegen.gd")
 const Diag = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_diag.gd")
 const HmrDebugger = preload("res://addons/reactive_ui_toolkit/editor/hmr_debugger.gd")
+const Settings = preload("res://addons/reactive_ui_toolkit/core/settings.gd")
 
 ## The oldest Godot this addon supports. Evidence-based floor (2026-07): the compiler/HMR core
 ## uses `ProjectSettings.get_global_class_list()` (added in 4.3), and the paired editor addon's
@@ -73,6 +74,11 @@ var _first_sweep_done := false
 var _scan_waits := 0
 
 func _enter_tree() -> void:
+	# Seed the reactive_ui_toolkit/* Project Settings (RuitkSettings.register is idempotent; the
+	# editor addon registers them too, since many users enable only one of the two plugins).
+	# Before the version gate on purpose: settings registration needs no 4.3/4.4 API.
+	if Engine.is_editor_hint():
+		Settings.register()
 	# Godot-version gate: refuse politely instead of failing on a missing 4.3/4.4 API mid-sweep.
 	# The runtime's global class_names still load (that needs no plugin); only the .guitkx
 	# compile-on-save/HMR tooling is disabled on an unsupported engine.
