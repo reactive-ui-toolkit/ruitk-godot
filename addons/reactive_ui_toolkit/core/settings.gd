@@ -46,7 +46,7 @@ const HINTS := {
 # default is the non-constant `OS.is_debug_build()`. trace_level's String default maps to
 # the RuitkDiagnostics.TraceLevel enum in _apply_now.
 const DEFAULTS := {
-	KEY_TIME_SLICING: false,
+	KEY_TIME_SLICING: true,
 	KEY_TIME_SLICE_MS: 2.0,
 	KEY_FRAME_BUDGET_MS: 4.0,
 	KEY_HOST_NODE_POOL: true,

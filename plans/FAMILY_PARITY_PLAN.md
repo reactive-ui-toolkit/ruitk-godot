@@ -956,6 +956,57 @@ verified). Bench at defaults, same-session medians vs 2d307eb (ms/frame):
 6.897/6.893/12.151/17.425/26.481 vs 6.897/6.893/12.602/17.178/27.896 — inside the
 observed noise band in both directions (N≥1500 swings ±5% run-to-run this session).
 
+### P6 — THE FLIP + coupling fixes + bench proof — DONE (2026-07-31)
+
+Shipped (the behavior change: `time_slicing` defaults ON):
+
+- **The flip:** `config.gd` `time_slicing := true` + the doc comment reframed (slicing is
+  the default; `false` is the sync opt-out; mount stays always-synchronous);
+  `settings.gd` `DEFAULTS[KEY_TIME_SLICING]: true`.
+- **settings_test flipped expectations:** the three hand-written tests whose true/false
+  literals inverted meaning — `_test_apply_changed_keys` (changed value is now FALSE),
+  `_test_default_value_does_not_clobber` (key true = default; a pre-assigned `false`
+  static survives), `_test_one_shot_guard` (reapply applies FALSE) — plus the mechanical
+  `_orig`/DEFAULTS loops, which adapted unchanged. 103/0.
+- **Coupling fix — doom (L-07):** `doom_game_screen.guitkx` gains the sync-pin effect —
+  FIRST hook deliberately, so its post-mount-commit setup runs before
+  `use_doom_game`'s mount effect ever schedules a follow-up render: saves
+  `RuitkConfig.time_slicing`, forces false, restores on unmount cleanup. The GO-03
+  allocator-safety comment (`doom_types.gd`) now states the ACTUAL invariant (pin ↔
+  allocator, remove neither without the other; a parked sliced render would read rewound
+  pool records); `plans/archive/FINAL_AUDIT_GODOT_OPTIMIZATIONS.md` GO-03 got the dated
+  correction. doom_game_test 179/0 and the demos doom smoke prove the pin post-flip.
+- **Coupling fix — tests:** `demos_test` captures `time_slicing` at `_run()` start and
+  restores THAT (not hard-coded false); `core_test._test_time_slicing` captures/restores
+  BOTH statics it touches — the sweep found it also leaked `frame_budget_ms = 0.0` for
+  the rest of the suite (inert pre-flip, real leak post-flip; fixed). Sweep confirms
+  scheduler/strict_boundary/settings suites already capture-restore.
+- **Suite stabilization — ONE fix, await-settlement, no force-sync:** the P5 trace-ladder
+  test asserted two frames after a sliced update, but trace print()s are slow on the
+  headless console — under VERBOSE the 2 ms quantum expires after a handful of units and
+  the pass parks across MANY frames. New `_await_trace_msg` settle helper (bounded 120
+  frames; settles on the commit summary — the LAST line of a pass — or on the first
+  `[Diff]` line for the trace-NONE arm; level-gated ABSENCE claims stay safe at any
+  time). Every other suite passed the flip untouched (HMR forced-sync included).
+- **Slicing demo:** NO edit (reads the live static; its label reflects ON at launch);
+  contract goldens verified unmoved (66/66).
+- **Bench proof** (same session as the P5 numbers): NEW defaults (sliced), medians of 3
+  — 6.898/6.896/6.850/9.321/14.666 ms/frame: the per-frame cost now sits at/near the
+  4 ms budget floor (N=1500 drops 12.2→6.9, N=3000 26.5→14.7) with commits spread
+  across frames — the feature, not a like-for-like speedup (fps counts frames, not
+  commits; the P0 context-run caveat). Sync opt-out arm (temp edit, reverted), medians
+  of 3 — 6.897/6.893/12.055/16.734/26.223 vs P5-at-sync 6.897/6.893/12.151/17.425/26.481
+  and P0 6.897/6.893/17.408/37.814/57.219 (different machine state; P5 is the honest
+  same-session baseline): within noise — the sync path is untouched by the flip.
+  `recon_bench`/`apply_bench` sanity runs normal.
+
+Acceptance: full §7 verify green under the flipped default — core 161/0 ·
+settings 103/0 · scheduler 56/0 · strict_boundary 59/0 · style 42/0 · router_match 18/0 ·
+router_spine 37/0 · update PASSED · demos 31/0 · doom 179/0 · guitkx PASSED · hmr PASSED
+(55) · guitkx_editor 437/0 · guitkx_lsp 39/0 · contract 66/66 · migrate 0 · machine-path
+gate green · guitkx_build 49/0. Mounts remain synchronous everywhere (scheduler_test's
+mount-never-sliced pin; every suite's mount asserts unchanged).
+
 ## 9. Risks / watch-list / STOP-AND-ASK
 
 - **Headless timing flakiness** (scheduler budgets are wall-clock): design scheduler tests

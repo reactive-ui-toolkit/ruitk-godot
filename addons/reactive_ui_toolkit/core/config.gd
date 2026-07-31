@@ -2,10 +2,13 @@ class_name RuitkConfig
 extends RefCounted
 ## Global reactive-UI configuration.
 ##
-## Time-slicing is OFF by default — synchronous renders are simplest and fast for normal
-## UIs. Turn it on for very large trees that would otherwise stutter on a big update: the
-## render phase is then chunked into quantum-sized slices driven by the four-lane
-## RuitkScheduler (commit stays atomic). Two knobs, ported from the Unity leg
+## Time-slicing is ON by default (0.14, family parity): update renders are chunked into
+## quantum-sized slices driven by the four-lane RuitkScheduler, so one big update can't
+## stutter a frame past the budget. Commit stays atomic and the initial mount is ALWAYS
+## synchronous (never sliced), so a fresh scene still paints whole on its first frame.
+## Set `time_slicing = false` to opt back into the classic synchronous single-pass render
+## per update (simplest; also what per-frame linear allocators like the doom demo's
+## require — it pins this off for its own lifetime). Two knobs, ported from the Unity leg
 ## (FiberReconciler.TimeSliceMs + RenderScheduler.frameBudgetMs):
 ##
 ##   time_slice_ms   — the render-phase QUANTUM: the work loop checks elapsed time AFTER
@@ -13,12 +16,12 @@ extends RefCounted
 ##                     unit overruns (cooperative — no preemption).
 ##   frame_budget_ms — the SCHEDULER's per-frame budget, cumulative across all lanes in
 ##                     one frame pump; a 2 ms slice can run twice inside a 4 ms budget.
-##                     `false` time_slicing bypasses the scheduler entirely (synchronous
-##                     single-pass render per update), so this is inert until slicing is on.
+##                     `false` time_slicing bypasses the scheduler entirely, making this
+##                     inert on the sync opt-out path.
 ##
-##   RuitkConfig.time_slicing = true
+##   RuitkConfig.time_slicing = false   # opt out (or the reactive_ui_toolkit/runtime/time_slicing setting)
 
-static var time_slicing := false
+static var time_slicing := true
 static var time_slice_ms := 2.0
 static var frame_budget_ms := 4.0
 

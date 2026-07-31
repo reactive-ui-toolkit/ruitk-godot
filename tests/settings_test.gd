@@ -133,7 +133,7 @@ func _test_register_idempotent() -> void:
 
 ## A key whose stored value differs from the compiled default is applied onto the static.
 func _test_apply_changed_keys() -> void:
-	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, true)
+	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, false)   # ≠ the true default (P6 flip)
 	ProjectSettings.set_setting(Settings.KEY_TIME_SLICE_MS, 1.0)
 	ProjectSettings.set_setting(Settings.KEY_FRAME_BUDGET_MS, 6.0)   # ≠ the 4.0 default (L-02 re-scope)
 	ProjectSettings.set_setting(Settings.KEY_HOST_NODE_POOL, false)
@@ -144,7 +144,7 @@ func _test_apply_changed_keys() -> void:
 	ProjectSettings.set_setting(Settings.KEY_DIAG_ENABLED, true)
 	ProjectSettings.set_setting(Settings.KEY_DIAG_CAPTURE, true)
 	Settings.reapply()
-	_ok(RuitkConfig.time_slicing == true, "changed key applies: time_slicing -> true")
+	_ok(RuitkConfig.time_slicing == false, "changed key applies: time_slicing -> false (the P6 sync opt-out)")
 	_ok(RuitkConfig.time_slice_ms == 1.0, "changed key applies: time_slice_ms -> 1.0")
 	_ok(RuitkConfig.frame_budget_ms == 6.0, "changed key applies: frame_budget_ms -> 6.0")
 	_ok(RuitkConfig.host_node_pool == false, "changed key applies: host_node_pool -> false")
@@ -161,17 +161,17 @@ func _test_apply_changed_keys() -> void:
 	_restore_statics()
 
 ## A key present-but-equal-to-default must NOT clobber a static that user code assigned before
-## mounting — `RuitkConfig.time_slicing = true` in a _ready (config.gd's documented API) must
-## survive apply().
+## mounting — `RuitkConfig.time_slicing = false` in a _ready (config.gd's documented sync
+## opt-out) must survive apply().
 func _test_default_value_does_not_clobber() -> void:
-	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, false)   # present AND equal to default
+	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, true)   # present AND equal to default (P6: true)
 	ProjectSettings.set_setting(Settings.KEY_FRAME_BUDGET_MS, 4.0)
 	ProjectSettings.set_setting(Settings.KEY_TIME_SLICE_MS, 2.0)
-	RuitkConfig.time_slicing = true          # "user code" assigned directly, pre-mount
+	RuitkConfig.time_slicing = false         # "user code" assigned directly, pre-mount
 	RuitkConfig.frame_budget_ms = 12.0
 	RuitkConfig.time_slice_ms = 5.0
 	Settings.reapply()
-	_ok(RuitkConfig.time_slicing == true, "default-valued key does not clobber a pre-assigned static (bool)")
+	_ok(RuitkConfig.time_slicing == false, "default-valued key does not clobber a pre-assigned static (bool)")
 	_ok(RuitkConfig.frame_budget_ms == 12.0, "default-valued key does not clobber a pre-assigned static (float)")
 	_ok(RuitkConfig.time_slice_ms == 5.0, "default-valued key does not clobber a pre-assigned static (time_slice_ms)")
 	_restore_statics()
@@ -242,12 +242,12 @@ func _test_enum_knobs() -> void:
 ## apply() is one-shot (RuitkRoot.create calls it on every mount): after the first call it must
 ## be a free no-op; reapply() is the explicit test/dev override.
 func _test_one_shot_guard() -> void:
-	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, true)
-	RuitkConfig.time_slicing = false
+	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, false)   # ≠ the true default (P6 flip)
+	RuitkConfig.time_slicing = true
 	Settings.apply()   # already armed by the first apply() in _test_apply_no_keys_is_noop
-	_ok(RuitkConfig.time_slicing == false, "second apply() is a no-op (one-shot guard)")
+	_ok(RuitkConfig.time_slicing == true, "second apply() is a no-op (one-shot guard)")
 	Settings.reapply()
-	_ok(RuitkConfig.time_slicing == true, "reapply() bypasses the guard and applies")
+	_ok(RuitkConfig.time_slicing == false, "reapply() bypasses the guard and applies")
 	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, Settings.DEFAULTS[Settings.KEY_TIME_SLICING])
 	_restore_statics()
 

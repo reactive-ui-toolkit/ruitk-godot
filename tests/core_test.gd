@@ -485,6 +485,17 @@ func _test_missing_deps() -> void:
 	RuitkConfig.enable_strict_diagnostics = _sd
 	RuitkConfig.enable_hook_validation = _hv
 
+## Await until a captured trace message satisfies `pred` (bounded). Needed because trace
+## print()s are slow on the headless console: under VERBOSE a 2 ms slice quantum expires
+## after a handful of units, so a sliced update render can park across MANY frames — await
+## settlement, never force sync (the campaign's stabilization rule). Level-gated ABSENCE
+## claims (e.g. "no [Diff] at BASIC") are safe at any time; only presence needs settling.
+func _await_trace_msg(prefix: String, frames := 120) -> void:
+	for i in frames:
+		if RuitkDiagnostics.messages.any(func(s): return s.begins_with(prefix)):
+			return
+		await process_frame
+
 func _test_trace_ladder() -> void:
 	# P5 trace ladder (family knobs 8+9): NONE emits nothing; BASIC = structural events only
 	# (placements, deletions, replacements, commit summaries); VERBOSE adds per-element/
@@ -533,26 +544,24 @@ func _test_trace_ladder() -> void:
 	# BASIC on a keyed removal: a Delete line (one per removed subtree).
 	RuitkDiagnostics.clear_messages()
 	ctrl["set"].call({ "n": 2, "swap": false, "t": "a" })
-	await process_frame
-	await process_frame
+	await _await_trace_msg("[Fiber] Commit #")
 	_ok(RuitkDiagnostics.messages.any(func(s): return s.begins_with("[Fiber] Delete ")),
 		"BASIC keyed removal emits a Delete line, got %s" % str(RuitkDiagnostics.messages))
 
 	# BASIC on a type swap: a Replace line (the structural replacement site).
 	RuitkDiagnostics.clear_messages()
 	ctrl["set"].call({ "n": 2, "swap": true, "t": "a" })
-	await process_frame
-	await process_frame
+	await _await_trace_msg("[Fiber] Commit #")
 	_ok(RuitkDiagnostics.messages.any(func(s): return s.begins_with("[Fiber] Replace ")),
 		"BASIC type swap emits a Replace line, got %s" % str(RuitkDiagnostics.messages))
 
 	# VERBOSE ⊇ Basic, plus per-element updates, per-hook detail, render entries, and the
-	# diff channel (the OR's verbose side — diff_tracing itself still false).
+	# diff channel (the OR's verbose side — diff_tracing itself still false). Settle on the
+	# commit summary: it is the LAST line of a pass, so every other family is in by then.
 	RuitkDiagnostics.trace_level = RuitkDiagnostics.TraceLevel.VERBOSE
 	RuitkDiagnostics.clear_messages()
 	ctrl["set"].call({ "n": 2, "swap": true, "t": "b" })
-	await process_frame
-	await process_frame
+	await _await_trace_msg("[Fiber] Commit #")
 	var vmsgs: Array = RuitkDiagnostics.messages
 	_ok(vmsgs.any(func(s): return s.begins_with("[Fiber] Update ")), "VERBOSE emits per-element update lines, got %s" % str(vmsgs))
 	_ok(vmsgs.any(func(s): return s.begins_with("[Fiber] Commit #")), "VERBOSE keeps the Basic structural lines")
@@ -560,13 +569,14 @@ func _test_trace_ladder() -> void:
 	_ok(vmsgs.any(func(s): return s.begins_with("[Fiber] Render '")), "VERBOSE emits component render entries")
 	_ok(vmsgs.any(func(s): return s.begins_with("[Diff] ")), "VERBOSE lights the diff channel (OR, verbose side)")
 
-	# diff_tracing ALONE (trace NONE): diff-decision lines and ZERO structural lines.
+	# diff_tracing ALONE (trace NONE): diff-decision lines and ZERO structural lines. The
+	# structural/hook ABSENCE is level-gated (holds at any point in the pass); presence of
+	# diff lines settles on the bailout entry, emitted as the component render begins.
 	RuitkDiagnostics.trace_level = RuitkDiagnostics.TraceLevel.NONE
 	RuitkDiagnostics.diff_tracing = true
 	RuitkDiagnostics.clear_messages()
 	ctrl["set"].call({ "n": 2, "swap": true, "t": "c" })
-	await process_frame
-	await process_frame
+	await _await_trace_msg("[Diff] ")
 	var dmsgs: Array = RuitkDiagnostics.messages
 	_ok(dmsgs.any(func(s): return s.begins_with("[Diff] ")), "diff_tracing alone emits diff-decision lines, got %s" % str(dmsgs))
 	_ok(not dmsgs.any(func(s): return s.begins_with("[Fiber]")), "diff_tracing alone emits no structural lines (independence)")
@@ -955,6 +965,10 @@ func _test_tree() -> void:
 	m[0].queue_free()
 
 func _test_time_slicing() -> void:
+	# Capture-and-restore (P6): slicing is the default now, and this test also jams the
+	# frame budget — restoring hard-coded values would leak state into later tests.
+	var _ts := RuitkConfig.time_slicing
+	var _fb := RuitkConfig.frame_budget_ms
 	RuitkConfig.time_slicing = true
 	RuitkConfig.frame_budget_ms = 0.0   # park after every unit of work
 	var ctrl := { "set": null }
@@ -975,7 +989,8 @@ func _test_time_slicing() -> void:
 		await process_frame
 	_ok(vbox.get_child(0).text == "item 0-1", "sliced update completed, got '%s'" % vbox.get_child(0).text)
 	_ok(vbox.get_child(7).text == "item 7-1", "sliced update reached last item, got '%s'" % vbox.get_child(7).text)
-	RuitkConfig.time_slicing = false
+	RuitkConfig.time_slicing = _ts
+	RuitkConfig.frame_budget_ms = _fb
 	m[1].unmount()
 	m[0].queue_free()
 
