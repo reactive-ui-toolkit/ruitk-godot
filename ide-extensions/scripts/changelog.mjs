@@ -345,7 +345,7 @@ function displayPath(relToIdeRoot) {
  * publish time — so a stale changelog.json means the next publish ships a
  * changelog that is wrong (or the discrepancy is masked until publish exposes it).
  *
- * Run in CI on every push/PR (see `.github/workflows/ide-extensions.yml`): fails
+ * Run in CI on every push/PR (the `gates` job in `.github/workflows/test.yml`): fails
  * loudly, with a diff, the moment changelog.json and a committed CHANGELOG.md
  * disagree — instead of silently at the next publish.
  */

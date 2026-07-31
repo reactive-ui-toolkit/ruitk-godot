@@ -1,6 +1,11 @@
 name: Tests
 
-# Parity with ReactiveUIToolkit's test.yml: run the test suites on every push/PR.
+# Family CI contract (mirrored in the Unity and Unreal siblings): every leg exposes EXACTLY four
+# check contexts, named exactly `gates`, `tests`, `extensions`, `docs`. Those four words are the
+# required-status-check contexts in the canonical ruleset pair (.github/rulesets/protect-dev.json),
+# and a job's *display name* is its check context — so each job's `name:` below is load-bearing.
+# Renaming one silently orphans the branch protection.
+#
 # Here "tests" = the headless GDScript suites (Godot has no compile step), driven exactly
 # like the local loop: build the class cache once, then run each tests/*.gd script (each
 # quits with a non-zero code on failure, so the step fails).
@@ -8,8 +13,16 @@ name: Tests
 on:
   push:
     branches: [master, dev]
+  # No `paths:` filter on ANY of the four jobs: they are *required* status checks, so they must
+  # always report a conclusion — a filtered required check never reports on a PR outside its
+  # paths (e.g. docs-only or issue-template changes) and blocks that PR forever.
   pull_request:
     branches: [master, dev]
+
+# One run per ref; superseded PR pushes are cancelled, push builds on master/dev never are.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -21,17 +34,18 @@ env:
   # compatibility_minimum = "4.4"; FoldableContainer is is_class()/string-guarded so it degrades
   # gracefully below 4.5), but we test on the current stable.
   GODOT_VERSION: "4.7.0"
+  NODE_VERSION: "22"
 
 jobs:
   # Engine-free gates run without Godot so they stay green even when engine CI is unavailable.
   gates:
-    name: engine-free gates
+    name: gates
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
       - name: family-corpus hash gate (A4/TD-009 mirror tripwire)
         # Verifies the mirrored family scanner corpus (familyCore tiers) still hashes to the
         # value pinned in plans/family-corpus.hash — i.e. it has not drifted from the Unreal/Unity
@@ -48,8 +62,17 @@ jobs:
         # "Machine-local paths".
         run: node scripts/check-machine-paths.mjs
 
-  headless-tests:
-    name: Headless GDScript tests
+      - name: Changelog sync gate (changelog.json in sync with generated CHANGELOG.md files)
+        # Guards the exact failure mode that shipped GUITKX 0.6.0-0.8.4: the generated CHANGELOG.md
+        # files (vscode, vs2022, and the Godot editor addon since its 0.6.3 cutover) must be
+        # regenerated from ide-extensions/changelog.json and committed together with it — nothing
+        # stops someone from hand-editing a CHANGELOG.md (or adding a changelog.json entry without
+        # regenerating) in between publishes, and nothing did, which is exactly how changelog.json
+        # silently fell 14 versions behind. This step fails loudly, with a diff, on every push/PR.
+        run: node ide-extensions/scripts/changelog.mjs verify
+
+  tests:
+    name: tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -125,3 +148,57 @@ jobs:
 
       - name: 0.13.0 rename-migration tripwire (tree must already be renamed)
         run: godot --headless --path . --script res://tests/guitkx_rename_migrate.gd
+
+  # The .guitkx IDE tooling: the TypeScript language server (unit tests + an end-to-end stdio LSP
+  # smoke test) and the VS Code extension (type-check + server bundle + .vsix package). The VS2022
+  # extension needs the VS SDK and is built on Windows with the VS toolchain, so it is not built here.
+  extensions:
+    name: extensions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build language server
+        working-directory: ide-extensions/lsp-server
+        run: npm ci && npm run build
+
+      - name: Language server unit tests (scanner / source map / virtual doc / context routing)
+        working-directory: ide-extensions/lsp-server
+        run: node --test out/test/*.test.js
+
+      - name: End-to-end LSP smoke test (stdio handshake + markup completion)
+        working-directory: ide-extensions/lsp-server
+        run: node scripts/smoke.js
+
+      - name: Build VS Code extension
+        working-directory: ide-extensions/vscode
+        run: npm ci && npm run build
+
+      - name: Bundle server + package .vsix
+        working-directory: ide-extensions/vscode
+        run: |
+          node scripts/bundle-server.js
+          npx --yes @vscode/vsce package --no-dependencies --out guitkx.vsix
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: guitkx-vsix
+          path: ide-extensions/vscode/guitkx.vsix
+
+  # The docs site (RuitkGodotDocs~ — trailing ~ so the Godot importer skips it): type-check +
+  # production Vite build. No deploy here; this proves the site still builds on every push/PR.
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build docs site (tsc -b + vite build)
+        working-directory: "RuitkGodotDocs~"
+        run: npm ci && npm run build
