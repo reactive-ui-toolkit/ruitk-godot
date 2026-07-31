@@ -20,7 +20,7 @@ that both implementations agree on real files.
 - `tests/contract_dump.gd` — regenerates the goldens; `-- --check` re-derives in memory and fails
   on drift (CI runs this in `test.yml`, so a grammar change on the GD side without a regen is red).
 - `ide-extensions/lsp-server/src/test/contract.test.ts` — asserts `markupWindows()` +
-  `parseMarkup()` reproduce every golden exactly (runs in `ide-extensions.yml` via `npm test`), so
+  `parseMarkup()` reproduce every golden exactly (runs in `test.yml`'s `extensions` job), so
   a grammar change on the TS side without its GD mirror is red too.
 
 ## Offsets are Unicode code points
