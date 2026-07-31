@@ -1059,6 +1059,17 @@ gate green · guitkx_build 49/0 (2 pre-existing warnings) · docs `npm run build
 `npm run lint` green · `changelog.mjs verify` green (extension lane untouched) ·
 CHANGELOG mirror byte-identical. NO version bumps (owner-gated at release staging).
 
+**P7 addendum (same day, review follow-up):** every "0.14" the campaign had hard-coded into
+shipped surfaces (docs pages, both READMEs, CLAUDE.md, reconciler.gd/config.gd doc comments,
+doom_types.gd + doom_game_screen.guitkx P6 comments) is neutralized to "family parity" /
+"by default" wording — the flip's version number is exactly the owner's pending fold-vs-bump
+ruling, so nothing user-visible may pre-announce it; release staging stamps the real number.
+The CHANGELOG `[Unreleased]` section was already version-neutral. Internal-only mention left
+as-is (flagged for the release sweep): `plans/archive/FINAL_AUDIT_GODOT_OPTIMIZATIONS.md`
+GO-03's dated correction says "the 0.14 default flip". Re-verified: guitkx_build 49/0 (same
+2 pre-existing warnings), core 161/0, settings 103/0, demos 31/0, doom 179/0, docs
+build+lint, machine-path gate, mirror byte-identical.
+
 ## 9. Risks / watch-list / STOP-AND-ASK
 
 - **Headless timing flakiness** (scheduler budgets are wall-clock): design scheduler tests

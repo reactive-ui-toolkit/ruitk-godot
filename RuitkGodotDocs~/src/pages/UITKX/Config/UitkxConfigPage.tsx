@@ -69,7 +69,7 @@ export const UitkxConfigPage: FC = () => (
             <TableCell><code>reactive_ui_toolkit/runtime/time_slicing</code></TableCell>
             <TableCell>boolean</TableCell>
             <TableCell><code>true</code></TableCell>
-            <TableCell><code>RuitkConfig.time_slicing</code> — update renders are sliced across frames (the default since 0.14); <code>false</code> restores the synchronous single-pass render per update. Mounts are always synchronous; the commit is atomic either way.</TableCell>
+            <TableCell><code>RuitkConfig.time_slicing</code> — update renders are sliced across frames by default; <code>false</code> restores the synchronous single-pass render per update. Mounts are always synchronous; the commit is atomic either way.</TableCell>
           </TableRow>
           <TableRow>
             <TableCell><code>reactive_ui_toolkit/runtime/time_slice_ms</code></TableCell>
@@ -81,7 +81,7 @@ export const UitkxConfigPage: FC = () => (
             <TableCell><code>reactive_ui_toolkit/runtime/frame_budget_ms</code></TableCell>
             <TableCell>float</TableCell>
             <TableCell><code>4.0</code></TableCell>
-            <TableCell><code>RuitkConfig.frame_budget_ms</code> — the scheduler&apos;s per-frame budget, cumulative across all lanes (a 2 ms slice can run twice inside it). Re-scoped in 0.14: it was the single-render park budget (default 8.0).</TableCell>
+            <TableCell><code>RuitkConfig.frame_budget_ms</code> — the scheduler&apos;s per-frame budget, cumulative across all lanes (a 2 ms slice can run twice inside it). Re-scoped by the family parity wave: it was previously the single-render park budget (default 8.0).</TableCell>
           </TableRow>
           <TableRow>
             <TableCell><code>reactive_ui_toolkit/runtime/host_node_pool</code></TableCell>

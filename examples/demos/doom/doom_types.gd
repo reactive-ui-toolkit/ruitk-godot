@@ -394,13 +394,13 @@ class FrameData extends RefCounted:
 	# tax -- the originals are C# structs). reset_pools() rewinds the used-cursors
 	# at the top of cast_frame; take_* hand out a reset() instance, growing the
 	# backing pool only when a frame needs more records than any prior frame did.
-	# SAFETY INVARIANT (P6, 0.14): safe because DoomGameScreen PINS
+	# SAFETY INVARIANT (P6, family parity): safe because DoomGameScreen PINS
 	# RuitkConfig.time_slicing OFF for its lifetime (the L-07 sync-pin effect in
 	# doom_game_screen.guitkx), so a render is always a single synchronous pass
 	# that fully consumes a frame's records before the next tick rewinds them.
 	# Under a PARKED sliced render, the next tick's reset_pools() would hand the
 	# same record objects to new columns while the in-flight render still reads
-	# them -- the global time_slicing default flipped to ON in 0.14, so do not
+	# them -- the global time_slicing default flipped to ON (family parity), so do not
 	# remove the pin without redesigning this allocator (and vice versa).
 	var _wallseg_pool: Array = []
 	var _wallseg_used: int = 0

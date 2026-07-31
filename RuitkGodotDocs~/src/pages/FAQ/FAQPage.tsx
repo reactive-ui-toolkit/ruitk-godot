@@ -61,8 +61,8 @@ export const FAQPage: FC = () => (
     </Typography>
     <Typography variant="body2" paragraph>
       Rendering only runs when state changes — there is no per-frame diff of a static UI. Each
-      update diffs the affected subtree and applies the minimal set of node changes. Since 0.14
-      update renders are <strong>time-sliced by default</strong>: large render phases are chunked
+      update diffs the affected subtree and applies the minimal set of node changes. Update
+      renders are <strong>time-sliced by default</strong>: large render phases are chunked
       across frames under a per-frame budget, so one big update can&apos;t stall a frame — the
       commit stays atomic and the initial mount is always synchronous. Set{' '}
       <code>RuitkConfig.time_slicing = false</code> for a strictly synchronous single-pass render

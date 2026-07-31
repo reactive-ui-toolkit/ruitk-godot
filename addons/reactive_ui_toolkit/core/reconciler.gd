@@ -9,7 +9,7 @@ extends RefCounted
 ##                     enforce child order -> swap current<->wip -> two-pass passive
 ##                     effects -> release the old tree -> replay deferred updates.
 ##
-## Update renders are TIME-SLICED by default (0.14, family parity): the work loop yields
+## Update renders are TIME-SLICED by default (family parity): the work loop yields
 ## after `RuitkConfig.time_slice_ms` (the quantum, checked AFTER each completed unit — no
 ## preemption) and continues as a self-re-enqueueing RuitkScheduler Normal-lane slice under
 ## the scheduler's cumulative `frame_budget_ms`; `RuitkConfig.time_slicing = false` opts

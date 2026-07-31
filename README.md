@@ -453,7 +453,7 @@ Advanced toggle):
 | `reactive_ui_toolkit/diagnostics/enabled` | `false` | `RuitkDiagnostics.enabled` *(Godot-only)* |
 | `reactive_ui_toolkit/diagnostics/capture` | `false` | `RuitkDiagnostics.capture` *(Godot-only)* |
 
-**Time-slicing is ON by default** (0.14+): update renders are chunked into `time_slice_ms`
+**Time-slicing is ON by default**: update renders are chunked into `time_slice_ms`
 quanta scheduled under the cumulative per-frame `frame_budget_ms`, so one big update can't stall
 a frame — the commit stays atomic and the initial mount is always synchronous. Set
 `time_slicing = false` (key or static) to opt back into the classic synchronous single-pass

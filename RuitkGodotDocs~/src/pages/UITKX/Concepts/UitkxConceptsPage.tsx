@@ -90,7 +90,7 @@ export const UitkxConceptsPage: FC = () => (
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RuitkConfig.time_slicing</code> — cooperative render slicing, <strong>on by default</strong> (0.14): update renders are chunked into <code>RuitkConfig.time_slice_ms</code> quanta (default <code>2.0</code>) under the scheduler&apos;s cumulative per-frame <code>RuitkConfig.frame_budget_ms</code> (default <code>4.0</code>); the commit stays atomic and mounts are always synchronous. Set <code>false</code> for the classic synchronous single-pass render per update.</>} />
+          <ListItemText primary={<><code>RuitkConfig.time_slicing</code> — cooperative render slicing, <strong>on by default</strong>: update renders are chunked into <code>RuitkConfig.time_slice_ms</code> quanta (default <code>2.0</code>) under the scheduler&apos;s cumulative per-frame <code>RuitkConfig.frame_budget_ms</code> (default <code>4.0</code>); the commit stays atomic and mounts are always synchronous. Set <code>false</code> for the classic synchronous single-pass render per update.</>} />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary={<><code>RuitkConfig.strict_mode</code> — opt-in double-invoke of render fns with the first result discarded (effects run once); forced off in release builds — read via <code>RuitkConfig.strict_mode_effective()</code>.</>} />

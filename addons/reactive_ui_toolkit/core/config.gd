@@ -2,7 +2,7 @@ class_name RuitkConfig
 extends RefCounted
 ## Global reactive-UI configuration.
 ##
-## Time-slicing is ON by default (0.14, family parity): update renders are chunked into
+## Time-slicing is ON by default (family parity): update renders are chunked into
 ## quantum-sized slices driven by the four-lane RuitkScheduler, so one big update can't
 ## stutter a frame past the budget. Commit stays atomic and the initial mount is ALWAYS
 ## synchronous (never sliced), so a fresh scene still paints whole on its first frame.

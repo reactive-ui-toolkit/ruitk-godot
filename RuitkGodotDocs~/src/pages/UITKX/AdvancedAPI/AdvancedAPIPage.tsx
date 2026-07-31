@@ -197,7 +197,7 @@ export const AdvancedAPIPage: FC = () => (
         when its <code>reset_key</code> changes. Because GDScript has no
         try/catch, it cannot <strong>auto-catch</strong> a hard render-time
         crash (bad index, call on null) — that documented parity limitation
-        survives. The cooperative path (0.14): a failing render{' '}
+        survives. The cooperative path: a failing render{' '}
         <em>calls</em> <code>RuitkFail.render(reason)</code> and returns early —
         the nearest boundary shows its fallback in the same commit and receives
         the reason via <code>on_error</code>. Imperative activation

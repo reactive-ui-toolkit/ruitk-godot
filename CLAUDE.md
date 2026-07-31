@@ -95,7 +95,7 @@ runtime**; the classes are available as soon as the files exist. Enabling the pl
   reconciles children + runs components descending, `complete_work` diffs/creates host nodes + builds
   the post-order effect list ascending) → **commit phase** (deletions → placement/update/layout effects
   → enforce child order → swap current↔wip → passive effects). Update renders are **time-sliced by
-  default** (0.14): the loop yields on the `RuitkConfig.time_slice_ms` quantum and continues as a
+  default** (family parity): the loop yields on the `RuitkConfig.time_slice_ms` quantum and continues as a
   self-re-enqueueing `RuitkScheduler` Normal-lane slice under the cumulative `frame_budget_ms` budget;
   `time_slicing = false` opts back into the synchronous single pass. Mounts and HMR flushes are always
   synchronous; the commit is atomic either way. A hook setter calls `request_update()`, which

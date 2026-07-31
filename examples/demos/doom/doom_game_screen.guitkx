@@ -11,7 +11,7 @@ export DoomGameScreen(restart_version: int = 0,
   # doom_types.gd (FrameData.take_*) is only safe when a render never parks
   # across game ticks -- a parked sliced render would still be reading pool
   # records the next tick's reset_pools() has already rewound. time_slicing is
-  # ON by default since 0.14, so this screen pins itself to synchronous renders
+  # ON by default (family parity), so this screen pins itself to synchronous renders
   # for its lifetime and restores the caller's setting on unmount. FIRST hook
   # on purpose: its setup runs before use_doom_game's mount effect, so the very
   # first follow-up render is already sync. (Slicing buys a re-render-every-

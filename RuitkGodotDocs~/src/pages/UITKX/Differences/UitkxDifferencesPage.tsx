@@ -121,7 +121,7 @@ export const UitkxDifferencesPage: FC = () => (
       </Typography>
       <Typography variant="body1" paragraph>
         The fiber reconciler coalesces all updates scheduled in a frame into one re-render, and —
-        by default since 0.14 — <strong>time-slices</strong> that render phase across frames on a
+        by default — <strong>time-slices</strong> that render phase across frames on a
         four-lane scheduler (React-18-style cooperative slicing). The commit is always atomic and
         the initial mount is always synchronous. There is still no priority-based preemption of a
         render in flight.
