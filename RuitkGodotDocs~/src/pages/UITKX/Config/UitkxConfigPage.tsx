@@ -68,20 +68,32 @@ export const UitkxConfigPage: FC = () => (
           <TableRow>
             <TableCell><code>reactive_ui_toolkit/runtime/time_slicing</code></TableCell>
             <TableCell>boolean</TableCell>
-            <TableCell><code>false</code></TableCell>
-            <TableCell><code>RuitkConfig.time_slicing</code> — chunk the render phase across frames for very large trees.</TableCell>
+            <TableCell><code>true</code></TableCell>
+            <TableCell><code>RuitkConfig.time_slicing</code> — update renders are sliced across frames (the default since 0.14); <code>false</code> restores the synchronous single-pass render per update. Mounts are always synchronous; the commit is atomic either way.</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell><code>reactive_ui_toolkit/runtime/time_slice_ms</code></TableCell>
+            <TableCell>float</TableCell>
+            <TableCell><code>2.0</code></TableCell>
+            <TableCell><code>RuitkConfig.time_slice_ms</code> — the render-phase quantum: the work loop yields after this much elapsed time (checked after each completed unit).</TableCell>
           </TableRow>
           <TableRow>
             <TableCell><code>reactive_ui_toolkit/runtime/frame_budget_ms</code></TableCell>
             <TableCell>float</TableCell>
-            <TableCell><code>8.0</code></TableCell>
-            <TableCell><code>RuitkConfig.frame_budget_ms</code> — render work per frame before parking until the next one.</TableCell>
+            <TableCell><code>4.0</code></TableCell>
+            <TableCell><code>RuitkConfig.frame_budget_ms</code> — the scheduler&apos;s per-frame budget, cumulative across all lanes (a 2 ms slice can run twice inside it). Re-scoped in 0.14: it was the single-render park budget (default 8.0).</TableCell>
           </TableRow>
           <TableRow>
             <TableCell><code>reactive_ui_toolkit/runtime/host_node_pool</code></TableCell>
             <TableCell>boolean</TableCell>
             <TableCell><code>true</code></TableCell>
             <TableCell><code>RuitkConfig.host_node_pool</code> — recycle leaf Controls across keyed-list churn.</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell><code>reactive_ui_toolkit/runtime/strict_mode</code></TableCell>
+            <TableCell>boolean</TableCell>
+            <TableCell><code>false</code></TableCell>
+            <TableCell><code>RuitkConfig.strict_mode</code> — double-invoke render fns with the first result discarded (see below). Forced off in release builds.</TableCell>
           </TableRow>
           <TableRow>
             <TableCell><code>reactive_ui_toolkit/runtime/hook_validation</code></TableCell>
@@ -93,28 +105,92 @@ export const UitkxConfigPage: FC = () => (
             <TableCell><code>reactive_ui_toolkit/runtime/strict_diagnostics</code></TableCell>
             <TableCell>enum</TableCell>
             <TableCell><code>auto</code></TableCell>
-            <TableCell><code>RuitkConfig.enable_strict_diagnostics</code> — state-update-during-render warnings.</TableCell>
+            <TableCell><code>RuitkConfig.enable_strict_diagnostics</code> — misuse warnings: state updates during render and missing dependency arrays.</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell><code>reactive_ui_toolkit/runtime/environment</code></TableCell>
+            <TableCell>enum</TableCell>
+            <TableCell><code>auto</code></TableCell>
+            <TableCell><code>RuitkConfig.environment</code> — <code>auto</code> / <code>development</code> / <code>production</code>; a read-only label for your components (see below).</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell><code>reactive_ui_toolkit/diagnostics/trace_level</code></TableCell>
+            <TableCell>enum</TableCell>
+            <TableCell><code>none</code></TableCell>
+            <TableCell><code>RuitkDiagnostics.trace_level</code> — <code>none</code> / <code>basic</code> / <code>verbose</code> trace ladder (see below).</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell><code>reactive_ui_toolkit/diagnostics/diff_tracing</code></TableCell>
+            <TableCell>boolean</TableCell>
+            <TableCell><code>false</code></TableCell>
+            <TableCell><code>RuitkDiagnostics.diff_tracing</code> — reconciler diff-decision logs, independent of the trace ladder (also on whenever <code>trace_level</code> is <code>verbose</code>).</TableCell>
           </TableRow>
           <TableRow>
             <TableCell><code>reactive_ui_toolkit/diagnostics/enabled</code></TableCell>
             <TableCell>boolean</TableCell>
             <TableCell><code>false</code></TableCell>
-            <TableCell><code>RuitkDiagnostics.enabled</code> — count renders, commits, placements, updates, deletions.</TableCell>
+            <TableCell><code>RuitkDiagnostics.enabled</code> — count renders, commits, placements, updates, deletions. <strong>(Godot-only)</strong></TableCell>
           </TableRow>
           <TableRow>
             <TableCell><code>reactive_ui_toolkit/diagnostics/capture</code></TableCell>
             <TableCell>boolean</TableCell>
             <TableCell><code>false</code></TableCell>
-            <TableCell><code>RuitkDiagnostics.capture</code> — record diagnostic messages for tests / overlays.</TableCell>
+            <TableCell><code>RuitkDiagnostics.capture</code> — record diagnostic messages for tests / overlays. <strong>(Godot-only)</strong></TableCell>
           </TableRow>
         </TableBody>
       </Table>
     </TableContainer>
     <Typography variant="body2" paragraph>
-      The two <code>enum</code> settings are tri-states: <code>auto</code> keeps
-      the compiled <code>OS.is_debug_build()</code> default (on while developing,
-      off in exported release builds); <code>enabled</code> / <code>disabled</code>{' '}
-      force the flag regardless of build type.
+      The two validator <code>enum</code> settings are tri-states: <code>auto</code>{' '}
+      keeps the compiled <code>OS.is_debug_build()</code> default (on while
+      developing, off in exported release builds); <code>enabled</code> /{' '}
+      <code>disabled</code> force the flag regardless of build type. The two{' '}
+      <strong>(Godot-only)</strong> keys are leg-specific extras — the Unity and
+      Unreal legs of the family don&apos;t have them.
+    </Typography>
+
+    {/* ── Strict mode / environment / trace ladder ──────────────────────── */}
+    <Typography variant="h6" component="h3" sx={Styles.section}>
+      Strict mode
+    </Typography>
+    <Typography variant="body2" paragraph>
+      Opt-in (<code>strict_mode</code>, default off): every component render
+      function runs <strong>twice</strong> per pass with the first result
+      discarded — React StrictMode&apos;s impure-render flusher (hidden state in a
+      render body surfaces as a visible double effect), and hook-order validation
+      catches shape bugs on the <em>first</em> render. Effects are{' '}
+      <strong>not</strong> double-invoked and diagnostics count the render once.
+      It is <strong>forced off in exported release builds</strong> regardless of
+      the stored setting — the read surface is{' '}
+      <code>RuitkConfig.strict_mode_effective()</code>; the stored value
+      round-trips untouched.
+    </Typography>
+    <Typography variant="h6" component="h3" sx={Styles.section}>
+      Environment label
+    </Typography>
+    <Typography variant="body2" paragraph>
+      <code>environment</code> is a <strong>read-only surface for your
+      components</strong> — call <code>RuitkConfig.environment_resolved()</code>{' '}
+      to get <code>&quot;development&quot;</code> or{' '}
+      <code>&quot;production&quot;</code> (<code>auto</code> resolves off{' '}
+      <code>OS.is_debug_build()</code>; explicit values pass through), e.g. to
+      gate a debug overlay. The library itself never branches on it.
+    </Typography>
+    <Typography variant="h6" component="h3" sx={Styles.section}>
+      Trace ladder &amp; diff tracing
+    </Typography>
+    <Typography variant="body2" paragraph>
+      <code>trace_level</code> is a ladder: <code>basic</code> logs{' '}
+      <strong>structural</strong> events only (placements, deletions, node
+      replacements, commit summaries); <code>verbose</code> adds per-element
+      updates, portal retargets, component render entries, and per-hook detail.{' '}
+      <code>diff_tracing</code> is an <strong>independent</strong> switch for the
+      reconciler&apos;s diff-decision logs (bailout taken/skipped,
+      reuse-vs-replace, keyed-list match decisions): it fires on its own at any
+      trace level, and <code>verbose</code> lights it too. With everything off
+      the cost is a single comparison per site. Output goes to the console and —
+      when <code>diagnostics/capture</code> is on — into{' '}
+      <code>RuitkDiagnostics.messages</code>.
     </Typography>
 
     {/* ── VS Code / editor settings ─────────────────────────────────────── */}

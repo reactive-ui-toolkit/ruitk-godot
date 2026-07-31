@@ -80,19 +80,34 @@ group (registered by either plugin, shown as basic settings):
 
 | Key | Default | Applies to |
 |---|---|---|
-| `reactive_ui_toolkit/runtime/time_slicing` | `false` | `RuitkConfig.time_slicing` |
-| `reactive_ui_toolkit/runtime/frame_budget_ms` | `8.0` | `RuitkConfig.frame_budget_ms` |
+| `reactive_ui_toolkit/runtime/time_slicing` | `true` | `RuitkConfig.time_slicing` |
+| `reactive_ui_toolkit/runtime/time_slice_ms` | `2.0` | `RuitkConfig.time_slice_ms` |
+| `reactive_ui_toolkit/runtime/frame_budget_ms` | `4.0` | `RuitkConfig.frame_budget_ms` |
 | `reactive_ui_toolkit/runtime/host_node_pool` | `true` | `RuitkConfig.host_node_pool` |
+| `reactive_ui_toolkit/runtime/strict_mode` | `false` | `RuitkConfig.strict_mode` |
 | `reactive_ui_toolkit/runtime/hook_validation` | `auto` | `RuitkConfig.enable_hook_validation` |
 | `reactive_ui_toolkit/runtime/strict_diagnostics` | `auto` | `RuitkConfig.enable_strict_diagnostics` |
-| `reactive_ui_toolkit/diagnostics/enabled` | `false` | `RuitkDiagnostics.enabled` |
-| `reactive_ui_toolkit/diagnostics/capture` | `false` | `RuitkDiagnostics.capture` |
+| `reactive_ui_toolkit/runtime/environment` | `auto` | `RuitkConfig.environment` |
+| `reactive_ui_toolkit/diagnostics/trace_level` | `none` | `RuitkDiagnostics.trace_level` |
+| `reactive_ui_toolkit/diagnostics/diff_tracing` | `false` | `RuitkDiagnostics.diff_tracing` |
+| `reactive_ui_toolkit/diagnostics/enabled` | `false` | `RuitkDiagnostics.enabled` *(Godot-only)* |
+| `reactive_ui_toolkit/diagnostics/capture` | `false` | `RuitkDiagnostics.capture` *(Godot-only)* |
+
+**Time-slicing is ON by default** (0.14+): update renders are chunked into `time_slice_ms`
+quanta under the cumulative per-frame `frame_budget_ms`; the commit stays atomic and the
+initial mount is always synchronous. Set `time_slicing = false` to opt back into the classic
+synchronous single-pass render per update.
 
 The two validators are tri-states: **`auto`** keeps the compiled default (`OS.is_debug_build()` —
-on while developing, off in exported games), `enabled`/`disabled` force them. Settings are read
-once at first mount and work in exported games; only values you *changed* apply, so assigning the
-statics directly from code (`RuitkConfig.time_slicing = true` in a `_ready`) still works exactly
-as documented. An `override.cfg` next to `project.godot` gives per-machine overrides.
+on while developing, off in exported games), `enabled`/`disabled` force them. `strict_mode`
+(opt-in) double-invokes render fns with the first result discarded and is forced off in
+exported release builds (`RuitkConfig.strict_mode_effective()`). `environment` is a read-only
+label for your components (`RuitkConfig.environment_resolved()`); `trace_level`/`diff_tracing`
+drive the trace ladder and the reconciler's diff-decision logs. The two *(Godot-only)* keys are
+leg-specific extras the other family legs don't have. Settings are read once at first mount and
+work in exported games; only values you *changed* apply, so assigning the statics directly from
+code (`RuitkConfig.time_slicing = false` in a `_ready`) still works exactly as documented. An
+`override.cfg` next to `project.godot` gives per-machine overrides.
 
 ## Upgrading
 

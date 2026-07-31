@@ -60,11 +60,13 @@ export const FAQPage: FC = () => (
       Does it add runtime overhead?
     </Typography>
     <Typography variant="body2" paragraph>
-      Rendering is synchronous and only runs when state changes — there is no per-frame diff of a
-      static UI. Each update diffs the affected subtree and applies the minimal set of node
-      changes. For very large trees you can enable time-slicing
-      (<code>RuitkConfig.time_slicing = true</code>) to chunk the render phase across frames; the
-      commit stays atomic. For typical menus and HUDs the overhead is negligible.
+      Rendering only runs when state changes — there is no per-frame diff of a static UI. Each
+      update diffs the affected subtree and applies the minimal set of node changes. Since 0.14
+      update renders are <strong>time-sliced by default</strong>: large render phases are chunked
+      across frames under a per-frame budget, so one big update can&apos;t stall a frame — the
+      commit stays atomic and the initial mount is always synchronous. Set{' '}
+      <code>RuitkConfig.time_slicing = false</code> for a strictly synchronous single-pass render
+      per update. For typical menus and HUDs the overhead is negligible either way.
     </Typography>
 
     <Typography variant="body1" sx={Styles.question}>
@@ -246,13 +248,14 @@ export const FAQPage: FC = () => (
     </Typography>
 
     <Typography variant="body1" sx={Styles.question}>
-      Godot logs a &quot;maximum render depth exceeded&quot; error — what happened?
+      Godot logs &quot;Too many re-renders (setState during render?)&quot; — what happened?
     </Typography>
     <Typography variant="body2" paragraph>
       A component updated its own state unconditionally during setup, creating an infinite
-      render loop. The reconciler caps re-render restarts (25) and stops the runaway. Move the
-      state update into an event handler or a <code>useEffect</code> instead of running it every
-      render.
+      render loop: each setState during a render is deferred and replayed after commit as a
+      follow-up render, and after 25 consecutive follow-ups the reconciler drops the queued
+      updates and keeps the last committed UI. Move the state update into an event handler or a{' '}
+      <code>useEffect</code> instead of running it every render.
     </Typography>
 
     <Typography variant="body1" sx={Styles.question}>

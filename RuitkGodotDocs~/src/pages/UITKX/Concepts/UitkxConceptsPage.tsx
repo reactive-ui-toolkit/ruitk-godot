@@ -90,7 +90,13 @@ export const UitkxConceptsPage: FC = () => (
       </Typography>
       <List sx={Styles.list}>
         <ListItem disablePadding>
-          <ListItemText primary={<><code>RuitkConfig.time_slicing</code> — opt into cooperative render slicing (default <code>false</code>). <code>RuitkConfig.frame_budget_ms</code> sets the per-frame budget (default <code>8.0</code>).</>} />
+          <ListItemText primary={<><code>RuitkConfig.time_slicing</code> — cooperative render slicing, <strong>on by default</strong> (0.14): update renders are chunked into <code>RuitkConfig.time_slice_ms</code> quanta (default <code>2.0</code>) under the scheduler&apos;s cumulative per-frame <code>RuitkConfig.frame_budget_ms</code> (default <code>4.0</code>); the commit stays atomic and mounts are always synchronous. Set <code>false</code> for the classic synchronous single-pass render per update.</>} />
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemText primary={<><code>RuitkConfig.strict_mode</code> — opt-in double-invoke of render fns with the first result discarded (effects run once); forced off in release builds — read via <code>RuitkConfig.strict_mode_effective()</code>.</>} />
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemText primary={<><code>RuitkConfig.environment</code> — a read-only <code>&quot;development&quot;</code>/<code>&quot;production&quot;</code> label for your components via <code>RuitkConfig.environment_resolved()</code> (<code>auto</code> follows the build type); the library never branches on it.</>} />
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary={<><code>RuitkConfig.enable_hook_validation</code> — rules-of-hooks checks (defaults to <code>OS.is_debug_build()</code>).</>} />
@@ -103,6 +109,9 @@ export const UitkxConceptsPage: FC = () => (
         </ListItem>
         <ListItem disablePadding>
           <ListItemText primary={<><code>RuitkDiagnostics.capture = true</code> — collect emitted messages into <code>RuitkDiagnostics.messages</code> for inspection in tests or an overlay.</>} />
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemText primary={<><code>RuitkDiagnostics.trace_level</code> / <code>RuitkDiagnostics.diff_tracing</code> — the trace ladder (<code>basic</code> = structural events, <code>verbose</code> = per-element/per-hook detail) and the independent reconciler diff-decision channel. See the Configuration Reference.</>} />
         </ListItem>
       </List>
       <Typography variant="body2" paragraph>

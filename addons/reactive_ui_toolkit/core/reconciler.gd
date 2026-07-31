@@ -1,7 +1,6 @@
 class_name RuitkReconciler
 extends RefCounted
-## The fiber reconciler. Ports ReactiveUIToolKit's FiberReconciler to a synchronous
-## (non-time-sliced) work loop:
+## The fiber reconciler. Ports ReactiveUIToolKit's FiberReconciler:
 ##
 ##   render phase   -> begin_work (reconcile children, run components) descending, then
 ##                     complete_work (create/diff host nodes, build the effect list) on
@@ -10,18 +9,29 @@ extends RefCounted
 ##                     enforce child order -> swap current<->wip -> two-pass passive
 ##                     effects -> release the old tree -> replay deferred updates.
 ##
-## Updates are coalesced (a hook setter schedules one deferred render per frame). Bailout
+## Update renders are TIME-SLICED by default (0.14, family parity): the work loop yields
+## after `RuitkConfig.time_slice_ms` (the quantum, checked AFTER each completed unit — no
+## preemption) and continues as a self-re-enqueueing RuitkScheduler Normal-lane slice under
+## the scheduler's cumulative `frame_budget_ms`; `RuitkConfig.time_slicing = false` opts
+## back into the synchronous single-pass render per update. The initial mount (`render()`)
+## and HMR flushes are ALWAYS synchronous; the commit is atomic either way. An update
+## arriving while a pass is in flight or parked is DEFERRED and replayed after commit,
+## coalesced into ONE follow-up render (defer-don't-restart; setState-in-render loops
+## terminate via the render-depth-25 guard). A render FAILURE (the `RuitkFail` latch) is
+## the only thing that restarts a pass — the boundary fallback lands in the same commit,
+## capped at `_MAX_ERROR_RESTARTS` rebuilds.
+##
+## Updates are coalesced (a hook setter schedules one render pass per frame). Bailout
 ## skips re-running a component's render fn when its props/state/context/children are
-## unchanged (reusing the cached output); the fiber tree is still rebuilt each pass —
-## true O(changed) subtree carry-over is a later perf optimization (see PORTING_PLAN 1.9).
+## unchanged (reusing the cached output); fibers are double-buffered — each pass reuses
+## the committed tree's ping-pong buddies instead of allocating fresh ones, and same-shape
+## host children are reused IN PLACE via the fast-leaf-list path.
 ##
 ## GDScript divergences vs the C# original:
 ##   - No exceptions: a failing render cooperatively CALLS `RuitkFail.render(reason)` (it
 ##     cannot throw); the latch is consumed after each component render and unwinds to the
 ##     nearest error boundary (`_handle_render_failure`). A real GDScript crash (bad index,
 ##     call on null) still cannot be auto-caught — that limitation survives.
-##   - Fresh fibers each pass (no 2-object double-buffer reuse) — simpler lifecycle, GC'd
-##     via explicit cycle-severing.
 
 const F = preload("res://addons/reactive_ui_toolkit/core/fiber.gd")
 const Hmr = preload("res://addons/reactive_ui_toolkit/core/hmr.gd")

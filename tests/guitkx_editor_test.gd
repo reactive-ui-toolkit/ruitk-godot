@@ -410,6 +410,15 @@ func _test_settings_dialog() -> void:
 	# diff_tracing rides the existing bool row machinery.
 	_ok(d._controls[RtSettings.KEY_DIFF_TRACING] is CheckBox, "diff_tracing builds a CheckBox row")
 
+	# (Godot-only) marking (family parity §4 / P7): the two leg-specific diagnostics extras
+	# carry the literal suffix in their tooltips; canonical family keys stay unmarked.
+	_ok((d._controls[RtSettings.KEY_DIAG_ENABLED] as Control).tooltip_text.ends_with("(Godot-only)"),
+		"diagnostics/enabled tooltip carries the (Godot-only) mark")
+	_ok((d._controls[RtSettings.KEY_DIAG_CAPTURE] as Control).tooltip_text.ends_with("(Godot-only)"),
+		"diagnostics/capture tooltip carries the (Godot-only) mark")
+	_ok(not (d._controls[RtSettings.KEY_TIME_SLICING] as Control).tooltip_text.contains("Godot-only"),
+		"canonical keys are not marked (Godot-only)")
+
 	# Version-skew degradation (risk list): _hint_for reaches HINTS through the script
 	# constant map, so a runtime addon PREDATING the HINTS const yields the tri-state
 	# fallback — a working control, not a crash.

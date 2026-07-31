@@ -131,7 +131,7 @@ const framework: CompEntry[] = [
   { name: 'Fragment', desc: 'Invisible grouping wrapper (no host node) — <>…</> or <Fragment>' },
   { name: 'Portal', desc: 'Renders children under an external Node target', hasTag: false, factory: 'V.portal' },
   { name: 'Suspense', desc: 'Shows a fallback while async content loads', hasTag: false, factory: 'V.suspense' },
-  { name: 'ErrorBoundary', desc: 'Shows a fallback on an imperative toggle', hasTag: false, factory: 'V.error_boundary' },
+  { name: 'ErrorBoundary', desc: 'Shows a fallback when a child latches a failure (RuitkFail.render) or on an imperative toggle', hasTag: false, factory: 'V.error_boundary' },
   { name: 'Memo', desc: 'Memoized function component (skips unchanged renders)', hasTag: false, factory: 'V.memo' },
 ]
 

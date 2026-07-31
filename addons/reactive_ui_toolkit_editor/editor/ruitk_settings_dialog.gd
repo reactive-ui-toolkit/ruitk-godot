@@ -23,6 +23,15 @@ const EditorSettingsScript := preload("res://addons/reactive_ui_toolkit_editor/e
 ## it at a nonexistent path and pin the W5 degradation without uninstalling the addon.
 var runtime_settings_path := "res://addons/reactive_ui_toolkit/core/settings.gd"
 
+## Leg-specific extras (family parity §4): the two diagnostics keys exist only on the Godot
+## leg — their tooltips carry the literal "(Godot-only)" suffix, matching the docs/README
+## table rows. Literal key strings (not runtime constants) so the marking survives any
+## runtime-addon version skew the same way the rest of this dialog does.
+const _GODOT_ONLY_KEYS: Array[String] = [
+	"reactive_ui_toolkit/diagnostics/enabled",
+	"reactive_ui_toolkit/diagnostics/capture",
+]
+
 # key -> its editing Control (CheckBox / SpinBox / OptionButton); rebuilt by rebuild().
 var _controls: Dictionary = {}
 # Section headers actually built, in order ("Runtime", "Editor") — the W5 test pins this.
@@ -112,9 +121,10 @@ func _add_section(header: String) -> GridContainer:
 ## owning class's default as fallback; populate uses the no-signal setters, and _write's
 ## unchanged-guard makes any populate-time signal echo harmless either way.
 func _add_row(grid: GridContainer, key: String, default_value: Variant, group: String, tri_hint: String) -> void:
+	var tooltip := (key + " (Godot-only)") if key in _GODOT_ONLY_KEYS else key
 	var label := Label.new()
 	label.text = _pretty_name(key, group)
-	label.tooltip_text = key
+	label.tooltip_text = tooltip
 	label.mouse_filter = Control.MOUSE_FILTER_STOP  # labels swallow tooltips otherwise
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_child(label)
@@ -148,7 +158,7 @@ func _add_row(grid: GridContainer, key: String, default_value: Variant, group: S
 		ob.select(maxi(idx, 0))
 		ob.item_selected.connect(_on_tri_selected.bind(ob, key, default_value))
 		control = ob
-	control.tooltip_text = key
+	control.tooltip_text = tooltip
 	control.size_flags_horizontal = Control.SIZE_SHRINK_END
 	grid.add_child(control)
 	_controls[key] = control

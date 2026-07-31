@@ -4,6 +4,100 @@ All notable changes to **Reactive UI Toolkit — Godot** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed — BEHAVIOR: update renders are now time-sliced by default
+
+The Godot leg of the **family parity campaign**: the Unity leg's render scheduler and
+defer semantics plus the Unreal leg's strict mode and error-boundary latch, ported
+faithfully. Every new knob lands off/auto/none — the one default that flips, and the only
+behavior an untouched project sees, is the first bullet below.
+
+- **`RuitkConfig.time_slicing` now defaults to `true`.** State-driven re-renders are
+  chunked into `time_slice_ms` (2.0 ms) quanta and scheduled on the new four-lane
+  `RuitkScheduler` under a cumulative `frame_budget_ms` (4.0 ms) per-frame budget, so one
+  big update can no longer stall a frame on render work. What does *not* change: the
+  commit stays **atomic** (a half-updated tree is never visible), the initial mount is
+  **always synchronous** (a fresh scene still paints whole on its first frame), and Fast
+  Refresh flushes stay synchronous. Updates arriving while a pass is in flight are
+  **deferred and replayed after commit as one follow-up render** (defer-don't-restart), so
+  sustained per-frame updates can't starve a large tree. **Opt out** with
+  `RuitkConfig.time_slicing = false` — or the `reactive_ui_toolkit/runtime/time_slicing`
+  Project Setting — to restore the classic synchronous single-pass render per update (the
+  sync path itself is untouched by this release).
+- **`reactive_ui_toolkit/runtime/frame_budget_ms` re-scoped: default 8.0 → 4.0, new
+  meaning.** The key keeps its name but now sets the *scheduler's* per-frame budget —
+  cumulative across all lanes in one frame (a 2 ms slice can run twice inside it) — instead
+  of the old single-render park budget; the render quantum is the new
+  `runtime/time_slice_ms` (2.0). No stored key is written, moved, or deleted: Godot only
+  persists values you changed, so an untouched project simply gets the new 4.0 default,
+  while a hand-tuned value carries forward under the new (cumulative) meaning — re-check it
+  if you had tightened the old 8.0 budget deliberately.
+- **Bench** (`tests/bench.gd`, keyed-list stress, ms/frame medians of 3, headless, at
+  N=300/750/1500/2000/3000): new defaults **6.898 / 6.896 / 6.850 / 9.321 / 14.666** —
+  per-frame cost now sits at/near the 4 ms budget floor (N=1500 drops 12.2 → 6.9, N=3000
+  26.5 → 14.7) with commits spread across frames — the feature, not a like-for-like speedup
+  (fps counts frames, not commits). The sync opt-out arm measured
+  6.897 / 6.893 / 12.055 / 16.734 / 26.223 against its same-session pre-flip baseline
+  6.897 / 6.893 / 12.151 / 17.425 / 26.481 — within noise.
+
+### Added
+
+- **Four-lane render scheduler (`RuitkScheduler`).** A faithful port of the Unity leg's
+  RenderScheduler: High/Normal/Low/Idle lanes with per-lane Callable dedup; the Low queue
+  is cancelled (dropped and counted) when High work exists at frame start; Normal runs only
+  once High drained; Idle runs only on otherwise-quiet frames under half the budget; the
+  batched-effects flush runs unbudgeted at frame end; `pump_now()` and `get_metrics()`
+  round it out. Lazily created per `SceneTree` and pumped from `process_frame` — no
+  autoload, no plugin-enable required. Sliced renders run as a self-re-enqueueing
+  Normal-lane slice action. New suite: `tests/scheduler_test.gd`.
+- **Defer-don't-restart + runaway guard.** An update arriving during an in-flight pass (or
+  during commit, e.g. from a layout effect) is queued and replayed after commit, coalesced
+  into exactly one follow-up render; the old restart-on-update machinery is gone (it
+  starved large trees under sustained load and leaked already-created hosts). Unconditional
+  setState-in-render loops terminate via a render-depth-25 guard (`Too many re-renders
+  (setState during render?)`) that drops the queued updates and keeps the committed UI.
+- **Cooperative error-boundary latch (`RuitkFail`).** GDScript can't throw, so a failing
+  render now *calls* `RuitkFail.render(reason)` and returns early: the reconciler consumes
+  the latch after every component render, discards that component's output, activates the
+  nearest enclosing `V.error_boundary` (its `fallback` shows, its `on_error` receives the
+  reason), and rebuilds the pass so the fallback lands **in the same commit** — mount and
+  update alike, sliced or sync. First failure wins; an already-active boundary can't
+  re-capture (a failing fallback escalates to the next boundary up); rebuilds are capped
+  at 25 per pass. Imperative activation (`"active": true`) and `reset_key` recovery keep
+  working unchanged; a hard GDScript crash (bad index, call on null) still cannot be
+  auto-caught. New suite: `tests/strict_boundary_test.gd`.
+- **Strict mode** (`reactive_ui_toolkit/runtime/strict_mode`, default `false`). Opt-in:
+  every component render fn runs **twice** per pass with the first result discarded —
+  React-StrictMode's impure-render flusher — and hook-order validation catches shape bugs
+  on the *first* render. Effects are **not** double-invoked and diagnostics count the
+  render once. Forced off in exported release builds regardless of the stored setting
+  (`RuitkConfig.strict_mode_effective()`).
+- **Missing-dependency warnings** under the existing `runtime/strict_diagnostics` gate:
+  `useEffect` / `useLayoutEffect` / `useDeferredValue` warn when called with no deps array
+  (`null` — the hook re-runs every render), and `useMemo` / `useCallback` /
+  `useImperativeHandle` warn on missing/empty deps. One warning per component per call
+  site, `[Hooks][Strict]`-prefixed, family-identical message text.
+- **Trace ladder + diff tracing** (`reactive_ui_toolkit/diagnostics/trace_level`,
+  `diagnostics/diff_tracing`). `trace_level` is `none` / `basic` / `verbose`: **basic**
+  logs structural events only (placements, deletions, node replacements, commit
+  summaries); **verbose** adds per-element updates, portal retargets, component render
+  entries, and per-hook detail. `diff_tracing` is an independent switch for the
+  reconciler's diff-decision logs (bailout taken/skipped, reuse-vs-replace, keyed-list
+  match decisions) — it fires on its own *or* whenever `trace_level` is `verbose`. Every
+  site is gated by one cheap comparison when off.
+- **Environment label** (`reactive_ui_toolkit/runtime/environment`, default `auto`). A
+  read-only surface for *user* components: `RuitkConfig.environment_resolved()` returns
+  `"development"` or `"production"` (`auto` resolves off `OS.is_debug_build()`) — e.g. to
+  gate a debug overlay. The library itself never branches on it.
+- **Settings surface for all of the above.** New keys `runtime/time_slice_ms`,
+  `runtime/strict_mode`, `runtime/environment`, `diagnostics/trace_level`, and
+  `diagnostics/diff_tracing` join the `reactive_ui_toolkit/*` group — with proper enum
+  vocabularies in both the settings dialog and the native Project Settings — and the two
+  leg-specific extras (`diagnostics/enabled`, `diagnostics/capture`) are now marked
+  **(Godot-only)** in the dialog tooltips and the docs. As before, only values you
+  *changed* are applied, so assigning the statics directly from code keeps working.
+
 ## [0.14.0] — 2026-07-31
 
 ### Added

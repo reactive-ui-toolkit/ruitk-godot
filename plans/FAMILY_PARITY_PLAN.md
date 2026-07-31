@@ -1007,6 +1007,58 @@ router_spine 37/0 · update PASSED · demos 31/0 · doom 179/0 · guitkx PASSED 
 gate green · guitkx_build 49/0. Mounts remain synchronous everywhere (scheduler_test's
 mount-never-sliced pin; every suite's mount asserts unchanged).
 
+### P7 — docs, dialog polish, changelog, stale claims — DONE (2026-07-31) — CAMPAIGN CLOSED
+
+Shipped (docs/metadata only — zero runtime-behavior changes; the one code edit is dialog
+tooltip text):
+
+- **Changelog:** root `CHANGELOG.md` gains `## [Unreleased]` (no version — owner-gated at
+  release staging): the loud "### Changed — BEHAVIOR: update renders are now time-sliced by
+  default" block (flip + what stays the same + the opt-out, the L-02 frame_budget_ms
+  re-scope migration story, the P6 bench medians verbatim) plus "### Added" entries for
+  scheduler / defer+depth-guard / RuitkFail latch / strict mode / missing-deps / trace
+  ladder+diff_tracing / environment / the settings surface. Mirrored byte-identical via
+  `cp` (tripwire green).
+- **READMEs (root + addon):** settings tables now carry all 12 keys with the flipped/new
+  defaults and *(Godot-only)* marks on the two diagnostics extras; a "Time-slicing is ON by
+  default" note with the opt-out; prose for strict_mode (release force-off via
+  `strict_mode_effective()`), environment (read-only, `environment_resolved()`),
+  trace_level/diff_tracing; the Notes & limitations error-boundary bullet rewritten to the
+  cooperative-latch reality (hard-crash no-auto-catch limitation kept, as are the
+  useTransition/useDeferredValue-are-synchronous notes).
+- **Stale claims:** `reconciler.gd` header rewritten — no longer "synchronous
+  (non-time-sliced)"; describes quantum/budget/slice-re-enqueue, defer-don't-restart +
+  depth-25, the failure-only restart, and the double-buffer reality (fresh-fibers bullet
+  DELETED; no-exceptions bullet kept, RuitkFail-phrased). CLAUDE.md: reconciler bullet
+  rewritten the same way, fiber bullet now says double-buffered, NEW scheduler.gd/fail.gd
+  bullets, Known-constraints + Conventions divergence wording updated (suite list was
+  already 16 from P1/P3).
+- **Docs site:** Config page — full §4 table (12 rows, types/defaults, the two enum
+  vocabularies, (Godot-only) marks) + new "Strict mode" / "Environment label" / "Trace
+  ladder & diff tracing" subsections; Concepts — knob list updated (slicing on-by-default
+  with the 2.0/4.0 split, strict_mode, environment, trace bullets); Differences —
+  rendering-model section now says time-sliced by default + defer-not-restart (no
+  priority preemption claim kept); FAQ — overhead answer updated + the depth-guard Q&A
+  now quotes the real error text; AdvancedAPI error-boundary + depth-guard sections and
+  examples rewritten to the latch/defer reality (the early-`return null` .guitkx shape in
+  the new example verified by compiling a scratch file — valid grammar, then removed);
+  Components table ErrorBoundary desc; docs.tsx search-index lines for all four pages.
+  `npm ci && npm run build && npm run lint` green.
+- **Dialog polish (deferred from P5):** the two Godot-only diagnostics keys' tooltips get
+  the literal " (Godot-only)" suffix (`_GODOT_ONLY_KEYS` literal strings — skew-safe);
+  guitkx_editor_test pins both marks + a canonical-key non-mark (437 → 440).
+- **Fresh-clone-order sanity:** `.godot` deleted, the CLAUDE.md ordered sequence re-run
+  from scratch — scan → guitkx_build 49/0 → rescan → suites; the two-pass order holds
+  post-campaign.
+
+Acceptance: full §7 verify green — core 161/0 · settings 103/0 · scheduler 56/0 ·
+strict_boundary 59/0 · style 42/0 · router_match 18/0 · router_spine 37/0 ·
+update PASSED · demos 31/0 · doom 179/0 · guitkx PASSED · hmr PASSED (55) ·
+guitkx_editor **440/0** · guitkx_lsp 39/0 · contract 66/66 · migrate 0 · machine-path
+gate green · guitkx_build 49/0 (2 pre-existing warnings) · docs `npm run build` +
+`npm run lint` green · `changelog.mjs verify` green (extension lane untouched) ·
+CHANGELOG mirror byte-identical. NO version bumps (owner-gated at release staging).
+
 ## 9. Risks / watch-list / STOP-AND-ASK
 
 - **Headless timing flakiness** (scheduler budgets are wall-clock): design scheduler tests
