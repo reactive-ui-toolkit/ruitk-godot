@@ -26,6 +26,7 @@ func _run() -> void:
 		"time_slice_ms": RuitkConfig.time_slice_ms,
 		"frame_budget_ms": RuitkConfig.frame_budget_ms,
 		"host_node_pool": RuitkConfig.host_node_pool,
+		"strict_mode": RuitkConfig.strict_mode,
 		"enable_hook_validation": RuitkConfig.enable_hook_validation,
 		"enable_strict_diagnostics": RuitkConfig.enable_strict_diagnostics,
 		"diag_enabled": RuitkDiagnostics.enabled,
@@ -49,6 +50,7 @@ func _restore_statics() -> void:
 	RuitkConfig.time_slice_ms = _orig["time_slice_ms"]
 	RuitkConfig.frame_budget_ms = _orig["frame_budget_ms"]
 	RuitkConfig.host_node_pool = _orig["host_node_pool"]
+	RuitkConfig.strict_mode = _orig["strict_mode"]
 	RuitkConfig.enable_hook_validation = _orig["enable_hook_validation"]
 	RuitkConfig.enable_strict_diagnostics = _orig["enable_strict_diagnostics"]
 	RuitkDiagnostics.enabled = _orig["diag_enabled"]
@@ -65,6 +67,7 @@ func _test_apply_no_keys_is_noop() -> void:
 	_ok(RuitkConfig.time_slice_ms == _orig["time_slice_ms"], "no keys: time_slice_ms untouched")
 	_ok(RuitkConfig.frame_budget_ms == _orig["frame_budget_ms"], "no keys: frame_budget_ms untouched")
 	_ok(RuitkConfig.host_node_pool == _orig["host_node_pool"], "no keys: host_node_pool untouched")
+	_ok(RuitkConfig.strict_mode == _orig["strict_mode"], "no keys: strict_mode untouched")
 	_ok(RuitkConfig.enable_hook_validation == _orig["enable_hook_validation"], "no keys: enable_hook_validation untouched")
 	_ok(RuitkConfig.enable_strict_diagnostics == _orig["enable_strict_diagnostics"], "no keys: enable_strict_diagnostics untouched")
 	_ok(RuitkDiagnostics.enabled == _orig["diag_enabled"], "no keys: RuitkDiagnostics.enabled untouched")
@@ -93,6 +96,8 @@ func _test_register_idempotent() -> void:
 	_ok(int(fb.get("type", -1)) == TYPE_FLOAT, "frame_budget_ms registered as a float")
 	var tsm: Dictionary = infos.get(Settings.KEY_TIME_SLICE_MS, {})
 	_ok(int(tsm.get("type", -1)) == TYPE_FLOAT, "time_slice_ms registered as a float")
+	var sm: Dictionary = infos.get(Settings.KEY_STRICT_MODE, {})
+	_ok(int(sm.get("type", -1)) == TYPE_BOOL, "strict_mode registered as a bool")
 	# register() must never overwrite a value the user already changed (keys all exist now, so
 	# this cannot dirty -> save).
 	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, true)
@@ -107,6 +112,7 @@ func _test_apply_changed_keys() -> void:
 	ProjectSettings.set_setting(Settings.KEY_TIME_SLICE_MS, 1.0)
 	ProjectSettings.set_setting(Settings.KEY_FRAME_BUDGET_MS, 6.0)   # ≠ the 4.0 default (L-02 re-scope)
 	ProjectSettings.set_setting(Settings.KEY_HOST_NODE_POOL, false)
+	ProjectSettings.set_setting(Settings.KEY_STRICT_MODE, true)
 	ProjectSettings.set_setting(Settings.KEY_DIAG_ENABLED, true)
 	ProjectSettings.set_setting(Settings.KEY_DIAG_CAPTURE, true)
 	Settings.reapply()
@@ -114,10 +120,11 @@ func _test_apply_changed_keys() -> void:
 	_ok(RuitkConfig.time_slice_ms == 1.0, "changed key applies: time_slice_ms -> 1.0")
 	_ok(RuitkConfig.frame_budget_ms == 6.0, "changed key applies: frame_budget_ms -> 6.0")
 	_ok(RuitkConfig.host_node_pool == false, "changed key applies: host_node_pool -> false")
+	_ok(RuitkConfig.strict_mode == true, "changed key applies: strict_mode -> true (the static round-trips; force-off lives at the READ site)")
 	_ok(RuitkDiagnostics.enabled == true, "changed key applies: diagnostics/enabled -> true")
 	_ok(RuitkDiagnostics.capture == true, "changed key applies: diagnostics/capture -> true")
 	for key in [Settings.KEY_TIME_SLICING, Settings.KEY_TIME_SLICE_MS, Settings.KEY_FRAME_BUDGET_MS,
-			Settings.KEY_HOST_NODE_POOL, Settings.KEY_DIAG_ENABLED, Settings.KEY_DIAG_CAPTURE]:
+			Settings.KEY_HOST_NODE_POOL, Settings.KEY_STRICT_MODE, Settings.KEY_DIAG_ENABLED, Settings.KEY_DIAG_CAPTURE]:
 		ProjectSettings.set_setting(key, Settings.DEFAULTS[key])
 	_restore_statics()
 

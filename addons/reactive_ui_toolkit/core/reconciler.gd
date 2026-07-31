@@ -424,11 +424,12 @@ func _begin_function(fiber: RuitkFiber) -> RuitkFiber:
 
 func _render_component(fiber: RuitkFiber) -> Array:
 	var state: RuitkComponentState = fiber.state
-	Hooks._begin(state)
-	_in_component_render = true
-	var result = fiber.component.call(fiber.pending_props, fiber.input_children)
-	_in_component_render = false
-	Hooks._end()
+	var result = _invoke_render(fiber, state)
+	# Strict mode (family parity P4): double-invoke with the FIRST result discarded — the
+	# impure-render flusher (Unreal RuitkReconciler.cpp RenderComponent's second RunOnce).
+	# A failure latched by invoke 1 short-circuits invoke 2 (consumed once, below).
+	if RuitkConfig.strict_mode_effective() and not RuitkFail._pending():
+		result = _invoke_render(fiber, state)
 	# Cooperative error latch (family parity P3; Unreal D-10): a failing render CALLED
 	# RuitkFail.render(...). Consume per component, immediately — the failed output is
 	# discarded and the pass unwinds to the nearest boundary (the WIP is abandoned
@@ -437,13 +438,27 @@ func _render_component(fiber: RuitkFiber) -> Array:
 	if failure != null:
 		_handle_render_failure(fiber, failure)
 		result = null
-	RuitkDiagnostics.on_render()
+	RuitkDiagnostics.on_render()   # ONCE per pass, after both strict invokes (family rule)
 	state.last_output = _to_vnode_array(result)
 	if not state.effects.is_empty():
 		fiber.effect_tag |= F.EFFECT_PASSIVE
 	if not state.layout_effects.is_empty():
 		fiber.effect_tag |= F.EFFECT_LAYOUT
 	return state.last_output
+
+## One render-fn invocation with full hook bracketing. `Hooks._begin`/`_end` wrap EACH
+## strict-mode invoke: the second `_begin` resets the cursors, so the invoke re-walks the
+## existing hook slots IN PLACE — state persists, effects register once (mount appends on
+## invoke 1; invoke 2 sees `i < size` and updates the slot), and `_end`'s hook-order
+## validation compares invoke 2 against invoke 1 (impure hook order surfaces on the FIRST
+## render when validation is on).
+func _invoke_render(fiber: RuitkFiber, state: RuitkComponentState):
+	Hooks._begin(state)
+	_in_component_render = true
+	var result = fiber.component.call(fiber.pending_props, fiber.input_children)
+	_in_component_render = false
+	Hooks._end()
+	return result
 
 func _begin_error_boundary(fiber: RuitkFiber) -> RuitkFiber:
 	# A mount-pass failure recorded its activation by key-path (the WIP fiber that carried

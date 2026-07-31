@@ -841,7 +841,45 @@ update PASSED · demos 31/0 · doom 179/0 · guitkx PASSED · hmr PASSED (55) ·
 guitkx_editor 428/0 · guitkx_lsp 39/0 · contract 66/66 · migrate 0 · machine-path gate
 green · guitkx_build 49/0.
 
-### P4 — strict mode — pending
+### P4 — strict mode — DONE (2026-07-31)
+
+Shipped (default OFF — opt-in, per §0 knob 7):
+
+- **`RuitkConfig.strict_mode := false` + `strict_mode_effective()`** (L-04): the static
+  round-trips untouched; the READ gates on `OS.is_debug_build()` — the exact
+  IsStrictModeEnabled shipping-force-false shape (doc comments cite it).
+- **Double-invoke in `_render_component`:** the render call extracted to
+  `_invoke_render(fiber, state)` with full `Hooks._begin`/`_end` bracketing per invoke;
+  when effective, invoke 2 runs and its result replaces invoke 1's (first discarded,
+  RuitkReconciler.cpp RenderComponent's second RunOnce). `RuitkDiagnostics.on_render()`
+  stays ONCE per pass after both invokes. Effects register once (verified against
+  hooks.gd's slot model: mount appends on invoke 1, invoke 2 re-walks `i < size` in
+  place) and run once per commit. Interaction guards: a failure latched by invoke 1
+  short-circuits invoke 2 via the new `RuitkFail._pending()` (consumed once);
+  set-in-render warns dedupe through `_warn_once` as before.
+- **Settings lockstep (§4):** `runtime/strict_mode` — KEY_ const + DEFAULTS false +
+  `_apply_now` bool branch + auto bool `_property_info`/dialog row; settings_test 64 → 71
+  (capture/restore map, no-keys row, bool property-info row, apply row asserting the
+  static round-trips with force-off at the read site). guitkx_editor_test dialog row
+  count self-adjusted (no edit).
+- **Tests (strict_boundary_test 41 → 59):** effective() shape both ways; mount+update
+  double-invoke pin (probe 2 calls/pass, effects 1x + cleanup 1x, `renders` 1x/pass,
+  state survives, committed output = invoke 2's); strict-off single-invoke control;
+  latch short-circuit (1 call, boundary captures, on_error once); hook-order validation
+  accelerated to the FIRST render (impure hook-count component: silent on mount without
+  strict, `[Hooks][order] hook count changed` captured on mount with strict).
+
+Acceptance: full §7 verify green — core 133/0 · settings 71/0 · scheduler 56/0 ·
+strict_boundary 59/0 · style 42/0 · router_match 18/0 · router_spine 37/0 ·
+update PASSED · demos 31/0 · doom 179/0 · guitkx PASSED · hmr PASSED (55) ·
+guitkx_editor 428/0 · guitkx_lsp 39/0 · contract 66/66 · migrate 0 · machine-path gate
+green. Bench at defaults (strict off): the machine session ran ~2x faster than round 1's
+absolute numbers, so the P2 commit was re-benched in a throwaway worktree the SAME
+session for an honest baseline — P2 medians 6.897/6.893/12.99/17.74/27.29 vs P3+P4
+6.896/6.893/12.56/16.92/26.42 ms/frame: at-or-below baseline at every N (≤ noise). A
+commit-cadence probe (N=2000, 100 update frames) pinned renders=100/commits=100 —
+the sync path still commits every frame; the absolute delta vs round 1 is machine
+state, not semantics.
 
 ## 9. Risks / watch-list / STOP-AND-ASK
 

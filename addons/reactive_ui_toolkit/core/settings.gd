@@ -17,6 +17,7 @@ const KEY_TIME_SLICING := GROUP + "runtime/time_slicing"
 const KEY_TIME_SLICE_MS := GROUP + "runtime/time_slice_ms"
 const KEY_FRAME_BUDGET_MS := GROUP + "runtime/frame_budget_ms"
 const KEY_HOST_NODE_POOL := GROUP + "runtime/host_node_pool"
+const KEY_STRICT_MODE := GROUP + "runtime/strict_mode"
 const KEY_HOOK_VALIDATION := GROUP + "runtime/hook_validation"
 const KEY_STRICT_DIAGNOSTICS := GROUP + "runtime/strict_diagnostics"
 const KEY_DIAG_ENABLED := GROUP + "diagnostics/enabled"
@@ -35,6 +36,7 @@ const DEFAULTS := {
 	KEY_TIME_SLICE_MS: 2.0,
 	KEY_FRAME_BUDGET_MS: 4.0,
 	KEY_HOST_NODE_POOL: true,
+	KEY_STRICT_MODE: false,
 	KEY_HOOK_VALIDATION: "auto",
 	KEY_STRICT_DIAGNOSTICS: "auto",
 	KEY_DIAG_ENABLED: false,
@@ -94,6 +96,10 @@ static func _apply_now() -> void:
 		RuitkConfig.frame_budget_ms = float(ProjectSettings.get_setting(KEY_FRAME_BUDGET_MS))
 	if _changed(KEY_HOST_NODE_POOL):
 		RuitkConfig.host_node_pool = bool(ProjectSettings.get_setting(KEY_HOST_NODE_POOL))
+	if _changed(KEY_STRICT_MODE):
+		# The stored value round-trips onto the static untouched; the release force-off
+		# lives at the READ site (RuitkConfig.strict_mode_effective(), L-04).
+		RuitkConfig.strict_mode = bool(ProjectSettings.get_setting(KEY_STRICT_MODE))
 	if _changed(KEY_HOOK_VALIDATION):
 		match str(ProjectSettings.get_setting(KEY_HOOK_VALIDATION)):
 			"enabled": RuitkConfig.enable_hook_validation = true

@@ -27,6 +27,20 @@ static var frame_budget_ms := 4.0
 ## and a no-op for static UIs (nothing churns). Exposed so it can be A/B-measured or disabled.
 static var host_node_pool := true
 
+## Strict mode (family knob; default OFF, explicit opt-in). When effective, every component
+## render fn runs TWICE per pass with the FIRST result discarded — the React-StrictMode
+## impure-render flusher (hidden state in a render body surfaces as a visible double
+## effect). Effects are NOT double-invoked (the hook slots re-walk in place on the second
+## invoke) and diagnostics count the render ONCE. Read via `strict_mode_effective()`.
+static var strict_mode := false
+
+## The read side of `strict_mode`: forced OFF in exported release builds regardless of the
+## stored setting — the family contract's release force-off, the exact shape of the Unreal
+## leg's IsStrictModeEnabled ("never in shipping, regardless of the CVar",
+## RuitkCoreMisc.cpp). The stored setting/static round-trips untouched; only the read gates.
+static func strict_mode_effective() -> bool:
+	return strict_mode and OS.is_debug_build()
+
 ## Dev diagnostics (Phase 7.0). Default ON in debug builds, OFF in exported games — they
 ## push_warning/push_error to surface misuse loudly while developing, and degrade silently
 ## in release (the port never throws catchable exceptions; GDScript can't).

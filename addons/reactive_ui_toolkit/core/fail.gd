@@ -18,6 +18,11 @@ static func render(reason: String) -> void:
 	if _reason == null:   # first failure wins (nested failures are fallout)
 		_reason = reason
 
+## Reconciler-side: is a failure latched? Used to short-circuit the strict-mode second
+## invoke (a failure raised by invoke 1 must not run invoke 2).
+static func _pending() -> bool:
+	return _reason != null
+
 ## Reconciler-side: consume the latch — returns the reason String, or null when no failure
 ## is pending. Called after every component render (per-component, immediately).
 static func _consume():
