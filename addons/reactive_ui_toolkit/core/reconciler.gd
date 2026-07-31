@@ -63,9 +63,15 @@ var _has_deletions := false
 var _is_committing := false
 var _deferred_updates: Array = []
 var _work_active := false      ## a render is in progress (possibly parked between frames)
-var _restart := false          ## update arrived mid-render -> rebuild from root (clears effect list)
-var _tick_pending := false     ## a _tick is scheduled (call_deferred or process_frame)
+var _restart := false          ## rebuild from root next tick (clears effect list) — the render-FAILURE path only; updates DEFER instead (family parity P2, L-05)
+var _tick_pending := false     ## a _tick is scheduled (call_deferred or scheduler slice)
 var _restart_count := 0
+var _is_replaying_deferred := false   ## _commit_root is draining _deferred_updates — replayed updates must re-mark and schedule, never re-defer (FiberReconciler.cs:23)
+var _in_component_render := false     ## a component's render fn is on the stack (setState-in-render discriminator)
+var _deferred_render_phase := false   ## the in-flight pass deferred >= 1 update FROM INSIDE a render fn (depth-guard accounting; external updates deferred while parked are legitimate load and never count)
+var _render_depth := 0                ## CONSECUTIVE commits whose render fns deferred updates (setState-in-render loops)
+var _warned_detached := false
+const _MAX_RENDER_DEPTH := 25         ## FiberFunctionComponent.cs:18 (MaxRenderDepth)
 
 func _init(container: Node) -> void:
 	_container = container
@@ -85,7 +91,7 @@ func render(vnode: RuitkVNode) -> void:
 	# Initial / top-level mount is always synchronous (no time-slicing) to avoid an empty
 	# first frame. Cancel any parked sliced render first so its continuation (scheduler slice
 	# or deferred tick) can't fire after us, and mark `_work_active` so a setState during
-	# render restarts coherently. [M7/M8]
+	# render defers coherently (replayed after this mount's commit). [M7/M8]
 	if _root_current == null:
 		return   # torn down by unmount() — a render after teardown is a no-op, not a crash [audit]
 	_cancel_pending_tick()
@@ -99,7 +105,7 @@ func render(vnode: RuitkVNode) -> void:
 	_restart = false
 	_commit_root()
 
-## Mark a fiber dirty and (unless we're mid-commit) schedule a coalesced render.
+## Mark a fiber dirty and (unless a pass or commit is in flight) schedule a coalesced render.
 func schedule_update_on_fiber(fiber: RuitkFiber, vnode) -> void:
 	if _root_current == null:
 		return   # torn down by unmount() — ignore late setState/effect callbacks [audit]
@@ -107,15 +113,53 @@ func schedule_update_on_fiber(fiber: RuitkFiber, vnode) -> void:
 		_root_vnode = vnode
 	var target := fiber if fiber != null else _root_current
 	target.has_pending_update = true
-	var p := target.parent
-	while p != null:
-		p.subtree_has_updates = true
-		p = p.parent
+	# Walk up marking subtree_has_updates and find this fiber's root (FiberReconciler.cs:215-234).
+	var top := target
+	while top.parent != null:
+		top.parent.subtree_has_updates = true
+		top = top.parent
+	if top != _root_current and top != _wip_root:
+		if _root_current.alternate != null and top == _root_current.alternate:
+			# Superseded-tree redirect (FiberReconciler.cs:254-281): the target belongs to the
+			# tree the last commit superseded — the typical case for deferred updates captured
+			# mid-pass and replayed after commit. Its flags would be CLOBBERED when the next
+			# pass reuses that fiber as the WIP buddy (the `has_pending_update` carry in
+			# _reconcile reads from the LIVE fiber), so re-mark the live `alternate` twin and
+			# its chain — the render then cannot bail out past the updated component.
+			var live: RuitkFiber = target.alternate if target.alternate != null else target
+			live.has_pending_update = true
+			var wu := live
+			while wu.parent != null:
+				wu.parent.subtree_has_updates = true
+				wu = wu.parent
+			target = live
+		else:
+			# Detached fiber (deleted subtree — its links were severed by _release):
+			# ignore, warn once (FiberReconciler.cs:282-289).
+			if not _warned_detached:
+				_warned_detached = true
+				push_warning("[reactive_ui_toolkit] Attempted update on a detached fiber. Ignoring (component unmounted?).")
+			return
 	if _is_committing:
+		# Mid-commit (a layout effect set state): resetting the tree now would corrupt the
+		# commit — defer and replay from _commit_root's tail (FiberReconciler.cs:302-309).
 		_deferred_updates.append([target, vnode])
 		return
-	if _work_active:
-		_restart = true   # update mid-render -> rebuild from root next tick (resets effect list)
+	if (_work_active or _next_unit != null) and not _is_replaying_deferred:
+		# A pass is in flight (parked between time slices, or a reentrant setState during a
+		# synchronous work loop): DEFER instead of discarding the pass. Restarting on every
+		# update starves large trees under sustained per-frame updates (signals ticking every
+		# frame): the pass never reaches commit, and hosts already created by the aborted
+		# walk leak. The deferred update replays from _commit_root's tail, coalescing
+		# everything that arrived during the pass into ONE follow-up render.
+		# (FiberReconciler.cs:311-325)
+		_deferred_updates.append([target, vnode])
+		if _in_component_render:
+			# Only setState-in-RENDER counts toward the runaway guard; external updates
+			# arriving while the pass is parked are exactly the sustained load the defer
+			# model exists to serve.
+			_deferred_render_phase = true
+		return
 	_ensure_tick()
 
 func request_update() -> void:
@@ -145,9 +189,10 @@ func _scheduled_slice() -> void:
 ## One work pass. Runs the whole render at once unless time-slicing is on, in which case
 ## it processes until the render quantum (`RuitkConfig.time_slice_ms`) is hit, then
 ## re-enqueues itself on the scheduler's Normal lane (the scheduler's cumulative
-## `frame_budget_ms` decides how many slices fit in one frame). An update arriving
-## mid-render sets `_restart`, which rebuilds from the root (clearing the effect list) —
-## the invariant that prevents stale Placement effects re-committing.
+## `frame_budget_ms` decides how many slices fit in one frame). `_restart` rebuilds from
+## the root, clearing the effect list — the invariant that prevents stale Placement
+## effects re-committing; since family parity P2 it serves the render-FAILURE path only
+## (updates arriving mid-render DEFER — see schedule_update_on_fiber).
 func _tick() -> void:
 	_tick_pending = false
 	if _root_vnode == null or not is_instance_valid(_container):
@@ -320,7 +365,9 @@ func _begin_function(fiber: RuitkFiber) -> RuitkFiber:
 func _render_component(fiber: RuitkFiber) -> Array:
 	var state: RuitkComponentState = fiber.state
 	Hooks._begin(state)
+	_in_component_render = true
 	var result = fiber.component.call(fiber.pending_props, fiber.input_children)
+	_in_component_render = false
 	Hooks._end()
 	RuitkDiagnostics.on_render()
 	state.last_output = _to_vnode_array(result)
@@ -718,11 +765,31 @@ func _commit_root() -> void:
 	# No per-frame tree-sever: the old current tree IS next frame's reusable buddy pool
 	# (double-buffering). Only genuinely-deleted subtrees are released (in _commit_deletion). [perf #1]
 
+	# Render-depth runaway guard (FiberFunctionComponent.cs:16-18, :140-155 — adapted to the
+	# defer model): count CONSECUTIVE commits whose render FNS deferred further updates
+	# (an unconditional setState-in-render loops forever otherwise); any commit that didn't
+	# resets the streak. Commit-phase defers (layout effects) and external updates deferred
+	# while the pass was parked don't count.
+	if _deferred_render_phase:
+		_render_depth += 1
+	else:
+		_render_depth = 0
+	_deferred_render_phase = false
+	if _render_depth > _MAX_RENDER_DEPTH:
+		push_error("[reactive_ui_toolkit] Too many re-renders (setState during render?). Aborting pass.")
+		_deferred_updates.clear()
+		_render_depth = 0
+		return   # drop the queued updates; the committed UI stays
+	# Replay updates deferred during the pass/commit: re-mark flags (with re-deferral
+	# suppressed), coalescing into ONE follow-up render via _ensure_tick's tick-pending
+	# guard (FiberReconciler.cs:884-909 — sync mode restarts the loop once; sliced mode
+	# lets the still-queued slice action pick the work up automatically).
 	if not _deferred_updates.is_empty():
-		var deferred := _deferred_updates
-		_deferred_updates = []
-		for entry in deferred:
+		_is_replaying_deferred = true
+		while not _deferred_updates.is_empty():
+			var entry: Array = _deferred_updates.pop_front()
 			schedule_update_on_fiber(entry[0], entry[1])
+		_is_replaying_deferred = false
 
 func _commit_placement(fiber: RuitkFiber) -> void:
 	if fiber.node == null or not is_instance_valid(fiber.node):

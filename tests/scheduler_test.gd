@@ -7,6 +7,10 @@ extends SceneTree
 ## the cumulative per-frame budget, slice self-re-enqueue, pump_now, and metrics — plus the
 ## reconciler integration: a sliced render commits across scheduler pumps, mount is never
 ## sliced, and the sync path (time_slicing false) never touches the scheduler.
+## Also the defer-don't-restart semantics (family parity P2): render-phase and commit-phase
+## setStates defer + coalesce into ONE follow-up render, the render-depth-25 runaway guard,
+## the sustained-updates starvation case, the superseded-tree redirect, and the
+## detached-fiber bail.
 ##
 ## Determinism discipline (plan §9): every budget-sensitive unit test drives a FAKE clock
 ## through the scheduler's `time_source` seam — headless CI wall-clock timing is never
@@ -42,6 +46,12 @@ func _run() -> void:
 	await _test_sliced_render_commits()
 	await _test_unmount_cancels_parked_slice()
 	await _test_sync_path_untouched()
+	await _test_defer_setstate_in_render_coalesces()
+	await _test_defer_during_commit()
+	await _test_render_depth_guard()
+	await _test_sustained_updates_starvation()
+	await _test_superseded_redirect()
+	await _test_detached_fiber_bail()
 	_restore_config()
 	print("\n[scheduler_test] %d passed, %d failed" % [_passes, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -341,6 +351,238 @@ func _test_sync_path_untouched() -> void:
 	ctrl["set"].call(7)
 	await process_frame
 	_ok(label.text == "v7", "sync path commits within one frame (got '%s')" % label.text)
+	app.unmount()
+	c.queue_free()
+	_restore_config()
+	await process_frame
+
+# --------------------------------------------------------------------------
+# Defer-don't-restart (family parity P2) — FiberReconciler.cs:302-325, :884-909
+# --------------------------------------------------------------------------
+
+## setState DURING a render (reentrant, sync work loop) defers; N setStates in one pass
+## coalesce into exactly ONE follow-up render, and every value lands.
+func _test_defer_setstate_in_render_coalesces() -> void:
+	RuitkConfig.time_slicing = false
+	var c := Control.new()
+	root.add_child(c)
+	var probe := { "renders": 0, "fire": false, "set": null }
+	var comp := func(_p, _ch):
+		probe["renders"] += 1
+		var s = Hooks.useState(0)
+		var s2 = Hooks.useState(0)
+		probe["set"] = s[1]
+		if probe["fire"] and s[0] == 1:
+			probe["fire"] = false
+			s2[1].call(9)    # setState during render -> deferred, not restarted
+			s2[1].call(10)   # a second one in the same pass -> coalesces into the SAME follow-up
+		return V.Label({ "text": "a%d-b%d" % [s[0], s2[0]] })
+	var app := RuitkRoot.create(c, V.fc(comp))
+	var label: Node = c.get_child(0)
+	_ok(probe["renders"] == 1, "mounted with one render")
+	probe["fire"] = true
+	probe["set"].call(1)
+	await process_frame
+	await process_frame
+	_ok(label.text == "a1-b10", "both render-phase setStates landed (got '%s')" % label.text)
+	_ok(probe["renders"] == 3, "exactly ONE coalesced follow-up render (mount + pass + follow-up = 3, got %d)" % probe["renders"])
+	app.unmount()
+	c.queue_free()
+	_restore_config()
+	await process_frame
+
+## setState during the COMMIT phase (from a layout effect) takes the same deferred queue
+## and coalesces into one follow-up render.
+func _test_defer_during_commit() -> void:
+	RuitkConfig.time_slicing = false
+	var c := Control.new()
+	root.add_child(c)
+	var probe := { "renders": 0, "set": null }
+	var comp := func(_p, _ch):
+		probe["renders"] += 1
+		var s = Hooks.useState(0)
+		var s2 = Hooks.useState("x")
+		probe["set"] = s[1]
+		var fx := func():
+			if s[0] == 1 and s2[0] == "x":
+				s2[1].call("y")   # fires inside _commit_root (layout effects are commit-owned)
+		Hooks.useLayoutEffect(fx, [s[0]])
+		return V.Label({ "text": "%d-%s" % [s[0], s2[0]] })
+	var app := RuitkRoot.create(c, V.fc(comp))
+	var label: Node = c.get_child(0)
+	probe["set"].call(1)
+	await process_frame
+	await process_frame
+	_ok(label.text == "1-y", "commit-phase setState landed via the deferred queue (got '%s')" % label.text)
+	_ok(probe["renders"] == 3, "one follow-up render for the commit-phase update (got %d)" % probe["renders"])
+	app.unmount()
+	c.queue_free()
+	_restore_config()
+	await process_frame
+
+## An UNCONDITIONAL setState-in-render loop terminates via the render-depth-25 guard
+## (FiberFunctionComponent.cs:16-18): the queued updates are dropped, the committed UI
+## stays, and rendering stops.
+func _test_render_depth_guard() -> void:
+	RuitkConfig.time_slicing = false
+	var c := Control.new()
+	root.add_child(c)
+	var probe := { "renders": 0 }
+	var comp := func(_p, _ch):
+		probe["renders"] += 1
+		var s = Hooks.useState(0)
+		s[1].call(s[0] + 1)   # unconditional setState during render — the classic runaway
+		return V.Label({ "text": "n%d" % s[0] })
+	print("  (depth-guard test: the following 'Too many re-renders' error is EXPECTED)")
+	var app := RuitkRoot.create(c, V.fc(comp))
+	await process_frame
+	await process_frame
+	var after: int = probe["renders"]
+	_ok(after == 26, "depth guard stops the loop after mount + 25 follow-ups (got %d renders)" % after)
+	await process_frame
+	_ok(probe["renders"] == after, "loop stays terminated (no further renders)")
+	_ok(c.get_child_count() == 1 and c.get_child(0) is Label, "committed UI intact after the abort")
+	app.unmount()
+	c.queue_free()
+	_restore_config()
+	await process_frame
+
+## The starvation case the reference comment names (FiberReconciler.cs:311-320): sustained
+## every-frame updates on a tree bigger than one slice must still COMMIT — the old
+## restart-on-update model would begin the pass again every frame and never finish.
+## Deterministic: the tree scheduler gets a fake clock, and a per-frame "jam" action blows
+## the frame budget right after one slice ran, holding the pass to one unit per frame.
+func _test_sustained_updates_starvation() -> void:
+	RuitkConfig.time_slicing = true
+	RuitkConfig.time_slice_ms = 0.0
+	RuitkConfig.frame_budget_ms = 4.0
+	var sched = SchedulerScript.for_tree(self)
+	var clock := { "t": 0.0 }
+	sched.time_source = func(): return clock["t"]
+	var jam := func(): clock["t"] += 100.0
+	var c := Control.new()
+	root.add_child(c)
+	var ctrl := { "set": null }
+	var comp := func(_p, _ch):
+		var s = Hooks.useState(0)
+		ctrl["set"] = s[1]
+		var items: Array = []
+		for i in 12:
+			items.append(V.Label({ "text": "s%d-%d" % [i, s[0]], "key": str(i) }))
+		return V.VBoxContainer({}, items)
+	var app := RuitkRoot.create(c, V.fc(comp))
+	var vbox: Node = c.get_child(0)
+	var committed_mid_storm := false
+	var last := 0
+	for i in range(1, 90):
+		sched.enqueue(jam, SchedulerScript.Priority.NORMAL)
+		ctrl["set"].call(i)
+		last = i
+		await process_frame
+		if vbox.get_child(0).text != "s0-0":
+			committed_mid_storm = true
+	_ok(committed_mid_storm, "the pass commits under sustained per-frame updates (defer, not restart)")
+	_ok(app._reconciler._render_depth == 0,
+		"external sustained load never engages the render-depth guard (got depth %d)" % app._reconciler._render_depth)
+	var settled := false
+	for i in 100:
+		await process_frame
+		if vbox.get_child(0).text == "s0-%d" % last and vbox.get_child(11).text == "s11-%d" % last:
+			settled = true
+			break
+	_ok(settled, "the coalesced final value lands once the storm stops (got '%s')" % vbox.get_child(0).text)
+	app.unmount()
+	c.queue_free()
+	sched.time_source = Callable()
+	_restore_config()
+	await process_frame
+
+## The P2.3 pin (plan §9 calls it mandatory): a deferred setState whose target fiber
+## belongs to the SUPERSEDED generation still re-renders the right component. The window:
+## the in-flight pass has already reconciled the component's position (carrying
+## has_pending_update=false onto the WIP buddy) but not yet re-run its begin_function
+## (which would re-bind state.fiber) — so the setter names the old-generation fiber, and
+## without the replay redirect the flag would be clobbered by the next pass's carry and
+## the component would bail out forever on its stale cached output.
+func _test_superseded_redirect() -> void:
+	RuitkConfig.time_slicing = true
+	RuitkConfig.time_slice_ms = 0.0
+	RuitkConfig.frame_budget_ms = 4.0
+	var sched = SchedulerScript.for_tree(self)
+	var clock := { "t": 0.0 }
+	sched.time_source = func(): return clock["t"]
+	var jam := func(): clock["t"] += 100.0
+	var c := Control.new()
+	root.add_child(c)
+	var probe := { "parent_renders": 0, "set_parent": null, "set_b": null }
+	var child_b := func(_p, _ch):
+		var s = Hooks.useState("init")
+		probe["set_b"] = s[1]
+		return V.Label({ "text": s[0] })
+	var child_a := func(_p, _ch):
+		var items: Array = []
+		for i in 14:
+			items.append(V.Label({ "text": "f%d" % i, "key": str(i) }))
+		return V.VBoxContainer({}, items)
+	var parent := func(_p, _ch):
+		probe["parent_renders"] += 1
+		var s = Hooks.useState(0)
+		probe["set_parent"] = s[1]
+		return V.VBoxContainer({}, [V.fc(child_a), V.fc(child_b)])
+	var app := RuitkRoot.create(c, V.fc(parent))
+	var outer: Node = c.get_child(0)
+	var b_label: Node = outer.get_child(1)
+	_ok(b_label.text == "init", "mounted (child_b initial state)")
+	probe["set_parent"].call(1)
+	# March one unit per frame until the parent re-rendered (its children are reconciled —
+	# the has_pending_update carry for child_b's position has already happened) ...
+	var marched := false
+	for i in 40:
+		sched.enqueue(jam, SchedulerScript.Priority.NORMAL)
+		await process_frame
+		if probe["parent_renders"] >= 2:
+			marched = true
+			break
+	_ok(marched, "sliced pass reached the parent render while parked")
+	# ... then two more single-unit frames, placing the pass INSIDE child_a's subtree,
+	# well before child_b's begin re-binds state.fiber ...
+	sched.enqueue(jam, SchedulerScript.Priority.NORMAL)
+	await process_frame
+	sched.enqueue(jam, SchedulerScript.Priority.NORMAL)
+	await process_frame
+	# ... and set child_b's state: the setter targets the old-generation fiber.
+	probe["set_b"].call("late")
+	var settled := false
+	for i in 100:
+		await process_frame
+		if b_label.text == "late":
+			settled = true
+			break
+	_ok(settled, "deferred setState on an old-generation fiber re-renders the component (superseded-tree redirect), got '%s'" % b_label.text)
+	app.unmount()
+	c.queue_free()
+	sched.time_source = Callable()
+	_restore_config()
+	await process_frame
+
+## An update naming a fiber outside the live tree and its alternate (a deleted/detached
+## subtree) is ignored with a warning — never scheduled (FiberReconciler.cs:282-289).
+func _test_detached_fiber_bail() -> void:
+	RuitkConfig.time_slicing = false
+	var c := Control.new()
+	root.add_child(c)
+	var probe := { "renders": 0 }
+	var comp := func(_p, _ch):
+		probe["renders"] += 1
+		return V.Label({ "text": "ok" })
+	var app := RuitkRoot.create(c, V.fc(comp))
+	var orphan := RuitkFiber.new()   # parentless — walks up to itself, matches no root
+	print("  (detached-fiber test: the following 'detached fiber' warning is EXPECTED)")
+	app._reconciler.schedule_update_on_fiber(orphan, null)
+	await process_frame
+	await process_frame
+	_ok(probe["renders"] == 1, "update on a detached fiber is ignored (no re-render, got %d)" % probe["renders"])
+	_ok(c.get_child(0).text == "ok", "live tree untouched")
 	app.unmount()
 	c.queue_free()
 	_restore_config()
