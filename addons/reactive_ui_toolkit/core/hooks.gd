@@ -123,7 +123,9 @@ static func _make_setter(state: RuitkComponentState, i: int) -> Callable:
 		if i >= state.hooks.size():   # state torn down (unmounted) — ignore late calls [audit C3]
 			return
 		if state.is_rendering and RuitkConfig.enable_strict_diagnostics:
-			_warn_once(state, "set_in_render", "[Hooks][Strict] state set during render of %s — move it to an effect or event handler (setting state in the render body loops)." % _comp_label(state))
+			# Key + text are family-frozen (Hooks.cs:159-160 — same key, same text at both
+			# the setter and dispatch sites).
+			_warn_once(state, "state-update-during-render", "[Hooks][Strict] State update scheduled during render of '%s'. Move this set call to an effect or event handler." % _comp_label(state))
 		var slot: Dictionary = state.hooks[i]
 		var prev = slot["value"]
 		var next = update.call(prev) if (update is Callable) else update
@@ -155,7 +157,8 @@ static func _make_dispatch(state: RuitkComponentState, i: int) -> Callable:
 		if i >= state.hooks.size():
 			return
 		if state.is_rendering and RuitkConfig.enable_strict_diagnostics:
-			_warn_once(state, "set_in_render", "[Hooks][Strict] dispatch during render of %s — move it to an effect or event handler." % _comp_label(state))
+			# Same family-frozen key + text as the useState setter (Hooks.cs:606-607).
+			_warn_once(state, "state-update-during-render", "[Hooks][Strict] State update scheduled during render of '%s'. Move this set call to an effect or event handler." % _comp_label(state))
 		var slot: Dictionary = state.hooks[i]
 		var prev = slot["value"]
 		var next = slot["reducer"].call(prev, action)

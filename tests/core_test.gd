@@ -412,14 +412,26 @@ func _test_hook_diagnostics() -> void:
 	Hooks._begin(st); Hooks.useState(0); Hooks.useEffect(func(): return null, []); Hooks._end()
 	_ok(RuitkDiagnostics.messages.any(func(m): return "[Hooks][order]" in m), "hook-order mismatch detected, got %s" % str(RuitkDiagnostics.messages))
 
-	# state-update-during-render guard
+	# state-update-during-render guard — key + text family-frozen (Hooks.cs:159-160/:606-607:
+	# same "state-update-during-render" key and same message at the setter AND dispatch sites)
 	RuitkDiagnostics.clear_messages()
 	var st2 := RuitkComponentState.new()
 	Hooks._begin(st2)
 	var sv: Array = Hooks.useState(0)
+	var rd: Array = Hooks.useReducer(func(s, _a): return s + 1, 0)
 	sv[1].call(1)   # setter invoked while is_rendering -> strict warning
 	Hooks._end()
-	_ok(RuitkDiagnostics.messages.any(func(m): return "[Hooks][Strict]" in m), "state-set-in-render warned, got %s" % str(RuitkDiagnostics.messages))
+	_ok(RuitkDiagnostics.messages.any(func(m): return "[Hooks][Strict] State update scheduled during render of" in m and "Move this set call to an effect or event handler." in m),
+		"state-set-in-render warned with the reference text, got %s" % str(RuitkDiagnostics.messages))
+	# dispatch path: SAME dedup key -> a dispatch-in-render on the same component adds nothing
+	var msg_count: int = RuitkDiagnostics.messages.size()
+	Hooks._begin(st2)
+	Hooks.useState(0)
+	rd = Hooks.useReducer(func(s, _a): return s + 1, 0)
+	rd[1].call(null)   # dispatch invoked while is_rendering -> deduped by the shared key
+	Hooks._end()
+	_ok(RuitkDiagnostics.messages.size() == msg_count,
+		"dispatch-in-render shares the setter's dedup key (no second warning), got %s" % str(RuitkDiagnostics.messages))
 
 	# silence when the flags are off (a different hook order must NOT warn)
 	RuitkConfig.enable_hook_validation = false

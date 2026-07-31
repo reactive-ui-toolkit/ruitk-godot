@@ -165,6 +165,8 @@ func enqueue_batched_effect(effect: Callable) -> void:
 ## Drain high/normal/low/idle immediately, without the per-frame gating (no low-cancel,
 ## no normal-gate, no idle-gate) — then flush batched effects (:214-223). The cumulative
 ## budget still applies within each queue, exactly as the reference code does.
+## Currently exercised by tests only — no production caller in this leg (the Unreal leg's
+## FlushSync analog serves surfaces this leg doesn't have). API kept for family parity.
 func pump_now() -> void:
 	var frame_start := _now_ms()
 	_execute_queue(Priority.HIGH, frame_start)

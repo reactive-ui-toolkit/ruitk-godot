@@ -9,8 +9,8 @@ extends SceneTree
 ## sliced, and the sync path (time_slicing false) never touches the scheduler.
 ## Also the defer-don't-restart semantics (family parity P2): render-phase and commit-phase
 ## setStates defer + coalesce into ONE follow-up render, the render-depth-25 runaway guard,
-## the sustained-updates starvation case, the superseded-tree redirect, and the
-## detached-fiber bail.
+## the sustained-updates starvation case, the superseded-tree redirect, the
+## deleted-subtree silent bail, and the detached-fiber bail.
 ##
 ## Determinism discipline (plan §9): every budget-sensitive unit test drives a FAKE clock
 ## through the scheduler's `time_source` seam — headless CI wall-clock timing is never
@@ -51,6 +51,7 @@ func _run() -> void:
 	await _test_render_depth_guard()
 	await _test_sustained_updates_starvation()
 	await _test_superseded_redirect()
+	await _test_deleted_subtree_silent_bail()
 	await _test_detached_fiber_bail()
 	_restore_config()
 	print("\n[scheduler_test] %d passed, %d failed" % [_passes, _fails])
@@ -562,6 +563,41 @@ func _test_superseded_redirect() -> void:
 	app.unmount()
 	c.queue_free()
 	sched.time_source = Callable()
+	_restore_config()
+	await process_frame
+
+## setState targeting a fiber in a subtree already TAGGED for deletion (the window between
+## reconcile and commit — e.g. a cleanup setting state on its own dying subtree) is dropped
+## SILENTLY: nothing is scheduled and no warning fires (FiberReconciler.cs:217-221,
+## :236-239 — the deletion check runs during the root walk-up, before the detached-fiber
+## warn path can be reached). Covers both shapes of the reference walk: the tag on the
+## target itself, and the tag on an ANCESTOR found while walking up.
+func _test_deleted_subtree_silent_bail() -> void:
+	RuitkConfig.time_slicing = false
+	var c := Control.new()
+	root.add_child(c)
+	var probe := { "renders": 0 }
+	var comp := func(_p, _ch):
+		probe["renders"] += 1
+		return V.Label({ "text": "ok" })
+	var app := RuitkRoot.create(c, V.fc(comp))
+	var rec = app._reconciler
+	var comp_fiber: RuitkFiber = rec._root_current.child
+	comp_fiber.effect_tag |= RuitkFiber.EFFECT_DELETION
+	# (a) the target IS the deletion-tagged fiber.
+	rec.schedule_update_on_fiber(comp_fiber, null)
+	_ok(not rec._tick_pending, "update on a deletion-tagged fiber schedules nothing (no tick pending)")
+	# (b) the tag sits on an ANCESTOR of the target — found during the walk-up.
+	var host_fiber: RuitkFiber = comp_fiber.child
+	rec.schedule_update_on_fiber(host_fiber, null)
+	_ok(not rec._tick_pending, "deletion tag found on the walk-up schedules nothing either")
+	await process_frame
+	await process_frame
+	_ok(probe["renders"] == 1, "no re-render from either dropped update (got %d)" % probe["renders"])
+	_ok(c.get_child(0).text == "ok", "live tree untouched")
+	comp_fiber.effect_tag = RuitkFiber.EFFECT_NONE   # untag before a real unmount
+	app.unmount()
+	c.queue_free()
 	_restore_config()
 	await process_frame
 

@@ -83,7 +83,6 @@ var _is_replaying_deferred := false   ## _commit_root is draining _deferred_upda
 var _in_component_render := false     ## a component's render fn is on the stack (setState-in-render discriminator)
 var _deferred_render_phase := false   ## the in-flight pass deferred >= 1 update FROM INSIDE a render fn (depth-guard accounting; external updates deferred while parked are legitimate load and never count)
 var _render_depth := 0                ## CONSECUTIVE commits whose render fns deferred updates (setState-in-render loops)
-var _warned_detached := false
 var _commit_seq := 0                  ## monotonic commit number for the trace ladder's commit summary ("[Fiber] Commit #n")
 const _MAX_RENDER_DEPTH := 25         ## FiberFunctionComponent.cs:18 (MaxRenderDepth)
 const _MAX_ERROR_RESTARTS := 25       ## RuitkReconciler.h MaxErrorRestarts (error-boundary rebuild cap)
@@ -131,9 +130,17 @@ func schedule_update_on_fiber(fiber: RuitkFiber, vnode) -> void:
 		_root_vnode = vnode
 	var target := fiber if fiber != null else _root_current
 	target.has_pending_update = true
-	# Walk up marking subtree_has_updates and find this fiber's root (FiberReconciler.cs:215-234).
+	# Walk up marking subtree_has_updates and find this fiber's root. A deletion tag anywhere
+	# on the walk means the target sits in a subtree already scheduled for removal (the window
+	# between reconcile and commit — e.g. a cleanup/effect setting state on its own dying
+	# subtree): bail SILENTLY, per the reference (FiberReconciler.cs:215-239) — unlike the
+	# detached case below, which warns.
 	var top := target
-	while top.parent != null:
+	while true:
+		if top.effect_tag & F.EFFECT_DELETION:
+			return
+		if top.parent == null:
+			break
 		top.parent.subtree_has_updates = true
 		top = top.parent
 	if top != _root_current and top != _wip_root:
@@ -152,11 +159,10 @@ func schedule_update_on_fiber(fiber: RuitkFiber, vnode) -> void:
 				wu = wu.parent
 			target = live
 		else:
-			# Detached fiber (deleted subtree — its links were severed by _release):
-			# ignore, warn once (FiberReconciler.cs:282-289).
-			if not _warned_detached:
-				_warned_detached = true
-				push_warning("[reactive_ui_toolkit] Attempted update on a detached fiber. Ignoring (component unmounted?).")
+			# Detached fiber (already-committed deletion — its links were severed by
+			# _release): ignore, warning EVERY time — the reference warns unconditionally
+			# on each attempt (FiberReconciler.cs:282-289).
+			push_warning("[reactive_ui_toolkit] Attempted update on a detached fiber. Ignoring (component unmounted?).")
 			return
 	if _is_committing:
 		# Mid-commit (a layout effect set state): resetting the tree now would corrupt the

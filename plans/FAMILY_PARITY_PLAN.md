@@ -1115,6 +1115,46 @@ version-number changes anywhere; NO Publish (owner-gated).
 **CAMPAIGN COMPLETE — ready for the owner's merge review.** Remaining owner touchpoints:
 merge PR #95 into dev → fast-forward master → the Publish button → paste the Discord entry.
 
+### Cross-leg conformance (2026-07-31) — post-campaign addendum
+
+The cross-leg conformance pass compared the three shipped campaigns knob-by-knob and
+behavior-by-behavior against the Unity reference. **Defaults verified identical ×10×3**:
+all ten family knobs (`time_slicing`, `time_slice_ms`, `frame_budget_ms`, `strict_mode`,
+`strict_diagnostics`, `hook_validation`, `trace_level`, `diff_tracing`, `environment`,
+plus the leg-local pool knob) carry the same default in all three legs. Blessed as-is for
+this leg (supervisor rulings): the engine-native **key namespaces** stay per-leg spellings
+of one canonical name set; the **tri-state vocabulary** (`auto`/`on`/`off` and the
+`auto = resolve-by-environment` rule) is family-frozen; **`auto` = leave-static-alone**
+(an `auto` value never rewrites a user's persisted explicit setting); and this leg's
+**budgeted `pump_now`** (cumulative budget still applied inside each drained lane) matches
+the reference and stays.
+
+Conformance fixes landed in this commit:
+
+- **C3 (real port gap)** — `schedule_update_on_fiber`'s root walk-up omitted the
+  reference's deletion check: an update targeting a fiber inside a subtree already tagged
+  `EFFECT_DELETION` (the reconcile→commit window) must bail SILENTLY
+  (FiberReconciler.cs:217-221, :236-239), before the detached-fiber warn path can be
+  reached. Ported 1:1 (`reconciler.gd` walk-up now checks the tag at every step); pinned by
+  `scheduler_test.gd::_test_deleted_subtree_silent_bail` (tag on the target + tag on an
+  ancestor: nothing scheduled, no re-render).
+- **C5 (warning text + key)** — the state-update-during-render strict warning now carries
+  the reference's exact text ("State update scheduled during render of '%s'. Move this set
+  call to an effect or event handler.") and the reference's dedup key
+  `"state-update-during-render"` at BOTH sites (useState setter + useReducer dispatch) —
+  supervisor ruling: Unity uses the same key and same text for both paths
+  (Hooks.cs:159-160, :606-607), so the two sites share one per-component dedup, replacing
+  the old divergent `set_in_render` texts. core_test pins the text and the shared-key dedup.
+- **C7 (warning cardinality)** — the detached-fiber warning's warn-once guard
+  (`_warned_detached`) removed: the reference warns on EVERY attempt
+  (FiberReconciler.cs:285-287).
+- **C6 (doc-mark only)** — `scheduler.gd pump_now` doc-commented as currently
+  tests-only (no production caller in this leg; the Unreal FlushSync analog serves surfaces
+  this leg doesn't have). API and behavior unchanged, kept for family parity.
+
+Pre-release internal corrections to the unpublished 0.14.0 wave — no changelog entry, no
+version changes.
+
 ## 9. Risks / watch-list / STOP-AND-ASK
 
 - **Headless timing flakiness** (scheduler budgets are wall-clock): design scheduler tests
