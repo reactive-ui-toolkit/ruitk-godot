@@ -23,6 +23,7 @@ func _initialize() -> void:
 func _run() -> void:
 	_orig = {
 		"time_slicing": RuitkConfig.time_slicing,
+		"time_slice_ms": RuitkConfig.time_slice_ms,
 		"frame_budget_ms": RuitkConfig.frame_budget_ms,
 		"host_node_pool": RuitkConfig.host_node_pool,
 		"enable_hook_validation": RuitkConfig.enable_hook_validation,
@@ -45,6 +46,7 @@ func _run() -> void:
 
 func _restore_statics() -> void:
 	RuitkConfig.time_slicing = _orig["time_slicing"]
+	RuitkConfig.time_slice_ms = _orig["time_slice_ms"]
 	RuitkConfig.frame_budget_ms = _orig["frame_budget_ms"]
 	RuitkConfig.host_node_pool = _orig["host_node_pool"]
 	RuitkConfig.enable_hook_validation = _orig["enable_hook_validation"]
@@ -60,6 +62,7 @@ func _test_apply_no_keys_is_noop() -> void:
 		_ok(not ProjectSettings.has_setting(key), "precondition: %s absent in --script mode" % key)
 	Settings.apply()   # the first-ever call — also arms the one-shot guard tested below
 	_ok(RuitkConfig.time_slicing == _orig["time_slicing"], "no keys: time_slicing untouched")
+	_ok(RuitkConfig.time_slice_ms == _orig["time_slice_ms"], "no keys: time_slice_ms untouched")
 	_ok(RuitkConfig.frame_budget_ms == _orig["frame_budget_ms"], "no keys: frame_budget_ms untouched")
 	_ok(RuitkConfig.host_node_pool == _orig["host_node_pool"], "no keys: host_node_pool untouched")
 	_ok(RuitkConfig.enable_hook_validation == _orig["enable_hook_validation"], "no keys: enable_hook_validation untouched")
@@ -88,6 +91,8 @@ func _test_register_idempotent() -> void:
 	_ok(int(ts.get("type", -1)) == TYPE_BOOL, "time_slicing registered as a bool")
 	var fb: Dictionary = infos.get(Settings.KEY_FRAME_BUDGET_MS, {})
 	_ok(int(fb.get("type", -1)) == TYPE_FLOAT, "frame_budget_ms registered as a float")
+	var tsm: Dictionary = infos.get(Settings.KEY_TIME_SLICE_MS, {})
+	_ok(int(tsm.get("type", -1)) == TYPE_FLOAT, "time_slice_ms registered as a float")
 	# register() must never overwrite a value the user already changed (keys all exist now, so
 	# this cannot dirty -> save).
 	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, true)
@@ -99,18 +104,20 @@ func _test_register_idempotent() -> void:
 ## A key whose stored value differs from the compiled default is applied onto the static.
 func _test_apply_changed_keys() -> void:
 	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, true)
-	ProjectSettings.set_setting(Settings.KEY_FRAME_BUDGET_MS, 4.0)
+	ProjectSettings.set_setting(Settings.KEY_TIME_SLICE_MS, 1.0)
+	ProjectSettings.set_setting(Settings.KEY_FRAME_BUDGET_MS, 6.0)   # ≠ the 4.0 default (L-02 re-scope)
 	ProjectSettings.set_setting(Settings.KEY_HOST_NODE_POOL, false)
 	ProjectSettings.set_setting(Settings.KEY_DIAG_ENABLED, true)
 	ProjectSettings.set_setting(Settings.KEY_DIAG_CAPTURE, true)
 	Settings.reapply()
 	_ok(RuitkConfig.time_slicing == true, "changed key applies: time_slicing -> true")
-	_ok(RuitkConfig.frame_budget_ms == 4.0, "changed key applies: frame_budget_ms -> 4.0")
+	_ok(RuitkConfig.time_slice_ms == 1.0, "changed key applies: time_slice_ms -> 1.0")
+	_ok(RuitkConfig.frame_budget_ms == 6.0, "changed key applies: frame_budget_ms -> 6.0")
 	_ok(RuitkConfig.host_node_pool == false, "changed key applies: host_node_pool -> false")
 	_ok(RuitkDiagnostics.enabled == true, "changed key applies: diagnostics/enabled -> true")
 	_ok(RuitkDiagnostics.capture == true, "changed key applies: diagnostics/capture -> true")
-	for key in [Settings.KEY_TIME_SLICING, Settings.KEY_FRAME_BUDGET_MS, Settings.KEY_HOST_NODE_POOL,
-			Settings.KEY_DIAG_ENABLED, Settings.KEY_DIAG_CAPTURE]:
+	for key in [Settings.KEY_TIME_SLICING, Settings.KEY_TIME_SLICE_MS, Settings.KEY_FRAME_BUDGET_MS,
+			Settings.KEY_HOST_NODE_POOL, Settings.KEY_DIAG_ENABLED, Settings.KEY_DIAG_CAPTURE]:
 		ProjectSettings.set_setting(key, Settings.DEFAULTS[key])
 	_restore_statics()
 
@@ -119,12 +126,15 @@ func _test_apply_changed_keys() -> void:
 ## survive apply().
 func _test_default_value_does_not_clobber() -> void:
 	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, false)   # present AND equal to default
-	ProjectSettings.set_setting(Settings.KEY_FRAME_BUDGET_MS, 8.0)
+	ProjectSettings.set_setting(Settings.KEY_FRAME_BUDGET_MS, 4.0)
+	ProjectSettings.set_setting(Settings.KEY_TIME_SLICE_MS, 2.0)
 	RuitkConfig.time_slicing = true          # "user code" assigned directly, pre-mount
 	RuitkConfig.frame_budget_ms = 12.0
+	RuitkConfig.time_slice_ms = 5.0
 	Settings.reapply()
 	_ok(RuitkConfig.time_slicing == true, "default-valued key does not clobber a pre-assigned static (bool)")
 	_ok(RuitkConfig.frame_budget_ms == 12.0, "default-valued key does not clobber a pre-assigned static (float)")
+	_ok(RuitkConfig.time_slice_ms == 5.0, "default-valued key does not clobber a pre-assigned static (time_slice_ms)")
 	_restore_statics()
 
 func _test_tri_state_hook_validation() -> void:
@@ -166,7 +176,7 @@ func _test_one_shot_guard() -> void:
 	ProjectSettings.set_setting(Settings.KEY_TIME_SLICING, Settings.DEFAULTS[Settings.KEY_TIME_SLICING])
 	_restore_statics()
 
-## Clear every key this suite created (register() seeded all seven) so the run leaves no residue.
+## Clear every key this suite created (register() seeded every DEFAULTS key) so the run leaves no residue.
 func _cleanup_keys() -> void:
 	for key in Settings.DEFAULTS:
 		ProjectSettings.set_setting(key, null)

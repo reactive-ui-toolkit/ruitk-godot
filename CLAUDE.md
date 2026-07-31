@@ -47,7 +47,8 @@ godot --headless --path . --script res://tests/core_test.gd
 build-then-scan habit still works — the strict order only matters on a fresh clone / CI.)
 
 The suites: `core_test.gd` (reconciler/hooks/effects/bailout/context/keyed), `settings_test.gd`
-(the `reactive_ui_toolkit/*` Project Settings bridge), `style_test.gd`,
+(the `reactive_ui_toolkit/*` Project Settings bridge), `scheduler_test.gd` (the four-lane
+`RuitkScheduler` — lanes/budgets/batching — plus sliced-render integration), `style_test.gd`,
 `router_match_test.gd` + `router_spine_test.gd`, `update_test.gd` (diff), `demos_test.gd` (renders
 every demo — the real check that generated `.gd` render without error), `doom_game_test.gd` (the
 Doom demo end-to-end), `guitkx_test.gd` (compiler + codegen + imports/resolver/codemod),

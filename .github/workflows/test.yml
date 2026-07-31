@@ -110,6 +110,9 @@ jobs:
       - name: Project Settings bridge tests (reactive_ui_toolkit/* -> RuitkConfig/RuitkDiagnostics)
         run: godot --headless --path . --script res://tests/settings_test.gd
 
+      - name: Render scheduler tests (four-lane RuitkScheduler + sliced-render integration)
+        run: godot --headless --path . --script res://tests/scheduler_test.gd
+
       - name: Style + elements tests
         run: godot --headless --path . --script res://tests/style_test.gd
 

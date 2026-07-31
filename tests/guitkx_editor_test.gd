@@ -385,7 +385,8 @@ func _test_settings_dialog() -> void:
 	_ok(cb.button_pressed == bool(ProjectSettings.get_setting(EdSettings.KEY_FORMAT_ON_SAVE, true)),
 		"editor bool populates from the stored value")
 	var sb: SpinBox = d._controls[RtSettings.KEY_FRAME_BUDGET_MS]
-	_ok(sb.value == float(ProjectSettings.get_setting(RtSettings.KEY_FRAME_BUDGET_MS, 8.0)),
+	_ok(sb.value == float(ProjectSettings.get_setting(RtSettings.KEY_FRAME_BUDGET_MS,
+			RtSettings.DEFAULTS[RtSettings.KEY_FRAME_BUDGET_MS])),
 		"frame_budget_ms populates the SpinBox")
 	var ob: OptionButton = d._controls[RtSettings.KEY_HOOK_VALIDATION]
 	_ok(ob.item_count == 3, "tri-state offers auto/enabled/disabled")
@@ -393,9 +394,10 @@ func _test_settings_dialog() -> void:
 		"tri-state populates the OptionButton")
 
 	# A stored non-default value populates after rebuild (the about_to_popup refresh path).
-	ProjectSettings.set_setting(RtSettings.KEY_FRAME_BUDGET_MS, 4.0)
+	# 6.0 ≠ the 4.0 default (frame_budget_ms was re-scoped to 4.0 by the parity campaign, L-02).
+	ProjectSettings.set_setting(RtSettings.KEY_FRAME_BUDGET_MS, 6.0)
 	d.rebuild()
-	_ok((d._controls[RtSettings.KEY_FRAME_BUDGET_MS] as SpinBox).value == 4.0,
+	_ok((d._controls[RtSettings.KEY_FRAME_BUDGET_MS] as SpinBox).value == 6.0,
 		"rebuild re-reads a value changed in the native dialog")
 	ProjectSettings.set_setting(RtSettings.KEY_FRAME_BUDGET_MS, RtSettings.DEFAULTS[RtSettings.KEY_FRAME_BUDGET_MS])
 	d.rebuild()
@@ -422,9 +424,10 @@ func _test_settings_dialog() -> void:
 	# while the control is INSIDE the tree — the popped-up dialog always is, but out-of-tree
 	# test nodes must emit like the UI would (the OptionButton pattern below).
 	sb = d._controls[RtSettings.KEY_FRAME_BUDGET_MS]
-	sb.value = 4.0
+	sb.value = 6.0
 	sb.value_changed.emit(sb.value)
-	_ok(float(ProjectSettings.get_setting(RtSettings.KEY_FRAME_BUDGET_MS, 8.0)) == 4.0,
+	_ok(float(ProjectSettings.get_setting(RtSettings.KEY_FRAME_BUDGET_MS,
+			RtSettings.DEFAULTS[RtSettings.KEY_FRAME_BUDGET_MS])) == 6.0,
 		"SpinBox change writes the float")
 	sb.value = float(RtSettings.DEFAULTS[RtSettings.KEY_FRAME_BUDGET_MS])
 	sb.value_changed.emit(sb.value)

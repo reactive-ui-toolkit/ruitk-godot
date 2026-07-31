@@ -4,14 +4,23 @@ extends RefCounted
 ##
 ## Time-slicing is OFF by default — synchronous renders are simplest and fast for normal
 ## UIs. Turn it on for very large trees that would otherwise stutter on a big update: the
-## render phase is then chunked across frames (commit stays atomic). Ports the frame-budget
-## idea from ReactiveUIToolKit's RenderScheduler.
+## render phase is then chunked into quantum-sized slices driven by the four-lane
+## RuitkScheduler (commit stays atomic). Two knobs, ported from the Unity leg
+## (FiberReconciler.TimeSliceMs + RenderScheduler.frameBudgetMs):
+##
+##   time_slice_ms   — the render-phase QUANTUM: the work loop checks elapsed time AFTER
+##                     each completed unit (one fiber) and yields past this; a long single
+##                     unit overruns (cooperative — no preemption).
+##   frame_budget_ms — the SCHEDULER's per-frame budget, cumulative across all lanes in
+##                     one frame pump; a 2 ms slice can run twice inside a 4 ms budget.
+##                     `false` time_slicing bypasses the scheduler entirely (synchronous
+##                     single-pass render per update), so this is inert until slicing is on.
 ##
 ##   RuitkConfig.time_slicing = true
-##   RuitkConfig.frame_budget_ms = 8.0   # work per frame before parking until the next one
 
 static var time_slicing := false
-static var frame_budget_ms := 8.0
+static var time_slice_ms := 2.0
+static var frame_budget_ms := 4.0
 
 ## Host-node pool (GO-05): recycle childless leaf Controls across keyed-list churn instead of
 ## queue_free + ClassDB.instantiate. On by default — pure win for churn-heavy dynamic lists,

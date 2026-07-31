@@ -14,6 +14,7 @@ extends RefCounted
 const GROUP := "reactive_ui_toolkit/"
 
 const KEY_TIME_SLICING := GROUP + "runtime/time_slicing"
+const KEY_TIME_SLICE_MS := GROUP + "runtime/time_slice_ms"
 const KEY_FRAME_BUDGET_MS := GROUP + "runtime/frame_budget_ms"
 const KEY_HOST_NODE_POOL := GROUP + "runtime/host_node_pool"
 const KEY_HOOK_VALIDATION := GROUP + "runtime/hook_validation"
@@ -31,7 +32,8 @@ const TRI_STATE_HINT := "auto,enabled,disabled"
 # default is the non-constant `OS.is_debug_build()`.
 const DEFAULTS := {
 	KEY_TIME_SLICING: false,
-	KEY_FRAME_BUDGET_MS: 8.0,
+	KEY_TIME_SLICE_MS: 2.0,
+	KEY_FRAME_BUDGET_MS: 4.0,
 	KEY_HOST_NODE_POOL: true,
 	KEY_HOOK_VALIDATION: "auto",
 	KEY_STRICT_DIAGNOSTICS: "auto",
@@ -86,6 +88,8 @@ static func reapply() -> void:
 static func _apply_now() -> void:
 	if _changed(KEY_TIME_SLICING):
 		RuitkConfig.time_slicing = bool(ProjectSettings.get_setting(KEY_TIME_SLICING))
+	if _changed(KEY_TIME_SLICE_MS):
+		RuitkConfig.time_slice_ms = float(ProjectSettings.get_setting(KEY_TIME_SLICE_MS))
 	if _changed(KEY_FRAME_BUDGET_MS):
 		RuitkConfig.frame_budget_ms = float(ProjectSettings.get_setting(KEY_FRAME_BUDGET_MS))
 	if _changed(KEY_HOST_NODE_POOL):

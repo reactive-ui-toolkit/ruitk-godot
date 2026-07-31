@@ -23,6 +23,7 @@ extends RefCounted
 
 const F = preload("res://addons/reactive_ui_toolkit/core/fiber.gd")
 const Hmr = preload("res://addons/reactive_ui_toolkit/core/hmr.gd")
+const Scheduler = preload("res://addons/reactive_ui_toolkit/core/scheduler.gd")
 
 ## --- Fast Refresh registry (Phase H) ---------------------------------------------------------
 ## Live reconcilers. Registration is unconditional (one WeakRef append per root — negligible,
@@ -82,8 +83,9 @@ func _init(container: Node) -> void:
 
 func render(vnode: RuitkVNode) -> void:
 	# Initial / top-level mount is always synchronous (no time-slicing) to avoid an empty
-	# first frame. Cancel any parked sliced render first so its process_frame tick can't fire
-	# after us, and mark `_work_active` so a setState during render restarts coherently. [M7/M8]
+	# first frame. Cancel any parked sliced render first so its continuation (scheduler slice
+	# or deferred tick) can't fire after us, and mark `_work_active` so a setState during
+	# render restarts coherently. [M7/M8]
 	if _root_current == null:
 		return   # torn down by unmount() — a render after teardown is a no-op, not a crash [audit]
 	_cancel_pending_tick()
@@ -123,12 +125,29 @@ func _ensure_tick() -> void:
 	if _tick_pending:
 		return
 	_tick_pending = true
+	if RuitkConfig.time_slicing:
+		var tree := _get_tree_safe()
+		if tree != null:
+			Scheduler.for_tree(tree).enqueue(_scheduled_slice, Scheduler.Priority.NORMAL)
+			return
 	call_deferred("_tick")
 
+## Scheduler-lane slice action (time-slicing only): the Normal-lane, self-re-enqueueing
+## render slice (FiberReconciler.cs ScheduleRootWork/Slice, :405-424). A cancelled tick
+## (render()/unmount() pre-empted a parked render) leaves a stale entry in the scheduler
+## queue — the `_tick_pending` guard makes it a no-op, mirroring the reference slice's
+## early return when `_nextUnitOfWork` is null.
+func _scheduled_slice() -> void:
+	if not _tick_pending:
+		return
+	_tick()
+
 ## One work pass. Runs the whole render at once unless time-slicing is on, in which case
-## it processes until the frame budget is hit, then parks until the next frame. An update
-## arriving mid-render sets `_restart`, which rebuilds from the root (clearing the effect
-## list) — the invariant that prevents stale Placement effects re-committing.
+## it processes until the render quantum (`RuitkConfig.time_slice_ms`) is hit, then
+## re-enqueues itself on the scheduler's Normal lane (the scheduler's cumulative
+## `frame_budget_ms` decides how many slices fit in one frame). An update arriving
+## mid-render sets `_restart`, which rebuilds from the root (clearing the effect list) —
+## the invariant that prevents stale Placement effects re-committing.
 func _tick() -> void:
 	_tick_pending = false
 	if _root_vnode == null or not is_instance_valid(_container):
@@ -149,14 +168,17 @@ func _tick() -> void:
 		_restart = false
 		_work_active = true
 
-	var start := Time.get_ticks_msec()
+	# Quantum check AFTER each completed unit — a long single unit overruns (no preemption);
+	# FiberReconciler.cs ProcessWorkUntilDeadline (:444-455). usec clock: the 2 ms default
+	# quantum is finer than get_ticks_msec's integer grain.
 	var sliced: bool = RuitkConfig.time_slicing
-	var budget: float = RuitkConfig.frame_budget_ms
+	var quantum: float = RuitkConfig.time_slice_ms
+	var start_ms: float = float(Time.get_ticks_usec()) / 1000.0
 	while _next_unit != null:
 		_next_unit = _perform_unit(_next_unit)
 		if _restart:
 			break
-		if sliced and float(Time.get_ticks_msec() - start) >= budget:
+		if sliced and (float(Time.get_ticks_usec()) / 1000.0) - start_ms >= quantum:
 			break
 
 	if _restart:
@@ -169,24 +191,28 @@ func _tick() -> void:
 	else:
 		_park()
 
-## Resume the parked render on the next frame (time-slicing only).
+## Park the sliced render by re-enqueueing the slice action on the scheduler's Normal lane
+## (the self-re-enqueueing slice, FiberReconciler.cs:405-424). The scheduler pump keeps
+## running queued slices while its cumulative frame budget lasts, so a short quantum can run
+## more than one slice per frame; when the budget is spent, the remainder waits for the next
+## frame's pump. Fallback when the container is not in a tree: next-idle call_deferred,
+## like the sync path.
 func _park() -> void:
 	if _tick_pending:
 		return
 	_tick_pending = true
 	var tree := _get_tree_safe()
 	if tree != null:
-		tree.process_frame.connect(_tick, CONNECT_ONE_SHOT)
+		Scheduler.for_tree(tree).enqueue(_scheduled_slice, Scheduler.Priority.NORMAL)
 	else:
 		call_deferred("_tick")
 
-## Sever a parked process_frame continuation (when render()/unmount() pre-empts a sliced
-## render still in flight), so a stale tick can't fire on a torn-down/replaced tree. [M7]
+## Sever a parked continuation (when render()/unmount() pre-empts a sliced render still in
+## flight), so a stale tick can't fire on a torn-down/replaced tree. [M7] A slice entry
+## already sitting in the scheduler queue cannot be unqueued — clearing `_tick_pending`
+## makes it a no-op instead (see _scheduled_slice).
 func _cancel_pending_tick() -> void:
 	_tick_pending = false
-	var tree := _get_tree_safe()
-	if tree != null and tree.process_frame.is_connected(_tick):
-		tree.process_frame.disconnect(_tick)
 
 ## Get the container's SceneTree, or null — without erroring when it's not in the tree.
 func _get_tree_safe() -> SceneTree:
