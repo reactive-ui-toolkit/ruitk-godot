@@ -16,8 +16,10 @@ extends RefCounted
 ## true O(changed) subtree carry-over is a later perf optimization (see PORTING_PLAN 1.9).
 ##
 ## GDScript divergences vs the C# original:
-##   - No exceptions: error boundaries render a fallback on demand but cannot auto-catch
-##     a render-time crash (GDScript has no try/catch). See `_begin_error_boundary`.
+##   - No exceptions: a failing render cooperatively CALLS `RuitkFail.render(reason)` (it
+##     cannot throw); the latch is consumed after each component render and unwinds to the
+##     nearest error boundary (`_handle_render_failure`). A real GDScript crash (bad index,
+##     call on null) still cannot be auto-caught — that limitation survives.
 ##   - Fresh fibers each pass (no 2-object double-buffer reuse) — simpler lifecycle, GC'd
 ##     via explicit cycle-severing.
 
@@ -63,15 +65,17 @@ var _has_deletions := false
 var _is_committing := false
 var _deferred_updates: Array = []
 var _work_active := false      ## a render is in progress (possibly parked between frames)
-var _restart := false          ## rebuild from root next tick (clears effect list) — the render-FAILURE path only; updates DEFER instead (family parity P2, L-05)
+var _restart := false          ## the pass is POISONED: a render failure activated a boundary — the work loop abandons the WIP and rebuilds from root (the render-FAILURE path ONLY; updates DEFER instead — family parity P2/P3, L-05)
 var _tick_pending := false     ## a _tick is scheduled (call_deferred or scheduler slice)
-var _restart_count := 0
+var _restart_count := 0        ## consecutive error rebuilds within the current pass (cap _MAX_ERROR_RESTARTS; reset at pass start and on commit)
+var _pending_eb_activations: Array = []   ## mount-pass boundary activations recorded by key-path, re-adopted by the rebuilt pass (Unreal PendingEbActivations); stale entries clear at commit/unmount
 var _is_replaying_deferred := false   ## _commit_root is draining _deferred_updates — replayed updates must re-mark and schedule, never re-defer (FiberReconciler.cs:23)
 var _in_component_render := false     ## a component's render fn is on the stack (setState-in-render discriminator)
 var _deferred_render_phase := false   ## the in-flight pass deferred >= 1 update FROM INSIDE a render fn (depth-guard accounting; external updates deferred while parked are legitimate load and never count)
 var _render_depth := 0                ## CONSECUTIVE commits whose render fns deferred updates (setState-in-render loops)
 var _warned_detached := false
 const _MAX_RENDER_DEPTH := 25         ## FiberFunctionComponent.cs:18 (MaxRenderDepth)
+const _MAX_ERROR_RESTARTS := 25       ## RuitkReconciler.h MaxErrorRestarts (error-boundary rebuild cap)
 
 func _init(container: Node) -> void:
 	_container = container
@@ -98,11 +102,14 @@ func render(vnode: RuitkVNode) -> void:
 	_root_vnode = vnode
 	_root_current.has_pending_update = true
 	_work_active = true
+	_restart_count = 0
 	_begin_render()
 	while _next_unit != null:
 		_next_unit = _perform_unit(_next_unit)
+		if _restart and not _consume_error_restart():
+			return   # abandoned at the rebuild cap: nothing commits, the container keeps its prior state
 	_work_active = false
-	_restart = false
+	_restart_count = 0
 	_commit_root()
 
 ## Mark a fiber dirty and (unless a pass or commit is in flight) schedule a coalesced render.
@@ -189,28 +196,19 @@ func _scheduled_slice() -> void:
 ## One work pass. Runs the whole render at once unless time-slicing is on, in which case
 ## it processes until the render quantum (`RuitkConfig.time_slice_ms`) is hit, then
 ## re-enqueues itself on the scheduler's Normal lane (the scheduler's cumulative
-## `frame_budget_ms` decides how many slices fit in one frame). `_restart` rebuilds from
-## the root, clearing the effect list — the invariant that prevents stale Placement
-## effects re-committing; since family parity P2 it serves the render-FAILURE path only
-## (updates arriving mid-render DEFER — see schedule_update_on_fiber).
+## `frame_budget_ms` decides how many slices fit in one frame). A render FAILURE poisons
+## the pass (`_restart`): the loop abandons the WIP and rebuilds from the root immediately,
+## so the newly-activated boundary's fallback lands in THIS pass's commit — see
+## `_consume_error_restart` (updates arriving mid-render DEFER — see
+## schedule_update_on_fiber; the failure rebuild is the restart machinery's ONLY use, L-05).
 func _tick() -> void:
 	_tick_pending = false
 	if _root_vnode == null or not is_instance_valid(_container):
 		_work_active = false
 		return
-	if not _work_active or _restart:
-		if _restart:
-			_restart_count += 1
-			if _restart_count > 25:
-				push_error("[reactive_ui_toolkit] Too many re-renders (setState during render?). Aborting pass.")
-				_work_active = false
-				_restart = false
-				_restart_count = 0
-				return
-		else:
-			_restart_count = 0
+	if not _work_active:
+		_restart_count = 0
 		_begin_render()
-		_restart = false
 		_work_active = true
 
 	# Quantum check AFTER each completed unit — a long single unit overruns (no preemption);
@@ -222,19 +220,81 @@ func _tick() -> void:
 	while _next_unit != null:
 		_next_unit = _perform_unit(_next_unit)
 		if _restart:
-			break
+			if not _consume_error_restart():
+				return   # abandoned at the rebuild cap; committed UI stays
+			continue     # rebuilt: keep working (the quantum check resumes next unit)
 		if sliced and (float(Time.get_ticks_usec()) / 1000.0) - start_ms >= quantum:
 			break
 
-	if _restart:
-		_ensure_tick()
-		return
 	if _next_unit == null:
 		_work_active = false
 		_restart_count = 0
 		_commit_root()
 	else:
 		_park()
+
+## Consume the pass-poison flag set by `_handle_render_failure`: a render failure activated
+## an error boundary, so abandon the poisoned WIP (its walk already reconciled the FAILING
+## children under the boundary) and rebuild from the root NOW — the fallback then lands in
+## THIS commit, mount and update alike (Unreal RuitkReconciler.cpp DoWork's bPassPoisoned
+## consume). Bounded: a rebuild only happens when a boundary NEWLY activates (an active one
+## can't re-capture — the captured-boundary rule), and `_restart_count` caps the mount-path
+## adopt-miss loop. Returns false when the cap is exceeded: the pass is abandoned (committed
+## UI stays) after reclaiming the WIP's never-committed nodes.
+func _consume_error_restart() -> bool:
+	_restart = false
+	_restart_count += 1
+	_reclaim_abandoned_wip(_wip_root)
+	if _restart_count > _MAX_ERROR_RESTARTS:
+		push_error("[reactive_ui_toolkit] Too many error-boundary rebuilds (%d). Abandoning the pass." % _MAX_ERROR_RESTARTS)
+		_work_active = false
+		_next_unit = null
+		_restart_count = 0
+		return false
+	_begin_render()
+	return true
+
+## Release what an abandoned (error-poisoned) pass created before the rebuild orphans it —
+## the analog of the reference's abandoned-WIP slab reclaim in BeginRender
+## (RuitkReconciler.cpp:418-426). Fibers NEWLY allocated by the abandoned walk
+## (alternate == null; a reused fiber is the live tree's ping-pong buddy and is left for
+## the next pass to re-reuse) sever their links and fresh component state so the RefCounted
+## cycles collect, and a fresh host node that never entered the scene is recycled or freed.
+func _reclaim_abandoned_wip(fiber: RuitkFiber) -> void:
+	var c := fiber.child
+	while c != null:
+		var nxt := c.sibling
+		_reclaim_abandoned_wip(c)
+		c = nxt
+	if fiber == _wip_root:
+		return
+	if fiber.alternate == null:
+		# CAREFUL: a stable leaf list is reused IN PLACE by _try_fast_leaf_list — its LIVE
+		# fibers (committed in-tree nodes, no buddy) sit directly in the WIP child chain and
+		# also match `alternate == null`. They are NOT this pass's allocations: severing
+		# their sibling/parent links would corrupt the live tree (bughunt P3-1). A node that
+		# exists but is invalid is skipped the same way (conservative: never corrupt).
+		if fiber.node != null and (not is_instance_valid(fiber.node) or fiber.node.is_inside_tree()):
+			return
+		# Newly allocated this pass: nothing else references it. Its node (if _complete_work
+		# already created one) was never placed — pool it like a deleted leaf, or free it.
+		if fiber.node != null:
+			if RuitkConfig.host_node_pool and fiber.node.get_child_count() == 0:
+				_recycle_node(fiber.node, fiber.props if fiber.props != null else {})
+			else:
+				fiber.node.queue_free()
+		_dispose_fiber_state(fiber)
+		fiber.parent = null
+		fiber.child = null
+		fiber.sibling = null
+		fiber.next_effect = null
+		fiber.node = null
+		fiber.deletions = []
+	else:
+		# Reused buddy: detach it from the abandoned chain; the rebuilt pass's _reconcile
+		# resets every render-scoped field when it re-reuses the fiber.
+		fiber.child = null
+		fiber.next_effect = null
 
 ## Park the sliced render by re-enqueueing the slice action on the scheduler's Normal lane
 ## (the self-re-enqueueing slice, FiberReconciler.cs:405-424). The scheduler pump keeps
@@ -369,6 +429,14 @@ func _render_component(fiber: RuitkFiber) -> Array:
 	var result = fiber.component.call(fiber.pending_props, fiber.input_children)
 	_in_component_render = false
 	Hooks._end()
+	# Cooperative error latch (family parity P3; Unreal D-10): a failing render CALLED
+	# RuitkFail.render(...). Consume per component, immediately — the failed output is
+	# discarded and the pass unwinds to the nearest boundary (the WIP is abandoned
+	# pre-commit, so the committed tree stays intact until the rebuilt pass commits).
+	var failure = RuitkFail._consume()
+	if failure != null:
+		_handle_render_failure(fiber, failure)
+		result = null
 	RuitkDiagnostics.on_render()
 	state.last_output = _to_vnode_array(result)
 	if not state.effects.is_empty():
@@ -378,23 +446,83 @@ func _render_component(fiber: RuitkFiber) -> Array:
 	return state.last_output
 
 func _begin_error_boundary(fiber: RuitkFiber) -> RuitkFiber:
-	# NOTE: GDScript has no try/catch, so this cannot auto-catch a child render crash.
-	# It renders the fallback when `eb_active` is set (toggled imperatively) and clears it
-	# when `reset_key` changes. Structural parity; auto-catch is a documented limitation.
+	# A mount-pass failure recorded its activation by key-path (the WIP fiber that carried
+	# it was abandoned with that pass) — re-adopt it before deciding what to render.
+	if not _pending_eb_activations.is_empty():
+		_adopt_pending_eb_activation(fiber)
+	# Structural boundary (family shape, Unreal BeginErrorBoundary): renders `fallback`
+	# while active; a `reset_key` change clears. Activation is cooperative — a failing
+	# descendant render calls RuitkFail.render and _handle_render_failure latches the
+	# boundary (GDScript has no exceptions, so a hard crash is still not auto-caught).
+	# A missing alternate is a MOUNT, not a reset: there is nothing to clear, and a
+	# just-adopted mount-pass activation must survive.
 	var alt := fiber.alternate
-	var reset_requested: bool = alt == null or alt.eb_reset_key != fiber.eb_reset_key
+	var reset_requested: bool = alt != null and alt.eb_reset_key != fiber.eb_reset_key
 	if reset_requested:
 		fiber.eb_active = false
-		fiber.eb_showing_fallback = false
 		fiber.eb_last_error = null
+	fiber.eb_showing_fallback = fiber.eb_active and not reset_requested
 	var children: Array
-	if fiber.eb_active and not reset_requested:
+	if fiber.eb_showing_fallback:
 		children = [fiber.eb_fallback] if fiber.eb_fallback != null else []
 	else:
 		children = fiber.eb_children
 	if _reconcile_children(fiber, _old_first(alt), children):
 		return null
 	return fiber.child
+
+## Unwind a failed render to the nearest error boundary (Unreal HandleRenderFailure).
+## Walks the WIP parent chain — pre-commit, safe. An ALREADY-ACTIVE boundary can't capture
+## again this pass (its fallback is what just failed) — skip upward, or the failure loops
+## forever (React's captured-boundary rule).
+func _handle_render_failure(failed_fiber: RuitkFiber, reason: String) -> void:
+	var f := failed_fiber
+	while f != null:
+		if f.tag == F.Tag.ERROR_BOUNDARY and not f.eb_active:
+			f.eb_active = true
+			f.eb_last_error = reason
+			if f.alternate != null:
+				# The committed twin carries the activation into the rebuilt pass (the
+				# rebuild's _reconcile reuse copies eb_* from the live fiber).
+				f.alternate.eb_active = true
+				f.alternate.eb_last_error = reason
+			else:
+				# Mount-pass boundary: this WIP fiber is abandoned with the pass and has no
+				# committed twin, so record the activation by key-path for the rebuilt pass
+				# to re-adopt (_begin_error_boundary). If an ancestor renders differently
+				# and the path misses, the child just fails again and re-records —
+				# self-healing, bounded by the error-restart cap.
+				_pending_eb_activations.append({ "path": _eb_key_path(f), "reason": reason })
+			if f.eb_handler.is_valid():
+				f.eb_handler.call(reason)
+			# Poison the pass: the work loop abandons the WIP (never committed) and rebuilds
+			# from the root so the boundary renders its fallback — the ERROR path's rebuild
+			# only; setState never poisons a pass (defer-don't-restart, L-05).
+			_restart = true
+			push_error("[reactive_ui_toolkit] render failed: %s (caught by error boundary)" % reason)
+			return
+		f = f.parent
+	push_error("[reactive_ui_toolkit] render failed with no error boundary above: %s" % reason)
+
+## Root-to-boundary identity for a mount-pass activation: the fiber key at each level from
+## the boundary up to (excluding) the root — stable across the abandoned and rebuilt passes
+## as long as the ancestors render the same shape (Unreal AdoptPendingEbActivation).
+func _eb_key_path(fiber: RuitkFiber) -> Array:
+	var path: Array = []
+	var p := fiber
+	while p != null and p.tag != F.Tag.ROOT:
+		path.append(_fiber_key(p))
+		p = p.parent
+	return path
+
+func _adopt_pending_eb_activation(fiber: RuitkFiber) -> void:
+	var path := _eb_key_path(fiber)
+	for i in _pending_eb_activations.size():
+		if _pending_eb_activations[i]["path"] == path:
+			fiber.eb_active = true
+			fiber.eb_last_error = _pending_eb_activations[i]["reason"]
+			_pending_eb_activations.remove_at(i)
+			return
 
 # --------------------------------------------------------------------------
 # Reconciliation
@@ -465,6 +593,7 @@ func _reconcile(parent_fiber: RuitkFiber, old_fiber: RuitkFiber, vnode: RuitkVNo
 		if fiber.tag == F.Tag.ERROR_BOUNDARY:   # inlined is_error_boundary() [perf]
 			fiber.eb_active = old_fiber.eb_active
 			fiber.eb_showing_fallback = old_fiber.eb_showing_fallback
+			fiber.eb_last_error = old_fiber.eb_last_error
 		# carry the cached apply plan (the size guard rebuilds it if the prop shape changed) [perf]
 		fiber.apply_size = old_fiber.apply_size
 		fiber.apply_special = old_fiber.apply_special
@@ -759,6 +888,7 @@ func _commit_root() -> void:
 		_enforce_child_order(hp)
 
 	_root_current = _wip_root
+	_pending_eb_activations.clear()   # activations that never found their boundary are stale now
 	_is_committing = false
 
 	_flush_passive()
@@ -1147,6 +1277,7 @@ func _release(fiber: RuitkFiber) -> void:
 
 func unmount() -> void:
 	_cancel_pending_tick()
+	_pending_eb_activations.clear()
 	if not _hmr_live.is_empty():   # drop our Fast Refresh registration (and any dead refs with it)
 		var kept: Array = []
 		for wr in _hmr_live:

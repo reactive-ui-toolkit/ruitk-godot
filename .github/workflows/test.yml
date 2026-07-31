@@ -128,6 +128,9 @@ jobs:
       - name: Demo smoke tests
         run: godot --headless --path . --script res://tests/demos_test.gd
 
+      - name: Error-boundary latch + strict-mode tests (RuitkFail, _handle_render_failure)
+        run: godot --headless --path . --script res://tests/strict_boundary_test.gd
+
       - name: GUITKX compiler tests (.guitkx -> .gd + codegen mechanism)
         run: godot --headless --path . --script res://tests/guitkx_test.gd
 

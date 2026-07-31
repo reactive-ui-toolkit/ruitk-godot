@@ -171,8 +171,10 @@ static func suspense(props := {}, children = null, key = null) -> RuitkVNode:
 	return fc(RuitkSuspense.suspense_fn, props, children, key)
 
 ## An error boundary. props: { "fallback": vnode, "on_error": Callable, "reset_key": any }.
-## NOTE: GDScript can't catch render crashes; the boundary shows `fallback` when activated
-## imperatively and resets when `reset_key` changes. See reconciler `_begin_error_boundary`.
+## Shows `fallback` after a descendant render calls `RuitkFail.render(reason)` — the
+## cooperative latch (GDScript can't catch a hard render crash; the latch is the no-throw
+## substitute) — invokes `on_error` with the reason, and resets when `reset_key` changes.
+## See reconciler `_begin_error_boundary` / `_handle_render_failure`.
 static func error_boundary(props := {}, children = null, key = null) -> RuitkVNode:
 	return RuitkVNode.make_error_boundary(props, _norm(children), key)
 

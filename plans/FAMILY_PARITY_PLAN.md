@@ -786,7 +786,62 @@ medians, 5 runs on the noisy N=1500 row): 6.897/6.893/17.595/37.561/57.120 vs
 6.897/6.893/17.408/37.814/57.219 — ≤1.1% everywhere (within the observed noise band;
 N=2000/3000 ±0.2%). No test forces sync to pass — the sliced tests await settlement.
 
-### P3 — error-boundary latch (RuitkFail) — pending
+### P3 — error-boundary latch (RuitkFail) — DONE (2026-07-31)
+
+Shipped (defaults unchanged):
+
+- **`core/fail.gd` (NEW, `class_name RuitkFail`)** — the cooperative latch per L-06:
+  `static render(reason)` first-failure-wins + internal `_consume()`, doc'd as the
+  no-throw path (RuitkCoreMisc.h/.cpp).
+- **Reference drift, verified by reading:** the Unreal latch machinery moved past this
+  plan's anchors (now RuitkReconciler.cpp:717-844) — `bRestart` became `bPassPoisoned`,
+  consumed INSIDE the work loop with an IMMEDIATE `BeginRender()` rebuild (fallback lands
+  in the SAME commit, mount and update alike), bounded by a per-pass `ErrorRestarts`
+  counter against `MaxErrorRestarts = 25` (RuitkReconciler.h:234), plus abandoned-WIP
+  slab reclaim in BeginRender and a dedicated cap message. Ported THAT shape (per the
+  §8 ambiguity rule: the reference wins) onto the dormant `_restart`/`_restart_count`
+  fields — still their only use (L-05): both work loops (mount `render()` + `_tick`)
+  consume the poison via `_consume_error_restart()`. DEVIATION from L-05's message note:
+  the cap error is the reference's current dedicated text ("Too many error-boundary
+  rebuilds (25). Abandoning the pass.") — the old cap-25 text now belongs to the P2
+  depth guard and would mislead ("setState during render?") on the error path.
+- **`_handle_render_failure`** — consume-after-every-component-render in
+  `_render_component` (output discarded, `on_render` still counts); walk WIP parents for
+  the nearest NON-ACTIVE boundary (captured-boundary rule); set `eb_active`+`eb_last_error`
+  on the fiber AND its committed twin; mount-pass boundaries (no twin) record a pending
+  activation by key-path, re-adopted in `_begin_error_boundary` (adopt-first, then the
+  mount-vs-reset rule — `reset_requested` now REQUIRES an alternate, fixing the
+  `alt == null`-counts-as-reset bug the plan names); `eb_handler` invoked; no boundary →
+  push_error and continue. `_reconcile` reuse now carries `eb_last_error` (Unreal :961);
+  pendings clear at commit tail + unmount.
+- **`_reclaim_abandoned_wip`** — the BeginRender slab-reclaim analog: severs fibers the
+  abandoned walk newly allocated (cycle-breaking + fresh-state dispose) and pools/frees
+  their never-placed nodes. **Bughunt find P3-1 (fixed + pinned):** `_try_fast_leaf_list`
+  stitches LIVE fibers (in-place reuse, `alternate == null`, committed nodes) into the
+  WIP chain — the first reclaim cut severed them, corrupting the live sibling chain. The
+  guard skips any fiber whose node is in-tree (or invalid — conservative). The pin is an
+  IDENTITY assert (same node instances survive the poisoned pass) because the node pool
+  masks a count-only assert — verified red-with-guard-off / green-with-guard-on.
+- v.gd + reconciler-header boundary comments rewritten to the latch reality (still no
+  auto-catch of a hard GDScript crash).
+- **NEW suite `tests/strict_boundary_test.gd` (41 asserts):** latch API first-wins;
+  mount-pass pending activation (fallback lands synchronously in the mount commit);
+  nearest-boundary + sibling/outer isolation + `on_error` + white-box eb fields;
+  first-failure-wins (second failing child never renders); active-boundary escalation
+  (failing fallback captured by the NEXT boundary up); reset_key recovery (clears
+  eb_active/eb_last_error); no-boundary path (failed component renders empty, siblings
+  stay, later renders recover); adopt-miss loop capped at exactly 26 renders/26 on_error
+  with nothing committed and clean unmount; the latch under time_slicing true (sliced
+  pass rebuild) and false; the P3-1 fast-list identity pin. CI step added after
+  demos_test in test.yml; CLAUDE.md suite list now 16.
+
+Acceptance: full §7 verify green — core 133/0 · settings 64/0 · scheduler 56/0 ·
+**strict_boundary 41/0 (NEW)** · style 42/0 · router_match 18/0 · router_spine 37/0 ·
+update PASSED · demos 31/0 · doom 179/0 · guitkx PASSED · hmr PASSED (55) ·
+guitkx_editor 428/0 · guitkx_lsp 39/0 · contract 66/66 · migrate 0 · machine-path gate
+green · guitkx_build 49/0.
+
+### P4 — strict mode — pending
 
 ## 9. Risks / watch-list / STOP-AND-ASK
 
