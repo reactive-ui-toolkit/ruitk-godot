@@ -4,6 +4,35 @@ All notable changes to **Reactive UI Toolkit — Godot** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.14.0] — 2026-07-31
+
+### Added
+
+- **Unified settings: the runtime's tunables are now native Project Settings.** The existing
+  `RuitkConfig` / `RuitkDiagnostics` knobs appear under **Project → Project Settings →
+  Reactive Ui Toolkit** (family-wide campaign; the Unity and Unreal legs ship the same surface
+  in their engines' native settings): `reactive_ui_toolkit/runtime/time_slicing`,
+  `runtime/frame_budget_ms`, `runtime/host_node_pool`, `runtime/hook_validation`,
+  `runtime/strict_diagnostics`, `reactive_ui_toolkit/diagnostics/enabled`, and
+  `diagnostics/capture`. The two validators are `auto`/`enabled`/`disabled` tri-states —
+  `auto` keeps the compiled `OS.is_debug_build()` behavior. Settings load once at first mount
+  (`RuitkRoot.create`), work in exported games, and only user-*changed* values apply — so
+  assigning the statics directly from code (`RuitkConfig.time_slicing = true`) keeps working
+  exactly as before. Both plugins register the group (idempotent), and `override.cfg` gives
+  per-machine overrides for free. New suite: `tests/settings_test.gd`.
+- **One settings dialog in the Godot editor.** With the editor addon enabled, a top-level
+  **Reactive UI Toolkit** menu in the editor's main menu bar (**Settings...**; degrades
+  automatically to **Project ▸ Tools ▸ Reactive UI Toolkit Settings...** if the menu bar cannot
+  be injected) — or the **Settings** button in the
+  ReactiveUITK main-screen toolbar — opens a single dialog (family design: one settings screen
+  per leg, on the plugin's own menu surface): a **Runtime** section with the seven
+  `reactive_ui_toolkit/*` keys above and an **Editor** section with the six
+  `reactive_ui_toolkit_editor/*` toggles. It is now the primary settings UI; storage is
+  unchanged — the dialog reads and writes the same Project Settings keys (saving only when a
+  value actually changed), so the native Project Settings dialog remains a mirror and
+  `override.cfg` overrides keep working. With the runtime addon absent the dialog degrades to
+  the Editor section alone.
+
 ## [0.13.0] — 2026-07-28
 
 ### Changed — BREAKING: the Reactive UI Toolkit rename (names only, zero behavior changes)
