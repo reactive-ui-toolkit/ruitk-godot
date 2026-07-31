@@ -656,6 +656,42 @@ godot --headless --path . --script res://tests/bench.gd                 # 3x, re
 - Do NOT relitigate §0. Ambiguity between this plan and the reference sources = read the
   reference again; still ambiguous = STOP AND ASK.
 
+---
+
+## 10. Execution log (append-only; one entry per phase, written with that phase's commit)
+
+### P0 — baseline — DONE (2026-07-31)
+
+Tree at start: `feat/family-parity` == `origin/dev` == 7b38f41 (the unified-settings campaign
+landed and was released — runtime 0.14.0, editor 0.12.0 — so §2's "uncommitted" framing is now
+"committed"; all anchors re-verified by reading, minor line drift only, shapes unchanged).
+Godot 4.7-stable (console binary via `.ruitk-local.json`); no editor held the project, so the
+ordered scan steps ran normally.
+
+§7 verify list, untouched tree — ALL GREEN:
+core 133/0 · settings 56/0 · style 42/0 · router_match 18/0 · router_spine 37/0 ·
+update ALL PASSED · demos 31/0 · doom 179/0 · guitkx ALL PASSED · hmr ALL PASSED (55) ·
+guitkx_editor 428/0 · guitkx_lsp 39/0 · contract 66/66 · migrate "migrated 0" ·
+machine-path gate green · guitkx_build 49 files, 0 errors.
+
+`tests/bench.gd` 3× at defaults (sync path) — ms/frame (median of 3):
+
+| N | run1 | run2 | run3 | median |
+|---|---|---|---|---|
+| 300 | 6.897 | 6.899 | 6.897 | 6.897 |
+| 750 | 6.936 | 6.893 | 6.893 | 6.893 |
+| 1500 | 17.408 | 17.254 | 17.906 | 17.408 |
+| 2000 | 37.814 | 37.118 | 38.294 | 37.814 |
+| 3000 | 57.219 | 58.254 | 56.635 | 57.219 |
+
+N=300/750 sit on the headless frame-pacing floor (~6.9 ms/frame, ~145 fps) — only N≥1500 rows
+are informative for regression comparison. Context run, `time_slicing = true` (today's 8.0
+single-budget park loop, temp edit reverted): 6.897 / 6.893 / 12.932 / 17.366 / 26.678 —
+NOT comparable 1:1 to sync (a parked pass spreads across frames; fps counts frames, not
+commits). Recorded for before/after context only.
+
+### P1 — scheduler + quantum/budget split — pending
+
 ## 9. Risks / watch-list / STOP-AND-ASK
 
 - **Headless timing flakiness** (scheduler budgets are wall-clock): design scheduler tests
