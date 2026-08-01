@@ -106,9 +106,11 @@ for (const t of (schema.hostElements ?? []) as SchemaTag[]) {
 
 // https://vite.dev/config/
 export default defineConfig({
-  // GitHub Pages PROJECT site: served from /ruitk-godot/. Asset URLs are base-prefixed and the
-  // router basename mirrors this (see src/main.tsx). Switch both to '/' for a custom domain.
-  base: '/ruitk-godot/',
+  // Mounted under the family documentation site at <domain>/godot/ (the `documentation` repo
+  // aggregates every leg; this build is pushed into its /godot/ folder by docs-sync.yml).
+  // Asset URLs are base-prefixed and the router basename mirrors this (see src/main.tsx), so
+  // this value MUST equal the public path the site is served from.
+  base: '/godot/',
   plugins: [react()],
   define: {
     __PACKAGE_VERSION__: JSON.stringify(readAddonVersion()),

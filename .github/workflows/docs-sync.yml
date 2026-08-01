@@ -1,0 +1,99 @@
+name: Docs sync
+
+# Build RuitkGodotDocs~ and push it into the family documentation site's /godot/ folder
+# (reactive-ui-toolkit/documentation, which is what reactiveuitoolkit.info serves).
+#
+# Each leg owns its own folder there and nothing else, so the three legs never touch the same
+# files — that is what makes the push-with-rebase-retry below safe under concurrent publishes.
+#
+# Deliberately a SEPARATE workflow from publish.yml, and dispatch-only: syncing docs must never
+# require running a release, and testing this must never risk cutting one. publish.yml can call
+# it later via `workflow_call` once the aggregator is the live docs host.
+#
+# Requires secret DOCUMENTATION_SYNC_PATS: a fine-grained PAT whose resource owner is the
+# reactive-ui-toolkit org, scoped to the `documentation` repo, with Contents: read and write.
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      DOCUMENTATION_SYNC_PATS:
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-sync
+  cancel-in-progress: false
+
+env:
+  AGG_REPO: reactive-ui-toolkit/documentation
+  LEG_DIR: godot
+
+jobs:
+  sync:
+    name: Build docs + push to the family site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: RuitkGodotDocs~
+        run: npm ci
+
+      - name: Build
+        working-directory: RuitkGodotDocs~
+        run: npm run build
+
+      - name: Guard — the build must match the folder it is served from
+        # vite.config.ts `base` is baked into every asset URL at build time. If it drifts from
+        # /godot/, the deployed site loads a blank page with 404s on its own JS/CSS -- and it
+        # would deploy perfectly happily. Cheaper to fail here than to debug it live.
+        run: |
+          if ! grep -q '"\?/${{ env.LEG_DIR }}/' RuitkGodotDocs~/dist/index.html; then
+            echo "::error::dist/index.html does not reference /${{ env.LEG_DIR }}/ — check vite.config.ts base"
+            grep -o 'src="[^"]*"\|href="[^"]*"' RuitkGodotDocs~/dist/index.html | head -20
+            exit 1
+          fi
+          echo "OK: assets are base-prefixed with /${{ env.LEG_DIR }}/"
+
+      - name: Push into the family documentation site
+        env:
+          TOKEN: ${{ secrets.DOCUMENTATION_SYNC_PATS }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${AGG_REPO}.git" _agg
+          cd _agg
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Replace the folder wholesale so files deleted upstream don't linger.
+          rm -rf "${LEG_DIR}"
+          mkdir -p "${LEG_DIR}"
+          cp -r "../RuitkGodotDocs~/dist/." "${LEG_DIR}/"
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No documentation changes to publish."
+            exit 0
+          fi
+          git commit -m "docs(${LEG_DIR}): sync from ${GITHUB_REPOSITORY}@${GITHUB_SHA}"
+
+          # Legs write disjoint folders, so a rebase is effectively always conflict-free; the
+          # retry exists for the plain race of two legs pushing within the same few seconds.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              echo "Pushed on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Push rejected (attempt ${attempt}) — rebasing onto the latest main."
+            git pull --rebase origin main
+          done
+          echo "::error::could not push to ${AGG_REPO} after 5 attempts"
+          exit 1
