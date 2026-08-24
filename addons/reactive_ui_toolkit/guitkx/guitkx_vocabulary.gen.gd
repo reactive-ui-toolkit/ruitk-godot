@@ -192,11 +192,13 @@ const DATA: Dictionary = {
 		"GUITKX2325": "error",
 		"GUITKX2326": "error",
 		"GUITKX2327": "error",
+		"GUITKX2328": "error",
 		"GUITKX2504": "error",
 		"GUITKX2505": "error",
 		"GUITKX2506": "error",
 		"GUITKX2507": "error",
-		"GUITKX2508": "error"
+		"GUITKX2508": "error",
+		"GUITKX2509": "error"
 	},
 	"v_factories": [
 		"AspectRatioContainer",

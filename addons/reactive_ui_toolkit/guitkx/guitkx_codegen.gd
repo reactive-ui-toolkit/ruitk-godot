@@ -529,6 +529,9 @@ static func compile_file(guitkx_path: String, known_components: Array = [], comp
 	var gd_parse_ok := gd_source_parses(r["gd"])
 	if not gd_parse_ok:
 		push_error("[guitkx] %s: the generated %s has GDScript errors (see the parser messages above) -- likely an unknown identifier or type error in an expression; fix the .guitkx source" % [guitkx_path, gd_path.get_file()])
+	# `ok` deliberately stays TRUE: an unknown identifier is legal .guitkx and a GDScript-level
+	# concern (0.6.2 contract, covered by the cold-open test). `gd_parse_ok` is the GDScript verdict;
+	# compile_all's PASS 2 is what turns a rejected output into a counted error.
 	return { "ok": true, "path": guitkx_path, "gd_path": gd_path, "diagnostics": r["diagnostics"], "gd_parse_ok": gd_parse_ok }
 
 ## True if generated GDScript source parses on a throwaway GDScript (resource-cache-clean). The
@@ -711,8 +714,20 @@ static func compile_all(root: String = "res://") -> Dictionary:
 	# M4 PASS 2: with every .gd on disk, re-check each output. A file that still doesn't parse has a
 	# real error (unknown identifier, or a preload target that genuinely never got written); one that
 	# only awaited a sibling now heals. gd_ok gates the HMR push -- never hot-load a rejected script.
+	var parsed_ok: Array = []
 	for c in compiled:
-		c["gd_ok"] = gd_path_parses(str(c["gd_path"]))
+		var ok2 := gd_path_parses(str(c["gd_path"]))
+		c["gd_ok"] = ok2
+		if ok2:
+			parsed_ok.append(c)
+		else:
+			# The .gd was WRITTEN but does not parse. Reporting it under `compiled` is what let the
+			# sweep print "N compiled, 0 error(s)" -- and a cheerful "compiled -> <path>" -- while the
+			# engine spat parse errors for a file the user had just been told was fine.
+			errors.append({ "ok": false, "path": c["path"], "gd_path": c["gd_path"], "diagnostics": [
+				Diag.make("GUITKX2509", Diag.ERROR, "the generated %s does not parse as GDScript (see the parser messages in Output) -- the .guitkx compiled, but its output is not loadable" % str(c["gd_path"]).get_file(), -1, 0),
+			] })
+	compiled = parsed_ok
 	if force and held.is_empty():
 		_write_fp_marker()
 	var refresh_roots := _compute_refresh_roots(compiled, all_paths, pb["sources"])

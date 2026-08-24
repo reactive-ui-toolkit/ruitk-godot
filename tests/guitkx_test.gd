@@ -2232,6 +2232,28 @@ func _test_es_modules_declarations() -> void:
 	var xguard := RuitkGuitkx.compile("use_foo() -> RuitkVNode {\n\treturn ( <Label /> )\n}\n", "use_foo")
 	_check_true(not xguard["ok"] and _has_code(xguard, "GUITKX2321") and not _has_code(xguard, "GUITKX2100"), "E-02: use_-prefixed + RuitkVNode is 2321 only (got %s)" % str(xguard["diagnostics"]))
 
+	# E-01 classifier guard (GUITKX2328): a decl that RETURNS MARKUP but is not a component. Left
+	# unguarded, the body lowered VERBATIM and the generated .gd could not parse -- with `0 error(s)`
+	# reported, because a raw GDScript parse error names no .guitkx source. The pre-0.13 spelling is
+	# called out by name: it is what every 0.12->0.13 upgrader who skipped the codemod hits.
+	var old_ret := RuitkGuitkx.compile("HelloWorld() -> RuitkVNode {
+	return ( <Label /> )
+}
+", "hello")
+	_check_true(not old_ret["ok"] and _has_code(old_ret, "GUITKX2328"), "E-01: markup in a non-component is 2328 (got %s)" % str(old_ret["diagnostics"]))
+	_check_true(str(_diag(old_ret, "GUITKX2328").get("message", "")).contains("migrate_0_13_0"), "E-01: 2328 names the codemod when the pre-0.13 `RuitkVNode` spelling is found (got %s)" % str(_diag(old_ret, "GUITKX2328").get("message", "")))
+	var no_ret := RuitkGuitkx.compile("HelloWorld() {
+	return ( <Label /> )
+}
+", "hello")
+	_check_true(not no_ret["ok"] and _has_code(no_ret, "GUITKX2328"), "E-01: markup with NO return annotation is 2328 (got %s)" % str(no_ret["diagnostics"]))
+	# ...and the guard must never fire on a parenthesized comparison, which merely LOOKS like markup.
+	var cmp_ok := RuitkGuitkx.compile("lt(a: int, b: int) -> bool {
+	return (a < b)
+}
+", "lt")
+	_check_true(cmp_ok["ok"] and not _has_code(cmp_ok, "GUITKX2328"), "E-01: `return (a < b)` is not markup (got %s)" % str(cmp_ok.get("diagnostics", [])))
+
 	# E-01: a `use_`-prefixed callable with no `-> RuitkVNode` is a hook -- emits under its own name
 	# (no `render` aliasing; that only applies to components).
 	var hook := RuitkGuitkx.compile("use_count(start: int) -> int {\n\treturn start\n}\n", "use_count")
@@ -2596,11 +2618,18 @@ func _test_es_modules_m4_ordering() -> void:
 	# pass 2 must reject it (this is exactly what makes guitkx_build's counted gate exit 1).
 	_imp_write(dir + "/z_vals.guitkx", "export zw: int = nonexistent_fn_xyz()\n")
 	var r2 := Codegen.compile_all(dir)
-	var broken_ok := true
+	var still_compiled := false
 	for c2 in (r2["compiled"] as Array):
 		if str(c2["path"]) == dir + "/z_vals.guitkx":
-			broken_ok = bool(c2["gd_ok"])
-	_check_true(not broken_ok, "M4.1: a broken value initializer FAILS the counted parse gate (gd_ok=false)")
+			still_compiled = true
+	_check_true(not still_compiled, "M4.1: a rejected output is NOT reported as compiled")
+	var rejected := false
+	for e2 in (r2["errors"] as Array):
+		if str((e2 as Dictionary).get("path", "")) == dir + "/z_vals.guitkx":
+			for d2 in ((e2 as Dictionary).get("diagnostics", []) as Array):
+				if str((d2 as Dictionary).get("code", "")) == "GUITKX2509":
+					rejected = true
+	_check_true(rejected, "M4.1: a broken value initializer FAILS the counted parse gate (GUITKX2509 error)")
 	# M4.2: flipping a value's export status recompiles importers in the SAME sweep
 	# (export_hash + _reverse_edge_stale). Restore, sweep to settle, then flip.
 	_imp_write(dir + "/z_vals.guitkx", "export zw: int = 9\n")
