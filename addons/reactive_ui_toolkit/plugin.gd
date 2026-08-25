@@ -187,8 +187,17 @@ func _compile_all() -> void:
 	for src_path in _last_diags.keys():
 		if not FileAccess.file_exists(str(src_path)):
 			_last_diags.erase(src_path)
+	# A REJECTED output (gd_ok false) was still written, so Godot must be told about it either way --
+	# on a cold clone every output can fail the parse gate until the next scan registers their
+	# class_names. But it is NOT a success: printing "compiled ->" for it, and clearing its stale
+	# error state, is what let a broken file look fine while the engine spat parse errors for it.
+	var rejected := 0
 	for entry in res["compiled"]:
 		_efs.update_file(entry["gd_path"])
+		if not bool(entry.get("gd_ok", true)):
+			rejected += 1
+			printerr("[guitkx] REJECTED -> %s (generated GDScript does not parse; see the parser messages above)" % entry["gd_path"])
+			continue
 		# A file that previously errored now compiles clean -> announce it and forget its stale errors
 		# (we can't wipe the dock, but a clear "resolved" line tells the user the fix landed).
 		if _last_diags.has(entry["path"]):
@@ -212,8 +221,15 @@ func _compile_all() -> void:
 	# already announced it, so they don't count as work here (a summary per retry floods Output).
 	var attempted: int = (res["compiled"] as Array).size() + (res["errors"] as Array).size()
 	if attempted > 0 or not _first_sweep_done:
-		print("[guitkx] sweep: %d .guitkx tracked -- %d compiled, %d error(s), %d held" % [
-			int(res.get("total", 0)), (res["compiled"] as Array).size(), (res["errors"] as Array).size(), held.size()])
+		# `rejected` is counted SEPARATELY from both compiled and errors: the .guitkx compiled, the
+		# .gd was written, but it does not parse. Folding it into "compiled" is what printed
+		# "N compiled, 0 error(s)" over a file the engine was rejecting.
+		var ok_count: int = (res["compiled"] as Array).size() - rejected
+		var line := "[guitkx] sweep: %d .guitkx tracked -- %d compiled, %d error(s), %d held" % [
+			int(res.get("total", 0)), ok_count, (res["errors"] as Array).size(), held.size()]
+		if rejected > 0:
+			line += ", %d REJECTED (generated .gd does not parse)" % rejected
+		print(line)
 	_first_sweep_done = true
 	_busy = false
 

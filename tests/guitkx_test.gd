@@ -2236,22 +2236,18 @@ func _test_es_modules_declarations() -> void:
 	# unguarded, the body lowered VERBATIM and the generated .gd could not parse -- with `0 error(s)`
 	# reported, because a raw GDScript parse error names no .guitkx source. The pre-0.13 spelling is
 	# called out by name: it is what every 0.12->0.13 upgrader who skipped the codemod hits.
-	var old_ret := RuitkGuitkx.compile("HelloWorld() -> RuitkVNode {
-	return ( <Label /> )
-}
-", "hello")
+	# The pre-0.13 spelling is BUILT, never written as a literal: tests/guitkx_rename_migrate.gd
+	# runs the rename codemod over res:// project-wide, and a literal here would be silently
+	# rewritten to the new spelling -- turning this fixture into a valid component and quietly
+	# gutting the test (it did exactly that once before this comment existed).
+	var old_cls := "RUI" + "VNode"
+	var old_ret := RuitkGuitkx.compile("HelloWorld() -> %s {\n\treturn ( <Label /> )\n}\n" % old_cls, "hello")
 	_check_true(not old_ret["ok"] and _has_code(old_ret, "GUITKX2328"), "E-01: markup in a non-component is 2328 (got %s)" % str(old_ret["diagnostics"]))
-	_check_true(str(_diag(old_ret, "GUITKX2328").get("message", "")).contains("migrate_0_13_0"), "E-01: 2328 names the codemod when the pre-0.13 `RuitkVNode` spelling is found (got %s)" % str(_diag(old_ret, "GUITKX2328").get("message", "")))
-	var no_ret := RuitkGuitkx.compile("HelloWorld() {
-	return ( <Label /> )
-}
-", "hello")
+	_check_true(str(_diag(old_ret, "GUITKX2328").get("message", "")).contains("migrate_0_13_0"), "E-01: 2328 names the codemod on the pre-0.13 spelling (got %s)" % str(_diag(old_ret, "GUITKX2328").get("message", "")))
+	var no_ret := RuitkGuitkx.compile("HelloWorld() {\n\treturn ( <Label /> )\n}\n", "hello")
 	_check_true(not no_ret["ok"] and _has_code(no_ret, "GUITKX2328"), "E-01: markup with NO return annotation is 2328 (got %s)" % str(no_ret["diagnostics"]))
 	# ...and the guard must never fire on a parenthesized comparison, which merely LOOKS like markup.
-	var cmp_ok := RuitkGuitkx.compile("lt(a: int, b: int) -> bool {
-	return (a < b)
-}
-", "lt")
+	var cmp_ok := RuitkGuitkx.compile("lt(a: int, b: int) -> bool {\n\treturn (a < b)\n}\n", "lt")
 	_check_true(cmp_ok["ok"] and not _has_code(cmp_ok, "GUITKX2328"), "E-01: `return (a < b)` is not markup (got %s)" % str(cmp_ok.get("diagnostics", [])))
 
 	# E-01: a `use_`-prefixed callable with no `-> RuitkVNode` is a hook -- emits under its own name
@@ -2618,18 +2614,17 @@ func _test_es_modules_m4_ordering() -> void:
 	# pass 2 must reject it (this is exactly what makes guitkx_build's counted gate exit 1).
 	_imp_write(dir + "/z_vals.guitkx", "export zw: int = nonexistent_fn_xyz()\n")
 	var r2 := Codegen.compile_all(dir)
-	var still_compiled := false
+	# The rejected entry STAYS in `compiled` with gd_ok=false -- callers must still be told the .gd
+	# was written (plugin.gd _efs.update_file; a cold clone heals only because of that). gd_ok is
+	# the verdict, and plugin.gd reports it separately from both compiled and errors.
+	var broken_ok := true
+	var present := false
 	for c2 in (r2["compiled"] as Array):
 		if str(c2["path"]) == dir + "/z_vals.guitkx":
-			still_compiled = true
-	_check_true(not still_compiled, "M4.1: a rejected output is NOT reported as compiled")
-	var rejected := false
-	for e2 in (r2["errors"] as Array):
-		if str((e2 as Dictionary).get("path", "")) == dir + "/z_vals.guitkx":
-			for d2 in ((e2 as Dictionary).get("diagnostics", []) as Array):
-				if str((d2 as Dictionary).get("code", "")) == "GUITKX2509":
-					rejected = true
-	_check_true(rejected, "M4.1: a broken value initializer FAILS the counted parse gate (GUITKX2509 error)")
+			present = true
+			broken_ok = bool(c2["gd_ok"])
+	_check_true(present, "M4.1: a rejected output is still reported so its .gd reaches the filesystem")
+	_check_true(not broken_ok, "M4.1: a broken value initializer FAILS the counted parse gate (gd_ok=false)")
 	# M4.2: flipping a value's export status recompiles importers in the SAME sweep
 	# (export_hash + _reverse_edge_stale). Restore, sweep to settle, then flip.
 	_imp_write(dir + "/z_vals.guitkx", "export zw: int = 9\n")

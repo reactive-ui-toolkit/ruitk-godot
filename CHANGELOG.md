@@ -14,20 +14,21 @@ project adheres to [Semantic Versioning](https://semver.org/).
   most commonly the pre-0.13 `-> RUIVNode` left behind when a project upgrades without running
   `dev/migrate_0_13_0.gd` — classified the declaration as a plain util, whose body is emitted
   VERBATIM. The generated `.gd` then contained raw markup and failed to parse with a bare
-  GDScript error (`Expected grouping expression`) that named no `.guitkx` source, while the
-  sweep reported the file as compiled with **0 errors**. The guard names the annotation it
-  actually found and, for the `RUIVNode` case, points at the codemod. It cannot false-fire on
-  `return (a < b)`: detection requires a parenthesized return whose first real token is `<` or
-  `@`, neither of which can begin a GDScript expression. Suppressed when GUITKX2105 already
-  fired, so a typo'd declaration keyword reports the typo rather than advice about annotations.
-- **A generated `.gd` that does not parse is reported as an error (GUITKX2509), not a success.**
-  `compile_all`'s second pass already re-checked every output once all of them were on disk, but
-  a rejected file stayed in `compiled` and only carried `gd_ok: false` — which gated the hot-reload
-  push and nothing else. The sweep summary therefore counted it as compiled, printed a cheerful
-  `compiled -> <path>`, and could even announce "compile errors resolved" for a file that had just
-  failed. Rejected outputs now move to `errors` with a diagnostic naming the file. `compile_file`'s
-  own `ok` is deliberately unchanged: an unknown identifier is legal `.guitkx` and a GDScript-level
-  concern, which is what `gd_parse_ok` reports.
+  GDScript error (`Expected grouping expression`) that named no `.guitkx` source. The guard names
+  the annotation it actually found and, for the `RUIVNode` case, points at the codemod. It cannot
+  false-fire on `return (a < b)`: detection requires a parenthesized return whose first real token
+  is `<` or `@`, neither of which can begin a GDScript expression. Suppressed when GUITKX2105 has
+  already fired, so a typo'd declaration keyword reports the typo rather than advice about
+  annotations.
+- **A generated `.gd` that does not parse is no longer reported as a successful compile.** The
+  sweep's second pass already re-checked every output once all of them were on disk, but a rejected
+  file was printed as `compiled -> <path>`, counted under "compiled" in the summary, and could even
+  clear its own stale error state with a "compile errors resolved" line — so a file the engine was
+  rejecting looked healthy. Rejected outputs now print a distinct `REJECTED -> <path>` line, keep
+  their error state, and are counted separately in the sweep summary. They deliberately still reach
+  the editor's filesystem update: on a cold project every output can fail this pass before its
+  siblings' `class_name`s are registered, and skipping that update would leave the class cache
+  permanently incomplete.
 ## [0.14.0] — 2026-07-31
 
 The settings + family-parity release, one wave: every runtime tunable is now a native

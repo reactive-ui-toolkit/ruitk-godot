@@ -714,20 +714,14 @@ static func compile_all(root: String = "res://") -> Dictionary:
 	# M4 PASS 2: with every .gd on disk, re-check each output. A file that still doesn't parse has a
 	# real error (unknown identifier, or a preload target that genuinely never got written); one that
 	# only awaited a sibling now heals. gd_ok gates the HMR push -- never hot-load a rejected script.
-	var parsed_ok: Array = []
+	# A rejected output STAYS in `compiled` deliberately: the caller still has to tell Godot the .gd
+	# was written (plugin.gd _efs.update_file). On a cold clone every output can fail this pass --
+	# their class_names are not registered yet -- and skipping the filesystem update would keep the
+	# cache incomplete forever, so nothing could heal on the next scan. `gd_ok` is the verdict;
+	# reporting it as a failure is the CALLER's job (see plugin.gd, which no longer prints a
+	# rejected output as "compiled").
 	for c in compiled:
-		var ok2 := gd_path_parses(str(c["gd_path"]))
-		c["gd_ok"] = ok2
-		if ok2:
-			parsed_ok.append(c)
-		else:
-			# The .gd was WRITTEN but does not parse. Reporting it under `compiled` is what let the
-			# sweep print "N compiled, 0 error(s)" -- and a cheerful "compiled -> <path>" -- while the
-			# engine spat parse errors for a file the user had just been told was fine.
-			errors.append({ "ok": false, "path": c["path"], "gd_path": c["gd_path"], "diagnostics": [
-				Diag.make("GUITKX2509", Diag.ERROR, "the generated %s does not parse as GDScript (see the parser messages in Output) -- the .guitkx compiled, but its output is not loadable" % str(c["gd_path"]).get_file(), -1, 0),
-			] })
-	compiled = parsed_ok
+		c["gd_ok"] = gd_path_parses(str(c["gd_path"]))
 	if force and held.is_empty():
 		_write_fp_marker()
 	var refresh_roots := _compute_refresh_roots(compiled, all_paths, pb["sources"])
