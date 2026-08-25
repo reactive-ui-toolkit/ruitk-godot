@@ -529,6 +529,9 @@ static func compile_file(guitkx_path: String, known_components: Array = [], comp
 	var gd_parse_ok := gd_source_parses(r["gd"])
 	if not gd_parse_ok:
 		push_error("[guitkx] %s: the generated %s has GDScript errors (see the parser messages above) -- likely an unknown identifier or type error in an expression; fix the .guitkx source" % [guitkx_path, gd_path.get_file()])
+	# `ok` deliberately stays TRUE: an unknown identifier is legal .guitkx and a GDScript-level
+	# concern (0.6.2 contract, covered by the cold-open test). `gd_parse_ok` is the GDScript verdict;
+	# compile_all's PASS 2 is what turns a rejected output into a counted error.
 	return { "ok": true, "path": guitkx_path, "gd_path": gd_path, "diagnostics": r["diagnostics"], "gd_parse_ok": gd_parse_ok }
 
 ## True if generated GDScript source parses on a throwaway GDScript (resource-cache-clean). The
@@ -711,6 +714,12 @@ static func compile_all(root: String = "res://") -> Dictionary:
 	# M4 PASS 2: with every .gd on disk, re-check each output. A file that still doesn't parse has a
 	# real error (unknown identifier, or a preload target that genuinely never got written); one that
 	# only awaited a sibling now heals. gd_ok gates the HMR push -- never hot-load a rejected script.
+	# A rejected output STAYS in `compiled` deliberately: the caller still has to tell Godot the .gd
+	# was written (plugin.gd _efs.update_file). On a cold clone every output can fail this pass --
+	# their class_names are not registered yet -- and skipping the filesystem update would keep the
+	# cache incomplete forever, so nothing could heal on the next scan. `gd_ok` is the verdict;
+	# reporting it as a failure is the CALLER's job (see plugin.gd, which no longer prints a
+	# rejected output as "compiled").
 	for c in compiled:
 		c["gd_ok"] = gd_path_parses(str(c["gd_path"]))
 	if force and held.is_empty():

@@ -2084,6 +2084,16 @@ static func _compile_mixed(source: String, decls: Array, class_name_override: St
 				var gu := _parse_plain_gd_body(source, int(dm["body_open"]), diags)
 				if not gu.get("ok", false):
 					return { "ok": false, "gd": "", "diagnostics": diags }
+				# E-01 classifier guard: a util whose body returns MARKUP is a component whose `-> RuitkVNode`
+				# annotation did not match. Without this the body lowers VERBATIM and the generated .gd
+				# fails to parse with a bare GDScript error naming no .guitkx source (0.12->0.13 upgraders
+				# who never ran the codemod hit this on every file).
+				# Suppressed when GUITKX2105 already fired: a typo'd declaration keyword lands in the
+				# source as leading JUNK, so the decl behind it parses as a util and 2328 would tell the
+				# user to add `-> RuitkVNode` when the real fix is the typo. 2105 already fails the
+				# compile; 2328 reappears on the next run if a genuine classifier mismatch remains.
+				if _body_has_markup_return(str(gu["body"])) and not _has_diag_code(diags, "GUITKX2105"):
+					diags.append(D.make("GUITKX2328", D.ERROR, _markup_in_non_component_msg(str(dm["name"]), str(dm.get("ret", ""))), int(dm["name_at"]), str(dm["name"]).length()))
 				parsed.append({ "dm": dm, "util": { "params": dm.get("params", ""), "ret": dm.get("ret", ""), "body": gu["body"], "body_at": gu["body_at"] } })
 			"value":
 				# Plain-only kind (E-01). Extent was already computed by _enumerate_decls; slice the
@@ -2458,6 +2468,44 @@ static func _split_return(body: String) -> Dictionary:
 	if chosen["shape"] == "paren":
 		return { "setup": setup, "markup_src": body, "m_start": int(chosen["m_start"]), "m_end": int(chosen["m_end"]), "chosen_at": int(chosen["at"]), "unit": unit, "anchor": anchor, "parts": parts }
 	return { "setup": setup, "markup_src": body, "m_start": int(chosen["m_start"]), "m_end": n, "chosen_at": int(chosen["at"]), "unit": unit, "anchor": anchor, "parts": parts }
+
+## True if `diags` already carries `code`.
+static func _has_diag_code(diags: Array, code: String) -> bool:
+	for d in diags:
+		if d is Dictionary and str((d as Dictionary).get("code", "")) == code:
+			return true
+	return false
+
+## GUITKX2328 message. Names the annotation actually found, because the fix differs: the
+## pre-0.13 `RUIVNode` spelling means the project predates the rename codemod, while any
+## other value (or none) is an ordinary typo/omission.
+static func _markup_in_non_component_msg(name: String, ret: String) -> String:
+	var base := "`%s` returns markup but is not a component -- components annotate `-> RuitkVNode`" % name
+	if ret == "RUIVNode":
+		return base + " (found the pre-0.13 `-> RUIVNode`: run addons/reactive_ui_toolkit/dev/migrate_0_13_0.gd, or see MIGRATION-0.13.md)"
+	if ret == "":
+		return base + " (this declaration has no return annotation)"
+	return base + " (found `-> %s`)" % ret
+
+## True when a body contains a `return (` whose content starts with markup (GUITKX2328).
+## This is the signature of a COMPONENT whose classifier annotation did not match -- e.g. a
+## file still on the pre-0.13 `-> RUIVNode` spelling compiled by a 0.13+ toolchain. Such a
+## decl classifies as a util, so its body is emitted VERBATIM and the generated .gd cannot
+## parse. Detection reuses _paren_holds_markup, so `return (x < y)` can never false-flag.
+static func _body_has_markup_return(body: String) -> bool:
+	var n := body.length()
+	var i := 0
+	while i < n:
+		var k := L.skip_noncode(body, i)
+		if k != i:
+			i = k
+			continue
+		if L.keyword_at(body, i, "return"):
+			var p := _skip_ws_and_comments(body, i + 6)
+			if p < n and body.unicode_at(p) == L.C_LPAREN and _paren_holds_markup(body, p + 1, n):
+				return true
+		i += 1
+	return false
 
 ## True when a parenthesized return's content [from,to) starts with markup (`<` element or `@`
 ## directive) -- neither can begin a legal GDScript expression, so this never false-flags a plain

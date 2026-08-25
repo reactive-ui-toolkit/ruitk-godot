@@ -4,6 +4,31 @@ All notable changes to **Reactive UI Toolkit — Godot** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.14.1] — Unreleased
+
+### Fixed
+
+- **A declaration that returns markup but is not a component is now an error (GUITKX2328),
+  instead of silently emitting an unparseable `.gd`.** Markup only lowers inside a component,
+  and a component is identified purely by its `-> RuitkVNode` annotation. Any other spelling —
+  most commonly the pre-0.13 `-> RUIVNode` left behind when a project upgrades without running
+  `dev/migrate_0_13_0.gd` — classified the declaration as a plain util, whose body is emitted
+  VERBATIM. The generated `.gd` then contained raw markup and failed to parse with a bare
+  GDScript error (`Expected grouping expression`) that named no `.guitkx` source. The guard names
+  the annotation it actually found and, for the `RUIVNode` case, points at the codemod. It cannot
+  false-fire on `return (a < b)`: detection requires a parenthesized return whose first real token
+  is `<` or `@`, neither of which can begin a GDScript expression. Suppressed when GUITKX2105 has
+  already fired, so a typo'd declaration keyword reports the typo rather than advice about
+  annotations.
+- **A generated `.gd` that does not parse is no longer reported as a successful compile.** The
+  sweep's second pass already re-checked every output once all of them were on disk, but a rejected
+  file was printed as `compiled -> <path>`, counted under "compiled" in the summary, and could even
+  clear its own stale error state with a "compile errors resolved" line — so a file the engine was
+  rejecting looked healthy. Rejected outputs now print a distinct `REJECTED -> <path>` line, keep
+  their error state, and are counted separately in the sweep summary. They deliberately still reach
+  the editor's filesystem update: on a cold project every output can fail this pass before its
+  siblings' `class_name`s are registered, and skipping that update would leave the class cache
+  permanently incomplete.
 ## [0.14.0] — 2026-07-31
 
 The settings + family-parity release, one wave: every runtime tunable is now a native
