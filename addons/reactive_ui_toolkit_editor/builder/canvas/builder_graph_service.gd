@@ -23,6 +23,7 @@ const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/
 const Specifiers = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_specifiers.gd")
 const BuilderTree = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_tree.gd")
 const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
+const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 
 const Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 const Resolve = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_resolve.gd")
@@ -53,7 +54,10 @@ static func project(modules: Array, focus_path: String) -> Graph:
 		var card := Graph.Card.new()
 		card.file_path = module.file_path()
 		card.module_id = module.id
-		card.title = module.name
+		# The file name minus `.guitkx`, NOT the module's bare name: the bare name has the
+		# companion infix stripped, so `app`, `app.style` and `app.hooks` all read as "app" and a
+		# family of three cards is three cards called the same thing.
+		card.title = card.file_path.get_file().trim_suffix(Paths.SUFFIX_PLAIN)
 		card.read_only = module.read_only
 		index_by_key[Paths.key(card.file_path)] = graph.cards.size()
 		graph.cards.append(card)
@@ -916,10 +920,13 @@ static func _append_entry(out: Array, source: String, from: int, to: int) -> voi
 
 # ── Layout ───────────────────────────────────────────────────────────────────────────
 
-## Column width and row pitch for the seeded layout, in canvas units. Only the SEED: once a card
-## has a saved position, that position wins.
-const COLUMN_WIDTH := 420.0
-const ROW_PITCH := 260.0
+## The gap left between cards by the seeded layout. Only the SEED: once a card has a saved
+## position, that position wins.
+##
+## The column PITCH is the widest a card ever gets plus this gap, not a number of its own. A
+## pitch narrower than the widest LOD overlaps adjacent columns at that zoom -- which is a click
+## that selects the card behind the one under the cursor, and only at one zoom level.
+const LAYOUT_GAP := 48.0
 
 
 ## Seeds a position for every card: the root first, then the cards it reaches, breadth-first, one
@@ -949,13 +956,16 @@ static func seed_positions(graph: Graph, root_index: int) -> void:
 		if not level.has(i):
 			level[i] = deepest + 1
 
-	var used := {}
+	# Stacked by MEASURED height, not by a fixed pitch: a card taller than the pitch overlaps the
+	# one below it, and two overlapping cards make a click ambiguous.
+	var column_pitch := Metrics.CARD_WIDTH_FULL + LAYOUT_GAP
+	var next_y := {}
 	for i in range(graph.cards.size()):
+		var card := graph.cards[i]
 		var col := int(level[i])
-		var row := int(used.get(col, 0))
-		used[col] = row + 1
-		graph.cards[i].x = col * COLUMN_WIDTH
-		graph.cards[i].y = row * ROW_PITCH
+		card.x = col * column_pitch
+		card.y = float(next_y.get(col, 0.0))
+		next_y[col] = card.y + Metrics.card_height(card) + LAYOUT_GAP
 
 
 # ── Row helpers ──────────────────────────────────────────────────────────────────────

@@ -54,9 +54,10 @@ The suites: `core_test.gd` (reconciler/hooks/effects/bailout/context/keyed), `se
 every demo — the real check that generated `.gd` render without error), `doom_game_test.gd` (the
 Doom demo end-to-end), `guitkx_test.gd` (compiler + codegen + imports/resolver/codemod),
 `hmr_test.gd` (Fast Refresh), `guitkx_editor_test.gd` + `guitkx_lsp_test.gd` (editor addon),
-`builder_model_test.gd` + `builder_graph_test.gd` + `builder_preview_test.gd` (the RUITK Builder
-— the document model, the canvas projection with golden markup trees, and the preview pipeline
-end to end),
+`builder_model_test.gd` + `builder_graph_test.gd` + `builder_preview_test.gd` +
+`builder_canvas_test.gd` (the RUITK Builder — the document model, the canvas projection with
+golden markup trees, the preview pipeline end to end, and the canvas metrics/layout/host),
+`builder_view_build.gd` (the addon's own `.guitkx` output is committed and must stay fresh),
 `contract_dump.gd -- --check` (GD↔TS grammar goldens). `tests/guitkx_migrate.gd` runs the 0.10.0
 import codemod over `examples/` (idempotent — a clean tree reports 0 migrated). `bench*.gd` /
 `microbench.gd` are benchmarks, not pass/fail tests.
@@ -170,7 +171,14 @@ are synchronous. Preserve these behaviors — they're faithful-to-reference, not
   (the `~` makes Godot's importer skip it) and compiled there through the real compiler at real
   paths, so the preview cannot compile differently from the build. Dirty means *changed since
   last built*, not *unsaved*; a failure skips only its dependents; a broken edit keeps the last
-  good render. Cleared on teardown and on open.
+  good render. Cleared on teardown and on open. `canvas/` also holds the surface itself: one
+  `builder_canvas_metrics.gd` every consumer measures with (the Unity leg has two LOD definitions
+  and they disagree), a screen-space `_draw` overlay for the Bezier edges, a host that owns the
+  camera — and `canvas_view.guitkx`, the card layer, **dogfooded**: the builder's own busiest
+  surface is written in the language the builder edits and rendered by this reconciler. Its
+  generated `.gd` is COMMITTED (an installed addon needs its canvas before the compile-on-scan
+  sweep runs) and gated fresh by `tests/builder_view_build.gd`. Pixels are covered by
+  `tests/builder_canvas_capture.gd`, which needs a window and so runs by hand, not in CI.
 - **External IDE extensions (`ide-extensions/`)** — a shared TypeScript language server + a TextMate
   grammar, driven by both VS Code and VS2022. Markup intelligence is answered locally from the schema;
   embedded-GDScript intelligence builds a synthetic `.gd` virtual document with a length-preserving

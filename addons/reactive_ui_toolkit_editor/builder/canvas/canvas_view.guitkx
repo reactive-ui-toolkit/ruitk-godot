@@ -1,0 +1,222 @@
+import { card_box, card_box_selected, card_placeholder, title, pill_title, signature, section_head, import_row, chip, chip_text, markup_row, component_row, directive_row, attrs, island_row, export_row, read_only, kind_tint } from "./canvas.style"
+
+## The builder's canvas, written in `.guitkx` and rendered by the reconciler it is a builder for.
+##
+## DOGFOODED ON PURPOSE. The canvas is the largest, busiest, most re-rendered surface this project
+## has, so it is also the strongest test the library gets: every keyed reorder, every bailout,
+## every style key the cards use is exercised on every edit, in the editor, by the person building
+## the thing. A canvas hand-built out of Control nodes would be easier and would prove nothing.
+##
+## The view is PURE PRESENTATION. It receives a projected graph and a camera and returns markup;
+## it holds no state, mutates nothing, and asks nothing of disk. Every number it measures with
+## comes from `RuitkBuilderCanvasMetrics`, so the card the view draws and the card the camera
+## measures cannot be different widths.
+
+## The builder's own modules, bound through `preload` rather than by their global `class_name`.
+## A global name resolves through the editor class cache, and `ProjectSettings.save()` rewrites
+## that cache down to whatever the running process loaded -- so a headless run of one test suite
+## can leave the canvas unable to load in the next. A preload cannot be invalidated by anything.
+M := preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
+GraphModel := preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
+
+export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
+		viewport = Vector2(1280, 720), selected: int = -1) -> RuitkVNode {
+
+	var lod = M.lod_of(zoom)
+	var card_w = M.card_width_for(lod)
+	var cards = graph.cards if graph != null else []
+
+	return (
+		<Control mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+			@for (i in range(cards.size())) {
+				var c = cards[i]
+				# One VIEWPORT of slack: a card built only when it crosses the edge appears a
+				# frame late during a pan, and the edge painter has no anchor to land on.
+				var near = M.is_near_viewport(c, card_w, camera, zoom, viewport)
+				# Position is SCREEN space and scale is the zoom, so the card's own contents are
+				# laid out once in card-local units whatever the zoom is -- a layout that had to
+				# re-measure every label at every zoom would re-wrap text as the user scrolled.
+				var pos = M.world_to_screen(Vector2(c.x, c.y), camera, zoom)
+				return (
+					<CanvasCard key={ c.file_path } card={ c } lod={ lod }
+						is_selected={ i == selected } at={ pos } zoom={ zoom } near={ near } />
+				)
+			}
+		</Control>
+	)
+}
+
+
+## One card: the frame, positioned and scaled, holding either its sections or -- when it is far
+## enough outside the viewport not to be worth building -- a plain box of the same height.
+##
+## A component of its own because the near/far choice is a whole different subtree, and a loop
+## body is a code block: the choice has to be made where markup can branch.
+export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
+		at = Vector2.ZERO, zoom: float = 1.0, near: bool = true) -> RuitkVNode {
+
+	var card_w = M.card_width_for(lod)
+
+	return (
+		@if (near) {
+			return (
+				<PanelContainer position={ at } scale={ Vector2(zoom, zoom) }
+					custom_minimum_size={ Vector2(card_w, 0) }
+					mouse_filter={ Control.MOUSE_FILTER_IGNORE }
+					style={ card_box_selected if is_selected else card_box }>
+					<VBoxContainer style={ {"separation": 4} }>
+						<CanvasCardHeader card={ card } lod={ lod } />
+						@if (M.shows_sections(lod)) {
+							return (
+								<CanvasCardSections card={ card } lod={ lod } />
+							)
+						}
+					</VBoxContainer>
+				</PanelContainer>
+			)
+		} @else {
+			# A culled card still occupies its estimated height, so nothing reflows when a pan
+			# brings it back.
+			return (
+				<Panel position={ at } scale={ Vector2(zoom, zoom) }
+					custom_minimum_size={ Vector2(card_w, M.card_height(card)) }
+					mouse_filter={ Control.MOUSE_FILTER_IGNORE }
+					style={ card_placeholder } />
+			)
+		}
+	)
+}
+
+
+## The card's identity row: kind badge, title, and -- at the pill LOD -- nothing else, because a
+## pill is what a card looks like when the whole tree is on screen at once.
+export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
+
+	var tint = kind_tint.get(int(card.kind), kind_tint[6])
+
+	return (
+		<HBoxContainer style={ {"separation": 6} }>
+			<ColorRect color={ tint } custom_minimum_size={ Vector2(4, 16) } />
+			<Label text={ card.title } style={ pill_title if lod == M.Lod.PILL else title } />
+			@if (card.read_only) {
+				return (
+					<Label text="read-only" style={ read_only } />
+				)
+			}
+		</HBoxContainer>
+	)
+}
+
+
+## Everything below the header: the signature, the import rows, the hook chips, and -- only at the
+## full LOD -- the markup tree, the code island and the export detail.
+export CanvasCardSections(card = null, lod: int = 1) -> RuitkVNode {
+
+	var detail = M.shows_detail(lod)
+
+	return (
+		<VBoxContainer style={ {"separation": 4} }>
+			@if (card.signature != "") {
+				return (
+					<Label text={ card.signature } style={ signature } />
+				)
+			}
+			@if (not card.imports.is_empty()) {
+				return (
+					<CanvasCardSection heading="IMPORTS">
+						@for (row in card.imports) {
+							return (
+								<Label key={ str(row.at) } text={ row.text } style={ import_row } />
+							)
+						}
+					</CanvasCardSection>
+				)
+			}
+			@if (not card.body.is_empty()) {
+				return (
+					<CanvasCardSection heading="HOOKS">
+						<HFlowContainer style={ {"separation": 4} }>
+							@for (row in card.body) {
+								return (
+									<PanelContainer key={ str(row.at) } style={ chip }>
+										<Label text={ row.text } style={ chip_text } />
+									</PanelContainer>
+								)
+							}
+						</HFlowContainer>
+					</CanvasCardSection>
+				)
+			}
+			@if (detail and not card.markup.is_empty()) {
+				return (
+					<CanvasCardSection heading="MARKUP">
+						@for (row in card.markup) {
+							return (
+								<CanvasMarkupRow key={ str(row.at) } row={ row } />
+							)
+						}
+					</CanvasCardSection>
+				)
+			}
+			@if (detail and not card.export_detail.is_empty()) {
+				return (
+					<CanvasCardSection heading="EXPORTS">
+						@for (row in card.export_detail) {
+							return (
+								<Label key={ str(row.at) + row.text }
+									text={ "  ".repeat(row.depth) + row.text } style={ export_row } />
+							)
+						}
+					</CanvasCardSection>
+				)
+			}
+			@if (detail and not card.island_lines.is_empty()) {
+				return (
+					<CanvasCardSection heading="SETUP">
+						@for (i in range(card.island_lines.size())) {
+							return (
+								<Label key={ str(i) } text={ card.island_lines[i] } style={ island_row } />
+							)
+						}
+					</CanvasCardSection>
+				)
+			}
+		</VBoxContainer>
+	)
+}
+
+
+## A titled group inside a card. Its own component so every section has the same lead, the same
+## separation and the same heading treatment -- three places to change it is how two of them stop
+## matching.
+export CanvasCardSection(heading: String = "") -> RuitkVNode {
+	return (
+		<VBoxContainer style={ {"separation": 2} }>
+			<Label text={ heading } style={ section_head } />
+			{ children }
+		</VBoxContainer>
+	)
+}
+
+
+## One row of the markup tree: indented to its depth, coloured by what it is, with its attribute
+## run beside it.
+export CanvasMarkupRow(row = null) -> RuitkVNode {
+	var LineKind = GraphModel.LineKind
+	var style = markup_row
+	if row.kind == LineKind.COMPONENT:
+		style = component_row
+	elif row.kind == LineKind.DIRECTIVE:
+		style = directive_row
+
+	return (
+		<HBoxContainer style={ {"separation": 6} }>
+			<Label text={ "    ".repeat(row.depth) + row.text } style={ style } />
+			@if (row.attrs_text != "") {
+				return (
+					<Label text={ row.attrs_text } style={ attrs } />
+				)
+			}
+		</HBoxContainer>
+	)
+}
