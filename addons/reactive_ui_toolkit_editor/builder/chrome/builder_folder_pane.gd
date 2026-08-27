@@ -39,7 +39,7 @@ var _rows := {}
 
 func _init() -> void:
 	columns = 2
-	set_column_title(0, "Module")
+	set_column_title(0, "Folders")
 	set_column_title(1, "State")
 	set_column_expand(1, false)
 	set_column_custom_minimum_width(1, 96)
@@ -71,16 +71,16 @@ func rebuild() -> void:
 		ordered.append(module)
 	ordered.sort_custom(func(a, b): return Paths.key(a.file_path()) < Paths.key(b.file_path()))
 
+	# NESTED, one item per path SEGMENT, under the tree's own root.
+	#
+	# One flat group per distinct folder, labelled with the whole path, was four rows all reading
+	# "tests/__builder…" in a 240px pane -- the same truncated prefix repeated, with the part that
+	# differs cut off. A folder tree that cannot show which folder is which is not showing a tree.
+	var base := _common_root(ordered)
+
 	for module in ordered:
-		var folder := module.folder
-		if not folders.has(folder):
-			var group := create_item(root_item)
-			group.set_text(0, _folder_label(folder))
-			group.set_selectable(0, false)
-			group.set_selectable(1, false)
-			group.set_custom_color(0, Color(0.55, 0.58, 0.64))
-			folders[folder] = group
-		var row := create_item(folders[folder])
+		var parent := _folder_item(root_item, folders, base, module.folder)
+		var row := create_item(parent)
 		row.set_text(0, module.file_path().get_file())
 		row.set_text(1, _state_of(module))
 		row.set_tooltip_text(0, "%s -- %s" % [module.file_path(), KIND_LABEL.get(module.kind, "")])
@@ -109,10 +109,49 @@ func _state_of(module: Module) -> String:
 	return ""
 
 
-func _folder_label(folder: String) -> String:
-	if workspace == null:
-		return folder
-	return folder.trim_prefix("res://")
+## The item for `folder`, creating every level between it and `base` that does not exist yet.
+func _folder_item(root_item: TreeItem, folders: Dictionary, base: String, folder: String) -> TreeItem:
+	var relative := folder.trim_prefix(base).trim_prefix("/")
+	if relative.is_empty():
+		return _ensure_folder(root_item, folders, base, base.get_file())
+	var parent := _ensure_folder(root_item, folders, base, base.get_file())
+	var walk := base
+	for segment in relative.split("/", false):
+		walk = walk.path_join(segment)
+		parent = _ensure_folder(parent, folders, walk, segment)
+	return parent
+
+
+func _ensure_folder(parent: TreeItem, folders: Dictionary, path: String, label: String) -> TreeItem:
+	if folders.has(path):
+		return folders[path]
+	var item := create_item(parent)
+	item.set_text(0, label)
+	item.set_selectable(0, false)
+	item.set_selectable(1, false)
+	item.set_custom_color(0, Color(0.55, 0.58, 0.64))
+	folders[path] = item
+	return item
+
+
+## The deepest folder every module in the tree lives under -- the tree's own root, so the pane
+## shows the shape INSIDE it rather than the path to it.
+func _common_root(modules: Array) -> String:
+	var common := PackedStringArray()
+	var first := true
+	for module in modules:
+		var parts := str(module.folder).trim_prefix("res://").split("/", false)
+		if first:
+			common = parts
+			first = false
+			continue
+		var shared := PackedStringArray()
+		for i in range(mini(common.size(), parts.size())):
+			if common[i] != parts[i]:
+				break
+			shared.append(common[i])
+		common = shared
+	return "res://" + "/".join(common)
 
 
 func selected_path() -> String:

@@ -123,3 +123,43 @@ static func kind_tint(kind: int) -> Color:
 			return Color(0.831, 0.647, 0.780)   # module
 		_:
 			return Color(0.549, 0.549, 0.600)   # unknown
+
+
+## Edge tints. A usage edge and a STYLE usage edge are different relationships and the canvas has
+## to say so: an import of a component puts an element in the tree, an import of a style module
+## puts a look on one. Drawn the same, a reader has to open both files to tell which is which.
+static func edge_component() -> Color:
+	return Color(0.482, 0.545, 0.647, 0.85)
+
+
+static func edge_style() -> Color:
+	return Color(0.831, 0.647, 0.925, 0.85)
+
+
+
+## The kind badge: a filled chip in the kind's own tint, carrying the kind as a WORD.
+##
+## A four-pixel colour bar said the same thing to anyone who already knew the colour code, and
+## nothing at all to anyone who did not. The legend in the toolbar names the colours; the badge
+## names itself, so a card is readable without looking away from it.
+static func kind_badge(tint: Color) -> Dictionary:
+	return {
+		"bg_color": Color(tint, 0.22),
+		"corner_radius_all": 4,
+		"content_margin_all": 3,
+	}
+
+
+static func kind_badge_text(tint: Color) -> Dictionary:
+	return { "font_size": 10, "font_color": tint }
+
+
+## A "+ hook" / "+ code" / "+ style" chip inside a card.
+static func add_chip() -> Dictionary:
+	return {
+		"font_size": 11,
+		"font_color": Color(0.635, 0.729, 0.910),
+		"bg_color": Color(0.180, 0.220, 0.290, 0.6),
+		"corner_radius_all": 6,
+		"content_margin_all": 4,
+	}

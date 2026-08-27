@@ -28,6 +28,13 @@ signal card_selected(index: int)
 signal canvas_context_requested(world_position: Vector2)
 signal card_context_requested(index: int, world_position: Vector2)
 
+## A card's own "+" affordance was used: `what` is one of "hook", "code", "style", "entry".
+##
+## The card is where the user is LOOKING when they want another hook, so it is where the button
+## belongs -- a builder whose only way to add state is a menu three levels into the chrome is a
+## builder people go back to the text editor to use.
+signal card_add_requested(index: int, what: String)
+
 var graph: Graph = null
 var camera := Vector2.ZERO
 var zoom := 1.0
@@ -99,6 +106,12 @@ func unmount() -> void:
 		_root = null
 
 
+## Relays a card's "+" to whoever owns the model. The view holds no model and edits nothing; it
+## reports that a button was pressed and the window turns that into one `apply_edit`.
+func _on_card_add(index: int, what: String) -> void:
+	card_add_requested.emit(index, what)
+
+
 func _render() -> void:
 	if graph == null:
 		return
@@ -108,6 +121,7 @@ func _render() -> void:
 		"zoom": zoom,
 		"viewport": size,
 		"selected": selected,
+		"on_add": Callable(self, "_on_card_add"),
 	}
 	if _root == null:
 		_root = RuitkRoot.create(_cards, V.fc(Callable(CanvasView, "render"), props))

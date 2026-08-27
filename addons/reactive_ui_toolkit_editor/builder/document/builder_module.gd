@@ -118,6 +118,25 @@ func owns_folder() -> bool:
 	return Paths.canon(folder).get_file().to_lower() == name.to_lower()
 
 
+## The name a NEW module of this kind starts life under, before anyone has renamed it.
+##
+## A name rather than an empty field: a module has to be in the tree to be edited, has to have a
+## path to be in the tree, and has to have a name to have a path. Asking first would mean a modal
+## between "I want one of these" and having one -- and the rename is one click away on the card.
+static func default_name_for(k: Kind) -> String:
+	match k:
+		Kind.HOOK:
+			return "newHook"
+		Kind.STYLE:
+			return "newStyle"
+		Kind.UTIL:
+			return "newUtil"
+		Kind.VALUE:
+			return "newValue"
+		_:
+			return "NewComponent"
+
+
 static func suffix_for(k: Kind) -> String:
 	match k:
 		Kind.STYLE:

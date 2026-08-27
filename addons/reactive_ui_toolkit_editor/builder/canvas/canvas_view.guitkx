@@ -26,7 +26,7 @@
 ## `canvas_palette.gd`, and `examples/demos/styles/` for the `.style.guitkx` a game would write.
 
 export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
-		viewport = Vector2(1280, 720), selected: int = -1) -> RuitkVNode {
+		viewport = Vector2(1280, 720), selected: int = -1, on_add = null) -> RuitkVNode {
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var lod = M.lod_of(zoom)
 	var card_w = M.card_width_for(lod)
@@ -44,8 +44,9 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 				# re-measure every label at every zoom would re-wrap text as the user scrolled.
 				var pos = M.world_to_screen(Vector2(c.x, c.y), camera, zoom)
 				return (
-					<CanvasCard key={ c.file_path } card={ c } lod={ lod }
-						is_selected={ i == selected } at={ pos } zoom={ zoom } near={ near } />
+					<CanvasCard key={ c.file_path } card={ c } lod={ lod } index={ i }
+						is_selected={ i == selected } at={ pos } zoom={ zoom } near={ near }
+						on_add={ on_add } />
 				)
 			}
 		</Control>
@@ -59,7 +60,8 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 ## A component of its own because the near/far choice is a whole different subtree, and a loop
 ## body is a code block: the choice has to be made where markup can branch.
 export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
-		at = Vector2.ZERO, zoom: float = 1.0, near: bool = true) -> RuitkVNode {
+		at = Vector2.ZERO, zoom: float = 1.0, near: bool = true, index: int = -1,
+		on_add = null) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var card_w = M.card_width_for(lod)
@@ -75,7 +77,7 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 						<CanvasCardHeader card={ card } lod={ lod } />
 						@if (M.shows_sections(lod)) {
 							return (
-								<CanvasCardSections card={ card } lod={ lod } />
+								<CanvasCardSections card={ card } lod={ lod } index={ index } on_add={ on_add } />
 							)
 						}
 					</VBoxContainer>
@@ -100,11 +102,14 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
+	var Model = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
 	var tint = P.kind_tint(int(card.kind))
 
 	return (
 		<HBoxContainer style={ {"separation": 6} }>
-			<ColorRect color={ tint } custom_minimum_size={ Vector2(4, 16) } />
+			<PanelContainer style={ P.kind_badge(tint) }>
+				<Label text={ Model.kind_word(int(card.kind)) } style={ P.kind_badge_text(tint) } />
+			</PanelContainer>
 			<Label text={ card.title } style={ P.pill_title() if lod == M.Lod.PILL else P.title() } />
 			@if (card.read_only) {
 				return (
@@ -118,7 +123,7 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 
 ## Everything below the header: the signature, the import rows, the hook chips, and -- only at the
 ## full LOD -- the markup tree, the code island and the export detail.
-export CanvasCardSections(card = null, lod: int = 1) -> RuitkVNode {
+export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = null) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var detail = M.shows_detail(lod)
@@ -141,9 +146,9 @@ export CanvasCardSections(card = null, lod: int = 1) -> RuitkVNode {
 					</CanvasCardSection>
 				)
 			}
-			@if (not card.body.is_empty()) {
+			@if (card.kind != 2) {
 				return (
-					<CanvasCardSection heading="HOOKS">
+					<CanvasCardSection heading="BODY — HOOKS & STATE">
 						<HFlowContainer style={ {"separation": 4} }>
 							@for (row in card.body) {
 								return (
@@ -152,13 +157,15 @@ export CanvasCardSections(card = null, lod: int = 1) -> RuitkVNode {
 									</PanelContainer>
 								)
 							}
+							<CanvasAddChip label="+ hook" what="hook" index={ index } on_add={ on_add } />
+							<CanvasAddChip label="+ code" what="code" index={ index } on_add={ on_add } />
 						</HFlowContainer>
 					</CanvasCardSection>
 				)
 			}
 			@if (detail and not card.markup.is_empty()) {
 				return (
-					<CanvasCardSection heading="MARKUP">
+					<CanvasCardSection heading="RETURN — MARKUP">
 						@for (row in card.markup) {
 							return (
 								<CanvasMarkupRow key={ str(row.at) } row={ row } />
@@ -167,7 +174,7 @@ export CanvasCardSections(card = null, lod: int = 1) -> RuitkVNode {
 					</CanvasCardSection>
 				)
 			}
-			@if (detail and not card.export_detail.is_empty()) {
+			@if (card.kind == 2) {
 				return (
 					<CanvasCardSection heading="EXPORTS">
 						@for (row in card.export_detail) {
@@ -176,6 +183,10 @@ export CanvasCardSections(card = null, lod: int = 1) -> RuitkVNode {
 									text={ "  ".repeat(row.depth) + row.text } style={ P.export_row() } />
 							)
 						}
+						<HFlowContainer style={ {"separation": 4} }>
+							<CanvasAddChip label="+ style" what="style" index={ index } on_add={ on_add } />
+							<CanvasAddChip label="+ entry" what="entry" index={ index } on_add={ on_add } />
+						</HFlowContainer>
 					</CanvasCardSection>
 				)
 			}
@@ -230,5 +241,25 @@ export CanvasMarkupRow(row = null) -> RuitkVNode {
 				)
 			}
 		</HBoxContainer>
+	)
+}
+
+
+## One "+" affordance inside a card — the way a hook, a line of setup or a style entry is added
+## without leaving the card you are looking at.
+##
+## A Button rather than a styled Label: it is a button, and a thing that looks like a chip but
+## does not take focus, show a hover or answer the keyboard is a thing that only works for people
+## using a mouse.
+export CanvasAddChip(label: String = "+", what: String = "", index: int = -1,
+		on_add = null) -> RuitkVNode {
+	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+	var target = index
+	var kind = what
+	var sink = on_add
+
+	return (
+		<Button text={ label } flat={ true } style={ P.add_chip() }
+			onPressed={ func(): (sink.call(target, kind) if sink != null else null) } />
 	)
 }

@@ -255,3 +255,25 @@ func edges_to(card_index: int) -> Array[Edge]:
 
 
 
+
+
+## The module kind as the word a card shows on its badge.
+##
+## The card's own vocabulary, not the file suffix: a reader sees "component" and "styles", which
+## is what the toolbar legend calls them too, so the badge and the key agree.
+static func kind_word(kind: int) -> String:
+	match kind:
+		0:
+			return "component"
+		1:
+			return "hooks"
+		2:
+			return "styles"
+		3:
+			return "utils"
+		4:
+			return "value"
+		5:
+			return "module"
+		_:
+			return "module"

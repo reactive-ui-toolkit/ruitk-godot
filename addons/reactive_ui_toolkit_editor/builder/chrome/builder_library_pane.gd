@@ -14,10 +14,17 @@ extends VBoxContainer
 const Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
 const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_module.gd")
+const Parts = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_chrome_parts.gd")
 
 ## An entry was chosen. `kind` is one of the ENTRY_* constants; `name` is the tag, hook or
 ## component name.
 signal entry_activated(kind: String, name: String)
+
+## A new module of `kind` was asked for from the pane's own `+ new` button. The library is where
+## a user looks for "something to put in", and a module they have not written yet is exactly that
+## -- so the create affordance belongs here rather than only behind a right-click on the canvas,
+## which is a gesture you have to already know about.
+signal create_requested(kind: int)
 
 const ENTRY_ELEMENT := "element"
 const ENTRY_HOOK := "hook"
@@ -44,6 +51,7 @@ var _sections := {}
 var _expanded := { ENTRY_ELEMENT: true, ENTRY_HOOK: true, ENTRY_COMPONENT: true }
 var _search := ""
 var _search_field: LineEdit = null
+var _create_menu: PopupMenu = null
 var _body: VBoxContainer = null
 
 
@@ -51,8 +59,22 @@ func _init() -> void:
 	add_theme_constant_override("separation", 4)
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
+	var new_button := Button.new()
+	new_button.text = "+ new"
+	new_button.flat = true
+	new_button.pressed.connect(_open_create_menu)
+	add_child(Parts.pane_header("Library", new_button))
+
+	_create_menu = PopupMenu.new()
+	_create_menu.add_item("New component (.guitkx)", Module.Kind.COMPONENT)
+	_create_menu.add_item("New style module (.style.guitkx)", Module.Kind.STYLE)
+	_create_menu.add_item("New hook module (.hooks.guitkx)", Module.Kind.HOOK)
+	_create_menu.add_item("New util module (.utils.guitkx)", Module.Kind.UTIL)
+	_create_menu.id_pressed.connect(func(id: int): create_requested.emit(id))
+	add_child(_create_menu)
+
 	_search_field = LineEdit.new()
-	_search_field.placeholder_text = "Filter"
+	_search_field.placeholder_text = "search library..."
 	_search_field.clear_button_enabled = true
 	_search_field.text_changed.connect(func(text: String):
 		_search = text.strip_edges().to_lower()
@@ -76,8 +98,10 @@ func rebuild() -> void:
 		_body.remove_child(child)
 	_sections.clear()
 
-	_add_section(ENTRY_COMPONENT, "COMPONENTS", _component_entries())
-	_add_section(ENTRY_ELEMENT, "ELEMENTS", _element_entries())
+	# Native first, then the tree's own, then hooks -- the order a component is usually assembled
+	# in, and the order the Unity leg uses.
+	_add_section(ENTRY_ELEMENT, "NATIVE ELEMENTS", _element_entries())
+	_add_section(ENTRY_COMPONENT, "CUSTOM COMPONENTS", _component_entries())
 	_add_section(ENTRY_HOOK, "HOOKS", _hook_entries())
 
 
@@ -175,7 +199,10 @@ func _entry_row(kind: String, name: String) -> Button:
 	var row := Button.new()
 	row.flat = true
 	row.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	row.text = "    " + name
+	# Elements and components read as the TAG they insert; a hook reads as the call it is. The
+	# library's job is to show what will land in the file, and `Label` and `<Label>` are not the
+	# same thing to someone scanning markup.
+	row.text = "    " + (name if kind == ENTRY_HOOK else "<%s>" % name)
 	row.tooltip_text = "%s -- drag onto a card, or click to insert" % name
 	row.set_meta("entry_kind", kind)
 	row.set_meta("entry_name", name)
@@ -208,3 +235,14 @@ func set_section_expanded(kind: String, open: bool) -> void:
 
 func is_section_expanded(kind: String) -> bool:
 	return bool(_expanded.get(kind, true))
+
+
+## Opens the create menu under the `+ new` button.
+func _open_create_menu() -> void:
+	_create_menu.position = Vector2i(get_screen_position() + Vector2(24, 28))
+	_create_menu.popup()
+
+
+## The create menu, for a harness or a caller that wants it opened without a click.
+func open_create_menu() -> void:
+	_open_create_menu()

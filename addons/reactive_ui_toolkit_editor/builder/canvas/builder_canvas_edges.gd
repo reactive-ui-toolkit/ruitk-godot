@@ -28,6 +28,12 @@ const ANCHOR_RADIUS := 3.5
 const BROKEN_DASH_ON := 6.0
 const BROKEN_DASH_OFF := 4.0
 
+const Palette = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+
+## How long a dash and a gap are on a STYLE edge, in screen pixels.
+const STYLE_DASH_ON := 7.0
+const STYLE_DASH_OFF := 5.0
+
 const EDGE_COLOR := Color(0.482, 0.545, 0.647, 0.85)
 const EDGE_COLOR_SELECTED := Color(0.361, 0.588, 0.965, 1.0)
 const BROKEN_COLOR := Color(0.902, 0.451, 0.451, 0.9)
@@ -107,14 +113,22 @@ func _draw_edge(edge: Graph.Edge, ordinal: int, card_width: float) -> void:
 	var to_card := graph.cards[edge.to_index]
 	var to := Metrics.world_to_screen(Metrics.edge_target_anchor(to_card), camera, zoom)
 	var highlighted := selected == edge.from_index or selected == edge.to_index
-	var color := EDGE_COLOR_SELECTED if highlighted else EDGE_COLOR
+	# A STYLE usage is a different relationship from a component usage — one puts an element in
+	# the tree, the other puts a look on one — so it is drawn as a different line, not the same
+	# line to a differently-tinted card. Selection still wins: a highlighted edge is a highlighted
+	# edge whatever it connects.
+	var to_style := int(to_card.kind) == int(Module.Kind.STYLE)
+	var color := EDGE_COLOR_SELECTED if highlighted else (Palette.edge_style() if to_style else EDGE_COLOR)
 
 	var points := PackedVector2Array()
 	for step in range(CURVE_STEPS + 1):
 		# Sampled in SCREEN space, from screen endpoints, so the curve's bow is a constant number
 		# of pixels rather than a world distance that collapses as the user zooms out.
 		points.append(Metrics.edge_point(from, to, 1.0, float(step) / CURVE_STEPS))
-	draw_polyline(points, color, EDGE_WIDTH, true)
+	if to_style:
+		_draw_dashed_path(points, color)
+	else:
+		draw_polyline(points, color, EDGE_WIDTH, true)
 	draw_circle(to, ANCHOR_RADIUS, color)
 
 
@@ -129,3 +143,31 @@ func _draw_dashed(from: Vector2, to: Vector2, color: Color) -> void:
 		var end: float = minf(at + BROKEN_DASH_ON, length)
 		draw_line(from + step * at, from + step * end, color, EDGE_WIDTH, true)
 		at = end + BROKEN_DASH_OFF
+
+
+## A dashed run along an arbitrary polyline. `_draw_dashed` walks a straight segment; a style edge is
+## a curve, and dashing it segment-by-segment would restart the pattern at every sample and read as
+## a solid line with dents in it. This carries the phase across the whole path.
+func _draw_dashed_path(points: PackedVector2Array, color: Color) -> void:
+	var carried := 0.0
+	var drawing := true
+	for i in range(points.size() - 1):
+		var from := points[i]
+		var to := points[i + 1]
+		var span := to - from
+		var length := span.length()
+		if length <= 0.0:
+			continue
+		var step := span / length
+		var at := 0.0
+		while at < length:
+			var budget := (STYLE_DASH_ON if drawing else STYLE_DASH_OFF) - carried
+			var end: float = minf(at + budget, length)
+			if drawing:
+				draw_line(from + step * at, from + step * end, color, EDGE_WIDTH, true)
+			if end - at >= budget:
+				drawing = not drawing
+				carried = 0.0
+			else:
+				carried += end - at
+			at = end

@@ -9,6 +9,7 @@ const __RUI_DECLS := {
 	"CanvasCardSections": { "kind": "component", "sig": "", "export": true },
 	"CanvasCardSection": { "kind": "component", "sig": "", "export": true },
 	"CanvasMarkupRow": { "kind": "component", "sig": "", "export": true },
+	"CanvasAddChip": { "kind": "component", "sig": "", "export": true },
 }
 
 const __RUI_KIND := "mixed"
@@ -22,6 +23,7 @@ static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var zoom = props.get("zoom", 1.0)
 	var viewport = props.get("viewport", Vector2(1280, 720))
 	var selected = props.get("selected", -1)
+	var on_add = props.get("on_add", null)
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var lod = M.lod_of(zoom)
 	var card_w = M.card_width_for(lod)
@@ -36,7 +38,7 @@ static func render(props: Dictionary, children: Array) -> RuitkVNode:
 		# laid out once in card-local units whatever the zoom is -- a layout that had to
 		# re-measure every label at every zoom would re-wrap text as the user scrolled.
 		var pos = M.world_to_screen(Vector2(c.x, c.y), camera, zoom)
-		__cf0.append(V.fc(CanvasCard, { "card": c, "lod": lod, "is_selected": i == selected, "at": pos, "zoom": zoom, "near": near }, [], c.file_path))
+		__cf0.append(V.fc(CanvasCard, { "card": c, "lod": lod, "index": i, "is_selected": i == selected, "at": pos, "zoom": zoom, "near": near, "on_add": on_add }, [], c.file_path))
 		continue
 	return V.Control({ "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [__cf0])
 
@@ -48,6 +50,8 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 	var at = props.get("at", Vector2.ZERO)
 	var zoom = props.get("zoom", 1.0)
 	var near = props.get("near", true)
+	var index = props.get("index", -1)
+	var on_add = props.get("on_add", null)
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var card_w = M.card_width_for(lod)
@@ -57,7 +61,7 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 			var __cf1 = null
 			if M.shows_sections(lod):
 				for __cf1_once in 1:
-					__cf1 = V.fc(CanvasCardSections, { "card": card, "lod": lod })
+					__cf1 = V.fc(CanvasCardSections, { "card": card, "lod": lod, "index": index, "on_add": on_add })
 					continue
 			__cf0 = V.PanelContainer({ "position": at, "scale": Vector2(zoom, zoom), "custom_minimum_size": Vector2(card_w, 0), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_box_selected() if is_selected else P.card_box() }, [V.VBoxContainer({ "style": {"separation": 4} }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod }), __cf1])])
 			continue
@@ -75,18 +79,21 @@ static func CanvasCardHeader(props: Dictionary, children: Array) -> RuitkVNode:
 	var lod = props.get("lod", 1)
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
+	var Model = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
 	var tint = P.kind_tint(int(card.kind))
 	var __cf0 = null
 	if card.read_only:
 		for __cf0_once in 1:
 			__cf0 = V.Label({ "text": "read-only", "style": P.read_only() })
 			continue
-	return V.HBoxContainer({ "style": {"separation": 6} }, [V.ColorRect({ "color": tint, "custom_minimum_size": Vector2(4, 16) }), V.Label({ "text": card.title, "style": P.pill_title() if lod == M.Lod.PILL else P.title() }), __cf0])
+	return V.HBoxContainer({ "style": {"separation": 6} }, [V.PanelContainer({ "style": P.kind_badge(tint) }, [V.Label({ "text": Model.kind_word(int(card.kind)), "style": P.kind_badge_text(tint) })]), V.Label({ "text": card.title, "style": P.pill_title() if lod == M.Lod.PILL else P.title() }), __cf0])
 
 # component CanvasCardSections
 static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode:
 	var card = props.get("card", null)
 	var lod = props.get("lod", 1)
+	var index = props.get("index", -1)
+	var on_add = props.get("on_add", null)
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var detail = M.shows_detail(lod)
@@ -105,13 +112,13 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 			__cf1 = V.fc(CanvasCardSection, { "heading": "IMPORTS" }, [__cf2])
 			continue
 	var __cf3 = null
-	if not card.body.is_empty():
+	if card.kind != 2:
 		for __cf3_once in 1:
 			var __cf4: Array = []
 			for row in card.body:
 				__cf4.append(V.PanelContainer({ "style": P.chip() }, [V.Label({ "text": row.text, "style": P.chip_text() })], str(row.at)))
 				continue
-			__cf3 = V.fc(CanvasCardSection, { "heading": "HOOKS" }, [V.HFlowContainer({ "style": {"separation": 4} }, [__cf4])])
+			__cf3 = V.fc(CanvasCardSection, { "heading": "BODY — HOOKS & STATE" }, [V.HFlowContainer({ "style": {"separation": 4} }, [__cf4, V.fc(CanvasAddChip, { "label": "+ hook", "what": "hook", "index": index, "on_add": on_add }), V.fc(CanvasAddChip, { "label": "+ code", "what": "code", "index": index, "on_add": on_add })])])
 			continue
 	var __cf5 = null
 	if detail and not card.markup.is_empty():
@@ -120,16 +127,16 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 			for row in card.markup:
 				__cf6.append(V.fc(CanvasMarkupRow, { "row": row }, [], str(row.at)))
 				continue
-			__cf5 = V.fc(CanvasCardSection, { "heading": "MARKUP" }, [__cf6])
+			__cf5 = V.fc(CanvasCardSection, { "heading": "RETURN — MARKUP" }, [__cf6])
 			continue
 	var __cf7 = null
-	if detail and not card.export_detail.is_empty():
+	if card.kind == 2:
 		for __cf7_once in 1:
 			var __cf8: Array = []
 			for row in card.export_detail:
 				__cf8.append(V.Label({ "text": "  ".repeat(row.depth) + row.text, "style": P.export_row() }, [], str(row.at) + row.text))
 				continue
-			__cf7 = V.fc(CanvasCardSection, { "heading": "EXPORTS" }, [__cf8])
+			__cf7 = V.fc(CanvasCardSection, { "heading": "EXPORTS" }, [__cf8, V.HFlowContainer({ "style": {"separation": 4} }, [V.fc(CanvasAddChip, { "label": "+ style", "what": "style", "index": index, "on_add": on_add }), V.fc(CanvasAddChip, { "label": "+ entry", "what": "entry", "index": index, "on_add": on_add })])])
 			continue
 	var __cf9 = null
 	if detail and not card.island_lines.is_empty():
@@ -165,4 +172,16 @@ static func CanvasMarkupRow(props: Dictionary, children: Array) -> RuitkVNode:
 			__cf0 = V.Label({ "text": row.attrs_text, "style": P.attrs() })
 			continue
 	return V.HBoxContainer({ "style": {"separation": 6} }, [V.Label({ "text": "    ".repeat(row.depth) + row.text, "style": style }), __cf0])
+
+# component CanvasAddChip
+static func CanvasAddChip(props: Dictionary, children: Array) -> RuitkVNode:
+	var label = props.get("label", "+")
+	var what = props.get("what", "")
+	var index = props.get("index", -1)
+	var on_add = props.get("on_add", null)
+	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+	var target = index
+	var kind = what
+	var sink = on_add
+	return V.Button({ "text": label, "flat": true, "style": P.add_chip(), "onPressed": func(): (sink.call(target, kind) if sink != null else null) })
 

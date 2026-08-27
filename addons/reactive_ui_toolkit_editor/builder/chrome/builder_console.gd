@@ -14,6 +14,7 @@ extends VBoxContainer
 ## the first two say so here, by name, with the reason.
 
 const Preview = preload("res://addons/reactive_ui_toolkit_editor/builder/preview/builder_preview.gd")
+const Parts = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_chrome_parts.gd")
 
 ## A row naming a module was activated: open it.
 signal location_activated(file_path: String)
@@ -34,7 +35,8 @@ func _init() -> void:
 
 	_summary = Label.new()
 	_summary.text = "nothing compiled yet"
-	add_child(_summary)
+	_summary.add_theme_font_size_override("font_size", Parts.TITLE_FONT_SIZE)
+	add_child(Parts.pane_header("Console", _summary))
 
 	_list = ItemList.new()
 	_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -114,3 +116,65 @@ func _on_item_activated(index: int) -> void:
 	var path := str((_rows[index] as Dictionary)["path"])
 	if not path.is_empty():
 		location_activated.emit(path)
+
+
+## Dumps the session's own state into the console: what the tree holds, what is dirty, what the
+## last round built, what the ledger remembers.
+##
+## The Unity leg calls this Trace and it earns its place on the toolbar: everything in a builder
+## session is in memory until Save, so when something looks wrong there is otherwise NOTHING to
+## inspect — no file to open, no log to read. This is the only window into the live state.
+func trace(workspace, ledger, preview) -> void:
+	_rows.clear()
+	_list.clear()
+	if workspace == null:
+		_summary.text = "trace: no tree open"
+		return
+	var modules: Array = workspace.modules()
+	var dirty := 0
+	for module in modules:
+		if module.is_dirty():
+			dirty += 1
+	_summary.text = "trace: %d module(s), %d dirty" % [modules.size(), dirty]
+	for module in modules:
+		var flags := PackedStringArray()
+		if module.is_dirty():
+			flags.append("dirty")
+		if module.has_moved():
+			flags.append("moved")
+		if module.read_only:
+			flags.append("read-only")
+		var suffix := ("  [" + ", ".join(flags) + "]") if not flags.is_empty() else ""
+		_add_line("%s%s" % [module.file_path(), suffix], module.file_path())
+	if ledger != null:
+		_add_line("history: %d entry(s)%s"
+			% [ledger.entries.size(), ("  next undo: " + ledger.undo_label()) if ledger.can_undo() else ""], "")
+	if preview != null:
+		_add_line("preview: %s" % ("mounted " + preview.mounted_path() if preview.is_mounted() else "nothing mounted"), "")
+
+
+## The interaction model, in the console, on request. The hint bar along the bottom carries the
+## short form permanently; this is the long form for when the short one was not enough.
+func show_help() -> void:
+	_rows.clear()
+	_list.clear()
+	_summary.text = "how to drive it"
+	for line in [
+		"CANVAS — wheel zooms, drag pans, right-click for the canvas menu, Fit frames the tree.",
+		"LAYERS — the toolbar dropdown picks the detail band; the canvas follows, and the zoom follows it back.",
+		"LIBRARY — drag an element, hook or component onto a card. The band you drop on decides:",
+		"          top third = before the row, middle = inside it, bottom third = after it.",
+		"CARDS — drag a row to reorder it, drag a card onto another to move the module into its folder.",
+		"        Right-click a card to open, rename or delete it.",
+		"EDITING — click an attribute or a badge to edit it in place; the source pane edits the same buffer.",
+		"SAVING — nothing reaches disk until Save. Abort throws the whole session away.",
+		"          Unsaved work is journalled, so a crash offers the tree back.",
+	]:
+		_add_line(line, "")
+
+
+## Adds one line to the list, remembering which module (if any) it points at so activating the row
+## can open it.
+func _add_line(text: String, file_path: String) -> void:
+	_list.add_item(text)
+	_rows.append({ "path": file_path })

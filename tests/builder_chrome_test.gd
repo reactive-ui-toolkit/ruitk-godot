@@ -543,19 +543,26 @@ func _test_cleanup() -> void:
 
 # ── Helpers ──────────────────────────────────────────────────────────────────────────
 
+## Every MODULE row in the pane, at whatever depth it sits.
+##
+## Walks the whole tree rather than assuming folder-then-row: the pane nests one item per path
+## segment, so a module three folders deep is three levels down. A module row is one carrying a
+## file path in its metadata -- folder items carry none, which is the difference that matters.
 func _tree_rows(pane: FolderPane) -> Array:
 	var out: Array = []
-	var root_item := pane.get_root()
-	if root_item == null:
-		return out
-	var group := root_item.get_first_child()
-	while group != null:
-		var row := group.get_first_child()
-		while row != null:
-			out.append(row)
-			row = row.get_next()
-		group = group.get_next()
+	_collect_rows(pane.get_root(), out)
 	return out
+
+
+func _collect_rows(item: TreeItem, out: Array) -> void:
+	if item == null:
+		return
+	var child := item.get_first_child()
+	while child != null:
+		if child.get_metadata(0) != null and not str(child.get_metadata(0)).is_empty():
+			out.append(child)
+		_collect_rows(child, out)
+		child = child.get_next()
 
 
 func _row_named(rows: Array, file_name: String) -> TreeItem:

@@ -37,13 +37,27 @@ const InlineEditor = preload("res://addons/reactive_ui_toolkit_editor/builder/ch
 const Edits = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_edits.gd")
 const Drag = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_drag.gd")
 const AddonSettings = preload("res://addons/reactive_ui_toolkit_editor/editor/ruitk_editor_settings.gd")
+const Parts = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_chrome_parts.gd")
+const PreviewPane = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_preview_pane.gd")
+const Palette = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 
 ## The tree changed in a way the host should know about -- for the plugin's title, or a prompt on
 ## close.
 signal dirty_changed(has_unsaved: bool)
 
 ## Menu ids. Named rather than positional, so inserting an item cannot silently re-point another.
-enum MenuId { SAVE, ABORT, UNDO, REDO, FIT_VIEW, REVEAL }
+enum MenuId { SAVE, ABORT, UNDO, REDO, FIT_VIEW, REVEAL, HISTORY, TRACE, HELP }
+
+## The three detail bands, NAMED. The canvas already had them — as a zoom threshold nobody could
+## see, so a user could not tell which band they were in or ask for one. The Unity leg puts them
+## on a dropdown, and a named layer is the difference between a level of detail and an accident
+## of how far you happened to scroll.
+const LAYERS := [
+	{ "title": "Layer 1 — Pills", "zoom": 0.34 },
+	{ "title": "Layer 2 — Cards", "zoom": 0.80 },
+	{ "title": "Layer 3 — Edit", "zoom": 1.20 },
+]
 enum CardMenuId { OPEN, RENAME, DELETE, REVEAL_CARD }
 
 var workspace: Workspace = null
@@ -63,6 +77,11 @@ var _toolbar: HBoxContainer = null
 var _status: Label = null
 var _card_menu: PopupMenu = null
 var _canvas_menu: PopupMenu = null
+var _preview_pane: PreviewPane = null
+var _layers: OptionButton = null
+var _history_menu: PopupMenu = null
+var _hint: Label = null
+var _syncing_layer := false
 
 var _focus_path := ""
 var _menu_target := ""
@@ -96,19 +115,7 @@ func _build_ui() -> void:
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(column)
 
-	_toolbar = HBoxContainer.new()
-	column.add_child(_toolbar)
-	_toolbar.add_child(_tool_button("Save", MenuId.SAVE))
-	_toolbar.add_child(_tool_button("Abort", MenuId.ABORT))
-	_toolbar.add_child(VSeparator.new())
-	_toolbar.add_child(_tool_button("Undo", MenuId.UNDO))
-	_toolbar.add_child(_tool_button("Redo", MenuId.REDO))
-	_toolbar.add_child(VSeparator.new())
-	_toolbar.add_child(_tool_button("Fit", MenuId.FIT_VIEW))
-	_status = Label.new()
-	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_toolbar.add_child(_status)
+	column.add_child(_build_toolbar())
 
 	var body := HSplitContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -131,18 +138,43 @@ func _build_ui() -> void:
 	var canvas_layer := Control.new()
 	canvas_layer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas_layer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	canvas_layer.custom_minimum_size = Vector2(0, 420)
 	middle.add_child(canvas_layer)
 	_canvas = CanvasHost.new()
 	canvas_layer.add_child(_canvas)
 	_inline = InlineEditor.new()
 	canvas_layer.add_child(_inline)
 
+	# The console gets a FLOOR, not half the column. It carries diagnostics, which are usually one
+	# line and occasionally many, and a split that opens at the middle gave a one-line console the
+	# same room as the canvas — the surface the whole window exists to show.
 	_console = Console.new()
+	_console.custom_minimum_size = Vector2(0, 96)
 	middle.add_child(_console)
+	middle.split_offset = 10000   # clamped to the canvas's floor: console at its minimum
 
+	# The right column is TWO panes, the way the Unity leg has it: what the component looks like
+	# above what it says. Source alone answers "what did I write"; only the preview answers "what
+	# did I build", and that is the question a visual builder is for.
+	var right := VSplitContainer.new()
+	right.custom_minimum_size = Vector2(380, 0)
+	body.add_child(right)
+	_preview_pane = PreviewPane.new()
+	_preview_pane.preview = preview
+	right.add_child(_preview_pane)
 	_source = SourcePane.new()
-	_source.custom_minimum_size = Vector2(360, 0)
-	body.add_child(_source)
+	right.add_child(_source)
+
+	_hint = Parts.hint_bar(PackedStringArray([
+		"Wheel: zoom",
+		"Drag Library items onto rows (top=before, bottom=after, middle=inside)",
+		"Drag rows to reorder",
+		"Right-click rows / cards / canvas to edit, delete, create",
+		"Click attributes and badges to edit in place",
+		"Source pane: edits apply as you type",
+		"Drag splitters to resize",
+	]))
+	column.add_child(_hint)
 
 	_card_menu = PopupMenu.new()
 	_card_menu.add_item("Open", CardMenuId.OPEN)
@@ -154,6 +186,80 @@ func _build_ui() -> void:
 	_canvas_menu = PopupMenu.new()
 	_canvas_menu.add_item("Fit to view", MenuId.FIT_VIEW)
 	add_child(_canvas_menu)
+
+	_history_menu = PopupMenu.new()
+	_history_menu.add_item("Undo", MenuId.UNDO)
+	_history_menu.add_item("Redo", MenuId.REDO)
+	add_child(_history_menu)
+
+
+## The header: what tree is open, which layer it is drawn at, the commands, and the legend that
+## makes the canvas's colours mean something.
+func _build_toolbar() -> HBoxContainer:
+	_toolbar = HBoxContainer.new()
+	_toolbar.add_theme_constant_override("separation", 6)
+
+	var title := Label.new()
+	title.text = "RUITK Visual Editor"
+	title.add_theme_color_override("font_color", Palette.kind_tint(0))
+	_toolbar.add_child(title)
+
+	_status = Label.new()
+	_status.add_theme_font_size_override("font_size", Parts.TITLE_FONT_SIZE)
+	_status.add_theme_color_override("font_color", Parts.TITLE_COLOR)
+	_toolbar.add_child(_status)
+
+	_layers = OptionButton.new()
+	for layer in LAYERS:
+		_layers.add_item(str((layer as Dictionary)["title"]))
+	_layers.selected = 2
+	_layers.item_selected.connect(_on_layer_chosen)
+	_toolbar.add_child(_layers)
+
+	_toolbar.add_child(VSeparator.new())
+	_toolbar.add_child(_tool_button("History", MenuId.HISTORY))
+	_toolbar.add_child(_tool_button("Trace", MenuId.TRACE))
+	_toolbar.add_child(_tool_button("? How to drive it", MenuId.HELP))
+	_toolbar.add_child(VSeparator.new())
+	_toolbar.add_child(_tool_button("Save", MenuId.SAVE))
+	_toolbar.add_child(_tool_button("Abort", MenuId.ABORT))
+
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_toolbar.add_child(spacer)
+
+	# The legend, and it is not decoration: the canvas says what a module IS with a colour, and a
+	# colour with no key is a colour the reader has to reverse-engineer from the filenames.
+	var legend := HBoxContainer.new()
+	legend.add_theme_constant_override("separation", 12)
+	legend.add_child(Parts.legend_entry("component", Palette.kind_tint(Module.Kind.COMPONENT)))
+	legend.add_child(Parts.legend_entry("hook module", Palette.kind_tint(Module.Kind.HOOK)))
+	legend.add_child(Parts.legend_entry("style module", Palette.kind_tint(Module.Kind.STYLE)))
+	legend.add_child(Parts.legend_entry("usage edge", Palette.edge_component()))
+	_toolbar.add_child(legend)
+	return _toolbar
+
+
+## Layer chosen from the dropdown: the canvas moves to that band's zoom, about its own centre.
+func _on_layer_chosen(index: int) -> void:
+	if _syncing_layer or _canvas == null or index < 0 or index >= LAYERS.size():
+		return
+	var want := float((LAYERS[index] as Dictionary)["zoom"])
+	var centre: Vector2 = _canvas.size * 0.5
+	_canvas.set_camera(Metrics.zoom_about(_canvas.camera, _canvas.zoom, want, centre), want)
+
+
+## Dropdown follows the zoom, because the zoom can change without it — a wheel, a fit, a restored
+## layout. A selector that only ever leads and never follows starts lying on the first scroll.
+func _sync_layer_selector() -> void:
+	if _layers == null or _canvas == null:
+		return
+	var band := int(Metrics.lod_of(_canvas.zoom))
+	if _layers.selected == band:
+		return
+	_syncing_layer = true
+	_layers.selected = band
+	_syncing_layer = false
 
 
 func _tool_button(label: String, id: int) -> Button:
@@ -173,7 +279,9 @@ func _wire() -> void:
 		_open_card_menu(path, get_global_mouse_position()))
 
 	_canvas.card_selected.connect(_on_card_selected)
+	_canvas.card_add_requested.connect(_on_card_add)
 	_canvas.camera_changed.connect(_on_camera_changed)
+	_canvas.camera_changed.connect(func(_c: Vector2, _z: float): _sync_layer_selector())
 	_canvas.card_context_requested.connect(func(index: int, world: Vector2):
 		if graph == null or index < 0 or index >= graph.cards.size():
 			return
@@ -184,12 +292,19 @@ func _wire() -> void:
 		_canvas_menu.position = Vector2i(get_global_mouse_position())
 		_canvas_menu.popup())
 
+	_library.create_requested.connect(create_module)
 	_source.buffer_edited.connect(_on_buffer_edited)
 	_console.location_activated.connect(select_module)
 	_card_menu.id_pressed.connect(_on_card_menu)
 	_canvas_menu.id_pressed.connect(run_command)
 	ledger.changed.connect(_refresh_status)
-	preview.compile_finished.connect(func(_p: String, _ok: bool, _e: String): _refresh_status())
+	preview.compile_finished.connect(func(_p: String, _ok: bool, _e: String):
+		_refresh_status()
+		# The preview re-renders on the BUILD, not on the keystroke: mounting a script that has not
+		# recompiled yet just re-mounts the one already showing.
+		if _preview_pane != null and not _preview_pane.path().is_empty():
+			_preview_pane.show_module(_preview_pane.path()))
+	_history_menu.id_pressed.connect(run_command)
 
 
 # ── Opening ──────────────────────────────────────────────────────────────────────────
@@ -347,6 +462,19 @@ func discard_recovery() -> void:
 
 func run_command(id: int) -> void:
 	match id:
+		MenuId.HISTORY:
+			# The ledger, as a menu. Undo and Redo are the whole of it today; the entries they
+			# would walk are already named in `ledger.entries`, which is what a fuller list draws from.
+			_history_menu.position = Vector2i(get_screen_position() + Vector2(0, 32))
+			_history_menu.popup()
+			return
+		MenuId.TRACE:
+			_console.trace(workspace, ledger, preview)
+			return
+		MenuId.HELP:
+			_console.show_help()
+			return
+	match id:
 		MenuId.SAVE:
 			save()
 		MenuId.ABORT:
@@ -357,6 +485,74 @@ func run_command(id: int) -> void:
 			redo()
 		MenuId.FIT_VIEW:
 			_canvas.fit_to_view()
+
+
+## A card's "+" was used. Turns it into ONE edit through the funnel, like every other gesture.
+##
+## The inserted text is a STARTING POINT, not a prompt: a hook chip that opened a dialog asking
+## which hook, with what arguments, before it would put anything in the file is slower than
+## typing the line. It lands as `useState(null)` and the user edits it where it now is.
+func _on_card_add(index: int, what: String) -> void:
+	if graph == null or workspace == null or index < 0 or index >= graph.cards.size():
+		return
+	var card = graph.cards[index]
+	var module := workspace.try_get(card.file_path)
+	if module == null or module.read_only:
+		return
+	var before := module.buffer_text
+	var after := before
+	var description := ""
+	match what:
+		"hook":
+			after = Edits.insert_setup_line(before, card, "var state = useState(null)")
+			description = "Add a hook to %s" % card.title
+		"code":
+			after = Edits.insert_setup_line(before, card, "# ...")
+			description = "Add a setup line to %s" % card.title
+		"style", "entry":
+			var export_name := str(card.exports[0]) if not card.exports.is_empty() else ""
+			if export_name.is_empty():
+				return
+			after = Edits.insert_style_entry(before, export_name, "bg_color", "Color(0.2, 0.2, 0.24)")
+			description = "Add a style entry to %s" % card.title
+		_:
+			return
+	if after != before:
+		apply_edit(card.file_path, after, description)
+
+
+## Creates a module of `kind` beside the focus, opens it, and points every surface at it.
+##
+## THROUGH THE WORKSPACE, like everything else: the module lands in the tree in memory with a
+## template buffer and nothing is written until Save, so creating one and thinking better of it
+## costs a Ctrl+Z rather than a file on disk to go and delete.
+func create_module(kind: int) -> String:
+	if workspace == null:
+		return ""
+	var folder := _focus_path.get_base_dir()
+	if folder.is_empty():
+		return ""
+	var base := _unused_name(folder, kind)
+	var path := folder.path_join(base + Module.suffix_for(kind))
+	var module := workspace.create_new(path, Edits.template_for(kind, base))
+	if module == null:
+		return ""
+	ledger.record_creation(path)
+	reproject()
+	select_module(path)
+	preview.request_refresh()
+	return path
+
+
+## A name nothing in the folder is using yet -- "NewComponent", then "NewComponent2", and so on.
+func _unused_name(folder: String, kind: int) -> String:
+	var stem := Module.default_name_for(kind)
+	var attempt := stem
+	var n := 1
+	while workspace.try_get(folder.path_join(attempt + Module.suffix_for(kind))) != null:
+		n += 1
+		attempt = "%s%d" % [stem, n]
+	return attempt
 
 
 ## Writes the tree.
@@ -467,7 +663,16 @@ func select_module(file_path: String) -> void:
 	_source.workspace = workspace
 	_source.show_module(_focus_path)
 	_folders.select_path(_focus_path)
+	if _preview_pane != null:
+		# BUILD IT IF IT IS NOT BUILT. A round compiles the focus's closure, and the module a user
+		# selects next is often outside the closure the last one had -- so the pane would sit on
+		# "select a component to see it rendered" while a component was selected, until some later
+		# edit happened to rebuild it. Selecting IS the request.
+		if preview.built_script(_focus_path) == null:
+			preview.compile_dirty(_focus_path)
+		_preview_pane.show_module(_focus_path)
 	preview.request_refresh()
+	_refresh_status()
 	_choosing = false
 
 
@@ -615,13 +820,18 @@ func delete_module(file_path: String) -> bool:
 
 func _refresh_status() -> void:
 	var dirty := workspace != null and workspace.has_unsaved_changes()
-	var parts := PackedStringArray()
-	if workspace != null:
-		parts.append("%d module(s)" % workspace.modules().size())
-	parts.append("unsaved" if dirty else "saved")
-	if ledger.can_undo():
-		parts.append("undo: " + ledger.undo_label())
-	_status.text = "   ".join(parts)
+	# "RightSide.guitkx | 5 file(s), 0 dirty" — WHAT IS OPEN first, then the shape of the tree.
+	# A count with no filename tells a user how much work is loaded but not which of it they are
+	# looking at, and the builder's whole left column is about which one that is.
+	if workspace == null:
+		_status.text = "no tree open — open a .guitkx to start"
+		return
+	var dirty_count := 0
+	for module in workspace.modules():
+		if module.is_dirty():
+			dirty_count += 1
+	var open_name := _focus_path.get_file() if not _focus_path.is_empty() else "no module selected"
+	_status.text = "%s  |  %d file(s), %d dirty" % [open_name, workspace.modules().size(), dirty_count]
 	for button in _toolbar.get_children():
 		if not button.has_meta("command"):
 			continue
