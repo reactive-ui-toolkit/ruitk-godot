@@ -97,6 +97,19 @@ static func shows_sections(lod: Lod) -> bool:
 
 
 ## Whether a card shows its markup tree and code island at this LOD.
+## Whether the markup rows carry their attribute runs.
+##
+## A LEVEL BEYOND `shows_detail`. Showing every attribute the moment the markup appears makes the
+## edit layer and the zoomed layer carry identical information, and sets the card's width from its
+## longest attribute run -- which is what pushed the tree wider than the canvas.
+static func shows_attributes(zoom: float) -> bool:
+	return zoom >= ATTRIBUTE_ZOOM
+
+
+## The zoom at which a markup row starts carrying its attributes.
+const ATTRIBUTE_ZOOM := 1.2
+
+
 static func shows_detail(lod: Lod) -> bool:
 	return lod == Lod.FULL
 
@@ -314,7 +327,15 @@ static func edge_target_anchor(card: Graph.Card) -> Vector2:
 ## The two control points of the edge curve. Pulled horizontally by a fraction of the span, with
 ## a floor, so a short back-edge still bows out instead of collapsing into the cards it joins.
 static func edge_control_points(from: Vector2, to: Vector2, zoom: float) -> Array[Vector2]:
-	var pull: float = maxf(40.0 / maxf(zoom, 0.001), absf(to.x - from.x) * 0.45)
+	# THE PULL FOLLOWS THE DOMINANT DIRECTION. Pulling horizontally always was right when levels
+	# were columns and every child sat to the right; with levels as rows, most children sit BELOW
+	# and slightly left, so a rightward pull out of the source and a leftward pull into the target
+	# doubles the curve back through itself -- the knot of loops the canvas was drawing.
+	var span := to - from
+	if absf(span.y) > absf(span.x):
+		var vertical: float = maxf(40.0 / maxf(zoom, 0.001), absf(span.y) * 0.45)
+		return [from + Vector2(0.0, vertical), to - Vector2(0.0, vertical)]
+	var pull: float = maxf(40.0 / maxf(zoom, 0.001), absf(span.x) * 0.45)
 	return [from + Vector2(pull, 0.0), to - Vector2(pull, 0.0)]
 
 

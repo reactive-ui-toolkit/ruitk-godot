@@ -59,6 +59,13 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 ##
 ## A component of its own because the near/far choice is a whole different subtree, and a loop
 ## body is a code block: the choice has to be made where markup can branch.
+##
+## THE FAR CARD KEEPS ITS HEADER. An empty rounded rectangle is indistinguishable from a card
+## that failed to render, and the reason a distant card is cheap to skip is that its SECTIONS are
+## expensive -- its name never was.
+##
+## (A `#` comment inside a markup block is a TEXT CHILD, not a comment. Two of them in a
+## directive body is two roots, and GUITKX0108 says so. Notes about markup live out here.)
 export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 		at = Vector2.ZERO, zoom: float = 1.0, near: bool = true, index: int = -1,
 		on_add = null) -> RuitkVNode {
@@ -77,7 +84,8 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 						<CanvasCardHeader card={ card } lod={ lod } />
 						@if (M.shows_sections(lod)) {
 							return (
-								<CanvasCardSections card={ card } lod={ lod } index={ index } on_add={ on_add } />
+								<CanvasCardSections card={ card } lod={ lod } index={ index } on_add={ on_add }
+				zoom={ zoom } />
 							)
 						}
 					</VBoxContainer>
@@ -87,10 +95,14 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 			# A culled card still occupies its estimated height, so nothing reflows when a pan
 			# brings it back.
 			return (
-				<Panel position={ at } scale={ Vector2(zoom, zoom) }
+				<PanelContainer position={ at } scale={ Vector2(zoom, zoom) }
 					custom_minimum_size={ Vector2(card_w, M.card_height(card)) }
 					mouse_filter={ Control.MOUSE_FILTER_IGNORE }
-					style={ P.card_placeholder() } />
+					style={ P.card_placeholder() }>
+					<MarginContainer style={ {"margin_left": 10, "margin_top": 10, "margin_right": 10} }>
+						<CanvasCardHeader card={ card } lod={ lod } />
+					</MarginContainer>
+				</PanelContainer>
 			)
 		}
 	)
@@ -127,7 +139,8 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 ## EXPORTS carries "+ style" and not "+ entry": the projection already emits one "+ entry" per
 ## export, carrying which dictionary it adds to, and a second card-level one would be a button
 ## that has to guess which. "+ style" adds a whole new export and has nothing to guess about.
-export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = null) -> RuitkVNode {
+export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = null,
+		zoom: float = 1.0) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var detail = M.shows_detail(lod)
@@ -174,7 +187,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 					<CanvasCardSection heading="RETURN — MARKUP">
 						@for (row in card.markup) {
 							return (
-								<CanvasMarkupRow key={ str(row.at) } row={ row } />
+								<CanvasMarkupRow key={ str(row.at) } row={ row } zoom={ zoom } />
 							)
 						}
 					</CanvasCardSection>
@@ -227,8 +240,9 @@ export CanvasCardSection(heading: String = "") -> RuitkVNode {
 
 ## One row of the markup tree: indented to its depth, coloured by what it is, with its attribute
 ## run beside it.
-export CanvasMarkupRow(row = null) -> RuitkVNode {
+export CanvasMarkupRow(row = null, zoom: float = 1.0) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var Model = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
 	var LineKind = Model.LineKind
 	var style = P.markup_row()
@@ -240,7 +254,7 @@ export CanvasMarkupRow(row = null) -> RuitkVNode {
 	return (
 		<HBoxContainer style={ {"separation": 6} }>
 			<Label text={ "    ".repeat(row.depth) + row.text } style={ style } />
-			@if (row.attrs_text != "") {
+			@if (row.attrs_text != "" and M.shows_attributes(zoom)) {
 				return (
 					<Label text={ row.attrs_text } style={ P.attrs() } />
 				)

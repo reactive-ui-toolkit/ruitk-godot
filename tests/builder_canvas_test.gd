@@ -263,9 +263,14 @@ func _test_edge_geometry() -> void:
 	_check((controls[0] as Vector2).x > from.x, "pulled forward out of the start")
 	_check((controls[1] as Vector2).x < to.x, "and back out of the end")
 
-	var short_controls: Array = Metrics.edge_control_points(Vector2.ZERO, Vector2(4.0, 80.0), 1.0)
-	_check((short_controls[0] as Vector2).x >= 40.0,
+	# The pull follows the DOMINANT DIRECTION. With levels as rows, most children sit below and
+	# slightly to one side; pulling horizontally regardless doubled such a curve back through
+	# itself, which is a knot rather than an edge.
+	var down: Array = Metrics.edge_control_points(Vector2.ZERO, Vector2(4.0, 80.0), 1.0)
+	_eq((down[0] as Vector2).x, 0.0, "a mostly-vertical edge is not pulled sideways at all")
+	_check((down[0] as Vector2).y >= 40.0,
 		"a short back-edge still bows out rather than collapsing into the cards it joins")
+	_check((down[1] as Vector2).y <= 80.0 - 40.0, "and arrives bowed from the other side")
 
 
 func _test_seeded_layout_does_not_overlap() -> void:

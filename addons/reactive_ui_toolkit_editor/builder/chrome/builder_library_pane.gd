@@ -67,10 +67,13 @@ func _init() -> void:
 	add_child(Parts.pane_header("Library", new_button))
 
 	_create_menu = PopupMenu.new()
+	# A menu that names itself: this one is reached from a "+ new" button whose label is gone the
+	# moment the popup covers it.
+	_create_menu.add_separator("CREATE")
 	_create_menu.add_item("New component (.guitkx)", Module.Kind.COMPONENT)
 	_create_menu.add_item("New style module (.style.guitkx)", Module.Kind.STYLE)
 	_create_menu.add_item("New hook module (.hooks.guitkx)", Module.Kind.HOOK)
-	_create_menu.add_item("New util module (.utils.guitkx)", Module.Kind.UTIL)
+	_create_menu.add_item("New util module (.guitkx)", Module.Kind.UTIL)
 	_create_menu.id_pressed.connect(func(id: int): create_requested.emit(id))
 	add_child(_create_menu)
 
@@ -124,6 +127,9 @@ func _component_entries() -> PackedStringArray:
 			continue
 		for export_name in card.exports:
 			out.append(export_name)
+	# ALPHABETICAL. Projection order is graph order, which is the order the tree was walked in --
+	# stable, but meaningless to someone scanning a list for a name.
+	out.sort()
 	return out
 
 

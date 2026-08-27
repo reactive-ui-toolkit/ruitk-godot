@@ -67,12 +67,9 @@ func rebuild() -> void:
 	var previously_selected := selected_path()
 	clear()
 	_rows.clear()
-	if workspace == null:
-		return
-
 	# "No tree open." rather than a blank pane: an empty region says nothing about whether it is
 	# empty because there is nothing, or empty because something failed.
-	if workspace.modules().is_empty():
+	if workspace == null or workspace.modules().is_empty():
 		var empty := create_item(create_item())
 		empty.set_text(0, "No tree open.")
 		empty.set_selectable(0, false)

@@ -204,6 +204,9 @@ func _build_ui() -> void:
 	_new_menu.id_pressed.connect(_on_card_new)
 
 	_card_menu = PopupMenu.new()
+	# A header naming the module the menu is about. "Delete" over a canvas of five cards is a
+	# question the user answers from memory of where they right-clicked.
+	_card_menu.add_separator("")
 	_card_menu.add_child(_new_menu)
 	_card_menu.add_submenu_item("New", "New")
 	_card_menu.add_separator()
@@ -801,6 +804,7 @@ func _open_card_menu(file_path: String, at: Vector2) -> void:
 	# The menu says WHICH module it is about. "Delete" over a canvas of five cards is a question
 	# the user has to answer from memory of where they right-clicked.
 	var shown := file_path.get_file()
+	_card_menu.set_item_text(0, shown.to_upper())
 	_card_menu.set_item_text(_card_menu.get_item_index(CardMenuId.RENAME), "Rename %s..." % shown)
 	_card_menu.set_item_text(_card_menu.get_item_index(CardMenuId.DELETE), "Delete %s" % shown)
 	_card_menu.position = Vector2i(at)
@@ -927,8 +931,8 @@ func _refresh_status() -> void:
 	# "RightSide.guitkx | 5 file(s), 0 dirty" — WHAT IS OPEN first, then the shape of the tree.
 	# A count with no filename tells a user how much work is loaded but not which of it they are
 	# looking at, and the builder's whole left column is about which one that is.
-	if workspace == null:
-		_status.text = "no tree open — open a .guitkx to start"
+	if workspace == null or workspace.modules().is_empty():
+		_status.text = "No tree open — double-click a .guitkx in the FileSystem dock, or start one below"
 		return
 	var dirty_count := 0
 	for module in workspace.modules():
