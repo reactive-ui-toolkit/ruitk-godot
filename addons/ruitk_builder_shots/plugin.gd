@@ -183,6 +183,9 @@ func _open_builder(focus: String):
 	_window.title = "RUITK Builder"
 	_window.size = SHOT_SIZE
 	_window.wrap_controls = true
+	# Popups are sub-windows of their own, and a sub-window is not part of this window's texture.
+	# Embedded, they draw INSIDE it and a shot of a menu is a shot of the menu.
+	_window.gui_embed_subwindows = true
 	_window.add_child(control)
 	EditorInterface.get_base_control().add_child(_window)
 	_window.popup_centered()
