@@ -533,6 +533,16 @@ static func delete_clause(source: String, row: Graph.Line) -> String:
 ## reason: a placeholder identifier ("condition", "count") is a name the compiler can only reject,
 ## so the preview reports an error on a wrap the user has not begun to type. `@while` seeds FALSE
 ## deliberately -- a true-seeded render loop would not terminate.
+## The line separators, built rather than written: an escape in a source literal has to survive
+## every layer that touches this file, and one that does not becomes a real newline inside a
+## string -- which is a parse error a long way from where it was introduced.
+static func _lf() -> String:
+	return String.chr(10)
+
+
+static func _crlf() -> String:
+	return String.chr(13) + String.chr(10)
+
 const WRAPS := [
 	{ "label": "@if", "header": "@if (true)" },
 	{ "label": "@for", "header": "@for (item in [])" },
@@ -589,10 +599,10 @@ static func set_island(source: String, row_start: int, row_end: int, text: Strin
 	var unit := _indent_unit(source)
 
 	var replacement := PackedStringArray()
-	for line in text.replace("
-", "
-").split("
-"):
+	# CRLF NORMALISED FIRST: pasted text often carries it, and a stray carriage return left on
+	# the end of a line survives into the buffer as a character the compiler counts and nobody
+	# can see.
+	for line in text.replace(_crlf(), _lf()).split(_lf()):
 		replacement.append(str(line))
 	while replacement.size() > 0 and str(replacement[replacement.size() - 1]).strip_edges().is_empty():
 		replacement.remove_at(replacement.size() - 1)
