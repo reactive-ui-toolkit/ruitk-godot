@@ -68,3 +68,6 @@ addons/reactive_ui_toolkit_analyzer/
 #   the user picks.
 /__ruitk_builder_preview__~/
 /__ruitk_builder_unsaved__~/
+
+# Builder visual gauntlet: the reference shots are committed, ours are regenerated.
+/Images/current/

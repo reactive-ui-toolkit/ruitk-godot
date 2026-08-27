@@ -1,0 +1,7 @@
+export MiddleSide() -> RuitkVNode {
+	return (
+		<Control>
+			<Label text="Middle Side" />
+		</Control>
+	)
+}

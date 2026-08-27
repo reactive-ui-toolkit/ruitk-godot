@@ -1,0 +1,20 @@
+import { LeftSide } from "./components/LeftSide/LeftSide"
+import { MiddleSide } from "./components/MiddleSide/MiddleSide"
+import { RightSide } from "./components/RightSide/RightSide"
+import * as NewComponentStyle from "./newComponent.style"
+
+export NewComponent() -> RuitkVNode {
+	return (
+		<Control>
+			<Control style={ NewComponentStyle.container }>
+				<LeftSide />
+				<MiddleSide />
+				<RightSide />
+			</Control>
+			<Control>
+				<HSlider />
+				<Button text="Click" />
+			</Control>
+		</Control>
+	)
+}

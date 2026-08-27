@@ -1,0 +1,6 @@
+export container := {
+	"custom_minimum_size": Vector2(100, 100),
+	"size_flags_horizontal": Control.SIZE_EXPAND_FILL,
+	"separation": 16,
+	"content_margin_all": 16,
+}

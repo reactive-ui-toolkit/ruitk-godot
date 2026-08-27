@@ -1,0 +1,7 @@
+export LeftSide() -> RuitkVNode {
+	return (
+		<Control>
+			<Label text="Left Side" />
+		</Control>
+	)
+}
