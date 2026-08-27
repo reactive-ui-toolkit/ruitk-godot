@@ -78,6 +78,11 @@ func set_camera(new_camera: Vector2, new_zoom: float) -> void:
 	camera = new_camera
 	zoom = Metrics.clamp_zoom(new_zoom)
 	_render()
+	# ANNOUNCED, like `fit_to_view` does. Only the fit emitted, so everything downstream of the
+	# camera -- the saved layout, and the layer selector that is supposed to name the band on
+	# screen -- was updated by one of the two ways the camera moves and not by the other. A
+	# selector that only follows some camera changes is a selector that is sometimes wrong.
+	camera_changed.emit(camera, zoom)
 
 
 func select_card(index: int) -> void:

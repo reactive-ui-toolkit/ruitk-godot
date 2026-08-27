@@ -41,8 +41,14 @@ func _init() -> void:
 	columns = 2
 	set_column_title(0, "Folders")
 	set_column_title(1, "State")
+	# The NAME column takes what it needs and the state column takes what is left. Both columns
+	# expanding split the pane in half, so every file name ellipsised at ten characters -- with a
+	# third of the pane sitting empty beside it, and the two modules that differ only by their
+	# companion suffix rendering identically.
+	set_column_expand(0, true)
+	set_column_clip_content(0, false)
 	set_column_expand(1, false)
-	set_column_custom_minimum_width(1, 96)
+	set_column_custom_minimum_width(1, 72)
 	column_titles_visible = true
 	hide_root = true
 	allow_rmb_select = true
@@ -62,6 +68,15 @@ func rebuild() -> void:
 	clear()
 	_rows.clear()
 	if workspace == null:
+		return
+
+	# "No tree open." rather than a blank pane: an empty region says nothing about whether it is
+	# empty because there is nothing, or empty because something failed.
+	if workspace.modules().is_empty():
+		var empty := create_item(create_item())
+		empty.set_text(0, "No tree open.")
+		empty.set_selectable(0, false)
+		empty.set_custom_color(0, Color(0.55, 0.58, 0.64))
 		return
 
 	var root_item := create_item()

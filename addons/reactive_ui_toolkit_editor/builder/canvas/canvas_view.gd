@@ -107,7 +107,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 		for __cf1_once in 1:
 			var __cf2: Array = []
 			for row in card.imports:
-				__cf2.append(V.Label({ "text": row.text, "style": P.import_row() }, [], str(row.at)))
+				__cf2.append(V.Label({ "text": row.text, "style": P.import_row(), "text_overflow_trim": TextServer.OVERRUN_TRIM_ELLIPSIS, "clip_text": true }, [], str(row.at)))
 				continue
 			__cf1 = V.fc(CanvasCardSection, { "heading": "IMPORTS" }, [__cf2])
 			continue
@@ -136,10 +136,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 			for row in card.export_detail:
 				__cf8.append(V.Label({ "text": "  ".repeat(row.depth) + row.text, "style": P.export_row() }, [], str(row.at) + row.text))
 				continue
-			__cf7 = V.fc(CanvasCardSection, { "heading": "EXPORTS" }, [__cf8, V.Label({ "text": "# \"+ entry\" is NOT here: the projection already emits one per export, carrying
-						# which dictionary it adds to. A second, card-level one would be a button
-						# that has to guess. \"+ style\" adds a whole new export and has nothing to
-						# guess about." }), V.HFlowContainer({ "style": {"separation": 4} }, [V.fc(CanvasAddChip, { "label": "+ style", "what": "style", "index": index, "on_add": on_add })])])
+			__cf7 = V.fc(CanvasCardSection, { "heading": "EXPORTS" }, [__cf8, V.HFlowContainer({ "style": {"separation": 4} }, [V.fc(CanvasAddChip, { "label": "+ style", "what": "style", "index": index, "on_add": on_add })])])
 			continue
 	var __cf9 = null
 	if detail and not card.island_lines.is_empty():
@@ -186,5 +183,5 @@ static func CanvasAddChip(props: Dictionary, children: Array) -> RuitkVNode:
 	var target = index
 	var kind = what
 	var sink = on_add
-	return V.Button({ "text": label, "flat": true, "style": P.add_chip(), "onPressed": func(): (sink.call(target, kind) if sink != null else null) })
+	return V.Button({ "text": label, "flat": false, "style": P.add_chip(), "onPressed": func(): (sink.call(target, kind) if sink != null else null) })
 

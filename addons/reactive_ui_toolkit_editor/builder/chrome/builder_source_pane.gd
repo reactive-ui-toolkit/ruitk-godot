@@ -27,6 +27,7 @@ var workspace: Workspace = null
 var _title: Label = null
 var _editor: GuitkxEditor = null
 var _path := ""
+var _edit_toggle: Button = null
 
 
 func _init() -> void:
@@ -37,7 +38,22 @@ func _init() -> void:
 	_title.text = "no module selected"
 	_title.add_theme_font_size_override("font_size", Parts.TITLE_FONT_SIZE)
 	_title.add_theme_color_override("font_color", Parts.ACCENT_COLOR)
-	add_child(Parts.pane_header("Source — .guitkx", _title))
+	# An explicit read/edit toggle. The buffer is live either way, but a side pane that silently
+	# accepts keystrokes is a pane you can change a file in by clicking the wrong thing -- and the
+	# target has the affordance, so a reader looking for it should find it.
+	var trailing := HBoxContainer.new()
+	trailing.add_theme_constant_override("separation", 6)
+	_edit_toggle = Button.new()
+	_edit_toggle.text = "edit"
+	_edit_toggle.toggle_mode = true
+	_edit_toggle.button_pressed = true
+	_edit_toggle.flat = true
+	_edit_toggle.toggled.connect(func(on: bool):
+		if _editor != null:
+			_editor.editable = on)
+	trailing.add_child(_edit_toggle)
+	trailing.add_child(_title)
+	add_child(Parts.pane_header("Source — .guitkx", trailing))
 
 	_editor = GuitkxEditor.new()
 	_editor.size_flags_vertical = Control.SIZE_EXPAND_FILL

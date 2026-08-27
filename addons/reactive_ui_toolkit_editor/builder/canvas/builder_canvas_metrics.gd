@@ -289,7 +289,20 @@ static func fit_to_view(graph: Graph, viewport: Vector2, margin := 40.0) -> Dict
 ## four imports has four distinct departure points rather than four lines out of one.
 static func edge_source_anchor(card: Graph.Card, import_index: int,
 		card_width: float) -> Vector2:
+	# ON THE IMPORT ROW, when the card is showing its import rows.
+	#
+	# A fixed offset from the card top put every anchor in the header, so at the section and full
+	# bands all of a card's edges left from the same point and the card's own IMPORTS list -- the
+	# thing each edge actually comes from -- had nothing beside it. The section stack already
+	# knows where that list starts and how tall a row is; asking it is the difference between an
+	# edge attached to a line and an edge attached to a box.
 	var y := card.y + EDGE_ANCHOR_Y + maxi(0, import_index) * ANCHOR_PITCH
+	for entry in section_stack(card):
+		var section := entry as Dictionary
+		if int(section["section"]) != int(Section.IMPORTS):
+			continue
+		y = card.y + float(section["top"]) + SECTION_OVERHEAD_H 			+ (float(maxi(0, import_index)) + 0.5) * IMPORT_ROW_H
+		break
 	return Vector2(card.x + card_width, y)
 
 

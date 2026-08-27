@@ -123,6 +123,10 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 
 ## Everything below the header: the signature, the import rows, the hook chips, and -- only at the
 ## full LOD -- the markup tree, the code island and the export detail.
+##
+## EXPORTS carries "+ style" and not "+ entry": the projection already emits one "+ entry" per
+## export, carrying which dictionary it adds to, and a second card-level one would be a button
+## that has to guess which. "+ style" adds a whole new export and has nothing to guess about.
 export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = null) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
@@ -140,7 +144,9 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 					<CanvasCardSection heading="IMPORTS">
 						@for (row in card.imports) {
 							return (
-								<Label key={ str(row.at) } text={ row.text } style={ P.import_row() } />
+								<Label key={ str(row.at) } text={ row.text } style={ P.import_row() }
+									text_overflow_trim={ TextServer.OVERRUN_TRIM_ELLIPSIS }
+									clip_text={ true } />
 							)
 						}
 					</CanvasCardSection>
@@ -183,10 +189,6 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 									text={ "  ".repeat(row.depth) + row.text } style={ P.export_row() } />
 							)
 						}
-						# "+ entry" is NOT here: the projection already emits one per export, carrying
-						# which dictionary it adds to. A second, card-level one would be a button
-						# that has to guess. "+ style" adds a whole new export and has nothing to
-						# guess about.
 						<HFlowContainer style={ {"separation": 4} }>
 							<CanvasAddChip label="+ style" what="style" index={ index } on_add={ on_add } />
 						</HFlowContainer>
@@ -262,7 +264,7 @@ export CanvasAddChip(label: String = "+", what: String = "", index: int = -1,
 	var sink = on_add
 
 	return (
-		<Button text={ label } flat={ true } style={ P.add_chip() }
+		<Button text={ label } flat={ false } style={ P.add_chip() }
 			onPressed={ func(): (sink.call(target, kind) if sink != null else null) } />
 	)
 }

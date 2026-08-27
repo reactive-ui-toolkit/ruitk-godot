@@ -37,7 +37,7 @@ func _init() -> void:
 	size_flags_vertical = Control.SIZE_SHRINK_END
 
 	_summary = Label.new()
-	_summary.text = "nothing compiled yet"
+	_summary.text = ""
 	_summary.add_theme_font_size_override("font_size", Parts.TITLE_FONT_SIZE)
 	add_child(Parts.pane_header("Console", _summary))
 
@@ -47,6 +47,11 @@ func _init() -> void:
 	_list.visible = false
 	_list.item_activated.connect(_on_item_activated)
 	add_child(_list)
+
+	# Synced ONCE at build time too, not only on the mutations: with nothing reported yet the
+	# console had never been asked whether it should be on screen, so a fresh window opened with
+	# an empty console header sitting on the canvas.
+	_sync_visibility()
 
 
 ## Reports one preview round. A null summary means the round decided there was nothing to do,
@@ -72,6 +77,7 @@ func report(summary) -> void:
 			"the round ran out of its frame budget -- the rest is still queued")
 
 	_summary.text = _summarize(summary)
+	_sync_visibility()
 
 
 func _summarize(summary) -> String:
@@ -79,7 +85,7 @@ func _summarize(summary) -> String:
 		return "%d failed, %d skipped, %d built" % [
 			summary.failures.size(), summary.skipped.size(), summary.rebuilt.size()]
 	if summary.rebuilt.is_empty():
-		return "nothing to rebuild"
+		return ""
 	return "%d module(s) rebuilt, no problems" % summary.rebuilt.size()
 
 
@@ -114,7 +120,7 @@ func clear() -> void:
 	_rows.clear()
 	_list.clear()
 	_sync_visibility()
-	_summary.text = "nothing compiled yet"
+	_summary.text = ""
 
 
 func _on_item_activated(index: int) -> void:
@@ -194,3 +200,8 @@ func _add_line(text: String, file_path: String) -> void:
 ## region. Called by everything that fills or clears it.
 func _sync_visibility() -> void:
 	_list.visible = _list.item_count > 0
+	# The whole console goes when there is nothing at all to report. A header and a status line
+	# floating on the canvas background, in a state where nothing has compiled, is a panel that
+	# looks like it failed to draw itself -- and it was taking a strip off the bottom of the
+	# canvas to do it.
+	visible = _list.item_count > 0 or not _summary.text.is_empty()

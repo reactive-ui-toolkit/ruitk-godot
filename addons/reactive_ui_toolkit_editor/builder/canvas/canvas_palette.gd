@@ -151,7 +151,7 @@ static func kind_badge(tint: Color) -> Dictionary:
 
 
 static func kind_badge_text(tint: Color) -> Dictionary:
-	return { "font_size": 10, "font_color": tint }
+	return { "font_size": 12, "font_color": tint }
 
 
 ## A "+ hook" / "+ code" / "+ style" chip inside a card.

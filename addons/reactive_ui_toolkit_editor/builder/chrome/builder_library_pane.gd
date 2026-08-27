@@ -84,11 +84,18 @@ func _init() -> void:
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
 	add_child(scroll)
 
+	# The scroll wraps ALL THREE SECTIONS, and the body is told to fill it. Sized to its content
+	# instead, the container measured only as far as the first section, so everything below the
+	# native elements -- the tree's own components, and the hooks the hint bar tells you to drag
+	# onto a body -- ran off the bottom of the pane with no way to scroll to them.
 	_body = VBoxContainer.new()
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_body.add_theme_constant_override("separation", 2)
 	scroll.add_child(_body)
 
@@ -198,7 +205,10 @@ func _show_all(kind: String, entries: PackedStringArray) -> void:
 
 func _entry_row(kind: String, name: String) -> Button:
 	var row := Button.new()
-	row.flat = true
+	# NOT flat. A palette entry is a drag handle and a click target, and flat text on a panel
+	# background reads as a label -- the two things you are meant to drag looked exactly like the
+	# heading above them.
+	row.flat = false
 	row.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	# Elements and components read as the TAG they insert; a hook reads as the call it is. The
 	# library's job is to show what will land in the file, and `Label` and `<Label>` are not the

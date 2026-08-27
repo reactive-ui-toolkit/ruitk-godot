@@ -123,13 +123,20 @@ func _build_ui() -> void:
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(body)
 
+	# The folder tree is a handful of short rows; the library is three sections of many. Split at
+	# the middle, the tree sat mostly empty over a library that could not show its second section.
 	var left := VSplitContainer.new()
-	left.custom_minimum_size = Vector2(240, 0)
+	left.custom_minimum_size = Vector2(260, 0)
 	body.add_child(left)
 	_folders = FolderPane.new()
+	_folders.custom_minimum_size = Vector2(0, 240)
 	left.add_child(_folders)
 	_library = LibraryPane.new()
 	left.add_child(_library)
+	# NEGATIVE: a VSplitContainer's offset is measured from the centre, so a positive one hands
+	# the top child MORE than half -- which put the library in a strip at the bottom, the exact
+	# problem the split was being set to fix.
+	left.split_offset = -210
 
 	var middle := VSplitContainer.new()
 	middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
