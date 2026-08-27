@@ -186,4 +186,16 @@ func source_card(graph: Graph) -> Graph.Card:
 ## The markup a LIBRARY drag inserts. An element and a component are spelled the same way -- a
 ## tag is a tag -- so one template covers both.
 static func markup_for(tag: String) -> String:
+	# SEEDED, not bare. Ported from the Unity leg's `SeededTag`: a `<Label />` with no text is an
+	# invisible element, so dropping one produces a card row and nothing on screen, and the user
+	# has to guess whether the drop worked. A tag whose whole point is its text starts with some.
+	match tag:
+		"Label":
+			return "<Label text=\"New label\" />"
+		"Button":
+			return "<Button text=\"Click\" />"
+		"LineEdit":
+			return "<LineEdit placeholder_text=\"...\" />"
+		"CheckBox":
+			return "<CheckBox text=\"Option\" />"
 	return "<%s />" % tag

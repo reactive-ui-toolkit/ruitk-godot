@@ -953,6 +953,28 @@ func _on_row_menu(id: int) -> void:
 		apply_edit(_menu_target, after, what)
 
 
+## Adds the import a COMPONENT tag needs, if the tag names one and the file has not got it.
+##
+## In the SAME commit as the insertion, which is the reference's rule and the only one that
+## works: a `<Card />` with no `import { Card }` is a file that does not compile, so putting the
+## tag in first and the import in second means every drop of a component spends a moment in an
+## error state -- reported by the preview, in the console, about an edit the builder itself was
+## halfway through making.
+##
+## A HOST tag needs nothing, and a component that lives in the same file needs nothing either.
+func _with_component_import(source: String, importer_path: String, tag: String) -> String:
+	if graph == null or Compiler.host_tags().has(tag):
+		return source
+	for card in graph.cards:
+		if card.kind != Module.Kind.COMPONENT or not (tag in card.exports):
+			continue
+		if Paths.same(card.file_path, importer_path):
+			return source
+		return Edits.ensure_import(source, importer_path, card.file_path,
+			PackedStringArray([tag]))
+	return source
+
+
 ## A row's attributes, split into name / value / how the value was written.
 ##
 ## The SPELLING matters: `text="hi"` is a quoted string and `style={s}` is an expression, and
@@ -1035,7 +1057,9 @@ func _on_search_picked(payload: Variant) -> void:
 			return
 		"child":
 			var tag := str(payload)
-			after = Edits.insert(before, card, _menu_row, "<%s />" % tag, Edits.Placement.INSIDE)
+			after = _with_component_import(
+				Edits.insert(before, card, _menu_row, Drag.markup_for(tag), Edits.Placement.INSIDE),
+				_menu_target, tag)
 			what = "Add <%s> to %s" % [tag, _menu_row.text.strip_edges()]
 		"attribute":
 			var name := ""
@@ -1588,7 +1612,9 @@ func drop_library_entry(kind: String, name: String, at: Vector2) -> bool:
 			[{ "code": "", "severity": Console.SEVERITY_WARNING, "message": str(verdict["reason"]), "line": -1 }])
 		return false
 	return apply_edit(card.file_path,
-		Edits.insert(_buffer_of(card.file_path), card, row, Drag.markup_for(name), placement),
+		_with_component_import(
+			Edits.insert(_buffer_of(card.file_path), card, row, Drag.markup_for(name), placement),
+			card.file_path, name),
 		"add <%s>" % name)
 
 

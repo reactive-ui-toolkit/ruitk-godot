@@ -520,7 +520,7 @@ static func _write(path: String, text: String) -> bool:
 ## KEEPS THE LAST GOOD RENDER. A focus that did not build leaves the previous mount standing and
 ## reports false: a preview that blanks on every transient syntax error is a preview nobody can
 ## work against, because typing passes through broken states constantly.
-func mount(container: Node, focus_path: String) -> bool:
+func mount(container: Node, focus_path: String, props := {}) -> bool:
 	if container == null:
 		return false
 	var script := built_script(focus_path)
@@ -531,9 +531,23 @@ func mount(container: Node, focus_path: String) -> bool:
 	# rebuild that reloaded the script under it. Clearing before a mount costs one `load` per
 	# child and removes a whole class of "the edit is not showing".
 	_clear_scratch_comp_cache()
-	_root = RuitkRoot.create(container, V.fc(Callable(script, "render"), {}))
+	# PROPS, not an empty dictionary. A component previewed with its declared defaults is
+	# previewed with the least interesting values it ever takes -- an empty label, a list with no
+	# items -- and the knobs above the stage exist precisely to change them.
+	_root = RuitkRoot.create(container, V.fc(Callable(script, "render"), props))
 	_mounted_path = Paths.canon(focus_path)
 	return _root != null
+
+
+## The reconciler's committed fiber tree for the current mount, or null.
+##
+## For the state panel: the values a component's hooks are HOLDING are only knowable from the
+## running tree, and they are the thing a preview is most often opened to check.
+func mounted_root_fiber():
+	if _root == null:
+		return null
+	var reconciler = _root.get("_reconciler")
+	return reconciler.get("_root_current") if reconciler != null else null
 
 
 func mounted_path() -> String:

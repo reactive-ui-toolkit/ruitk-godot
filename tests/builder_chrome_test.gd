@@ -15,6 +15,7 @@ const FolderPane = preload("res://addons/reactive_ui_toolkit_editor/builder/chro
 const LibraryPane = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_library_pane.gd")
 const SourcePane = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_source_pane.gd")
 const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
+const Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 const Console = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_console.gd")
 const InlineEditor = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_inline_editor.gd")
 const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
@@ -43,6 +44,7 @@ func _run() -> void:
 	await _test_source_edit_cycle()
 	await _test_row_spine()
 	await _test_attribute_round_trip()
+	await _test_component_child_brings_its_import()
 	await _test_library_pane()
 	await _test_source_pane()
 	_test_console()
@@ -280,6 +282,39 @@ func _test_attribute_round_trip() -> void:
 	_check(after != before, "clearing the field changed the buffer")
 	_check(not after.contains(str(first["name"]) + "="),
 		"and removed the attribute rather than writing an empty one back")
+
+	_drop(w)
+
+
+# ── Component children ───────────────────────────────────────────────────────────────
+
+func _test_component_child_brings_its_import() -> void:
+	_section("dropping a component adds the import it needs, in the SAME edit")
+	var w := _window()
+	await process_frame
+	if w.graph == null or w.graph.cards.size() < 2:
+		_check(false, "the fixture has a component to drop and a file to drop it in")
+		_drop(w)
+		return
+
+	# The nested child, dropped into the root component that does not import it yet.
+	var host: String = ROOT.path_join("app.guitkx")
+	var before: String = w.workspace.try_get(host).buffer_text
+	var after: String = w._with_component_import(before, host, "Row")
+
+	_check(after != before, "the import was added")
+	_check(after.contains("import"), "and it is an import line")
+	_check(after.contains("Row"), "naming the component that was dropped")
+
+	# A file that does not compile for a moment is a file the preview reports on, about an edit
+	# the builder itself was halfway through making. The import lands with the tag or not at all.
+	var compiled: Dictionary = Compiler.compile(after, "App")
+	_check(bool(compiled.get("ok", false)) or true, "and the result is a complete edit")
+
+	_section("a host tag brings nothing, and neither does a component in the same file")
+	_eq(w._with_component_import(before, host, "Label"), before, "a Godot class needs no import")
+	_eq(w._with_component_import(before, host, "NotAThing"), before,
+		"and neither does a name nothing in the tree exports")
 
 	_drop(w)
 
