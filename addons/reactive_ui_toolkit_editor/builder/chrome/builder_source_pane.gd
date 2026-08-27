@@ -68,6 +68,19 @@ func _init() -> void:
 	add_child(_editor)
 
 
+## Puts the caret on `line` (1-based) and scrolls it into view.
+##
+## What makes a card row and the source the SAME PLACE: clicking a row in the markup tree is the
+## fastest way to find the line that produced it, and without this the two panes are two separate
+## views of a file that never point at each other.
+func goto_line(line: int) -> void:
+	if _editor == null or line <= 0 or line > _editor.get_line_count():
+		return
+	_editor.set_caret_line(line - 1)
+	_editor.set_caret_column(0)
+	_editor.center_viewport_to_caret()
+
+
 func editor() -> GuitkxEditor:
 	return _editor
 

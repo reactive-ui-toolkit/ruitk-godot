@@ -582,12 +582,8 @@ static func _walk_markup(node: Variant, depth: int, out: Array[Graph.Line],
 			for child in (nd.get("children", []) as Array):
 				_walk_markup(child, depth + 1, out, source, base, lines)
 		"text":
-			var value := str(nd.get("value", "")).strip_edges()
-			if value.is_empty():
-				return
-			var trow := _line(Graph.LineKind.TEXT, value, at, at + value.length(), source, lines)
-			trow.depth = depth
-			out.append(trow)
+			# Structure only -- see the note on the directive-body segments above.
+			return
 		"expr":
 			var code := str(nd.get("code", "")).strip_edges()
 			# The span is the braces the user wrote, matched -- not the trimmed code's length,
@@ -739,18 +735,18 @@ static func _walk_directive_body(body_markup: String, body_at: int, depth: int,
 		return
 	for part in (split.get("parts", []) as Array):
 		var pd := part as Dictionary
-		if str(pd.get("t", "")) == "gd":
-			# Prep code inside the clause is the user's own, and the card is the editing
-			# surface -- a row it declined to show would be uneditable and would silently
-			# disagree with the source pane.
-			_append_code_rows(body_markup, int(pd["from"]), int(pd["to"]),
-				body_at, depth, out, source, lines)
-			continue
-		if not bool(pd.get("markup", false)):
-			# A `return null` guard, or a plain value return. Still the user's own line, so it
-			# gets a row -- dropping it leaves a clause whose card shows only half its logic.
-			_append_code_rows(body_markup, int(pd["at"]), maxi(int(pd["at"]), int(pd["end"])),
-				body_at, depth, out, source, lines)
+		# CODE INSIDE A CLAUSE IS NOT A MARKUP ROW.
+		#
+		# This emitted one row per non-blank line, reasoning that the code is the user's own and
+		# the card is the editing surface. That reasoning is wrong: the markup section shows the
+		# STRUCTURE of what a component returns, and a `var` line and a `#` comment are neither.
+		# Opened on a real file it put four lines of prose from a source comment into the
+		# RETURN -- MARKUP section of that file's own card.
+		#
+		# The Unity leg's walk handles exactly six node kinds -- element, if, foreach, for, while,
+		# switch -- and skips everything else, which is why this cannot happen there. Editing that
+		# code is the source pane's job; a component's setup already has the SETUP section.
+		if str(pd.get("t", "")) == "gd" or not bool(pd.get("markup", false)):
 			continue
 		var parser := Markup.new()
 		var parsed := parser.parse(body_markup, int(pd["m_start"]), int(pd["m_end"]))

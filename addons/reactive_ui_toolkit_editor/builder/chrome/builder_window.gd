@@ -63,6 +63,12 @@ const LAYERS := [
 ## submenu row, and setting its text put "Rename ..." on the item that opens New.
 enum CardMenuId { OPEN = 100, RENAME = 101, DELETE = 102, REVEAL_CARD = 103 }
 
+## Row-menu ids, in their own range for the same reason the card menu's are.
+enum RowMenuId {
+	ADD_ATTRIBUTE = 200, ADD_CHILD = 201, REMOVE_ATTRIBUTE = 202,
+	WRAP_IF = 203, WRAP_FOR = 204, DELETE_ROW = 205, EDIT_HEADER = 206,
+}
+
 var workspace: Workspace = null
 var ledger := Ledger.new()
 var preview := Preview.new()
@@ -80,6 +86,10 @@ var _toolbar: HBoxContainer = null
 var _status: Label = null
 var _card_menu: PopupMenu = null
 var _new_menu: PopupMenu = null
+var _row_menu: PopupMenu = null
+var _menu_row = null
+var _menu_card := -1
+var _menu_at := Vector2.ZERO
 
 ## The card menu's header row: the only item addressed positionally.
 const _HEADER_ITEM := 0
@@ -234,6 +244,10 @@ func _build_ui() -> void:
 	_canvas_menu.add_item("Fit to view", MenuId.FIT_VIEW)
 	add_child(_canvas_menu)
 
+	_row_menu = PopupMenu.new()
+	_row_menu.id_pressed.connect(_on_row_menu)
+	add_child(_row_menu)
+
 	_history_menu = PopupMenu.new()
 	_history_menu.add_item("Undo", MenuId.UNDO)
 	_history_menu.add_item("Redo", MenuId.REDO)
@@ -376,6 +390,9 @@ func _wire() -> void:
 
 	_canvas.card_selected.connect(_on_card_selected)
 	_canvas.card_add_requested.connect(_on_card_add)
+	_canvas.row_clicked.connect(_on_row_clicked)
+	_canvas.row_context_requested.connect(_on_row_context)
+	_inline.committed.connect(_on_inline_committed)
 	_canvas.camera_changed.connect(_on_camera_changed)
 	_canvas.camera_changed.connect(func(_c: Vector2, _z: float): _sync_layer_selector())
 	_canvas.card_context_requested.connect(func(index: int, world: Vector2):
@@ -589,6 +606,161 @@ func run_command(id: int) -> void:
 			redo()
 		MenuId.FIT_VIEW:
 			_canvas.fit_to_view()
+
+
+## A row was clicked: focus its module and put the source pane's caret on the line that made it.
+##
+## The two panes were two views of the same file that never pointed at each other. A markup tree
+## whose rows carry exact source spans and does nothing with them on a click is showing structure
+## it refuses to navigate.
+func _on_row_clicked(card_index: int, _section: int, row_index: int) -> void:
+	var row = _row_of(card_index, _section, row_index)
+	if row == null:
+		return
+	select_module(graph.cards[card_index].file_path)
+	_source.goto_line(row.source_line)
+
+
+## Right-click on a row: the operations that apply to THAT row.
+##
+## Ported from the Unity leg's `OnCanvasRowContext`. A directive head gets clause operations; an
+## element row gets attributes, children, wrapping and deletion. This is the builder's primary
+## editing gesture and it did not exist -- the canvas offered a card menu (open / rename / delete
+## the FILE) and nothing that could touch what is inside one.
+func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2) -> void:
+	var row = _row_of(card_index, section, row_index)
+	if row == null or graph == null:
+		return
+	var card = graph.cards[card_index]
+	var module := workspace.try_get(card.file_path) if workspace != null else null
+	if module == null or module.read_only:
+		return
+
+	_menu_target = card.file_path
+	_menu_row = row
+	_menu_card = card_index
+	_menu_at = at
+	_row_menu.clear()
+	_row_menu.add_separator(row.text.strip_edges())
+
+	if row.kind == Graph.LineKind.DIRECTIVE:
+		_row_menu.add_item("Edit header...", RowMenuId.EDIT_HEADER)
+		_row_menu.add_separator()
+		_row_menu.add_item("Delete " + row.badge_text, RowMenuId.DELETE_ROW)
+	else:
+		_row_menu.add_item("Add attribute...", RowMenuId.ADD_ATTRIBUTE)
+		_row_menu.add_item("Add child element...", RowMenuId.ADD_CHILD)
+		if not str(row.attrs_text).is_empty():
+			_row_menu.add_item("Remove attribute...", RowMenuId.REMOVE_ATTRIBUTE)
+		_row_menu.add_separator()
+		_row_menu.add_item("Wrap in @if", RowMenuId.WRAP_IF)
+		_row_menu.add_item("Wrap in @for", RowMenuId.WRAP_FOR)
+		# The FIRST element row is the component's return root: deleting it leaves a component
+		# with nothing to return, which is a compile error rather than an edit.
+		if row_index > 0 or section != Metrics.Section.MARKUP:
+			_row_menu.add_separator()
+			_row_menu.add_item("Delete element", RowMenuId.DELETE_ROW)
+
+	_row_menu.position = Vector2i(_canvas.get_screen_position() + at)
+	_row_menu.reset_size()
+	_row_menu.popup()
+
+
+## Carries out a row-menu choice. Every branch ends in one `apply_edit`, like every other gesture.
+func _on_row_menu(id: int) -> void:
+	var row = _menu_row
+	if row == null or workspace == null or _menu_target.is_empty():
+		return
+	var module := workspace.try_get(_menu_target)
+	if module == null or module.read_only:
+		return
+	var card = graph.cards[_menu_card] if graph != null and _menu_card >= 0 		and _menu_card < graph.cards.size() else null
+	var before := module.buffer_text
+	var after := before
+	var what := ""
+
+	match id:
+		RowMenuId.DELETE_ROW:
+			after = Edits.remove(before, row)
+			what = "Delete %s" % row.text.strip_edges()
+		RowMenuId.WRAP_IF:
+			after = Edits.wrap_in_directive(before, row, "@if (true)")
+			what = "Wrap %s in @if" % row.text.strip_edges()
+		RowMenuId.WRAP_FOR:
+			after = Edits.wrap_in_directive(before, row, "@for (item in [])")
+			what = "Wrap %s in @for" % row.text.strip_edges()
+		RowMenuId.ADD_CHILD:
+			after = Edits.insert(before, card, row, "<Label text=\"\" />", Edits.Placement.INSIDE)
+			what = "Add a child to %s" % row.text.strip_edges()
+		RowMenuId.ADD_ATTRIBUTE:
+			# Seeded and then edited in place, rather than behind a dialog that asks which
+			# attribute before it will put anything in the file.
+			after = Edits.set_attribute(before, row, "name", "value", true)
+			what = "Add an attribute to %s" % row.text.strip_edges()
+		RowMenuId.REMOVE_ATTRIBUTE:
+			var first := str(row.attr_pairs[0]).split("=")[0] if not row.attr_pairs.is_empty() else ""
+			if first.is_empty():
+				return
+			after = Edits.remove_attribute(before, row, first)
+			what = "Remove %s from %s" % [first, row.text.strip_edges()]
+		RowMenuId.EDIT_HEADER:
+			# Edited in place over the row, not behind a dialog: the header is one line of the
+			# user's own code and they are already looking at it.
+			_inline.open_at(Rect2(_menu_at, Vector2(260, 24)), row.directive_text,
+				{ "kind": "directive", "path": _menu_target, "row": row })
+			return
+		_:
+			return
+
+	if after != before:
+		apply_edit(_menu_target, after, what)
+
+
+## An inline edit was committed. Dispatched by the token the editor was opened with, so one
+## floating field serves every in-place edit the canvas offers.
+func _on_inline_committed(token: Variant, text: String) -> void:
+	if not (token is Dictionary) or workspace == null:
+		return
+	var spec := token as Dictionary
+	var path := str(spec.get("path", ""))
+	var module := workspace.try_get(path)
+	if module == null or module.read_only:
+		return
+	var row = spec.get("row")
+	var before := module.buffer_text
+	var after := before
+	var what := ""
+	match str(spec.get("kind", "")):
+		"directive":
+			after = Edits.set_directive_header(before, row, text)
+			what = "Edit %s" % row.badge_text
+		"attribute":
+			after = Edits.set_attribute(before, row, str(spec.get("name", "")), text, true)
+			what = "Edit %s on %s" % [str(spec.get("name", "")), row.text.strip_edges()]
+		_:
+			return
+	if after != before:
+		apply_edit(path, after, what)
+
+
+## The row under the pointer, from the section the hit-test named.
+func _row_of(card_index: int, section: int, row_index: int):
+	if graph == null or card_index < 0 or card_index >= graph.cards.size():
+		return null
+	var card = graph.cards[card_index]
+	var rows: Array = []
+	match section:
+		Metrics.Section.IMPORTS:
+			rows = card.imports
+		Metrics.Section.BODY:
+			rows = card.body
+		Metrics.Section.MARKUP:
+			rows = card.markup
+		Metrics.Section.EXPORTS:
+			rows = card.export_detail
+		_:
+			return null
+	return rows[row_index] if row_index >= 0 and row_index < rows.size() else null
 
 
 ## A card's "+" was used. Turns it into ONE edit through the funnel, like every other gesture.

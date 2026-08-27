@@ -28,6 +28,15 @@ signal card_selected(index: int)
 signal canvas_context_requested(world_position: Vector2)
 signal card_context_requested(index: int, world_position: Vector2)
 
+## A ROW inside a card was clicked, or right-clicked. `section` is a `Metrics.Section`.
+##
+## The spine of the whole surface, and it was missing: clicks resolved to a CARD and stopped, so
+## every row-level gesture the builder is FOR -- jump the source to this line, add an attribute to
+## this element, wrap this row in an @if, delete this element -- had no way to be expressed. The
+## hit-test existed and was only ever asked by a drop.
+signal row_clicked(card_index: int, section: int, row_index: int)
+signal row_context_requested(card_index: int, section: int, row_index: int, at: Vector2)
+
 ## A card's own "+" affordance was used: `what` is one of "hook", "code", "style", "entry".
 ##
 ## The card is where the user is LOOKING when they want another hook, so it is where the button
@@ -221,7 +230,11 @@ func _handle_button(event: InputEventMouseButton) -> void:
 			accept_event()
 		MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				select_card(card_at(event.position))
+				var index := card_at(event.position)
+				select_card(index)
+				var hit := row_at(index, event.position)
+				if bool(hit.get("found", false)):
+					row_clicked.emit(index, int(hit["section"]), int(hit["index"]))
 			accept_event()
 		MOUSE_BUTTON_RIGHT:
 			if not event.pressed:
@@ -229,10 +242,27 @@ func _handle_button(event: InputEventMouseButton) -> void:
 			var world := Metrics.screen_to_world(event.position, camera, zoom)
 			var index := card_at(event.position)
 			if index >= 0:
-				card_context_requested.emit(index, world)
+				# A row menu when the pointer is ON a row, the card's menu otherwise. The row is
+				# the more specific target and the one the user aimed at.
+				var hit := row_at(index, event.position)
+				if bool(hit.get("found", false)):
+					row_context_requested.emit(
+						index, int(hit["section"]), int(hit["index"]), event.position)
+				else:
+					card_context_requested.emit(index, world)
 			else:
 				canvas_context_requested.emit(world)
 			accept_event()
+
+
+## The row under a SCREEN point within card `index`, as `Metrics.row_hit` reports it.
+func row_at(index: int, screen_position: Vector2) -> Dictionary:
+	if graph == null or index < 0 or index >= graph.cards.size():
+		return { "found": false }
+	if not Metrics.shows_sections(Metrics.lod_of(zoom)):
+		return { "found": false }   # a pill has no rows to aim at
+	var card := graph.cards[index]
+	return Metrics.row_hit(card, Metrics.card_local_of(card, screen_position, camera, zoom))
 
 
 ## The card under a SCREEN point, or -1.

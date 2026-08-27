@@ -371,7 +371,6 @@ func _test_markup_golden() -> void:
   @else  dir(3)  @else
     Label  el/  text="low"
   @for  dir(4)  @for (f in facts)
-    var label = str(f)  code
     Row  comp/  key={f} text={label}
   @while  dir(5)  @while (count < 0)
     Label  el/  text="never"
@@ -432,10 +431,18 @@ func _test_directive_families() -> void:
 		_check(h.close_line >= h.source_line,
 			"%s closes at or after it opens (%d >= %d)" % [h.badge_text, h.close_line, h.source_line])
 
-	_section("prep code inside a clause is shown, not swallowed")
-	var prep := _find_row(app.markup, "")
-	_check(_render_markup(app).contains("var label = str(f)  code"),
-		"the loop body's own statement gets a row")
+	_section("prep code inside a clause is NOT a markup row")
+	# This asserted the opposite, and pinned a bug in place: the markup section shows the
+	# STRUCTURE of what a component returns -- elements, and the directives that arrange them.
+	# A `var` line is not structure, and neither is a `#` comment, which is how a real file's
+	# source comments ended up drawn as markup rows on its own card.
+	#
+	# The Unity leg's walk handles exactly six node kinds (element / if / foreach / for / while /
+	# switch) and skips everything else. Editing that code is the source pane's job.
+	_check(not _render_markup(app).contains("var label = str(f)"),
+		"a statement in a loop body is not drawn as markup")
+	_check(not _render_markup(app).contains("#"),
+		"and neither is a comment")
 
 
 func _test_spans_address_the_source() -> void:

@@ -30,6 +30,7 @@ func _initialize() -> void:
 	_test_move()
 	_test_attributes()
 	_test_directive_headers()
+	_test_wrap_in_directive()
 	_test_imports()
 	_test_setup_lines()
 	_test_style_entries()
@@ -569,3 +570,45 @@ func _test_drag_survives_a_rerender() -> void:
 
 	drag.cancel()
 	_check(not drag.is_active(), "cancelling ends the gesture")
+
+
+# ── Wrapping ─────────────────────────────────────────────────────────────────────────
+
+func _test_wrap_in_directive() -> void:
+	_section("a row can be wrapped in a directive")
+	var src := "export App() -> RuitkVNode {
+	return (
+		<VBoxContainer>
+			<Label text=\"hi\" />
+		</VBoxContainer>
+	)
+}
+"
+	var label := _row(src, "Label")
+	_check(label != null, "the row to wrap is there")
+
+	var wrapped := Edits.wrap_in_directive(src, label, "@if (true)")
+	_eq(wrapped,
+		"export App() -> RuitkVNode {
+	return (
+		<VBoxContainer>
+			@if (true) {
+				return (
+					<Label text=\"hi\" />
+				)
+			}
+		</VBoxContainer>
+	)
+}
+",
+		"the wrapper is the house form: header, return, the block one deeper, then the closers")
+
+	# THE POINT OF THE SEEDED LITERAL. `@if (condition)` names something that does not exist, so
+	# the preview reports an error on a wrap the user has not begun to edit. `true` compiles.
+	var compiled: Dictionary = Compiler.compile(wrapped, "App")
+	_check(bool(compiled["ok"]),
+		"and what it produces COMPILES (got %s)" % str(compiled.get("diagnostics", [])))
+
+	_section("wrapping is refused where there is nothing to wrap")
+	_eq(Edits.wrap_in_directive(src, null, "@if (true)"), src, "a null row changes nothing")
+	_eq(Edits.wrap_in_directive(src, label, "   "), src, "and neither does an empty header")

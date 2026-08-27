@@ -456,6 +456,53 @@ static func _is_space(c: String) -> bool:
 ## an error-tier diagnostic on this leg (GUITKX2304) -- so a create that helpfully wired the
 ## module up would produce a tree that does not compile until the user finishes the thought.
 ## Creation states PLACEMENT; wiring states USAGE, and they are separate gestures.
+## Wraps a row's whole span in a directive, and returns the new source.
+##
+## Ported from the Unity leg's `WrapRowInDirective`. The scaffolding is the house form every
+## sample uses -- header, `return (`, the indented block, `);`, `}` -- and the closer aligns with
+## its own `return (` rather than with the body it closes.
+##
+## The header is seeded with a COMPILABLE literal, never a placeholder identifier: `@if (true)`
+## compiles and can then be edited, while `@if (condition)` is a name that does not exist and the
+## preview reports it as an error on a wrap the user has not finished typing. `@while` seeds
+## `false` deliberately -- a true-seeded render loop would not terminate.
+static func wrap_in_directive(source: String, row: Graph.Line, header: String) -> String:
+	if row == null or header.strip_edges().is_empty():
+		return source
+	var lines := source.split("
+")
+	var from: int = clampi(row.source_line - 1, 0, lines.size() - 1)
+	var to: int = clampi((row.end_line if row.end_line > 0 else row.source_line) - 1,
+		from, lines.size() - 1)
+	var indent := _indent_of_line(str(lines[from]))
+	var unit := _indent_unit(source)
+
+	var out := PackedStringArray()
+	for i in range(lines.size()):
+		if i == from:
+			out.append(indent + header + " {")
+			out.append(indent + unit + "return (")
+		if i >= from and i <= to:
+			# TWO units: the block sits inside the `return (`, which is itself one unit inside the
+			# header. One unit put the wrapped element level with its own `return (`.
+			out.append(unit + unit + str(lines[i]))
+		else:
+			out.append(str(lines[i]))
+		if i == to:
+			out.append(indent + unit + ")")
+			out.append(indent + "}")
+	return "
+".join(out)
+
+
+## The leading whitespace of one line.
+static func _indent_of_line(line: String) -> String:
+	var i := 0
+	while i < line.length() and (line[i] == "	" or line[i] == " "):
+		i += 1
+	return line.substr(0, i)
+
+
 static func template_for(kind: int, name: String) -> String:
 	match kind:
 		Module.Kind.HOOK:
