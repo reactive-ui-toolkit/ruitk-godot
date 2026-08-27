@@ -48,6 +48,9 @@ signal card_add_requested(index: int, what: String)
 ## Something was dropped on the canvas. `data` is whatever the source put in it; `at` is where.
 signal dropped(data: Dictionary, at: Vector2)
 
+## A card was dragged to a new place on the canvas. The window persists it to the layout.
+signal card_moved(index: int, to: Vector2)
+
 var graph: Graph = null
 var camera := Vector2.ZERO
 var zoom := 1.0
@@ -58,6 +61,14 @@ var _edges: Edges = null
 var _root: RuitkRoot = null
 var _panning := false
 var _pan_from := Vector2.ZERO
+
+## A card being dragged: which one, and where in the card the pointer took hold, so it does not
+## jump to have its corner under the cursor.
+var _moving := -1
+var _grab_offset := Vector2.ZERO
+## Where the left button went down, to tell a click from the start of a drag.
+var _pressed_at := Vector2.ZERO
+var _press_index := -1
 
 
 func _init() -> void:
@@ -239,12 +250,8 @@ const GRID_COLOR := Color(0.34, 0.34, 0.40, 0.55)
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		_handle_button(event as InputEventMouseButton)
-	elif event is InputEventMouseMotion and _panning:
-		var motion := event as InputEventMouseMotion
-		camera += motion.position - _pan_from
-		_pan_from = motion.position
-		_render()
-		accept_event()
+	elif event is InputEventMouseMotion:
+		_handle_motion(event as InputEventMouseMotion)
 
 
 func _handle_button(event: InputEventMouseButton) -> void:
@@ -271,11 +278,21 @@ func _handle_button(event: InputEventMouseButton) -> void:
 			accept_event()
 		MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				var index := card_at(event.position)
-				select_card(index)
-				var hit := row_at(index, event.position)
+				_pressed_at = event.position
+				_press_index = card_at(event.position)
+				select_card(_press_index)
+				var hit := row_at(_press_index, event.position)
 				if bool(hit.get("found", false)):
-					row_clicked.emit(index, int(hit["section"]), int(hit["index"]))
+					row_clicked.emit(_press_index, int(hit["section"]), int(hit["index"]))
+			else:
+				# A card that was dragged tells the window where it ended up; one that was only
+				# clicked has already been handled by the press.
+				if _moving >= 0:
+					card_moved.emit(_moving, Vector2(graph.cards[_moving].x, graph.cards[_moving].y))
+				_moving = -1
+				_panning = false
+				_press_index = -1
+				camera_changed.emit(camera, zoom)
 			accept_event()
 		MOUSE_BUTTON_RIGHT:
 			if not event.pressed:
@@ -332,6 +349,51 @@ func _get_drag_data(at_position: Vector2) -> Variant:
 		"row_at": int(rows[row_index].at),
 		"row_index": row_index,
 	}
+
+
+## Pointer movement: moving a card, panning the canvas, or neither.
+##
+## BOTH WERE MISSING. A canvas that cannot be panned except by the middle button, and cards that
+## cannot be moved at all, is a diagram rather than a canvas -- and the layout store, the
+## per-tree persistence and the fit-to-view were all written for positions nobody could change.
+func _handle_motion(motion: InputEventMouseMotion) -> void:
+	if _moving >= 0:
+		var world := Metrics.screen_to_world(motion.position, camera, zoom)
+		var card := graph.cards[_moving]
+		card.x = world.x - _grab_offset.x
+		card.y = world.y - _grab_offset.y
+		_render()
+		accept_event()
+		return
+
+	if _panning:
+		camera += motion.position - _pan_from
+		_pan_from = motion.position
+		queue_redraw()
+		_render()
+		accept_event()
+		return
+
+	# A left button held down becomes a DRAG once it has travelled far enough -- on a card it
+	# moves the card, on empty canvas it pans. Below the threshold it is still a click, because
+	# treating every click as a one-pixel drag makes selection impossible.
+	if not (motion.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		return
+	if _pressed_at.distance_to(motion.position) < DRAG_THRESHOLD:
+		return
+	if _press_index >= 0 and graph != null and _press_index < graph.cards.size():
+		var card := graph.cards[_press_index]
+		var world := Metrics.screen_to_world(_pressed_at, camera, zoom)
+		_grab_offset = world - Vector2(card.x, card.y)
+		_moving = _press_index
+	else:
+		_panning = true
+		_pan_from = motion.position
+	accept_event()
+
+
+## How far the pointer travels before a press is a drag rather than a click.
+const DRAG_THRESHOLD := 4.0
 
 
 ## The row under a SCREEN point within card `index`, as `Metrics.row_hit` reports it.

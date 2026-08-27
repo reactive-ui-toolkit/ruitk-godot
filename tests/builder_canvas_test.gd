@@ -29,7 +29,7 @@ const ROOT := "res://tests/__builder_canvas_tmp/app"
 const VIEWPORT := Vector2(1280, 720)
 
 ## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
-const ASSERTION_FLOOR := 125
+const ASSERTION_FLOOR := 128
 
 var _fails := 0
 var _passes := 0
@@ -45,6 +45,8 @@ func _run() -> void:
 	_graph = _build_graph()
 
 	_test_lod_bands()
+	await _test_card_can_be_moved()
+	await _test_canvas_can_be_panned()
 	_test_camera()
 	_test_height_model()
 	_test_culling()
@@ -565,3 +567,78 @@ func _count(node: Node) -> int:
 	for child in node.get_children():
 		total += _count(child)
 	return total
+
+
+# ── Moving things ────────────────────────────────────────────────────────────────────
+
+## A mounted canvas over the suite's own graph.
+func _mounted_host() -> Host:
+	var host := Host.new()
+	host.size = VIEWPORT
+	root.add_child(host)
+	host.show_graph(_graph)
+	host.set_camera(Vector2.ZERO, 1.0)
+	return host
+
+
+## A press, a drag past the threshold, a release -- the gesture, not the handler.
+func _drag(host, from: Vector2, to: Vector2) -> void:
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = from
+	host._gui_input(press)
+	# TWO moves: the first crosses the threshold and decides what kind of drag this is, the
+	# second is the one that actually carries it.
+	for at in [from.lerp(to, 0.5), to]:
+		var motion := InputEventMouseMotion.new()
+		motion.position = at
+		motion.button_mask = MOUSE_BUTTON_MASK_LEFT
+		host._gui_input(motion)
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	release.position = to
+	host._gui_input(release)
+
+
+func _test_card_can_be_moved() -> void:
+	_section("a card can be dragged to a new place")
+	# It could not. The layout store, its per-tree keying and its "top up rather than re-seed"
+	# rule were all written for positions a user chooses, and nothing in the builder could change
+	# one -- the canvas was a diagram, not a canvas.
+	var host: Host = _mounted_host()
+	await process_frame
+	var card = host.graph.cards[0]
+	var was := Vector2(card.x, card.y)
+	var grab := Metrics.world_to_screen(was + Vector2(20, 10), host.camera, host.zoom)
+
+	var moved := [Vector2.ZERO]
+	host.card_moved.connect(func(_i: int, to: Vector2): moved[0] = to)
+	_drag(host, grab, grab + Vector2(140, 80))
+
+	_check(Vector2(card.x, card.y) != was,
+		"the card is somewhere else (%s -> %s)" % [was, Vector2(card.x, card.y)])
+	_check(moved[0] != Vector2.ZERO, "and it announced where, so the layout can remember it")
+
+	# PUT IT BACK. The graph is shared with every other section in this suite, and one of them
+	# asserts no two cards occupy the same slot -- a test that leaves a card where it dropped it
+	# fails a later one about something else entirely.
+	card.x = was.x
+	card.y = was.y
+	host.unmount()
+
+
+func _test_canvas_can_be_panned() -> void:
+	_section("the canvas pans with the left button on empty space")
+	# Panning was MIDDLE BUTTON ONLY, which is a gesture a lot of people never try and some mice
+	# do not have.
+	var host: Host = _mounted_host()
+	await process_frame
+	var before := host.camera
+	# A corner far from any card: dragging ON a card moves the card instead, which is the point.
+	var empty := host.size - Vector2(20, 20)
+	_drag(host, empty, empty - Vector2(120, 70))
+
+	_check(host.camera != before, "the camera moved (%s -> %s)" % [before, host.camera])
+	host.unmount()

@@ -586,6 +586,7 @@ func _wire() -> void:
 	_canvas.row_clicked.connect(_on_row_clicked)
 	_canvas.row_context_requested.connect(_on_row_context)
 	_canvas.dropped.connect(_on_canvas_drop)
+	_canvas.card_moved.connect(_on_card_moved)
 	_inline.committed.connect(_on_inline_committed)
 	_canvas.camera_changed.connect(_on_camera_changed)
 	_canvas.camera_changed.connect(func(_c: Vector2, _z: float): _sync_layer_selector())
@@ -623,6 +624,14 @@ func _wire() -> void:
 
 ## Opens the tree the given module belongs to.
 func open_tree(focus_path: String) -> void:
+	if focus_path.strip_edges().is_empty():
+		# The START SCREEN. Opening with nothing is what the menu does on a project that has no
+		# `.guitkx` open, and it is a state this window is built to show.
+		if workspace == null:
+			workspace = Workspace.new()
+		reproject()
+		_refresh_status()
+		return
 	if workspace == null:
 		workspace = Workspace.new()
 	# On open, not only on teardown: a crashed editor leaves a mirror behind, and compiling
@@ -647,6 +656,21 @@ func open_tree(focus_path: String) -> void:
 ## The layout is applied and then TOPPED UP: what it already knows keeps its slot, and only a
 ## module it has never seen takes a seeded one. Re-seeding everything would move every card the
 ## user has ever dragged the moment one module is added.
+## Frames the tree once the canvas actually has a size.
+##
+## Deferred, because `reproject` runs before the containers have laid out and a fit against a
+## zero-sized canvas frames nothing. The retry is bounded: a canvas that never gets a size is a
+## window that was never shown.
+func _fit_when_sized(attempts := 8) -> void:
+	if _canvas == null or attempts <= 0:
+		return
+	if _canvas.size.x > 1.0 and _canvas.size.y > 1.0:
+		_canvas.fit_to_view()
+		return
+	await get_tree().process_frame
+	_fit_when_sized(attempts - 1)
+
+
 ## Whether the onboarding panel should be on screen: only when there is genuinely nothing open.
 func _sync_empty_state() -> void:
 	if _empty_state == null:
@@ -665,6 +689,11 @@ func reproject() -> void:
 		_canvas.camera = layout.camera
 		_canvas.zoom = layout.zoom
 	_canvas.show_graph(graph)
+	# A TREE WITH NO SAVED CAMERA IS FRAMED, not left wherever the last one happened to sit. A
+	# freshly opened tree came up clipped against the top-left corner -- the fit existed, on a
+	# toolbar button nobody has pressed yet.
+	if layout.zoom <= 0.0 and not graph.cards.is_empty():
+		_fit_when_sized()
 	if _preview_pane != null:
 		_preview_pane.graph = graph
 	_sync_empty_state()
@@ -832,6 +861,18 @@ func _on_row_clicked(card_index: int, _section: int, row_index: int) -> void:
 		return
 	select_module(graph.cards[card_index].file_path)
 	_source.goto_line(row.source_line)
+
+
+## A card was dragged somewhere. Its new place is remembered for this tree.
+##
+## The layout store, its per-tree keying and the "top up rather than re-seed" rule were all
+## written before anything could move a card -- so the whole persistence path had never once run
+## on a position a user chose.
+func _on_card_moved(index: int, to: Vector2) -> void:
+	if graph == null or layout == null or index < 0 or index >= graph.cards.size():
+		return
+	layout.set_position(graph.cards[index].file_path, to)
+	_capture_layout()
 
 
 ## Something was dropped on the canvas. Routes it to the operation that already existed for it.

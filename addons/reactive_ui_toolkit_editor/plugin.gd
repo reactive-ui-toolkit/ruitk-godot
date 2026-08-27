@@ -427,12 +427,10 @@ func _open_builder() -> void:
 	# A session already open is shown as it is. Only a builder with NOTHING open needs a file to
 	# open a tree from -- and re-pointing an open session at whatever the editor happens to be
 	# showing would take a tree with unsaved work away from under someone.
+	# An empty focus is fine: the builder opens on its start screen, which is where someone with
+	# no tree open is supposed to begin.
 	if _builder.focus_path().is_empty():
-		var focus := _builder_focus_path()
-		if focus.is_empty():
-			printerr("[reactive_ui_toolkit_editor] the builder needs a .guitkx to open a tree from -- open one first")
-			return
-		_builder.open_tree(focus)
+		_builder.open_tree(_builder_focus_path())
 	_builder_window.popup_centered()
 
 
@@ -442,8 +440,10 @@ func _open_builder() -> void:
 func _builder_focus_path() -> String:
 	if _view != null and _view.has_method("current_path"):
 		var current := str(_view.call("current_path"))
-		if not current.is_empty():
+		if not current.is_empty() and not current.begins_with("res://addons/"):
 			return current
-	for path in GuitkxWorkspace.all_paths():
-		return str(path)
+	# NOTHING, deliberately. This used to answer with the first `.guitkx` anywhere in the project,
+	# which on a fresh install is one of the ADDON's own files -- so opening the builder from the
+	# menu showed the builder's own canvas source, read-only, instead of the start screen. A tree
+	# nobody asked for is worse than no tree: the empty state is there to be the answer.
 	return ""
