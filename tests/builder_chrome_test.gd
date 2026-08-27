@@ -28,7 +28,7 @@ const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/bu
 const ROOT := "res://tests/__builder_chrome_tmp/app"
 
 ## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
-const ASSERTION_FLOOR := 155
+const ASSERTION_FLOOR := 165
 
 var _fails := 0
 var _passes := 0
@@ -50,6 +50,7 @@ func _run() -> void:
 	await _test_component_child_brings_its_import()
 	await _test_drag_and_drop_is_reachable()
 	await _test_every_signal_is_listened_to()
+	await _test_unplaced_tree_is_placed_before_written()
 	await _test_library_pane()
 	await _test_source_pane()
 	_test_console()
@@ -403,6 +404,54 @@ func _is_own_signal(emitter: Object, name: String) -> bool:
 		if str((entry as Dictionary)["name"]) == name:
 			return true
 	return false
+
+
+# ── A tree that has never been placed ────────────────────────────────────────────────
+
+func _test_unplaced_tree_is_placed_before_written() -> void:
+	_section("a tree built from the start screen is PLACED before it is written")
+	# Everything created with no tree open lives under the provisional root, whose name ends in
+	# `~` so Godot's importer skips it wholesale. Writing there puts real files somewhere the
+	# engine never looks: the module exists on disk and every import of it resolves to nothing.
+	#
+	# The create flow could not reach this at all until now -- with no focus it asked for the
+	# base directory of an empty string and refused with "no folder to create in", so the four
+	# buttons on the start screen, the one path a first-time user takes, was the one that failed.
+	var w := BuilderWindow.new()
+	w.size = Vector2(1200, 700)
+	root.add_child(w)
+	await process_frame
+	w.open_tree("")
+	await process_frame
+
+	_eq(w._validate_name(Module.Kind.COMPONENT, "Fresh"), "",
+		"a name is accepted with no tree open")
+	var made: String = w._create_named(Module.Kind.COMPONENT, "Fresh")
+	_check(made.begins_with(Workspace.UNSAVED_ROOT),
+		"a first module is born at the provisional root (%s)" % made)
+	_eq(w.workspace.unlocated_modules().size(), 1, "and the workspace knows it is unplaced")
+	_eq(w.graph.cards.size(), 1, "the canvas shows it straight away, in memory")
+
+	_eq(w.save(), 0, "Save writes NOTHING while the tree has no home")
+	_check(not FileAccess.file_exists(made), "and nothing reached the provisional path either")
+
+	_section("given a folder, the whole tree moves and then writes")
+	_check(w._place_tree_in(PLACED_ROOT), "placing it succeeds")
+	_eq(w.workspace.unlocated_modules().size(), 0, "nothing is unplaced any more")
+	_check(w.save() > 0, "and now Save writes")
+	_check(FileAccess.file_exists(PLACED_ROOT.path_join("Fresh.guitkx")),
+		"where the user asked, not under the provisional root")
+
+	_drop(w)
+	# Cleaned up by hand: this suite has no rm helper, and a tree left behind makes the next run
+	# of this section fail on "already there" rather than on anything it is testing.
+	for name in ["Fresh.guitkx", "Fresh.guitkx.uid", "Fresh.gd", "Fresh.gd.uid"]:
+		DirAccess.remove_absolute(PLACED_ROOT.path_join(name))
+	DirAccess.remove_absolute(PLACED_ROOT)
+
+
+## Where the placement test puts its tree.
+const PLACED_ROOT := "res://tests/__builder_placed_tmp"
 
 
 # ── Folder pane ──────────────────────────────────────────────────────────────────────

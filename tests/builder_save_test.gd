@@ -421,3 +421,4 @@ func _test_no_residue() -> void:
 	Layout.clear_all()
 	_check(not DirAccess.dir_exists_absolute(ROOT.get_base_dir()), "the fixture tree is gone")
 	_check(not FileAccess.file_exists(Journal.JOURNAL_PATH), "the journal is cleared")
+

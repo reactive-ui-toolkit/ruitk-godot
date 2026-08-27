@@ -1567,6 +1567,7 @@ func _validate_name(kind: int, name: String) -> String:
 	var folder := _create_folder()
 	if folder.is_empty():
 		return "no folder to create in"
+	
 	if workspace.try_get(folder.path_join(name + Module.suffix_for(kind))) != null:
 		return "%s already exists" % name
 	if kind == Module.Kind.COMPONENT:
@@ -1576,9 +1577,19 @@ func _validate_name(kind: int, name: String) -> String:
 	return ""
 
 
-## Where a new module is born: beside the focused one.
+## Where a new module is born: beside the focused one, or at the PROVISIONAL ROOT when there is
+## no focus yet.
+##
+## NOTHING IS ON DISK UNTIL SAVE, including the first module of a brand new tree, and the
+## workspace already had the whole mechanism for that -- `UNSAVED_ROOT`, `is_unlocated`,
+## `unlocated_modules` and a save that asks where an unlocated module should go. The create flow
+## never used it: with no focus it asked for the base directory of an empty string, got an empty
+## string, and refused with "no folder to create in" -- so the ONE path a first-time user takes,
+## the four buttons on the start screen, was the one path that could not work.
 func _create_folder() -> String:
-	return _focus_path.get_base_dir()
+	if not _focus_path.is_empty():
+		return _focus_path.get_base_dir()
+	return Workspace.UNSAVED_ROOT
 
 
 ## Creates `name` once the prompt accepted it.
@@ -1657,6 +1668,13 @@ func _unused_name(folder: String, kind: int) -> String:
 func save() -> int:
 	if workspace == null:
 		return 0
+	# A TREE THAT HAS NEVER BEEN PLACED IS PLACED FIRST. Everything a user builds from the start
+	# screen lives under the provisional root, whose name ends in `~` so Godot's importer skips
+	# it -- writing there would put real files somewhere the engine never looks, and the module
+	# would exist on disk while every import of it resolved to nothing.
+	if not workspace.unlocated_modules().is_empty():
+		_ask_where_the_tree_lives()
+		return 0
 	for blank in workspace.blank_modules():
 		_console.add_diagnostics(blank.file_path(), [{
 			"code": "", "severity": Console.SEVERITY_WARNING, "line": -1,
@@ -1670,6 +1688,64 @@ func save() -> int:
 	_folders.rebuild()
 	_refresh_status()
 	return written
+
+
+## Asks for a folder, then moves every unplaced module into it.
+##
+## Ported from the Unity leg's `ResolveUnsavedLocation`. The whole relocation is PLANNED BEFORE
+## ANYTHING MOVES, so a collision cancels all of it rather than leaving half the tree in the new
+## folder and half at the provisional path -- and the relative shape under the provisional root
+## is preserved, because a component and the folder it owns were arranged that way on purpose.
+func _ask_where_the_tree_lives() -> void:
+	var dialog := EditorFileDialog.new()
+	dialog.file_mode = EditorFileDialog.FILE_MODE_OPEN_DIR
+	dialog.access = EditorFileDialog.ACCESS_RESOURCES
+	dialog.title = "Where should this UI live?"
+	dialog.dir_selected.connect(func(folder: String):
+		dialog.queue_free()
+		if _place_tree_in(folder):
+			save())
+	dialog.canceled.connect(func():
+		dialog.queue_free()
+		toast("Save cancelled — a new tree needs a folder before it can be written."))
+	add_child(dialog)
+	dialog.popup_centered_ratio(0.6)
+
+
+## Moves every unplaced module under `folder`, keeping the shape they had. False when nothing
+## moved, so the caller does not go on to save a tree that is still unplaced.
+func _place_tree_in(folder: String) -> bool:
+	var pending := workspace.unlocated_modules()
+	if pending.is_empty():
+		return true
+	var root := Workspace.UNSAVED_ROOT
+
+	# Planned first, in full.
+	var plan: Array = []
+	for module in pending:
+		var relative := Paths.canon(module.folder).trim_prefix(root).trim_prefix("/")
+		var target := folder.path_join(relative) if not relative.is_empty() else folder
+		var destination := target.path_join(module.file_path().get_file())
+		if workspace.try_get(destination) != null or FileAccess.file_exists(destination):
+			toast("%s is already there — nothing was moved." % destination.get_file())
+			return false
+		plan.append({ "module": module, "to": target })
+
+	ledger.begin("Place the tree")
+	var snapshot := workspace.capture_imports()
+	for entry in plan:
+		var spec := entry as Dictionary
+		var module = spec["module"]
+		var from: String = module.file_path()
+		workspace.move_to(from, str(spec["to"]), module.name)
+		if Paths.same(_focus_path, from):
+			_focus_path = module.file_path()
+	for rewrite in workspace.reconcile_imports(snapshot):
+		var r := rewrite as Dictionary
+		ledger.record(str(r["file_path"]), str(r["before"]), str(r["after"]))
+	ledger.end()
+	reproject()
+	return true
 
 
 func abort() -> int:

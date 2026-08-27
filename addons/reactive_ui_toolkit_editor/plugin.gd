@@ -39,6 +39,7 @@ var _settings_dialog: AcceptDialog  # lazy; shared by the menu entries and the t
 # owns one (the .guitkx view), and a plugin has exactly one. Lazy, and kept between openings so a
 # tree with unsaved work survives closing the window.
 var _builder_window: Window = null
+var _builder_context: EditorContextMenuPlugin = null
 var _builder: Control = null
 var _main_menu: PopupMenu = null  # top-level "Reactive UI Toolkit" menu; null when on the fallback
 var _tools_fallback := false  # true when the Project > Tools item was registered instead
@@ -81,6 +82,14 @@ func _enter_tree() -> void:
 	# The dialog itself is sectioned per addon: Runtime (from the reactive_ui_toolkit addon,
 	# when installed) and Editor (this addon), so settings come from both without requiring both.
 	_register_settings_menu()
+
+	# "Open in RUITK Builder" on a `.guitkx` in the FileSystem dock. The start screen tells the
+	# user to open an existing tree from there, and until now nothing in the editor could.
+	var context_script := load("res://addons/reactive_ui_toolkit_editor/builder/builder_context_menu.gd")
+	if context_script != null:
+		_builder_context = context_script.new()
+		_builder_context.open_requested.connect(open_builder_on)
+		add_context_menu_plugin(EditorContextMenuPlugin.CONTEXT_SLOT_FILESYSTEM, _builder_context)
 
 	# M3: announce the native analyzer once per session — embedded-GDScript intelligence
 	# (type-aware completion/hover/diagnostics inside {expr} and setup code) turns on when the
@@ -147,6 +156,9 @@ func _exit_tree() -> void:
 		remove_tool_menu_item(SETTINGS_MENU)
 		remove_tool_menu_item(BUILDER_MENU)
 		_tools_fallback = false
+	if _builder_context != null:
+		remove_context_menu_plugin(_builder_context)
+		_builder_context = null
 	if _builder_window != null:
 		_builder_window.queue_free()   # takes the builder with it; a disabled plugin leaves no window
 		_builder_window = null
@@ -434,9 +446,18 @@ func _open_builder() -> void:
 	_builder_window.popup_centered()
 
 
-## The `.guitkx` a FIRST open should build its tree from: whatever the editor view is showing,
-## else the first one in the project. "Open the builder" means "on what I am looking at" -- but
-## only when there is nothing open yet; see the caller.
+## Opens the builder on a specific file. What the FileSystem dock's context item calls, and the
+## one entry point that does not have to guess what the user meant.
+func open_builder_on(file_path: String) -> void:
+	_open_builder()
+	if _builder != null and not file_path.is_empty():
+		_builder.open_tree(file_path)
+		_builder.grab_focus()
+
+
+## The `.guitkx` a FIRST open should build its tree from: whatever the editor view is showing.
+## "Open the builder" means "on what I am looking at" -- and when I am looking at nothing, the
+## start screen, not the first file the project happens to contain.
 func _builder_focus_path() -> String:
 	if _view != null and _view.has_method("current_path"):
 		var current := str(_view.call("current_path"))
