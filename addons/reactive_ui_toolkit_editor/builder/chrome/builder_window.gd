@@ -428,8 +428,14 @@ func _build_ui() -> void:
 	_card_menu.add_item("Delete", CardMenuId.DELETE)
 	add_child(_card_menu)
 
+	# The canvas's own menu: what you can do with the SURFACE, plus the create actions, because
+	# right-clicking empty canvas is where someone reaches for "put something here".
 	_canvas_menu = PopupMenu.new()
+	_canvas_menu.add_separator("CANVAS")
 	_canvas_menu.add_item("Fit to view", MenuId.FIT_VIEW)
+	_canvas_menu.add_separator()
+	_canvas_menu.add_child(_canvas_new_menu())
+	_canvas_menu.add_submenu_item("New", "CanvasNew")
 	add_child(_canvas_menu)
 
 	_search_menu = SearchMenu.new()
@@ -494,6 +500,52 @@ func _build_empty_state() -> Control:
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(hint)
 	return centre
+
+
+## The create submenu the canvas menu carries.
+func _canvas_new_menu() -> PopupMenu:
+	var menu := PopupMenu.new()
+	menu.name = "CanvasNew"
+	menu.add_item("New component", Module.Kind.COMPONENT)
+	menu.add_item("New style module", Module.Kind.STYLE)
+	menu.add_item("New hook module", Module.Kind.HOOK)
+	menu.add_item("New util module", Module.Kind.UTIL)
+	menu.id_pressed.connect(prompt_create)
+	return menu
+
+
+## A library entry was clicked. Inserts it where the selection is.
+func _on_library_activated(kind: String, name: String) -> void:
+	if graph == null or _focus_path.is_empty():
+		toast("Select a card first — a click in the library inserts into the selected module.")
+		return
+	var index := graph.index_of(_focus_path)
+	if index < 0:
+		return
+	var card = graph.cards[index]
+	var module := workspace.try_get(card.file_path)
+	if module == null or module.read_only:
+		toast("%s is read-only." % card.title)
+		return
+
+	var before := module.buffer_text
+	var after := before
+	if kind == LibraryPane.ENTRY_HOOK:
+		after = Edits.insert_setup_line(before, card, "var _ = %s()" % name)
+	else:
+		# Into the LAST markup row, which is where "add one more" means on a card you are
+		# looking at. A drag says where precisely; a click says "somewhere sensible".
+		if card.markup.is_empty():
+			toast("%s has no markup to add to yet." % card.title)
+			return
+		var row = card.markup[card.markup.size() - 1]
+		after = _with_component_import(
+			Edits.insert(before, card, row, Drag.markup_for(name), Edits.Placement.AFTER),
+			card.file_path, name)
+	if after == before:
+		toast("Couldn't insert <%s> there." % name)
+		return
+	apply_edit(card.file_path, after, "Add %s to %s" % [name, card.title])
 
 
 ## The header: what tree is open, which layer it is drawn at, the commands, and the legend that
@@ -588,6 +640,10 @@ func _wire() -> void:
 	_canvas.dropped.connect(_on_canvas_drop)
 	_canvas.card_moved.connect(_on_card_moved)
 	_inline.committed.connect(_on_inline_committed)
+	# An ABANDONED inline edit still has to clear what it was about: leaving `_menu_row` pointing
+	# at a row after the user pressed Escape means the next Delete acts on a row they walked away
+	# from.
+	_inline.cancelled.connect(func(_token: Variant): _menu_row = null)
 	_canvas.camera_changed.connect(_on_camera_changed)
 	_canvas.camera_changed.connect(func(_c: Vector2, _z: float): _sync_layer_selector())
 	_canvas.card_context_requested.connect(func(index: int, world: Vector2):
@@ -601,6 +657,10 @@ func _wire() -> void:
 		_canvas_menu.popup())
 
 	_library.create_requested.connect(prompt_create)
+	# CLICKING an entry inserts it into the selected card, which is the keyboard-and-trackpad
+	# route to the same place the drag goes. The signal existed and nothing listened, so a click
+	# in the library did nothing at all and the only way in was a drag.
+	_library.entry_activated.connect(_on_library_activated)
 	_source.buffer_edited.connect(_on_buffer_edited)
 	_source.edit_applied.connect(func(path: String, text: String):
 		apply_edit(path, text, "Edit %s" % path.get_file()))

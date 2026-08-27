@@ -28,7 +28,7 @@ const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/bu
 const ROOT := "res://tests/__builder_chrome_tmp/app"
 
 ## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
-const ASSERTION_FLOOR := 148
+const ASSERTION_FLOOR := 155
 
 var _fails := 0
 var _passes := 0
@@ -49,6 +49,7 @@ func _run() -> void:
 	await _test_attribute_round_trip()
 	await _test_component_child_brings_its_import()
 	await _test_drag_and_drop_is_reachable()
+	await _test_every_signal_is_listened_to()
 	await _test_library_pane()
 	await _test_source_pane()
 	_test_console()
@@ -361,6 +362,47 @@ func _test_drag_and_drop_is_reachable() -> void:
 		"and something that is not a payload at all is not")
 
 	_drop(w)
+
+
+# ── Nothing shouts into the void ─────────────────────────────────────────────────────
+
+func _test_every_signal_is_listened_to() -> void:
+	_section("every signal a pane emits has someone listening")
+	# A pane that emits and a window that does not connect is a feature that exists in the code
+	# and not on the screen -- `entry_activated` was like that, so a click in the library did
+	# nothing at all and the only way in was a drag nobody could start either.
+	var w := _window()
+	await process_frame
+
+	for spec in [
+		{ "who": w.folder_pane(), "what": "folder pane" },
+		{ "who": w.library_pane(), "what": "library" },
+		{ "who": w.source_pane(), "what": "source pane" },
+		{ "who": w.console(), "what": "console" },
+		{ "who": w.inline_editor(), "what": "inline editor" },
+		{ "who": w.canvas(), "what": "canvas" },
+	]:
+		var emitter: Object = (spec as Dictionary)["who"]
+		var what := str((spec as Dictionary)["what"])
+		for entry in emitter.get_signal_list():
+			var name := str((entry as Dictionary)["name"])
+			# Godot's own Node/Control signals are not this builder's contract.
+			if not name.begins_with("_") and _is_own_signal(emitter, name):
+				_check(emitter.get_signal_connection_list(name).size() > 0,
+					"%s.%s has a listener" % [what, name])
+
+	_drop(w)
+
+
+## Whether a signal is one the builder declared, rather than one Godot gave every Control.
+func _is_own_signal(emitter: Object, name: String) -> bool:
+	var script: Script = emitter.get_script()
+	if script == null:
+		return false
+	for entry in script.get_script_signal_list():
+		if str((entry as Dictionary)["name"]) == name:
+			return true
+	return false
 
 
 # ── Folder pane ──────────────────────────────────────────────────────────────────────
