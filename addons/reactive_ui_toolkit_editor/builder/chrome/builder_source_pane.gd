@@ -1,0 +1,116 @@
+@tool
+class_name RuitkBuilderSourcePane
+extends VBoxContainer
+## The selected module's buffer, editable, in the same code editor the `.guitkx` view uses.
+##
+## REUSED, not rebuilt: `GuitkxCodeEdit` already carries the whole editing substrate -- markup
+## completion, the diagnostics gutter, signature help, go-to-definition, comment toggling, the
+## bookmark cycle. A second code editor in the same addon would be a second set of all of that,
+## and the two would drift on the first change to either.
+##
+## The buffer is the WORKSPACE's. Typing here calls `apply_edit`, which is the same entry the
+## canvas uses, so an edit made in the source pane and an edit made by a drag on the canvas are
+## the same kind of event and land in the same ledger.
+
+const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
+const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_module.gd")
+const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_paths.gd")
+const GuitkxEditor = preload("res://addons/reactive_ui_toolkit_editor/editor/guitkx_code_edit.gd")
+
+## The buffer changed. `before`/`after` are the whole text either side, which is what the ledger
+## records: a gesture is undone by putting the text back, not by replaying keystrokes.
+signal buffer_edited(file_path: String, before: String, after: String)
+
+var workspace: Workspace = null
+
+var _title: Label = null
+var _editor: GuitkxEditor = null
+var _path := ""
+
+
+func _init() -> void:
+	add_theme_constant_override("separation", 2)
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	_title = Label.new()
+	_title.text = "no module selected"
+	add_child(_title)
+
+	_editor = GuitkxEditor.new()
+	_editor.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_editor.configure()
+	_editor.text_changed.connect(_on_text_changed)
+	add_child(_editor)
+
+
+func editor() -> GuitkxEditor:
+	return _editor
+
+
+func path() -> String:
+	return _path
+
+
+## Shows a module. Re-showing the one already open is a no-op rather than a reload: reloading
+## would drop the caret and the selection every time something else re-announced the same file.
+func show_module(file_path: String) -> void:
+	if workspace == null:
+		return
+	if Paths.key(file_path) == Paths.key(_path):
+		return
+	var module := workspace.try_get(file_path)
+	if module == null:
+		clear()
+		return
+	_path = module.file_path()
+	_title.text = "%s%s" % [_path.get_file(), "  (read-only)" if module.read_only else ""]
+	_editor.file_path = _path
+	_editor.editable = not module.read_only
+	_editor.text = module.buffer_text
+
+
+## Re-reads the buffer from the model, for a change that came from somewhere else -- an undo, a
+## drag on the canvas, an import rewritten by a move. The caret is kept where it was, because
+## losing it on every canvas gesture makes the two surfaces unusable together.
+func refresh_from_model() -> void:
+	if workspace == null or _path.is_empty():
+		return
+	var module := workspace.try_get(_path)
+	if module == null:
+		clear()
+		return
+	if module.buffer_text == _editor.text:
+		return
+	var line := _editor.get_caret_line()
+	var column := _editor.get_caret_column()
+	_editor.text = module.buffer_text
+	_editor.set_caret_line(clampi(line, 0, maxi(0, _editor.get_line_count() - 1)))
+	_editor.set_caret_column(clampi(column, 0,
+		_editor.get_line(_editor.get_caret_line()).length()))
+
+
+func clear() -> void:
+	_path = ""
+	_title.text = "no module selected"
+	_editor.text = ""
+
+
+## Writes a real edit back to the model.
+##
+## The guard is the COMPARISON, not a loading flag. Setting `TextEdit.text` from code does not
+## emit `text_changed` at all, so a load cannot arrive here today -- and if that ever changed, a
+## load is by definition text that already equals the model's, so it would still be rejected here.
+## A flag would have to be right about the engine's behaviour; this does not.
+func _on_text_changed() -> void:
+	if workspace == null or _path.is_empty():
+		return
+	var module := workspace.try_get(_path)
+	if module == null or module.read_only:
+		return
+	var before := module.buffer_text
+	var after := _editor.text
+	if before == after:
+		return
+	if not workspace.apply_edit(_path, after):
+		return
+	buffer_edited.emit(_path, before, after)
