@@ -565,8 +565,13 @@ func _collect_rows(item: TreeItem, out: Array) -> void:
 		child = child.get_next()
 
 
+## The row FOR a module, found by the path it carries rather than by the text it displays.
+##
+## The displayed text is a presentation choice -- it leads with a kind glyph now -- and a lookup
+## that matches it exactly turns every change to how a row LOOKS into a failure about which rows
+## EXIST. The metadata is the identity.
 func _row_named(rows: Array, file_name: String) -> TreeItem:
 	for row in rows:
-		if (row as TreeItem).get_text(0) == file_name:
+		if str((row as TreeItem).get_metadata(0)).get_file() == file_name:
 			return row
 	return null

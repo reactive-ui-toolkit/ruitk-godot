@@ -51,6 +51,11 @@ var _sections := {}
 ## itself every time the model changed would be unusable while anyone was working.
 var _expanded := { ENTRY_ELEMENT: true, ENTRY_HOOK: true, ENTRY_COMPONENT: true }
 var _search := ""
+
+## The component whose card is selected on the canvas, so the palette row for it can say so.
+## Without it the library is the one region that never reflects the selection every other region
+## is showing.
+var _selected_component := ""
 var _search_field: LineEdit = null
 var _create_menu: PopupMenu = null
 var _body: VBoxContainer = null
@@ -222,6 +227,9 @@ func _entry_row(kind: String, name: String) -> Button:
 	row.text = "    " + (name if kind == ENTRY_HOOK else "<%s>" % name)
 	row.tooltip_text = "%s -- drag onto a card, or click to insert" % name
 	row.set_meta("entry_kind", kind)
+	if kind == ENTRY_COMPONENT and name == _selected_component:
+		row.button_pressed = true
+		row.toggle_mode = true
 	row.set_meta("entry_name", name)
 	row.pressed.connect(func(): entry_activated.emit(kind, name))
 	return row
@@ -263,3 +271,11 @@ func _open_create_menu() -> void:
 ## The create menu, for a harness or a caller that wants it opened without a click.
 func open_create_menu() -> void:
 	_open_create_menu()
+
+
+## Points the palette at the component the canvas has selected.
+func select_component(name: String) -> void:
+	if _selected_component == name:
+		return
+	_selected_component = name
+	rebuild()

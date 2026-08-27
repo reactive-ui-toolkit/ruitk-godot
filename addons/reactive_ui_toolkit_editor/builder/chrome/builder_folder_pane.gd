@@ -22,6 +22,18 @@ signal module_selected(file_path: String)
 signal module_activated(file_path: String)
 signal module_context_requested(file_path: String, at: Vector2)
 
+## What each kind's row is marked with. Text, not editor icons: the pane is built headlessly in
+## the suites, where `EditorInterface` has no theme to ask.
+const KIND_GLYPH := {
+	Module.Kind.COMPONENT: "◆",
+	Module.Kind.HOOK: "⬡",
+	Module.Kind.STYLE: "◐",
+	Module.Kind.UTIL: "▪",
+	Module.Kind.VALUE: "▫",
+	Module.Kind.MODULE: "▪",
+	Module.Kind.UNKNOWN: "•",
+}
+
 const KIND_LABEL := {
 	Module.Kind.COMPONENT: "component",
 	Module.Kind.HOOK: "hook",
@@ -94,7 +106,9 @@ func rebuild() -> void:
 	for module in ordered:
 		var parent := _folder_item(root_item, folders, base, module.folder)
 		var row := create_item(parent)
-		row.set_text(0, module.file_path().get_file())
+		# A GLYPH PER KIND, ahead of the name. Colour alone carries the kind only for a reader who
+		# has the legend in view and is not colour-blind; a shape carries it for everyone.
+		row.set_text(0, "%s  %s" % [KIND_GLYPH.get(module.kind, "•"), module.file_path().get_file()])
 		row.set_text(1, _state_of(module))
 		row.set_tooltip_text(0, "%s -- %s" % [module.file_path(), KIND_LABEL.get(module.kind, "")])
 		row.set_metadata(0, module.file_path())
@@ -144,7 +158,7 @@ func _ensure_folder(parent: TreeItem, folders: Dictionary, path: String, label: 
 	if folders.has(path):
 		return folders[path]
 	var item := create_item(parent)
-	item.set_text(0, label)
+	item.set_text(0, "▸ " + label)
 	item.set_selectable(0, false)
 	item.set_selectable(1, false)
 	item.set_custom_color(0, Color(0.55, 0.58, 0.64))

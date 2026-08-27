@@ -127,6 +127,16 @@ func _draw_anchors(card: Graph.Card, index: int, card_width: float) -> void:
 		var at := Metrics.world_to_screen(world, camera, zoom)
 		draw_circle(at, ANCHOR_RADIUS, ANCHOR_COLOR)
 
+	# AND ONE PER OUTGOING EDGE, on the row that owns it. Only the arrival side had dots, so a
+	# parent card showed four edges leaving its right edge with nothing marking where -- and the
+	# IMPORTS list each one comes from had no visible connection to any of them. Placed by
+	# `edge_source_anchor`, which is what the edge itself leaves from, so a dot cannot end up
+	# somewhere the line does not start.
+	var outgoing := graph.edges_from(index)
+	for k in range(outgoing.size()):
+		var source := Metrics.edge_source_anchor(card, k, card_width)
+		draw_circle(Metrics.world_to_screen(source, camera, zoom), ANCHOR_RADIUS, ANCHOR_COLOR)
+
 
 func _draw_edge(edge: Graph.Edge, ordinal: int, card_width: float) -> void:
 	var from_card := graph.cards[edge.from_index]

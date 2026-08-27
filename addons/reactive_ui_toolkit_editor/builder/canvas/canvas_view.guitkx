@@ -121,7 +121,8 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 		<PanelContainer style={ P.card_header_band(tint) }>
 		<HBoxContainer style={ {"separation": 6} }>
 			<PanelContainer style={ P.kind_badge(tint) }>
-				<Label text={ Model.kind_word(int(card.kind)) } style={ P.kind_badge_text(tint) } />
+				<Label text={ Model.kind_word(int(card.kind)) }
+					style={ P.pill_badge_text(tint) if lod == M.Lod.PILL else P.kind_badge_text(tint) } />
 			</PanelContainer>
 			<Label text={ card.title } style={ P.pill_title() if lod == M.Lod.PILL else P.title() } />
 			@if (card.read_only) {
@@ -160,8 +161,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 						@for (row in card.imports) {
 							return (
 								<Label key={ str(row.at) } text={ row.text } style={ P.import_row() }
-									text_overflow_trim={ TextServer.OVERRUN_TRIM_ELLIPSIS }
-									clip_text={ true } />
+									text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
 							)
 						}
 					</CanvasCardSection>

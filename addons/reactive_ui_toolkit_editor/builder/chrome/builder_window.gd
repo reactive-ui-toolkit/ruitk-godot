@@ -779,6 +779,11 @@ func select_module(file_path: String) -> void:
 	_source.workspace = workspace
 	_source.show_module(_focus_path)
 	_folders.select_path(_focus_path)
+	if _library != null and graph != null:
+		var at := graph.index_of(_focus_path)
+		var card = graph.cards[at] if at >= 0 else null
+		_library.select_component(
+			str(card.exports[0]) if card != null and not card.exports.is_empty() else "")
 	if _preview_pane != null:
 		# BUILD IT IF IT IS NOT BUILT. A round compiles the focus's closure, and the module a user
 		# selects next is often outside the closure the last one had -- so the pane would sit on

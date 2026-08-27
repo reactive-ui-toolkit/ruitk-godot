@@ -183,3 +183,14 @@ static func card_header_band(tint: Color) -> Dictionary:
 ## The hairline between one section of a card and the next.
 static func section_rule() -> Dictionary:
 	return { "color": Color(0.24, 0.24, 0.29, 0.9), "custom_minimum_size": Vector2(0, 1) }
+
+
+
+## The badge at the PILL band, where the card is scaled down with the canvas.
+##
+## Larger than the badge on a full card, because at that band the whole card is drawn at a third
+## of its size: a badge sized for 1:1 renders there as a smudge, and the kind word -- the only
+## thing besides the name that a pill carries -- becomes unreadable exactly where the reader is
+## scanning many cards at once.
+static func pill_badge_text(tint: Color) -> Dictionary:
+	return { "font_size": 22, "font_color": tint }

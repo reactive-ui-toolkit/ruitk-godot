@@ -86,7 +86,7 @@ static func CanvasCardHeader(props: Dictionary, children: Array) -> RuitkVNode:
 		for __cf0_once in 1:
 			__cf0 = V.Label({ "text": "read-only", "style": P.read_only() })
 			continue
-	return V.PanelContainer({ "style": P.card_header_band(tint) }, [V.HBoxContainer({ "style": {"separation": 6} }, [V.PanelContainer({ "style": P.kind_badge(tint) }, [V.Label({ "text": Model.kind_word(int(card.kind)), "style": P.kind_badge_text(tint) })]), V.Label({ "text": card.title, "style": P.pill_title() if lod == M.Lod.PILL else P.title() }), __cf0])])
+	return V.PanelContainer({ "style": P.card_header_band(tint) }, [V.HBoxContainer({ "style": {"separation": 6} }, [V.PanelContainer({ "style": P.kind_badge(tint) }, [V.Label({ "text": Model.kind_word(int(card.kind)), "style": P.pill_badge_text(tint) if lod == M.Lod.PILL else P.kind_badge_text(tint) })]), V.Label({ "text": card.title, "style": P.pill_title() if lod == M.Lod.PILL else P.title() }), __cf0])])
 
 # component CanvasCardSections
 static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode:
@@ -108,7 +108,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 		for __cf1_once in 1:
 			var __cf2: Array = []
 			for row in card.imports:
-				__cf2.append(V.Label({ "text": row.text, "style": P.import_row(), "text_overflow_trim": TextServer.OVERRUN_TRIM_ELLIPSIS, "clip_text": true }, [], str(row.at)))
+				__cf2.append(V.Label({ "text": row.text, "style": P.import_row(), "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS }, [], str(row.at)))
 				continue
 			__cf1 = V.fc(CanvasCardSection, { "heading": "IMPORTS" }, [__cf2])
 			continue

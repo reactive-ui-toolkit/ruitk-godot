@@ -43,6 +43,17 @@ func _init() -> void:
 	# "my component renders the same colour as the panel" look identical.
 	_stage = PanelContainer.new()
 	_stage.custom_minimum_size = Vector2(0, 120)
+	_stage.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	# A BORDER, explicitly. Without one the rendered component is painted straight onto the pane
+	# and there is nothing saying where the component ends and the builder's own chrome begins --
+	# a preview whose bounds are invisible cannot answer "is my layout filling its parent".
+	var frame := StyleBoxFlat.new()
+	frame.bg_color = Color(0.11, 0.11, 0.13)
+	frame.border_color = Color(0.24, 0.24, 0.30)
+	frame.set_border_width_all(1)
+	frame.set_corner_radius_all(4)
+	frame.set_content_margin_all(2)
+	_stage.add_theme_stylebox_override("panel", frame)
 	add_child(_stage)
 
 	_slot = MarginContainer.new()
@@ -63,6 +74,12 @@ func _init() -> void:
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_note)
+
+	# The captions describe the stage, so they sit under it and everything spare goes below them
+	# rather than between.
+	var tail := Control.new()
+	tail.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	add_child(tail)
 
 	_show_idle()
 
