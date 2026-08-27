@@ -71,6 +71,7 @@ enum RowMenuId {
 	ADD_ATTRIBUTE = 200, ADD_CHILD = 201, REMOVE_ATTRIBUTE = 202,
 	WRAP_IF = 203, WRAP_FOR = 204, DELETE_ROW = 205, EDIT_HEADER = 206,
 	ADD_ELSE = 207, ADD_ELSE_IF = 208, DELETE_CLAUSE = 209, EDIT_ATTRIBUTE = 210,
+	APPLY_STYLE = 211, UNWRAP = 212,
 }
 
 var workspace: Workspace = null
@@ -858,12 +859,15 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 			_row_menu.add_item("Add @elif", RowMenuId.ADD_ELSE_IF)
 			_row_menu.add_item("Add @else", RowMenuId.ADD_ELSE)
 		_row_menu.add_separator()
+		_row_menu.add_item("Remove %s, keep its contents" % row.badge_text, RowMenuId.UNWRAP)
 		if row.clause_index > 0:
 			_row_menu.add_item("Delete this %s clause" % row.badge_text, RowMenuId.DELETE_CLAUSE)
 		_row_menu.add_item("Delete " + row.badge_text, RowMenuId.DELETE_ROW)
 	else:
 		_row_menu.add_item("Add attribute...", RowMenuId.ADD_ATTRIBUTE)
 		_row_menu.add_item("Add child element...", RowMenuId.ADD_CHILD)
+		if _has_style_modules():
+			_row_menu.add_item("Apply style from a module...", RowMenuId.APPLY_STYLE)
 		if not str(row.attrs_text).is_empty():
 			_row_menu.add_item("Edit attribute...", RowMenuId.EDIT_ATTRIBUTE)
 			_row_menu.add_item("Remove attribute...", RowMenuId.REMOVE_ATTRIBUTE)
@@ -904,6 +908,9 @@ func _on_row_menu(id: int) -> void:
 		RowMenuId.ADD_ELSE_IF:
 			after = Edits.add_if_clause(before, row, true)
 			what = "Add @elif"
+		RowMenuId.UNWRAP:
+			after = Edits.unwrap_directive(before, row)
+			what = "Remove %s, keeping its contents" % row.badge_text
 		RowMenuId.DELETE_CLAUSE:
 			after = Edits.delete_clause(before, row)
 			what = "Delete the %s clause" % row.badge_text
@@ -925,6 +932,11 @@ func _on_row_menu(id: int) -> void:
 				"attributes of <%s>" % tag,
 				Attributes.menu_for(tag, row, _component_named(tag)),
 				_menu_screen_at(), "add \"%s\" (untyped)")
+			return
+		RowMenuId.APPLY_STYLE:
+			_search_purpose = "style"
+			_search_menu.open_menu("apply a style to %s" % row.text.strip_edges(),
+				_style_items(), _menu_screen_at())
 			return
 		RowMenuId.EDIT_ATTRIBUTE:
 			_search_purpose = "edit_attribute"
@@ -973,6 +985,37 @@ func _with_component_import(source: String, importer_path: String, tag: String) 
 		return Edits.ensure_import(source, importer_path, card.file_path,
 			PackedStringArray([tag]))
 	return source
+
+
+## Whether the open tree has a style module to offer at all.
+func _has_style_modules() -> bool:
+	if graph == null:
+		return false
+	for card in graph.cards:
+		if card.kind == Module.Kind.STYLE and not card.exports.is_empty():
+			return true
+	return false
+
+
+## Every style a module in this tree exports, as menu items.
+##
+## One entry per EXPORT, not per module: a style module holds several looks and "apply a style"
+## means one of them, so a menu that stopped at the module would need a second menu behind it.
+func _style_items() -> Array:
+	var items: Array = []
+	if graph == null:
+		return items
+	for card in graph.cards:
+		if card.kind != Module.Kind.STYLE or card.exports.is_empty():
+			continue
+		items.append({ "heading": card.title })
+		for export_name in card.exports:
+			items.append(SearchMenu.item(str(export_name), {
+				"export": str(export_name),
+				"path": card.file_path,
+				"alias": str(export_name),
+			}, card.title))
+	return items
 
 
 ## A row's attributes, split into name / value / how the value was written.
@@ -1084,6 +1127,17 @@ func _on_search_picked(payload: Variant) -> void:
 				{ "kind": "attribute", "path": _menu_target, "row": _menu_row,
 					"name": str(spec["name"]), "quoted": bool(spec["quoted"]) })
 			return
+		"style":
+			# THE IMPORT LANDS WITH THE ATTRIBUTE. `style={Palette.CARD}` with nothing importing
+			# `Palette` is a file that does not compile, and a style applied in two commits is a
+			# style that is briefly an error.
+			var pick := payload as Dictionary
+			var alias := str(pick["alias"])
+			after = Edits.set_attribute(before, _menu_row, "style",
+				"%s.%s" % [alias, str(pick["export"])], false)
+			after = Edits.ensure_import(after, _menu_target, str(pick["path"]),
+				PackedStringArray([str(pick["export"])]))
+			what = "Style %s with %s" % [_menu_row.text.strip_edges(), str(pick["export"])]
 		"remove_attribute":
 			after = Edits.remove_attribute(before, _menu_row, str(payload))
 			what = "Remove %s from %s" % [str(payload), _menu_row.text.strip_edges()]

@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_test_directive_headers()
 	_test_wrap_in_directive()
 	_test_clauses()
+	_test_unwrap()
 	_test_imports()
 	_test_setup_lines()
 	_test_style_entries()
@@ -662,3 +663,35 @@ func _test_clauses() -> void:
 	lying.directive_line = 0
 	_eq(Edits.delete_clause(IF_SRC, lying), IF_SRC, "a row with no directive line changes nothing")
 	_eq(Edits.add_if_clause(IF_SRC, lying, false), IF_SRC, "and neither does one with no close")
+
+
+# ── Unwrapping ───────────────────────────────────────────────────────────────────────
+
+func _test_unwrap() -> void:
+	_section("a directive can be removed, keeping what it wrapped")
+	var head := _directive(IF_SRC, "@if")
+	var without := Edits.unwrap_directive(IF_SRC, head)
+
+	_check(not without.contains("@if"), "the wrapper is gone")
+	_check(without.contains("<Label text=\"yes\" />"), "and what it wrapped survives")
+	_check(bool(Compiler.compile(without, "App")["ok"]),
+		"and the result compiles -- the return scaffolding went with the wrapper, not without it")
+
+	_section("the block de-indents to where the header was")
+	for line in without.split("
+"):
+		if str(line).strip_edges() == "<Label text=\"yes\" />":
+			_eq(str(line), "			<Label text=\"yes\" />",
+				"one level in from the container, where the @if used to sit")
+
+	_section("round trip")
+	# Wrapping and unwrapping is the same file again. Not asserted for whitespace equality --
+	# the wrap re-indents and the unwrap has to guess the unit back -- but for the same MARKUP.
+	var wrapped := Edits.wrap_in_directive(IF_SRC, _row(IF_SRC, "Label"), "@if (true)")
+	var back := Edits.unwrap_directive(wrapped, _directive(wrapped, "@if"))
+	_check(bool(Compiler.compile(back, "App")["ok"]), "the round trip still compiles")
+
+	_section("a row the buffer does not agree with is refused")
+	var lying := Graph.Line.new()
+	lying.directive_line = 0
+	_eq(Edits.unwrap_directive(IF_SRC, lying), IF_SRC, "no directive line, no change")

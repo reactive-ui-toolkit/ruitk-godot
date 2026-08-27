@@ -527,6 +527,77 @@ static func delete_clause(source: String, row: Graph.Line) -> String:
 ".join(out)
 
 
+## Removes a directive WRAPPER, keeping what it wrapped. The inverse of `wrap_in_directive`.
+##
+## Ported from the Unity leg's `RemoveDirectiveBlock`. The header, its `return (` / `)`
+## scaffolding and the closing brace go, and the block that was inside de-indents to where the
+## header used to be.
+##
+## The block is found by BRACE DEPTH from the header rather than from the row's `close_line`: a
+## clause the user has been editing may not agree with the projection yet, and unwrapping to the
+## wrong line takes a chunk of unrelated markup with it.
+static func unwrap_directive(source: String, row: Graph.Line) -> String:
+	if row == null or row.directive_line <= 0:
+		return source
+	var lines := source.split("
+")
+	var header := row.directive_line - 1
+	if header < 0 or header >= lines.size():
+		return source
+
+	var depth := 0
+	var close := -1
+	for i in range(header, lines.size()):
+		for c in str(lines[i]):
+			if c == "{":
+				depth += 1
+			elif c == "}":
+				depth -= 1
+		if depth <= 0 and i > header:
+			close = i
+			break
+	if close < 0:
+		return source
+
+	var inner := PackedStringArray()
+	for i in range(header + 1, close):
+		inner.append(str(lines[i]))
+
+	# The `return (` / `)` pair belonged to the wrapper, not to what it wrapped.
+	var open_at := -1
+	var close_at := -1
+	for i in range(inner.size()):
+		var trimmed := str(inner[i]).strip_edges()
+		if trimmed == "return (" and open_at < 0:
+			open_at = i
+		if trimmed == ")":
+			close_at = i
+	if open_at >= 0 and close_at > open_at:
+		inner.remove_at(close_at)
+		inner.remove_at(open_at)
+
+	# De-indent by however much the shallowest surviving line is deeper than the header was.
+	var header_indent := _indent_of_line(str(lines[header])).length()
+	var shallowest := 1 << 30
+	for line in inner:
+		if not str(line).strip_edges().is_empty():
+			shallowest = mini(shallowest, _indent_of_line(str(line)).length())
+	var shift: int = 0 if shallowest == (1 << 30) else maxi(0, shallowest - header_indent)
+
+	var out := PackedStringArray()
+	for i in range(lines.size()):
+		if i == header:
+			for line in inner:
+				var text := str(line)
+				out.append(text.substr(shift) if text.length() >= shift 					and text.substr(0, shift).strip_edges().is_empty() else text)
+			continue
+		if i > header and i <= close:
+			continue
+		out.append(str(lines[i]))
+	return "
+".join(out)
+
+
 ## Wraps a row's whole span in a directive, and returns the new source.
 ##
 ## Ported from the Unity leg's `WrapRowInDirective`. The scaffolding is the house form every
