@@ -40,7 +40,9 @@ const LOD_SECTIONS_BELOW := 0.75
 ## because it is the only one that rides the attribute run on a markup row.
 const CARD_WIDTH_PILL := 300.0
 const CARD_WIDTH_SECTIONS := 340.0
-const CARD_WIDTH_FULL := 430.0
+## Narrower than it was. At 430 the widest thing on a card was the blank half to the right of
+## its content -- and with attributes now a zoom deeper, nothing on the card needs that width.
+const CARD_WIDTH_FULL := 360.0
 
 ## The gutter between columns of the seeded layout, and between a card and the next row.
 const CARD_GUTTER := 48.0

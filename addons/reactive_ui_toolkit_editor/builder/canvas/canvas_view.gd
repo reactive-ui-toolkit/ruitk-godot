@@ -86,7 +86,7 @@ static func CanvasCardHeader(props: Dictionary, children: Array) -> RuitkVNode:
 		for __cf0_once in 1:
 			__cf0 = V.Label({ "text": "read-only", "style": P.read_only() })
 			continue
-	return V.HBoxContainer({ "style": {"separation": 6} }, [V.PanelContainer({ "style": P.kind_badge(tint) }, [V.Label({ "text": Model.kind_word(int(card.kind)), "style": P.kind_badge_text(tint) })]), V.Label({ "text": card.title, "style": P.pill_title() if lod == M.Lod.PILL else P.title() }), __cf0])
+	return V.PanelContainer({ "style": P.card_header_band(tint) }, [V.HBoxContainer({ "style": {"separation": 6} }, [V.PanelContainer({ "style": P.kind_badge(tint) }, [V.Label({ "text": Model.kind_word(int(card.kind)), "style": P.kind_badge_text(tint) })]), V.Label({ "text": card.title, "style": P.pill_title() if lod == M.Lod.PILL else P.title() }), __cf0])])
 
 # component CanvasCardSections
 static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode:
@@ -154,7 +154,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 static func CanvasCardSection(props: Dictionary, children: Array) -> RuitkVNode:
 	var heading = props.get("heading", "")
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
-	return V.VBoxContainer({ "style": {"separation": 2} }, [V.Label({ "text": heading, "style": P.section_head() }), (children)])
+	return V.VBoxContainer({ "style": {"separation": 2} }, [V.ColorRect({ "color": Color(0.24, 0.24, 0.29, 0.9), "custom_minimum_size": Vector2(0, 1) }), V.Label({ "text": heading, "style": P.section_head() }), (children)])
 
 # component CanvasMarkupRow
 static func CanvasMarkupRow(props: Dictionary, children: Array) -> RuitkVNode:
@@ -186,5 +186,5 @@ static func CanvasAddChip(props: Dictionary, children: Array) -> RuitkVNode:
 	var target = index
 	var kind = what
 	var sink = on_add
-	return V.Button({ "text": label, "flat": false, "style": P.add_chip(), "onPressed": func(): (sink.call(target, kind) if sink != null else null) })
+	return V.Button({ "text": label, "flat": true, "style": P.add_chip(), "onPressed": func(): (sink.call(target, kind) if sink != null else null) })
 

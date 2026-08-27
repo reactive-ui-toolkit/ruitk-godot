@@ -130,7 +130,8 @@ func _test_lod_bands() -> void:
 
 	_eq(Metrics.card_width_for(Metrics.Lod.PILL), 300.0, "a pill is the narrowest")
 	_eq(Metrics.card_width_for(Metrics.Lod.SECTIONS), 340.0, "sections are wider")
-	_eq(Metrics.card_width_for(Metrics.Lod.FULL), 430.0, "and full is the widest -- it rides the attribute run")
+	_eq(Metrics.card_width_for(Metrics.Lod.FULL), 360.0,
+		"and full is the widest -- but only as wide as its content, not as wide as an attribute run")
 
 	_check(Metrics.shows_sections(Metrics.Lod.SECTIONS), "sections show at L1")
 	_check(not Metrics.shows_sections(Metrics.Lod.PILL), "and not at L0")

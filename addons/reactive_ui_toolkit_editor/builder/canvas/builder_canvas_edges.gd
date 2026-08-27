@@ -149,17 +149,21 @@ func _draw_edge(edge: Graph.Edge, ordinal: int, card_width: float) -> void:
 	# line to a differently-tinted card. Selection still wins: a highlighted edge is a highlighted
 	# edge whatever it connects.
 	var to_style := int(to_card.kind) == int(Module.Kind.STYLE)
-	var color := EDGE_COLOR_SELECTED if highlighted else (Palette.edge_style() if to_style else EDGE_COLOR)
+	# ONE COLOUR PER KIND, and selection is shown by WEIGHT. Tinting the selected card's edges a
+	# different colour put three colours on a canvas whose legend names two, so the key stopped
+	# mapping onto what was drawn.
+	var color := Palette.edge_style() if to_style else Palette.edge_component()
 
 	var points := PackedVector2Array()
 	for step in range(CURVE_STEPS + 1):
 		# Sampled in SCREEN space, from screen endpoints, so the curve's bow is a constant number
 		# of pixels rather than a world distance that collapses as the user zooms out.
 		points.append(Metrics.edge_point(from, to, 1.0, float(step) / CURVE_STEPS))
+	var weight := EDGE_WIDTH * (2.0 if highlighted else 1.0)
 	if to_style:
-		_draw_dashed_path(points, color)
+		_draw_dashed_path(points, color, weight)
 	else:
-		draw_polyline(points, color, EDGE_WIDTH, true)
+		draw_polyline(points, color, weight, true)
 	draw_circle(to, ANCHOR_RADIUS, color)
 
 
@@ -179,7 +183,7 @@ func _draw_dashed(from: Vector2, to: Vector2, color: Color) -> void:
 ## A dashed run along an arbitrary polyline. `_draw_dashed` walks a straight segment; a style edge is
 ## a curve, and dashing it segment-by-segment would restart the pattern at every sample and read as
 ## a solid line with dents in it. This carries the phase across the whole path.
-func _draw_dashed_path(points: PackedVector2Array, color: Color) -> void:
+func _draw_dashed_path(points: PackedVector2Array, color: Color, weight := EDGE_WIDTH) -> void:
 	var carried := 0.0
 	var drawing := true
 	for i in range(points.size() - 1):
@@ -195,7 +199,7 @@ func _draw_dashed_path(points: PackedVector2Array, color: Color) -> void:
 			var budget := (STYLE_DASH_ON if drawing else STYLE_DASH_OFF) - carried
 			var end: float = minf(at + budget, length)
 			if drawing:
-				draw_line(from + step * at, from + step * end, color, EDGE_WIDTH, true)
+				draw_line(from + step * at, from + step * end, color, weight, true)
 			if end - at >= budget:
 				drawing = not drawing
 				carried = 0.0

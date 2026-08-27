@@ -58,7 +58,10 @@ const LAYERS := [
 	{ "title": "Layer 2 — Cards", "zoom": 0.80 },
 	{ "title": "Layer 3 — Edit", "zoom": 1.20 },
 ]
-enum CardMenuId { OPEN, RENAME, DELETE, REVEAL_CARD }
+## Card-menu ids, started past zero. `add_submenu_item` takes no id and Godot assigns it one from
+## the low end, so ids counted from 0 collided with it -- `get_item_index(RENAME)` answered with the
+## submenu row, and setting its text put "Rename ..." on the item that opens New.
+enum CardMenuId { OPEN = 100, RENAME = 101, DELETE = 102, REVEAL_CARD = 103 }
 
 var workspace: Workspace = null
 var ledger := Ledger.new()
@@ -77,6 +80,9 @@ var _toolbar: HBoxContainer = null
 var _status: Label = null
 var _card_menu: PopupMenu = null
 var _new_menu: PopupMenu = null
+
+## The card menu's header row: the only item addressed positionally.
+const _HEADER_ITEM := 0
 var _canvas_menu: PopupMenu = null
 var _preview_pane: PreviewPane = null
 var _layers: OptionButton = null
@@ -181,6 +187,13 @@ func _build_ui() -> void:
 	_source = SourcePane.new()
 	right.add_child(_source)
 
+	# A window that has never opened a tree has also never refreshed: nothing had called
+	# `_refresh_status` or rebuilt the folder pane, so the two places that are supposed to say
+	# "no tree open" said nothing at all -- which is how the empty state came to be the one state
+	# with no words in it.
+	_folders.rebuild()
+	_refresh_status()
+
 	_hint = Parts.hint_bar(PackedStringArray([
 		"Wheel: zoom",
 		"Drag Library items onto rows (top=before, bottom=after, middle=inside)",
@@ -206,6 +219,7 @@ func _build_ui() -> void:
 	_card_menu = PopupMenu.new()
 	# A header naming the module the menu is about. "Delete" over a canvas of five cards is a
 	# question the user answers from memory of where they right-clicked.
+	# Index 0, and nothing else is ever addressed by index.
 	_card_menu.add_separator("")
 	_card_menu.add_child(_new_menu)
 	_card_menu.add_submenu_item("New", "New")
@@ -804,7 +818,7 @@ func _open_card_menu(file_path: String, at: Vector2) -> void:
 	# The menu says WHICH module it is about. "Delete" over a canvas of five cards is a question
 	# the user has to answer from memory of where they right-clicked.
 	var shown := file_path.get_file()
-	_card_menu.set_item_text(0, shown.to_upper())
+	_card_menu.set_item_text(_HEADER_ITEM, shown.to_upper())
 	_card_menu.set_item_text(_card_menu.get_item_index(CardMenuId.RENAME), "Rename %s..." % shown)
 	_card_menu.set_item_text(_card_menu.get_item_index(CardMenuId.DELETE), "Delete %s" % shown)
 	_card_menu.position = Vector2i(at)

@@ -163,3 +163,23 @@ static func add_chip() -> Dictionary:
 		"corner_radius_all": 6,
 		"content_margin_all": 4,
 	}
+
+
+
+## The tinted strip behind a card's identity row.
+##
+## A card with no banding is one continuous column of text in which the name, the signature and
+## every section label carry the same weight -- so the reader has to parse the card to find its
+## structure, which is the job the card was supposed to be doing for them.
+static func card_header_band(tint: Color) -> Dictionary:
+	return {
+		"bg_color": Color(tint, 0.10),
+		"corner_radius_top_left": 10,
+		"corner_radius_top_right": 10,
+		"content_margin_all": 8,
+	}
+
+
+## The hairline between one section of a card and the next.
+static func section_rule() -> Dictionary:
+	return { "color": Color(0.24, 0.24, 0.29, 0.9), "custom_minimum_size": Vector2(0, 1) }

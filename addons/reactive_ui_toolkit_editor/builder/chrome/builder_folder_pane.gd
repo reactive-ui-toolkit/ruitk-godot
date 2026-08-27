@@ -14,6 +14,7 @@ extends Tree
 const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_module.gd")
 const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_paths.gd")
 const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
+const Palette = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 
 ## A module row was chosen -- single click, so the canvas and the source pane follow the pane.
 signal module_selected(file_path: String)
@@ -97,6 +98,11 @@ func rebuild() -> void:
 		row.set_text(1, _state_of(module))
 		row.set_tooltip_text(0, "%s -- %s" % [module.file_path(), KIND_LABEL.get(module.kind, "")])
 		row.set_metadata(0, module.file_path())
+		# TINTED BY KIND, from the same palette the card badges and the toolbar legend use. The
+		# tree was the one surface where a component and its style companion were the same colour,
+		# so the kind a card states outright had to be inferred here from the file name -- which
+		# is exactly the two names that differ only by a companion suffix.
+		row.set_custom_color(0, Palette.kind_tint(int(module.kind)))
 		if module.read_only:
 			row.set_custom_color(0, Color(0.65, 0.65, 0.70))
 		_rows[Paths.key(module.file_path())] = row

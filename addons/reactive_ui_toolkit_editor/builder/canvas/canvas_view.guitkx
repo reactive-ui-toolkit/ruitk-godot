@@ -118,6 +118,7 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 	var tint = P.kind_tint(int(card.kind))
 
 	return (
+		<PanelContainer style={ P.card_header_band(tint) }>
 		<HBoxContainer style={ {"separation": 6} }>
 			<PanelContainer style={ P.kind_badge(tint) }>
 				<Label text={ Model.kind_word(int(card.kind)) } style={ P.kind_badge_text(tint) } />
@@ -129,6 +130,7 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 				)
 			}
 		</HBoxContainer>
+		</PanelContainer>
 	)
 }
 
@@ -231,6 +233,8 @@ export CanvasCardSection(heading: String = "") -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	return (
 		<VBoxContainer style={ {"separation": 2} }>
+			<ColorRect color={ Color(0.24, 0.24, 0.29, 0.9) }
+				custom_minimum_size={ Vector2(0, 1) } />
 			<Label text={ heading } style={ P.section_head() } />
 			{ children }
 		</VBoxContainer>
@@ -278,7 +282,7 @@ export CanvasAddChip(label: String = "+", what: String = "", index: int = -1,
 	var sink = on_add
 
 	return (
-		<Button text={ label } flat={ false } style={ P.add_chip() }
+		<Button text={ label } flat={ true } style={ P.add_chip() }
 			onPressed={ func(): (sink.call(target, kind) if sink != null else null) } />
 	)
 }
