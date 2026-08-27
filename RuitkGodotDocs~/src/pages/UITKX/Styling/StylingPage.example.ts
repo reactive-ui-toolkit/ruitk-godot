@@ -11,15 +11,13 @@ export const EXAMPLE_IMPORT = `# Nothing to import. RuitkStyle reads the \`style
 export const EXAMPLE_BOTH_APIs = `# 1. Inline dict — the everyday form.
 <PanelContainer style={ {"bg_color": Color(0.16, 0.17, 0.24), "corner_radius_all": 10, "content_margin_all": 16} } />
 
-# 2. A shared style constant — the GDScript analogue of a reusable style module.
-#    Declare it once in a *.style.gd file, reference it from many components.
-#    (styling.style.gd)
-class_name CardStyle
-extends RefCounted
-static var PANEL := { "bg_color": Color(0.16, 0.17, 0.24), "corner_radius_all": 10, "content_margin_all": 16 }
+# 2. A style module — the real answer for reuse across files.
+#    (card.style.guitkx)
+export PANEL := { "bg_color": Color(0.16, 0.17, 0.24), "corner_radius_all": 10, "content_margin_all": 16 }
 
-# then, in markup:
-<PanelContainer style={ CardStyle.PANEL } />
+# then, in any .guitkx:
+import { PANEL } from "./card.style"
+<PanelContainer style={ PANEL } />
 
 # 3. Named bundles via RuitkStyleSheet + the \`classes\` prop (see below).
 <PanelContainer classes={ ["card"] } style={ {"content_margin_all": 20} } />   # inline style wins last`
@@ -94,6 +92,65 @@ Card(is_selected) -> RuitkVNode {
   return (
     <PanelContainer classes={ ["card"] } style={ highlight }>
       <Label text="Baseline from 'card', border from inline style" />
+    </PanelContainer>
+  )
+}`
+
+
+export const EXAMPLE_STYLE_MODULE = `# card.style.guitkx — a STYLE MODULE. No markup, no component; a look, named.
+# It compiles to a sibling card.style.gd, so importing one costs nothing at render time.
+
+export PANEL := {
+    "bg_color": Color(0.13, 0.13, 0.16),
+    "corner_radius_all": 8,
+    "border_width_all": 1,
+    "border_color": Color(0.24, 0.24, 0.30),
+    "content_margin_all": 12,
+}
+
+export HEADING := { "font_size": 20, "font_color": Color(0.0, 0.9, 0.75) }
+export BODY    := { "font_color": Color(0.72, 0.72, 0.76) }
+
+# An exported FUNCTION is a parameterised style: one definition that answers for every
+# state, instead of one constant per state that drift apart.
+export swatch(tint: Color, is_on: bool) -> Dictionary {
+    return {
+        "bg_color": tint if is_on else Color(tint, 0.25),
+        "corner_radius_all": 6,
+        "border_width_all": 2,
+        "border_color": tint,
+    }
+}`
+
+export const EXAMPLE_STYLE_MODULE_USE = `# Named imports pull individual exports in…
+import { PANEL, HEADING } from "./card.style"
+
+# …or a namespace alias keeps the origin visible at every use site.
+import * as Palette from "./card.style"
+
+Card(is_on: bool = true) -> RuitkVNode {
+  return (
+    <PanelContainer style={ PANEL }>
+      <VBoxContainer style={ {"separation": 8} }>
+        <Label text="Styled from a module" style={ HEADING } />
+        <Label text="Body copy" style={ Palette.BODY } />
+        <PanelContainer style={ Palette.swatch(Color(0.4, 0.85, 0.5), is_on) } />
+      </VBoxContainer>
+    </PanelContainer>
+  )
+}`
+
+export const EXAMPLE_THEME_DIRECTIVE = `# @uss preloads a Godot Theme and hands it to this component's ROOT element, so
+# every Control beneath inherits it — the engine's own cascade, not a second one.
+# @theme is the same directive under the name Godot users expect.
+@uss "res://ui/dark.tres"
+
+Panel() -> RuitkVNode {
+  return (
+    # Wears the Theme; sets no style of its own.
+    <PanelContainer>
+      # The Theme sets the floor, a style dict wins where it speaks.
+      <Label text="Overridden" style={ {"font_color": Color.WHITE} } />
     </PanelContainer>
   )
 }`

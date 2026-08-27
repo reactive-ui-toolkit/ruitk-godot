@@ -12,9 +12,10 @@ extends RefCounted
 ## Mirroring costs a few kilobytes of writes per edit and buys exact fidelity: the same
 ## `resolve_specifier`, the same `preload` lowering, the same `V.comp` lazy binding.
 ##
-## The scratch root's name ends in `~`, which Godot's importer skips wholesale, so nothing under
-## it is ever imported, scanned, or registered as a global class. It is cleared on teardown AND
-## on open, so a crashed session cannot leave a shadow tree behind.
+## The scratch root is doubly hidden: its name ends in `~`, which Godot's importer skips wholesale,
+## and it holds a `.gdignore`, which keeps the COMPILER's own sweep out (the `~` does not -- see
+## `_ensure_scratch_root`). It is cleared on teardown AND on open, so a crashed session cannot
+## leave a shadow tree behind.
 ##
 ## WHAT IS DIRTY is what has changed since it was last BUILT -- not what is unsaved. Those differ
 ## in a case that bites immediately: type a label, then type it back, and the module is clean
@@ -28,6 +29,9 @@ const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document
 const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_paths.gd")
 const Specifiers = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_specifiers.gd")
 const Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
+# The preview writes SHADOWS of real modules, so it strips their `class_name` the same way the
+# compiler's own parse gate does -- one definition of what that means, in the compiler.
+const Codegen = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_codegen.gd")
 const Config = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_config.gd")
 const BuilderWorkspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
 # The runtime half, preloaded for the same reason as everything else here: a global `class_name`
@@ -161,6 +165,10 @@ func compile_dirty(focus_path: String) -> Summary:
 	if dirty.is_empty():
 		return null
 
+	# Before a single file is mirrored: the root has to be invisible to the compiler sweep from
+	# the moment it holds anything at all.
+	_ensure_scratch_root()
+
 	# A module whose DEPENDENCY changed has to be rebuilt too, and its own text has not moved, so
 	# it is never a candidate on its own. Editing a style otherwise rebuilds the style and nothing
 	# that uses it, and the preview goes on rendering the component against the old one.
@@ -256,13 +264,14 @@ func _build(module: Module) -> Dictionary:
 		return { "ok": false, "error": _first_error(result) }
 
 	var gd_path := mirrored.get_basename() + ".gd"
-	if not _write(gd_path, str(result.get("gd", ""))):
+	var generated := Codegen.strip_class_name(str(result.get("gd", "")))
+	if not _write(gd_path, generated):
 		return { "ok": false, "error": "could not write the preview script for %s" % path.get_file() }
 
 	var script: GDScript = load(gd_path)
 	if script == null:
 		return { "ok": false, "error": "could not load the preview script for %s" % path.get_file() }
-	script.source_code = str(result.get("gd", ""))
+	script.source_code = generated
 	# `reload(false)`, NOT keep_state. Keeping state preserves the script's STATIC VARS -- which
 	# is exactly where a value module's exported data lives, so an edited style would re-parse
 	# and then hand back its previous contents. Nothing is mounted against these scripts at this
@@ -456,6 +465,8 @@ static func _prune_unclaimed(dir: String, wanted: Dictionary) -> void:
 	if d == null:
 		return
 	for file in d.get_files():
+		if file == ".gdignore":
+			continue   # the marker that keeps the sweep out; see _ensure_scratch_root
 		var path := dir.path_join(file)
 		if not Paths.ends_with_ci(file, Paths.SUFFIX_PLAIN):
 			# A generated `.gd` is claimed by its own source; anything else under the scratch
@@ -472,6 +483,24 @@ static func _prune_unclaimed(dir: String, wanted: Dictionary) -> void:
 		var child := DirAccess.open(dir.path_join(sub))
 		if child != null and child.get_files().is_empty() and child.get_directories().is_empty():
 			DirAccess.remove_absolute(dir.path_join(sub))
+
+
+## The mirror must be INVISIBLE to the compiler sweep, and the trailing `~` is not enough.
+##
+## Godot skips a `~`-suffixed folder in the IMPORTER, so nothing under the mirror is imported or
+## registered as a global class -- but `RuitkGuitkxCodegen.find_all` walks with DirAccess and
+## skips only dot-directories and folders holding a `.gdignore`. Without the marker, the editor
+## plugin's compile-on-scan sweep finds the mirror's `.guitkx`, compiles it, and every component
+## in it collides with the real one it is a copy of (GUITKX2106) -- whose generated `.gd` the
+## duplicate-binding remediation then DELETES. A preview is not allowed to touch the project.
+static func _ensure_scratch_root() -> void:
+	DirAccess.make_dir_recursive_absolute(SCRATCH_ROOT)
+	var marker := SCRATCH_ROOT.path_join(".gdignore")
+	if FileAccess.file_exists(marker):
+		return
+	var f := FileAccess.open(marker, FileAccess.WRITE)
+	if f != null:
+		f.close()
 
 
 static func _write(path: String, text: String) -> bool:
@@ -560,3 +589,5 @@ static func _clear_scratch_comp_cache() -> void:
 	for key in (V._comp_cache as Dictionary).keys():
 		if str(key).begins_with(SCRATCH_ROOT):
 			(V._comp_cache as Dictionary).erase(key)
+
+

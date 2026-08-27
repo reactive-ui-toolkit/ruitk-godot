@@ -80,6 +80,15 @@ func _exit_tree() -> void:
 	preview.teardown()
 
 
+## The builder drives its own idle work: the debounced preview round and the crash journal.
+##
+## Here rather than in the host that opened it, because the cadence is the builder's own business
+## and a host that forgot to pump it would leave the preview permanently one edit behind -- with
+## nothing to show for it, since a missed tick looks exactly like an edit that changed nothing.
+func _process(_delta: float) -> void:
+	tick()
+
+
 # ── Assembly ─────────────────────────────────────────────────────────────────────────
 
 func _build_ui() -> void:

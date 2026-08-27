@@ -23,6 +23,7 @@ import { UitkxPortalPage } from './pages/UITKX/Portal/UitkxPortalPage'
 import { UitkxSuspensePage } from './pages/UITKX/Suspense/UitkxSuspensePage'
 import { HmrPage } from './pages/Tooling/HMR/HmrPage'
 import { EditorPage } from './pages/Tooling/Editor/EditorPage'
+import { BuilderPage } from './pages/Tooling/Builder/BuilderPage'
 import { FAQPage } from './pages/FAQ/FAQPage'
 import { LicensingPage } from './pages/Licensing/LicensingPage'
 import { StylingPage } from './pages/UITKX/Styling/StylingPage'
@@ -261,6 +262,15 @@ export const sections: DocSection[] = [
         keywords: ['editor', 'ide', 'addon', 'diagnostics', 'completion', 'rename', 'search'],
         searchContent: 'in-godot editor reactive_ui_toolkit_editor addon main-screen guitkx editor double-click filesystem dock open syntax highlighting theme-matched host component tag colours embedded expression sub-highlighting live compiler diagnostics gutter icons did-you-mean problems bottom panel project scope sidecar aggregation GUITKX codes completion tags attributes snippet caret inside quotes attribute values enum true false style-dict keys directives Color builtin constants hook names onPressed on_signal both spellings hover tooltips signature help event lambda parameter strip navigation ctrl+click go to definition shift+f12 references panel ctrl+g go to line outline tree declarations f2 rename project-wide collision refusing find replace replace-all one undo step search .guitkx bottom panel project-wide comment toggle move lines duplicate delete bookmark zoom word wrap enter between tags multi-file open list session restore retarget detach format guitkx.config.json printWidth indentStyle format-on-save new file component skeleton project settings reactive_ui_toolkit_editor toggles open_guitkx_in_editor watcher sibling gd save all quit confirmation play flush GUITKX2106 GUITKX2107 hash-gated overlay search in files exclusion script editor adoption 150k live compile adaptive debounce native analyzer roadmap',
         element: () => <EditorPage />,
+      },
+      {
+        id: 'builder-page',
+        canonicalId: 'builder',
+        title: 'UI Builder',
+        path: '/tooling/builder',
+        keywords: ['builder', 'visual editor', 'canvas', 'drag and drop', 'module tree', 'cards'],
+        searchContent: 'ui builder visual editor guitkx module tree canvas cards import edges infinite canvas reactive ui toolkit menu builder open plugin reactive_ui_toolkit_editor project tools module tree transitive imports folder five module kinds component hook style util value badge tint read-only addons package sources folder pane library pane host elements hooks components vocabulary.json source pane guitkx code edit highlighting completion diagnostics console problems jump to module pan zoom wheel fit to view level of detail LOD culling anchor dots bezier edges layout remembered per tree membership drag drop three bands before inside after move subtree move module folder attributes directive headers @if @for @while @match inline editor rename module specifier rewrite ensure import GUITKX0108 one root ledger undo redo typing merge one entry two files save abort batch write format on save planned moves companions .uid .diags.json generated .gd delete to trash blank module pending crash journal user:// recovery live preview scratch mirror debounce focus closure importers recompile no writes to project no multi-select no auto-layout unity parity guitkx.config.json',
+        element: () => <BuilderPage />,
       },
       {
         id: 'portal-page',

@@ -20,6 +20,13 @@ import { DemoSlicing } from "~/examples/demos/slicing/slicing"
 import { DemoSpread } from "~/examples/demos/spread/spread"
 import { DemoStress } from "~/examples/demos/stress_test/stress_test"
 import { DemoStressNative } from "~/examples/demos/stress_native/stress_native"
+## A NAMESPACE import, where its neighbours use named ones. A named component import binds the
+## module's global `class_name`, and a global name has to be registered in Godot's class cache
+## before a script that spells it can parse. That cache is rewritten by every headless run from
+## whatever THAT process registered, so a class can be present after an editor scan and missing
+## two suites later -- "Identifier X not declared", from a file nobody touched. A namespace
+## import lowers to `preload("res://...")`: a path, resolved by the loader, registered nowhere.
+import * as StyleModuleDemo from "~/examples/demos/style_module/style_module"
 import { DemoStyling } from "~/examples/demos/styling/styling"
 import { DemoTextField } from "~/examples/demos/text_field/text_field"
 import { DemoTodo } from "~/examples/demos/todo/todo"
@@ -54,6 +61,7 @@ export entries -> Array {
     { "title": "Effect order", "fn": DemoEffectOrder.render },
     { "title": "Deep tree", "fn": DemoDeepTree.render },
     { "title": "Styling", "fn": DemoStyling.render },
+    { "title": "Style modules", "fn": StyleModuleDemo.render },
     { "title": "Controls", "fn": DemoControls.render },
     { "title": "Stress test", "fn": DemoStress.render },
     { "title": "Stress (native)", "fn": DemoStressNative.render },

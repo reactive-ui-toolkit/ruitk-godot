@@ -1,3 +1,20 @@
+## [0.15.0] - 2026-08-27
+
+**The UI Builder ships.** A visual editor for a whole `.guitkx` module tree, on the editor's own menu (**Reactive UI Toolkit → Builder...**). It opens the module you focused plus everything it imports, transitively, and its folder, drawing each as a card on an infinite canvas with the imports between them as curved edges. Cards aren't thumbnails — each lists the module's real structure (imports, signature, markup tree, exports) at three levels of detail as you zoom. All five module kinds are editable; anything under `addons/` opens read-only.
+
+**Editing is structural, and it writes `.guitkx`.** Drag an element, a hook, or one of the tree's own components onto a card and the drop lands before, inside or after the row under the pointer. Dragging a row moves the subtree; dragging a card onto another moves the module into that folder. Attributes, directive headers (`@if`, `@for`, `@match`) and names edit inline. Dropping a component from another module adds the `import` it needs; renaming a module rewrites the specifier everywhere.
+
+**One funnel, one ledger.** A keystroke, a drop and a replayed undo all take the same path. Typing merges into one entry; a gesture that touched two files is one entry, and undo walks all of it or none.
+
+**Nothing touches disk until Save** — it formats every dirty buffer, carries renames across the module's companions (`.uid`, `.diags.json`, the generated `.gd`), rewrites importers, and trashes deletions. Unsaved work is journalled, so a crashed editor offers the tree back. Live preview compiles into a scratch mirror, so a module that doesn't compile yet costs you nothing.
+
+The canvas itself is written in `.guitkx`, rendered by the reconciler.
+
+**Also taught, finally:** `.style.guitkx` style modules and `@uss`/`@theme` now have real docs, a shipped **Style modules** demo, and a **Tooling → UI Builder** page.
+
+Update to **Reactive UI Toolkit 0.15.0** + **Editor 0.13.0** (Godot). GUITKX extensions unchanged at 0.13.0.
+
+---
 ## [0.14.0] - 2026-07-31
 
 **One wave: settings go native, and the renderer goes family-canonical.** Every runtime tunable is now a real Project Setting under **Project → Project Settings → Reactive Ui Toolkit** — twelve `reactive_ui_toolkit/*` keys with proper enum vocabularies — plus one settings dialog on the editor's own **Reactive UI Toolkit** menu (a **Runtime** and an **Editor** section; the native dialog stays a mirror, `override.cfg` keeps working). Settings load at first mount, work in exported games, and only values you *changed* apply — assigning the statics from code keeps working.

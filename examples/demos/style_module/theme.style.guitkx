@@ -1,0 +1,42 @@
+## A STYLE MODULE: `.style.guitkx`, the fifth module kind.
+##
+## A style module holds no markup and no component -- it is where a look lives. It compiles to a
+## plain `.gd`, so importing one costs nothing at render time, and every `export` here is
+## reachable from any `.guitkx` in the project by name.
+##
+## Why a module and not a literal at the use site: a style that appears in three markup blocks has
+## to be changed in three places, and the third one is how "all the cards look the same" quietly
+## stops being true. Naming it once also makes the intent readable -- `PANEL` says what it is,
+## `{"bg_color": Color(0.13, 0.13, 0.16), "corner_radius_all": 8}` says how it was built.
+##
+## The keys are Godot's own: `bg_color`, `corner_radius_all` and `border_width_all` are
+## StyleBoxFlat properties, `font_size`/`font_color` are theme channels, `separation` and
+## `content_margin_all` are container/box settings. There is no style DSL to learn -- if Godot
+## names it, the style dictionary takes it.
+
+export PANEL := {
+	"bg_color": Color(0.13, 0.13, 0.16),
+	"corner_radius_all": 8,
+	"border_width_all": 1,
+	"border_color": Color(0.24, 0.24, 0.30),
+	"content_margin_all": 12,
+}
+
+export HEADING := { "font_size": 20, "font_color": Color(0.0, 0.9, 0.75) }
+
+export BODY := { "font_color": Color(0.72, 0.72, 0.76) }
+
+export ROW := { "separation": 8 }
+
+
+## A style module is still GDScript, so an `export`ed FUNCTION is a parameterised style -- one
+## definition that answers for every state, instead of one constant per state that drift apart.
+export swatch(tint: Color, is_on: bool) -> Dictionary {
+	return {
+		"bg_color": tint if is_on else Color(tint, 0.25),
+		"corner_radius_all": 6,
+		"border_width_all": 2,
+		"border_color": tint,
+		"custom_minimum_size": Vector2(56, 56),
+	}
+}

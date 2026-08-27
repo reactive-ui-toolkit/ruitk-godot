@@ -2,10 +2,7 @@ class_name CanvasView
 extends RefCounted
 ## AUTO-GENERATED from canvas_view.guitkx -- do not edit.
 
-const __RUI_IMP_75a38a0e = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas.style.gd")
 const __RUI_DECLS := {
-	"M": { "kind": "value", "export": false },
-	"GraphModel": { "kind": "value", "export": false },
 	"CanvasView": { "kind": "component", "sig": "", "export": true },
 	"CanvasCard": { "kind": "component", "sig": "", "export": true },
 	"CanvasCardHeader": { "kind": "component", "sig": "", "export": true },
@@ -18,10 +15,6 @@ const __RUI_KIND := "mixed"
 
 const __RUI_HOOK_SIG := ""
 
-static var M := preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
-
-static var GraphModel := preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
-
 # component CanvasView
 static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var graph = props.get("graph", null)
@@ -29,6 +22,7 @@ static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var zoom = props.get("zoom", 1.0)
 	var viewport = props.get("viewport", Vector2(1280, 720))
 	var selected = props.get("selected", -1)
+	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var lod = M.lod_of(zoom)
 	var card_w = M.card_width_for(lod)
 	var cards = graph.cards if graph != null else []
@@ -54,6 +48,8 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 	var at = props.get("at", Vector2.ZERO)
 	var zoom = props.get("zoom", 1.0)
 	var near = props.get("near", true)
+	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var card_w = M.card_width_for(lod)
 	var __cf0 = null
 	if near:
@@ -63,13 +59,13 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 				for __cf1_once in 1:
 					__cf1 = V.fc(CanvasCardSections, { "card": card, "lod": lod })
 					continue
-			__cf0 = V.PanelContainer({ "position": at, "scale": Vector2(zoom, zoom), "custom_minimum_size": Vector2(card_w, 0), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": __RUI_IMP_75a38a0e.card_box_selected if is_selected else __RUI_IMP_75a38a0e.card_box }, [V.VBoxContainer({ "style": {"separation": 4} }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod }), __cf1])])
+			__cf0 = V.PanelContainer({ "position": at, "scale": Vector2(zoom, zoom), "custom_minimum_size": Vector2(card_w, 0), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_box_selected() if is_selected else P.card_box() }, [V.VBoxContainer({ "style": {"separation": 4} }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod }), __cf1])])
 			continue
 	else:
 		for __cf0_once in 1:
 			# A culled card still occupies its estimated height, so nothing reflows when a pan
 			# brings it back.
-			__cf0 = V.Panel({ "position": at, "scale": Vector2(zoom, zoom), "custom_minimum_size": Vector2(card_w, M.card_height(card)), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": __RUI_IMP_75a38a0e.card_placeholder })
+			__cf0 = V.Panel({ "position": at, "scale": Vector2(zoom, zoom), "custom_minimum_size": Vector2(card_w, M.card_height(card)), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_placeholder() })
 			continue
 	return __cf0
 
@@ -77,30 +73,34 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 static func CanvasCardHeader(props: Dictionary, children: Array) -> RuitkVNode:
 	var card = props.get("card", null)
 	var lod = props.get("lod", 1)
-	var tint = __RUI_IMP_75a38a0e.kind_tint.get(int(card.kind), __RUI_IMP_75a38a0e.kind_tint[6])
+	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
+	var tint = P.kind_tint(int(card.kind))
 	var __cf0 = null
 	if card.read_only:
 		for __cf0_once in 1:
-			__cf0 = V.Label({ "text": "read-only", "style": __RUI_IMP_75a38a0e.read_only })
+			__cf0 = V.Label({ "text": "read-only", "style": P.read_only() })
 			continue
-	return V.HBoxContainer({ "style": {"separation": 6} }, [V.ColorRect({ "color": tint, "custom_minimum_size": Vector2(4, 16) }), V.Label({ "text": card.title, "style": __RUI_IMP_75a38a0e.pill_title if lod == M.Lod.PILL else __RUI_IMP_75a38a0e.title }), __cf0])
+	return V.HBoxContainer({ "style": {"separation": 6} }, [V.ColorRect({ "color": tint, "custom_minimum_size": Vector2(4, 16) }), V.Label({ "text": card.title, "style": P.pill_title() if lod == M.Lod.PILL else P.title() }), __cf0])
 
 # component CanvasCardSections
 static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode:
 	var card = props.get("card", null)
 	var lod = props.get("lod", 1)
+	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var detail = M.shows_detail(lod)
 	var __cf0 = null
 	if card.signature != "":
 		for __cf0_once in 1:
-			__cf0 = V.Label({ "text": card.signature, "style": __RUI_IMP_75a38a0e.signature })
+			__cf0 = V.Label({ "text": card.signature, "style": P.signature() })
 			continue
 	var __cf1 = null
 	if not card.imports.is_empty():
 		for __cf1_once in 1:
 			var __cf2: Array = []
 			for row in card.imports:
-				__cf2.append(V.Label({ "text": row.text, "style": __RUI_IMP_75a38a0e.import_row }, [], str(row.at)))
+				__cf2.append(V.Label({ "text": row.text, "style": P.import_row() }, [], str(row.at)))
 				continue
 			__cf1 = V.fc(CanvasCardSection, { "heading": "IMPORTS" }, [__cf2])
 			continue
@@ -109,7 +109,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 		for __cf3_once in 1:
 			var __cf4: Array = []
 			for row in card.body:
-				__cf4.append(V.PanelContainer({ "style": __RUI_IMP_75a38a0e.chip }, [V.Label({ "text": row.text, "style": __RUI_IMP_75a38a0e.chip_text })], str(row.at)))
+				__cf4.append(V.PanelContainer({ "style": P.chip() }, [V.Label({ "text": row.text, "style": P.chip_text() })], str(row.at)))
 				continue
 			__cf3 = V.fc(CanvasCardSection, { "heading": "HOOKS" }, [V.HFlowContainer({ "style": {"separation": 4} }, [__cf4])])
 			continue
@@ -127,7 +127,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 		for __cf7_once in 1:
 			var __cf8: Array = []
 			for row in card.export_detail:
-				__cf8.append(V.Label({ "text": "  ".repeat(row.depth) + row.text, "style": __RUI_IMP_75a38a0e.export_row }, [], str(row.at) + row.text))
+				__cf8.append(V.Label({ "text": "  ".repeat(row.depth) + row.text, "style": P.export_row() }, [], str(row.at) + row.text))
 				continue
 			__cf7 = V.fc(CanvasCardSection, { "heading": "EXPORTS" }, [__cf8])
 			continue
@@ -136,7 +136,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 		for __cf9_once in 1:
 			var __cf10: Array = []
 			for i in range(card.island_lines.size()):
-				__cf10.append(V.Label({ "text": card.island_lines[i], "style": __RUI_IMP_75a38a0e.island_row }, [], str(i)))
+				__cf10.append(V.Label({ "text": card.island_lines[i], "style": P.island_row() }, [], str(i)))
 				continue
 			__cf9 = V.fc(CanvasCardSection, { "heading": "SETUP" }, [__cf10])
 			continue
@@ -145,21 +145,24 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 # component CanvasCardSection
 static func CanvasCardSection(props: Dictionary, children: Array) -> RuitkVNode:
 	var heading = props.get("heading", "")
-	return V.VBoxContainer({ "style": {"separation": 2} }, [V.Label({ "text": heading, "style": __RUI_IMP_75a38a0e.section_head }), (children)])
+	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+	return V.VBoxContainer({ "style": {"separation": 2} }, [V.Label({ "text": heading, "style": P.section_head() }), (children)])
 
 # component CanvasMarkupRow
 static func CanvasMarkupRow(props: Dictionary, children: Array) -> RuitkVNode:
 	var row = props.get("row", null)
-	var LineKind = GraphModel.LineKind
-	var style = __RUI_IMP_75a38a0e.markup_row
+	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+	var Model = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
+	var LineKind = Model.LineKind
+	var style = P.markup_row()
 	if row.kind == LineKind.COMPONENT:
-		style = __RUI_IMP_75a38a0e.component_row
+		style = P.component_row()
 	elif row.kind == LineKind.DIRECTIVE:
-		style = __RUI_IMP_75a38a0e.directive_row
+		style = P.directive_row()
 	var __cf0 = null
 	if row.attrs_text != "":
 		for __cf0_once in 1:
-			__cf0 = V.Label({ "text": row.attrs_text, "style": __RUI_IMP_75a38a0e.attrs })
+			__cf0 = V.Label({ "text": row.attrs_text, "style": P.attrs() })
 			continue
 	return V.HBoxContainer({ "style": {"separation": 6} }, [V.Label({ "text": "    ".repeat(row.depth) + row.text, "style": style }), __cf0])
 

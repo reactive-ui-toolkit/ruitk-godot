@@ -23,8 +23,16 @@ func _initialize() -> void:
 		quit(0)
 		return
 
-	# The same TWO-PASS order the sweep uses: a value import lowers to `preload("....gd")`, so a
-	# file can only parse once every module it imports has its output on disk.
+	# The SWEEP's own inputs, resolved over the whole project: the component-class universe and the
+	# class -> generated-.gd binding table. Compiled with empty ones instead, every guitkx-bound
+	# tag lowers differently and the output never matches what the plugin writes -- so the
+	# tripwire would report the same two files stale forever, rewriting them into a shape the
+	# next sweep immediately undoes.
+	var project_paths: Array = Codegen.find_all("res://")
+	var pb: Dictionary = Codegen.project_bindings(project_paths)
+	var known: Array = pb["known"]
+	var bindings: Dictionary = pb["bindings"]
+
 	var stale: Array = []
 	var failed: Array = []
 	for path in paths:
@@ -33,7 +41,7 @@ func _initialize() -> void:
 		# what the file held a moment ago.
 		var gd_path := str(path).get_basename() + ".gd"
 		var before := FileAccess.get_file_as_string(gd_path) if FileAccess.file_exists(gd_path) else ""
-		var result: Dictionary = Codegen.compile_file(str(path), [], {}, false)
+		var result: Dictionary = Codegen.compile_file(str(path), known, bindings, false)
 		if not bool(result.get("ok", false)):
 			failed.append("%s: %s" % [path, str(result.get("error", "compile failed"))])
 			continue

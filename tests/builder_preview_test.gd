@@ -14,6 +14,7 @@ extends SceneTree
 const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
 const Preview = preload("res://addons/reactive_ui_toolkit_editor/builder/preview/builder_preview.gd")
 const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_paths.gd")
+const Codegen = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_codegen.gd")
 
 const ROOT := "res://tests/__builder_preview_tmp/ui"
 
@@ -446,9 +447,22 @@ func _test_scratch_hygiene() -> void:
 		"and so is its generated script")
 	_check(FileAccess.file_exists(mirrored_child), "while the modules that remain are untouched")
 
-	_section("the mirror is under a root Godot never looks inside")
+	_section("the mirror is under a root nothing looks inside")
 	_check(Preview.SCRATCH_ROOT.ends_with("~"),
-		"so nothing in it is imported, scanned, or registered as a global class")
+		"so Godot's importer skips it -- nothing in it is imported or registered as a global class")
+	# The `~` stops the IMPORTER, not the compiler: `find_all` walks with DirAccess and skips only
+	# dot-directories and folders holding a `.gdignore`. Without the marker, the editor plugin's
+	# sweep compiles the mirror, every component collides with the real one it copies (GUITKX2106),
+	# and the remediation DELETES the real module's generated .gd. Observed, not hypothetical.
+	_check(FileAccess.file_exists(Preview.SCRATCH_ROOT.path_join(".gdignore")),
+		"and a .gdignore keeps the COMPILER sweep out of it too")
+	var swept: Array = Codegen.find_all("res://")
+	var leaked: Array = []
+	for p in swept:
+		if str(p).begins_with(Preview.SCRATCH_ROOT):
+			leaked.append(p)
+	_check(leaked.is_empty(),
+		"so a project-wide sweep finds nothing in the mirror (found %s)" % str(leaked))
 	_check(Preview.scratch_path_of(ROOT.path_join("child.guitkx"))
 			.begins_with(Preview.SCRATCH_ROOT + "/"),
 		"and every mirrored path is inside it")

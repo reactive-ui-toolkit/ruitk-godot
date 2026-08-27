@@ -172,8 +172,11 @@ are synchronous. Preserve these behaviors — they're faithful-to-reference, not
   the compiler's own analysis (`analyzed_decls`, `decl_structure`, `scan_imports`,
   `RuitkGuitkxJsxScan.element_end`), so a row's span is exactly what the compiler compiled.
   `preview/` renders it: the whole tree is **mirrored** to `res://__ruitk_builder_preview__~/`
-  (the `~` makes Godot's importer skip it) and compiled there through the real compiler at real
-  paths, so the preview cannot compile differently from the build. Dirty means *changed since
+  and compiled there through the real compiler at real paths, so the preview cannot compile
+  differently from the build. That root is hidden TWICE — the `~` stops Godot's importer, and a
+  `.gdignore` written into it stops the compiler's own `find_all` sweep, which walks with
+  DirAccess and would otherwise compile the mirror, collide every component with the real one it
+  copies (GUITKX2106), and let the duplicate-binding remediation delete the real generated `.gd`. Dirty means *changed since
   last built*, not *unsaved*; a failure skips only its dependents; a broken edit keeps the last
   good render. Cleared on teardown and on open. `canvas/` also holds the surface itself: one
   `builder_canvas_metrics.gd` every consumer measures with (the Unity leg has two LOD definitions
@@ -183,6 +186,18 @@ are synchronous. Preserve these behaviors — they're faithful-to-reference, not
   generated `.gd` is COMMITTED (an installed addon needs its canvas before the compile-on-scan
   sweep runs) and gated fresh by `tests/builder_view_build.gd`. Pixels are covered by
   `tests/builder_canvas_capture.gd`, which needs a window and so runs by hand, not in CI.
+  `chrome/` is the window — folder/library/source panes, the diagnostics console, one floating
+  inline editor — and it is the ONE FUNNEL: a keystroke, a canvas drop and a replayed undo all
+  reach the model through `apply_edit`, so they produce the same ledger entry, preview round and
+  re-projection. `edits/` holds the structural operations and the three-band drag resolution.
+  The canvas PALETTE (`canvas/canvas_palette.gd`) is a hand-written `@tool` script rather than a
+  `.style.guitkx` module, and that exception is load-bearing: a generated `.gd` is not `@tool`,
+  and Godot never runs a non-tool script's `static var` initialisers in the editor, so a style
+  module read from editor code comes back EMPTY — silently. Static funcs do run, which is why
+  the rest of the canvas stays `.guitkx`. `plugin.gd` opens the builder from **Reactive UI
+  Toolkit → Builder…** (falling back to Project → Tools), in a `Window` of its own because a
+  plugin gets exactly one main screen and this one is already the `.guitkx` view; the window is
+  hidden rather than freed on close, so a session with unsaved work survives it.
 - **External IDE extensions (`ide-extensions/`)** — a shared TypeScript language server + a TextMate
   grammar, driven by both VS Code and VS2022. Markup intelligence is answered locally from the schema;
   embedded-GDScript intelligence builds a synthetic `.gd` virtual document with a length-preserving
@@ -199,6 +214,12 @@ a `guitkx.config.json` walk-up file.
 `examples/` is **not shipped** — the addon in `addons/reactive_ui_toolkit/` is self-contained. `examples/app.gd`
 (→ `examples/main.tscn`, the project's main scene) mounts the demo gallery. Open the project in Godot 4.x
 and press Play to explore.
+
+The gallery is registered in `examples/demos/gallery_table.guitkx`. Entries bind their demo by
+named import (`{ DemoX }` → the module's global `class_name`); `Style modules` is the exception
+and uses a namespace import, which lowers to a `preload("res://…")` and so needs no class
+registration — the class cache is rewritten by every headless run from whatever THAT process
+registered, and a demo can be present after an editor scan and missing two suites later.
 
 ## Conventions
 

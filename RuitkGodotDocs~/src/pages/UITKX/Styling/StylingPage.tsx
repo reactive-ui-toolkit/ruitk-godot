@@ -32,6 +32,9 @@ import {
   EXAMPLE_USS_FILE,
   EXAMPLE_USS_MULTIPLE,
   EXAMPLE_USS_COMBINED,
+  EXAMPLE_STYLE_MODULE,
+  EXAMPLE_STYLE_MODULE_USE,
+  EXAMPLE_THEME_DIRECTIVE,
 } from './StylingPage.example'
 
 /** Single collapsible style-key card. */
@@ -176,9 +179,99 @@ export const StylingPage: FC = () => {
     </Typography>
     <CodeBlock language="gdscript" code={EXAMPLE_BOTH_APIs} />
 
+    {/* ── Style modules ─────────────────────────────────────── */}
+    <Typography id="style-modules" variant="h5" component="h2" gutterBottom sx={{ mt: 4 }}>
+      Style modules (<code>.style.guitkx</code>)
+    </Typography>
+    <Typography variant="body1" paragraph>
+      A <strong>style module</strong> is a <code>.guitkx</code> file whose name carries the{' '}
+      <code>.style</code> infix and whose declarations are all <code>export</code>ed values. It
+      holds no markup and no component — it is where a look lives. The compiler emits a sibling{' '}
+      <code>.gd</code>, so importing one costs nothing at render time.
+    </Typography>
+    <Typography variant="body1" paragraph>
+      Why a module rather than a literal at the use site: a style that appears in three markup
+      blocks has to be changed in three places, and the third one is how &ldquo;all the cards look
+      the same&rdquo; quietly stops being true. Naming it once also makes the intent readable —{' '}
+      <code>PANEL</code> says what it is; the dict says how it was built.
+    </Typography>
+    <CodeBlock language="gdscript" code={EXAMPLE_STYLE_MODULE} />
+
+    <Typography variant="h6" component="h3" gutterBottom sx={{ mt: 3 }}>
+      Importing and applying
+    </Typography>
+    <Typography variant="body1" paragraph>
+      Style modules are imported like any other module — named imports for the handful you use, or{' '}
+      <code>import * as Alias</code> when you would rather see where a value came from at every use
+      site. The specifier is the file path <em>without</em> the <code>.guitkx</code> extension:{' '}
+      <code>&quot;./card.style&quot;</code>, <code>&quot;../shared/card.style&quot;</code>, or{' '}
+      <code>&quot;~/ui/card.style&quot;</code> from the project root.
+    </Typography>
+    <CodeBlock language="gdscript" code={EXAMPLE_STYLE_MODULE_USE} />
+    <Alert severity="info" sx={{ mt: 1, mb: 2 }}>
+      Value imports are <strong>eager</strong> — they lower to a <code>const</code> preload — so a
+      cycle between two style modules is an error (<code>GUITKX2306</code>), unlike component
+      imports, which resolve lazily and may cycle. Referencing a name you did not import is{' '}
+      <code>GUITKX2305</code>; importing one you never use is <code>GUITKX2304</code>.
+    </Alert>
+    <Alert severity="warning" sx={{ mb: 2 }}>
+      A generated <code>.gd</code> is not a <code>@tool</code> script, and Godot never runs a
+      non-tool script&apos;s <code>static var</code> initialisers <em>in the editor</em>. A style
+      module read from <code>@tool</code> editor code therefore comes back empty — silently. This
+      only affects editor-time code; at runtime, and in the <code>.guitkx</code> hot-reload path,
+      style modules behave normally. Export a <em>function</em> instead of a value if an editor
+      plugin has to read it.
+    </Alert>
+
+    {/* ── @uss / @theme ─────────────────────────────────────── */}
+    <Typography id="uss-directive" variant="h5" component="h2" gutterBottom sx={{ mt: 4 }}>
+      Whole-subtree looks: <code>@uss</code> / <code>@theme</code>
+    </Typography>
+    <Typography variant="body1" paragraph>
+      A style dict decorates one element. A Godot <code>Theme</code> resource decorates a whole
+      subtree, and <code>@uss</code> is how a <code>.guitkx</code> file attaches one: it preloads
+      the resource and hands it to the component&apos;s <strong>root element</strong>, which every
+      Control beneath inherits through Godot&apos;s own theme cascade.{' '}
+      <code>@theme</code> is an alias — the same directive under the name Godot users reach for
+      first.
+    </Typography>
+    <CodeBlock language="gdscript" code={EXAMPLE_THEME_DIRECTIVE} />
+    <Box component="ul" sx={{ pl: 3, mb: 2 }}>
+      <li>
+        Preamble only — before the first declaration, alongside <code>import</code> and{' '}
+        <code>@class_name</code>.
+      </li>
+      <li>
+        <strong>One per file</strong>: a root control holds a single <code>Theme</code>. A second
+        one is <code>GUITKX2210</code>.
+      </li>
+      <li>
+        Component files only, and the root must be a single <em>element</em> — a fragment or an
+        array root has nothing to receive the theme.
+      </li>
+      <li>
+        A root that sets <code>theme</code> itself wins; <code>@uss</code> never overwrites an
+        explicit prop.
+      </li>
+      <li>
+        Accepts <code>res://</code>, <code>uid://</code> and <code>~/</code> paths. The{' '}
+        <code>~/</code> root is the same one <code>guitkx.config.json</code> defines for imports.
+      </li>
+    </Box>
+    <Alert severity="info" sx={{ mb: 2 }}>
+      The two compose the way they do in the engine: the <code>Theme</code> sets the floor, a{' '}
+      <code>style</code> dict on an element wins where it speaks. Reach for <code>@uss</code> for
+      a project-wide look authored in Godot&apos;s theme editor, and for a style module for the
+      per-element overrides that live with your components. See the{' '}
+      <strong>Style modules</strong> demo in the gallery (
+      <code>examples/demos/style_module/</code>) for both together.
+    </Alert>
+
     {/* ── Jump links ────────────────────────────────────────── */}
     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2, mt: 4 }}>
       <Chip label="Key reference" component="a" href="#key-reference" clickable size="small" />
+      <Chip label="Style modules" component="a" href="#style-modules" clickable size="small" />
+      <Chip label="@uss / @theme" component="a" href="#uss-directive" clickable size="small" />
       <Chip label="Patterns" component="a" href="#patterns" clickable size="small" />
       <Chip label="Per-state styles" component="a" href="#per-state" clickable size="small" />
       <Chip label="Theme channels" component="a" href="#theme-channels" clickable size="small" />

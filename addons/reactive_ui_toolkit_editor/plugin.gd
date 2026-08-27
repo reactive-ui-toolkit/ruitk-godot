@@ -14,7 +14,11 @@ const PLUGIN_NAME := "ReactiveUITK"
 # The Project > Tools item that opens the settings dialog (family design: ONE settings screen
 # per leg, opened from the plugin's own menu surface). Same string for add/remove.
 const SETTINGS_MENU := "Reactive UI Toolkit Settings..."
+# The Project > Tools item that opens the builder, on a build with no menu bar to hang it from.
+const BUILDER_MENU := "Reactive UI Toolkit Builder..."
 const MAIN_MENU_TITLE := "Reactive UI Toolkit"
+## Main-menu item ids, named so inserting an item cannot silently re-point another.
+enum { MENU_BUILDER, MENU_SETTINGS }
 # The editor's main menu is a MenuBar close under the base control; the cap keeps the search from
 # ever crawling the whole editor tree if the layout changes (in which case we fall back anyway).
 const _MENU_BAR_SEARCH_DEPTH := 8
@@ -31,6 +35,11 @@ var _references: Control
 var _search: Control
 var _fs_debounce: Timer
 var _settings_dialog: AcceptDialog  # lazy; shared by the menu entries and the toolbar button
+# The builder lives in a window of its own rather than a second main screen: this plugin already
+# owns one (the .guitkx view), and a plugin has exactly one. Lazy, and kept between openings so a
+# tree with unsaved work survives closing the window.
+var _builder_window: Window = null
+var _builder: Control = null
 var _main_menu: PopupMenu = null  # top-level "Reactive UI Toolkit" menu; null when on the fallback
 var _tools_fallback := false  # true when the Project > Tools item was registered instead
 var _deps_ok := false
@@ -136,7 +145,12 @@ func _exit_tree() -> void:
 		return
 	if _tools_fallback:
 		remove_tool_menu_item(SETTINGS_MENU)
+		remove_tool_menu_item(BUILDER_MENU)
 		_tools_fallback = false
+	if _builder_window != null:
+		_builder_window.queue_free()   # takes the builder with it; a disabled plugin leaves no window
+		_builder_window = null
+		_builder = null
 	if _main_menu != null:
 		_main_menu.queue_free()  # detaches from the MenuBar; disabling the plugin removes the menu
 		_main_menu = null
@@ -187,19 +201,25 @@ func _register_settings_menu() -> void:
 	var bar := find_menu_bar(EditorInterface.get_base_control(), _MENU_BAR_SEARCH_DEPTH)
 	if bar == null:
 		add_tool_menu_item(SETTINGS_MENU, _open_settings_dialog)
+		add_tool_menu_item(BUILDER_MENU, _open_builder)
 		_tools_fallback = true
 		print_rich("[color=yellow][reactive_ui_toolkit_editor] main menu bar not found — Settings lives under Project > Tools on this Godot build.[/color]")
 		return
 	_main_menu = PopupMenu.new()
 	# MenuBar renders each child PopupMenu as a top-level menu titled by its node name.
 	_main_menu.name = MAIN_MENU_TITLE
-	_main_menu.add_item("Settings...", 0)
+	_main_menu.add_item("Builder...", MENU_BUILDER)
+	_main_menu.add_separator()
+	_main_menu.add_item("Settings...", MENU_SETTINGS)
 	_main_menu.id_pressed.connect(_on_main_menu_pressed)
 	bar.add_child(_main_menu)
 
+
 func _on_main_menu_pressed(id: int) -> void:
-	if id == 0:
+	if id == MENU_SETTINGS:
 		_open_settings_dialog()
+	elif id == MENU_BUILDER:
+		_open_builder()
 
 ## Breadth-limited search for the editor's main MenuBar. Static and depth-capped on purpose:
 ## testable headless with a synthetic tree, and it can never crawl the whole editor UI — if the
@@ -374,3 +394,56 @@ func _on_problem_activated(line: int) -> void:
 	_make_visible(true)
 	if _view != null:
 		_view.goto_line(line)
+
+
+# ── The builder ──────────────────────────────────────────────────────────────────────
+
+## Opens the RUITK Builder on the tree the current `.guitkx` belongs to.
+##
+## In a WINDOW of its own, not a second main screen: a plugin has exactly one, and this one is
+## already the `.guitkx` view. A window also matches what the builder is -- a place you go to work
+## on a tree, not a tab you scroll past.
+##
+## The window and its builder are kept between openings. Closing it does NOT discard the session:
+## the builder holds unsaved work by design, and a close that threw it away would make the window
+## button dangerous.
+func _open_builder() -> void:
+	if _builder_window == null:
+		var script := load("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_window.gd")
+		if script == null:
+			printerr("[reactive_ui_toolkit_editor] the builder could not be loaded")
+			return
+		_builder = script.new()
+		_builder_window = Window.new()
+		_builder_window.title = "RUITK Builder"
+		_builder_window.size = Vector2i(1440, 880)
+		_builder_window.min_size = Vector2i(900, 560)
+		_builder_window.wrap_controls = true
+		# Hidden, not freed: a session with unsaved work has to survive the window closing.
+		_builder_window.close_requested.connect(func(): _builder_window.hide())
+		_builder_window.add_child(_builder)
+		EditorInterface.get_base_control().add_child(_builder_window)
+
+	# A session already open is shown as it is. Only a builder with NOTHING open needs a file to
+	# open a tree from -- and re-pointing an open session at whatever the editor happens to be
+	# showing would take a tree with unsaved work away from under someone.
+	if _builder.focus_path().is_empty():
+		var focus := _builder_focus_path()
+		if focus.is_empty():
+			printerr("[reactive_ui_toolkit_editor] the builder needs a .guitkx to open a tree from -- open one first")
+			return
+		_builder.open_tree(focus)
+	_builder_window.popup_centered()
+
+
+## The `.guitkx` a FIRST open should build its tree from: whatever the editor view is showing,
+## else the first one in the project. "Open the builder" means "on what I am looking at" -- but
+## only when there is nothing open yet; see the caller.
+func _builder_focus_path() -> String:
+	if _view != null and _view.has_method("current_path"):
+		var current := str(_view.call("current_path"))
+		if not current.is_empty():
+			return current
+	for path in GuitkxWorkspace.all_paths():
+		return str(path)
+	return ""

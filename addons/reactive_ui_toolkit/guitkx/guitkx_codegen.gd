@@ -536,11 +536,31 @@ static func compile_file(guitkx_path: String, known_components: Array = [], comp
 ## two-pass gate (M4) calls this per output AFTER every .gd is on disk, so cross-file preloads exist.
 static func gd_source_parses(gd: String) -> bool:
 	var chk := GDScript.new()
-	var chk_src := gd
-	if chk_src.begins_with("class_name "):
-		chk_src = chk_src.substr(chk_src.find("\n") + 1)
-	chk.source_code = chk_src
+	chk.source_code = strip_class_name(gd)
 	return chk.reload() == OK
+
+## The generated source with its `class_name` declaration removed.
+##
+## Anything that loads generated code WITHOUT being the real module needs this: the parse gate's
+## throwaway, and the builder's preview mirror. Both are shadows of a module that is already
+## registered under that name, and a second script claiming it is `Class "X" hides a global script
+## class` -- a parse failure for code that is perfectly correct.
+##
+## Scanned through the HEADER rather than tested on the first line, because the declaration is not
+## guaranteed to be first -- an emitter that ever prepends an annotation would silently defeat a
+## first-line test, and this is a correctness gate, not a formatting one. Scanning stops at
+## `extends`: past it any `class_name` is inside a string, and cutting that line would take code
+## with it.
+static func strip_class_name(gd: String) -> String:
+	var lines := gd.split("\n")
+	for i in range(lines.size()):
+		var line := str(lines[i])
+		if line.begins_with("class_name "):
+			lines.remove_at(i)
+			return "\n".join(lines)
+		if line.begins_with("extends "):
+			break
+	return gd
 
 ## Two-pass gate helper: does the .gd already on disk at `gd_path` parse? Reads + strips + reloads.
 static func gd_path_parses(gd_path: String) -> bool:
@@ -899,13 +919,16 @@ static func _is_orphaned_output(gd_path: String, sources: Dictionary) -> bool:
 	var src := gd_path.get_basename() + ".guitkx"
 	if sources.has(src) or FileAccess.file_exists(src):
 		return false
-	# The marker sits in the first three lines of every generated file; read no more than that —
-	# this runs for every sibling-less .gd (all hand-written scripts) on every sweep/poll.
+	# The marker sits within the first FOUR lines of every generated file — an optional
+	# `class_name`, `extends RefCounted`, then the banner — and no more than that is read: this
+	# runs for every sibling-less .gd (every hand-written script) on every sweep and poll.
+	# Four, not the three the header actually uses, so one added header line cannot silently turn
+	# every generated output into a non-match and stop the orphan sweep collecting anything.
 	var f := FileAccess.open(gd_path, FileAccess.READ)
 	if f == null:
 		return false
 	var head := ""
-	for _i in 3:
+	for _i in 4:
 		head += f.get_line() + "\n"
 		if f.eof_reached():
 			break

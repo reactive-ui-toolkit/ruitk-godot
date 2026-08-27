@@ -1,4 +1,3 @@
-import { card_box, card_box_selected, card_placeholder, title, pill_title, signature, section_head, import_row, chip, chip_text, markup_row, component_row, directive_row, attrs, island_row, export_row, read_only, kind_tint } from "./canvas.style"
 
 ## The builder's canvas, written in `.guitkx` and rendered by the reconciler it is a builder for.
 ##
@@ -11,17 +10,24 @@ import { card_box, card_box_selected, card_placeholder, title, pill_title, signa
 ## it holds no state, mutates nothing, and asks nothing of disk. Every number it measures with
 ## comes from `RuitkBuilderCanvasMetrics`, so the card the view draws and the card the camera
 ## measures cannot be different widths.
-
-## The builder's own modules, bound through `preload` rather than by their global `class_name`.
-## A global name resolves through the editor class cache, and `ProjectSettings.save()` rewrites
-## that cache down to whatever the running process loaded -- so a headless run of one test suite
-## can leave the canvas unable to load in the next. A preload cannot be invalidated by anything.
-M := preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
-GraphModel := preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
+##
+## Everything the view leans on is bound with an inline `preload` IN EACH BODY, never by global
+## `class_name` and never as a top-level declaration. A global name resolves through the editor
+## class cache, which `ProjectSettings.save()` truncates to whatever the running process loaded.
+## A top-level value lowers to a `static var`, whose initialiser had not run by the first render
+## -- three "Nil" renders on every open, in the editor only. A `preload` in a body is a
+## compile-time constant with no initialisation order at all.
+##
+## The palette is the one thing here that is NOT `.guitkx`. A generated `.gd` carries no `@tool`,
+## and a non-tool script's static vars are never initialised in the editor at all, so a
+## `.style.guitkx` module reads back empty from editor code -- silently, every key missing.
+## Static FUNCS of a non-tool script do still run, which is why the rest of the canvas stays
+## `.guitkx`; only the palette's DATA had to become a hand-written `@tool` script. See
+## `canvas_palette.gd`, and `examples/demos/styles/` for the `.style.guitkx` a game would write.
 
 export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 		viewport = Vector2(1280, 720), selected: int = -1) -> RuitkVNode {
-
+	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var lod = M.lod_of(zoom)
 	var card_w = M.card_width_for(lod)
 	var cards = graph.cards if graph != null else []
@@ -54,7 +60,8 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 ## body is a code block: the choice has to be made where markup can branch.
 export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 		at = Vector2.ZERO, zoom: float = 1.0, near: bool = true) -> RuitkVNode {
-
+	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var card_w = M.card_width_for(lod)
 
 	return (
@@ -63,7 +70,7 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 				<PanelContainer position={ at } scale={ Vector2(zoom, zoom) }
 					custom_minimum_size={ Vector2(card_w, 0) }
 					mouse_filter={ Control.MOUSE_FILTER_IGNORE }
-					style={ card_box_selected if is_selected else card_box }>
+					style={ P.card_box_selected() if is_selected else P.card_box() }>
 					<VBoxContainer style={ {"separation": 4} }>
 						<CanvasCardHeader card={ card } lod={ lod } />
 						@if (M.shows_sections(lod)) {
@@ -81,7 +88,7 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 				<Panel position={ at } scale={ Vector2(zoom, zoom) }
 					custom_minimum_size={ Vector2(card_w, M.card_height(card)) }
 					mouse_filter={ Control.MOUSE_FILTER_IGNORE }
-					style={ card_placeholder } />
+					style={ P.card_placeholder() } />
 			)
 		}
 	)
@@ -91,16 +98,17 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 ## The card's identity row: kind badge, title, and -- at the pill LOD -- nothing else, because a
 ## pill is what a card looks like when the whole tree is on screen at once.
 export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
-
-	var tint = kind_tint.get(int(card.kind), kind_tint[6])
+	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
+	var tint = P.kind_tint(int(card.kind))
 
 	return (
 		<HBoxContainer style={ {"separation": 6} }>
 			<ColorRect color={ tint } custom_minimum_size={ Vector2(4, 16) } />
-			<Label text={ card.title } style={ pill_title if lod == M.Lod.PILL else title } />
+			<Label text={ card.title } style={ P.pill_title() if lod == M.Lod.PILL else P.title() } />
 			@if (card.read_only) {
 				return (
-					<Label text="read-only" style={ read_only } />
+					<Label text="read-only" style={ P.read_only() } />
 				)
 			}
 		</HBoxContainer>
@@ -111,14 +119,15 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 ## Everything below the header: the signature, the import rows, the hook chips, and -- only at the
 ## full LOD -- the markup tree, the code island and the export detail.
 export CanvasCardSections(card = null, lod: int = 1) -> RuitkVNode {
-
+	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var detail = M.shows_detail(lod)
 
 	return (
 		<VBoxContainer style={ {"separation": 4} }>
 			@if (card.signature != "") {
 				return (
-					<Label text={ card.signature } style={ signature } />
+					<Label text={ card.signature } style={ P.signature() } />
 				)
 			}
 			@if (not card.imports.is_empty()) {
@@ -126,7 +135,7 @@ export CanvasCardSections(card = null, lod: int = 1) -> RuitkVNode {
 					<CanvasCardSection heading="IMPORTS">
 						@for (row in card.imports) {
 							return (
-								<Label key={ str(row.at) } text={ row.text } style={ import_row } />
+								<Label key={ str(row.at) } text={ row.text } style={ P.import_row() } />
 							)
 						}
 					</CanvasCardSection>
@@ -138,8 +147,8 @@ export CanvasCardSections(card = null, lod: int = 1) -> RuitkVNode {
 						<HFlowContainer style={ {"separation": 4} }>
 							@for (row in card.body) {
 								return (
-									<PanelContainer key={ str(row.at) } style={ chip }>
-										<Label text={ row.text } style={ chip_text } />
+									<PanelContainer key={ str(row.at) } style={ P.chip() }>
+										<Label text={ row.text } style={ P.chip_text() } />
 									</PanelContainer>
 								)
 							}
@@ -164,7 +173,7 @@ export CanvasCardSections(card = null, lod: int = 1) -> RuitkVNode {
 						@for (row in card.export_detail) {
 							return (
 								<Label key={ str(row.at) + row.text }
-									text={ "  ".repeat(row.depth) + row.text } style={ export_row } />
+									text={ "  ".repeat(row.depth) + row.text } style={ P.export_row() } />
 							)
 						}
 					</CanvasCardSection>
@@ -175,7 +184,7 @@ export CanvasCardSections(card = null, lod: int = 1) -> RuitkVNode {
 					<CanvasCardSection heading="SETUP">
 						@for (i in range(card.island_lines.size())) {
 							return (
-								<Label key={ str(i) } text={ card.island_lines[i] } style={ island_row } />
+								<Label key={ str(i) } text={ card.island_lines[i] } style={ P.island_row() } />
 							)
 						}
 					</CanvasCardSection>
@@ -190,9 +199,10 @@ export CanvasCardSections(card = null, lod: int = 1) -> RuitkVNode {
 ## separation and the same heading treatment -- three places to change it is how two of them stop
 ## matching.
 export CanvasCardSection(heading: String = "") -> RuitkVNode {
+	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	return (
 		<VBoxContainer style={ {"separation": 2} }>
-			<Label text={ heading } style={ section_head } />
+			<Label text={ heading } style={ P.section_head() } />
 			{ children }
 		</VBoxContainer>
 	)
@@ -202,19 +212,21 @@ export CanvasCardSection(heading: String = "") -> RuitkVNode {
 ## One row of the markup tree: indented to its depth, coloured by what it is, with its attribute
 ## run beside it.
 export CanvasMarkupRow(row = null) -> RuitkVNode {
-	var LineKind = GraphModel.LineKind
-	var style = markup_row
+	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
+	var Model = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
+	var LineKind = Model.LineKind
+	var style = P.markup_row()
 	if row.kind == LineKind.COMPONENT:
-		style = component_row
+		style = P.component_row()
 	elif row.kind == LineKind.DIRECTIVE:
-		style = directive_row
+		style = P.directive_row()
 
 	return (
 		<HBoxContainer style={ {"separation": 6} }>
 			<Label text={ "    ".repeat(row.depth) + row.text } style={ style } />
 			@if (row.attrs_text != "") {
 				return (
-					<Label text={ row.attrs_text } style={ attrs } />
+					<Label text={ row.attrs_text } style={ P.attrs() } />
 				)
 			}
 		</HBoxContainer>

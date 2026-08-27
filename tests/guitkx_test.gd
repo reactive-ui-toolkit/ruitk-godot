@@ -1028,10 +1028,10 @@ func _test_imports_m1() -> void:
 ## with the `class_name` line stripped so it can't collide with the scanned global class.
 func _gd_parses(gd: String) -> bool:
 	var chk := GDScript.new()
-	var src := gd
-	if src.begins_with("class_name "):
-		src = src.substr(src.find("\n") + 1)
-	chk.source_code = src
+	# Through the COMPILER's own stripper rather than a first-line test of our own: one added header
+	# line and a local test stops stripping, and every throwaway collides with the real class it
+	# is a copy of -- a failure that reads as a compiler bug.
+	chk.source_code = Codegen.strip_class_name(gd)
 	return chk.reload() == OK
 
 ## M2 (0.10.0): MIXED-DECL v1 emission (§6.3) — several declarations in one file, privacy, __RUI_DECLS.
@@ -2534,7 +2534,10 @@ func _test_es_combined_imports() -> void:
 	# bare self-reference resolve to the CLASS TYPE, so utils.gd failed to compile the moment an
 	# importer preloaded it. A value binding now emits NO class_name.
 	var utils_gd := FileAccess.get_file_as_string("res://tests/__bh_tmp/esc/utils.gd")
-	_check_true(not utils_gd.begins_with("class_name "), "value-binding target emits no class_name (got head %s)" % utils_gd.substr(0, 40))
+	# Tested ANYWHERE in the file, not on the first line: a first-line test passes whatever the
+	# file says next, so it would keep passing if the emitter ever moved the declaration down.
+	_check_true(not utils_gd.contains("class_name "),
+		"value-binding target emits no class_name (got head %s)" % utils_gd.substr(0, 40))
 	_check_true(utils_gd.contains("static var something := 42"), "the value member itself still emits")
 	# Same LOCAL bound twice across the parts stays the explicit error (never a silent double).
 	var same_dup := RuitkGuitkx.compile("import get_something, { get_something } from \"./utils\"\nexport SD() -> RuitkVNode {\n\treturn ( <Label text={str(get_something())}/> )\n}\n", "sd", [], {}, "res://tests/__bh_tmp/esc/sd.guitkx", "res://")
