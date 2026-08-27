@@ -19,6 +19,9 @@ const Attributes = preload("res://addons/reactive_ui_toolkit_editor/builder/edit
 const NOTE_FONT_SIZE := 10
 const NOTE_COLOR := Color(0.478, 0.478, 0.545)
 
+## A component in the preview was clicked. The window selects the module that renders it.
+signal component_picked(file_path: String)
+
 var preview: Preview = null
 ## The projected graph, so the pane can find where this component is USED.
 var graph = null
@@ -67,6 +70,7 @@ func _init() -> void:
 	frame.set_corner_radius_all(4)
 	frame.set_content_margin_all(2)
 	_stage.add_theme_stylebox_override("panel", frame)
+	_stage.gui_input.connect(_on_stage_input)
 	add_child(_stage)
 
 	_slot = MarginContainer.new()
@@ -104,6 +108,43 @@ func _init() -> void:
 	_show_idle()
 
 
+## A click on the rendered component selects the module that renders it.
+##
+## Ported from the Unity leg's `OnPreviewComponentPicked`. Theirs maps the clicked ELEMENT back
+## to the component that owns it; ours can only answer for the mounted one, because Godot's
+## nodes carry no back-reference to the `.guitkx` row that made them. Selecting the mounted
+## component is the useful half and is honest about being it.
+func _on_stage_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var click := event as InputEventMouseButton
+	if click.pressed and click.button_index == MOUSE_BUTTON_LEFT and not _path.is_empty():
+		component_picked.emit(_path)
+
+
+## What a module with nothing to render says about itself.
+##
+## Ported from the Unity leg's `ModuleInfoFor`. A hook or a util module has no component to put
+## on the stage, and an empty box with "select a component" under it says the pane is broken
+## rather than that this module is not a component. Its signature and the components that import
+## it are both already on the graph, so the pane never has to fall back to generic phrasing.
+func _module_note(file_path: String) -> String:
+	if graph == null:
+		return ""
+	var index: int = graph.index_of(file_path)
+	if index < 0:
+		return ""
+	var card = graph.cards[index]
+	var consumers: PackedStringArray = PackedStringArray()
+	for other in graph.cards:
+		for row in other.imports:
+			if str(row.text).contains(card.title):
+				consumers.append(other.title)
+				break
+	var used := ("used by " + ", ".join(consumers)) if not consumers.is_empty() 		else "nothing imports it yet"
+	return "%s — %s" % [card.signature if not card.signature.is_empty() else card.title, used]
+
+
 ## Renders `file_path`'s component onto the stage.
 ##
 ## A component that does not build LEAVES THE LAST GOOD RENDER standing and says so underneath —
@@ -127,8 +168,15 @@ func show_module(file_path: String) -> void:
 	preview.request_refresh()
 	if _slot.get_child_count() > 0:
 		_note.text = "last good render — the current edit does not build yet"
-	else:
-		_show_idle()
+		return
+	# NOT A COMPONENT is not a failure. A hook or a util module has nothing to put on a stage,
+	# and saying "select a component" under an empty box reads as the pane being broken.
+	var info := _module_note(_path)
+	if not info.is_empty():
+		_note.text = info
+		_origin.text = "this module has no component to render"
+		return
+	_show_idle()
 
 
 ## Drops the mount. Called when the tree closes, so a preview never outlives the tree it came from.

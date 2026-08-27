@@ -1,0 +1,159 @@
+extends SceneTree
+## PARITY SWEEP: every feature the Unity leg's builder has, and where this one answers it. Run:
+##   godot --headless --path <project> --script res://tests/builder_parity.gd
+##
+## The reference is `../ruitk-unity/Builder/Editor/` — 20k lines, and the thing this builder is a
+## port OF. It is NOT in this repository, so this gate cannot read it; what it can do is hold the
+## checklist derived from it and fail when an entry stops being answered.
+##
+## WHY THIS EXISTS. This builder was written from a plan document while the source sat unread in
+## a sibling checkout, and the result was a subsystem full of behaviour I invented and then
+## justified in comments. Everything below was found afterwards, one user report at a time, and
+## most of it was a mechanism that already existed with nothing wired to it: a drop handler with
+## no drag, a layout store with no way to move a card, an `entry_activated` nobody listened to,
+## a provisional root the create flow never used. A list is the only thing that catches that
+## class of gap, because each one individually looks like a feature nobody has asked for yet.
+##
+## An entry is a Unity method name and a token that must appear somewhere under `builder/` or in
+## the editor plugin. The token is deliberately a distinctive IDENTIFIER, not prose: prose gets
+## reworded and the gate rots into a test of its own comments.
+
+const ROOTS := [
+	"res://addons/reactive_ui_toolkit_editor/builder",
+	"res://addons/reactive_ui_toolkit_editor/plugin.gd",
+]
+
+## Unity method -> the identifier that answers it here.
+const PARITY := [
+	# Entry points
+	["OpenEmpty", "func open_tree"],
+	["OpenFor", "func open_builder_on"],
+	["Assets/Open in RUITK UI Builder", "CONTEXT_SLOT_FILESYSTEM"],
+	# Folders and modules
+	["MoveModuleToFolder", "func drop_module"],
+	["MoveFolderToFolder", "func move_folder"],
+	["ShowEmptyState", "func _build_empty_state"],
+	["NewFile / ShowCreatePrompt", "func prompt_create"],
+	["ValidateNewName", "func _validate_name"],
+	["CreateModule", "func _create_named"],
+	["ShowRenamePrompt", "CardMenuId.RENAME"],
+	["StripReferencesTo", "func _strip_references_to"],
+	# The source pane
+	["BeginSourceEdit", "func _set_editing"],
+	["ApplySourceEdit", "func apply_edit"],
+	["CancelSourceEdit", "func cancel_edit"],
+	# History
+	["UndoAction / RedoAction", "func undo"],
+	["JumpHistoryTo", "func _jump_history_to"],
+	["ToggleHistory", "func _show_history"],
+	# The row spine
+	["OnCanvasRowClicked", "func _on_row_clicked"],
+	["OnCanvasRowContext", "func _on_row_context"],
+	["SyncLibrarySelection", "func select_component"],
+	["ShowAttributeMenu", "func menu_for"],
+	["ShowRemoveAttributeMenu", "RowMenuId.REMOVE_ATTRIBUTE"],
+	["OnAttrValueEdited", "func _attribute_items"],
+	["ShowAddChildMenu", "func _tag_items"],
+	["AddUsageImport", "func _with_component_import"],
+	["ApplyStyleModuleToRow", "RowMenuId.APPLY_STYLE"],
+	["DeleteElementRow", "RowMenuId.DELETE_ROW"],
+	# Directives
+	["AddWrapItems", "const WRAPS"],
+	["WrapRowInDirective", "func wrap_in_directive"],
+	["WrapRowInSwitch", "func wrap_in_match"],
+	["RemoveDirectiveBlock", "func unwrap_directive"],
+	["AddIfClause", "func add_if_clause"],
+	["DeleteClause", "func delete_clause"],
+	["OnDirectiveEdited", "RowMenuId.EDIT_HEADER"],
+	# Islands and style entries
+	["OnIslandEdited", "func set_island"],
+	["AdvanceStyleEntry", "RowMenuId.ADD_STYLE_ENTRY"],
+	# Drag and drop
+	["OnCanvasRowDrop", "func _on_canvas_drop"],
+	["drag sources", "func _get_drag_data"],
+	["drop target", "func _can_drop_data"],
+	["card dragging", "signal card_moved"],
+	# The preview
+	["UsageFor", "func _usage_note"],
+	["ModuleInfoFor", "func _module_note"],
+	["BuildKnobs", "func _build_knobs"],
+	["OnPreviewComponentPicked", "signal component_picked"],
+	["state panel", "func _refresh_state"],
+	# Chrome
+	["Toast", "func toast"],
+	["ToggleHelp", "func show_help"],
+	["TogglePreviewTrace", "func trace"],
+	["SetActiveMode", "func _on_layer_chosen"],
+	["BuildLegend", "func legend_entry"],
+	["OnKeyDown", "func _typing_focused"],
+	["DeleteSelection", "func _delete_selection"],
+	["CancelActiveEdit", "func _cancel_active_edit"],
+	# Save
+	["ResolveUnsavedLocation", "func _ask_where_the_tree_lives"],
+	["ResolveEmptyModules", "func blank_modules"],
+	["FormatDirtyBuffers", "format_on_save"],
+	["SaveAll", "func save_all"],
+	["AbortAll", "func abort_all"],
+	["OfferJournalRestore", "func pending_recovery"],
+]
+
+## Features the Unity leg has that this one deliberately does not, and why. Listed so the sweep
+## reads as a complete account rather than as a list that quietly stops where I stopped.
+const DELIBERATE := [
+	["ImportUxml", "no Godot analogue -- a .tscn importer is a separate project with its own design"],
+	["CodeField", "the source pane reuses guitkx_code_edit.gd, which is the .guitkx editor's own"],
+	["BuilderLspClient", "the editor addon's LSP layer already backs the code editor"],
+]
+
+
+func _initialize() -> void:
+	var sources := _all_sources()
+	var missing: Array = []
+	for entry in PARITY:
+		var pair := entry as Array
+		if not _found(sources, str(pair[1])):
+			missing.append("%s  (no `%s`)" % [str(pair[0]), str(pair[1])])
+
+	print("")
+	for entry in DELIBERATE:
+		print("  skipped  %-24s %s" % [str((entry as Array)[0]), str((entry as Array)[1])])
+	print("")
+	if not missing.is_empty():
+		for line in missing:
+			printerr("  MISSING  %s" % line)
+		printerr("[builder_parity] %d of %d features have no answer here"
+			% [missing.size(), PARITY.size()])
+		quit(1)
+		return
+	print("[builder_parity] all %d features answered, %d deliberately skipped"
+		% [PARITY.size(), DELIBERATE.size()])
+	quit(0)
+
+
+func _found(sources: PackedStringArray, token: String) -> bool:
+	for text in sources:
+		if text.contains(token):
+			return true
+	return false
+
+
+## Every `.gd` and `.guitkx` under the builder, read once.
+func _all_sources() -> PackedStringArray:
+	var out := PackedStringArray()
+	for root in ROOTS:
+		if FileAccess.file_exists(root):
+			out.append(FileAccess.get_file_as_string(root))
+			continue
+		_walk(root, out)
+	return out
+
+
+func _walk(dir: String, out: PackedStringArray) -> void:
+	var handle := DirAccess.open(dir)
+	if handle == null:
+		return
+	for file in handle.get_files():
+		if file.ends_with(".gd") or file.ends_with(".guitkx"):
+			out.append(FileAccess.get_file_as_string(dir.path_join(file)))
+	for sub in handle.get_directories():
+		_walk(dir.path_join(sub), out)

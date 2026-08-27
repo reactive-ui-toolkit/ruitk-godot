@@ -62,6 +62,9 @@ golden markup trees, the preview pipeline end to end, the canvas metrics/layout/
 panes with the single edit funnel, every structural edit as a before/after string, and the
 save/abort/undo matrix against exact disk state),
 `builder_view_build.gd` (the addon's own `.guitkx` output is committed and must stay fresh),
+`builder_parity.gd` (the checklist of every Unity-leg builder feature and the identifier that
+answers it here — the reference lives in a sibling checkout the gate cannot read, so the list
+is the gate),
 `contract_dump.gd -- --check` (GD↔TS grammar goldens). `tests/guitkx_migrate.gd` runs the 0.10.0
 import codemod over `examples/` (idempotent — a clean tree reports 0 migrated). `bench*.gd` /
 `microbench.gd` are benchmarks, not pass/fail tests.

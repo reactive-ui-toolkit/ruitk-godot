@@ -35,6 +35,7 @@ const SourcePane = preload("res://addons/reactive_ui_toolkit_editor/builder/chro
 const Console = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_console.gd")
 const InlineEditor = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_inline_editor.gd")
 const Edits = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_edits.gd")
+const Specifiers = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_specifiers.gd")
 const Drag = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_drag.gd")
 const AddonSettings = preload("res://addons/reactive_ui_toolkit_editor/editor/ruitk_editor_settings.gd")
 const Parts = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_chrome_parts.gd")
@@ -667,6 +668,7 @@ func _wire() -> void:
 	_source.edit_cancelled.connect(func(path: String, restore: String):
 		apply_edit(path, restore, "Revert %s" % path.get_file()))
 	_source.complained.connect(toast)
+	_preview_pane.component_picked.connect(select_module)
 	_console.location_activated.connect(select_module)
 	_card_menu.id_pressed.connect(_on_card_menu)
 	_canvas_menu.id_pressed.connect(run_command)
@@ -2004,13 +2006,45 @@ func delete_module(file_path: String) -> bool:
 	var module := workspace.try_get(file_path)
 	if module == null or module.read_only:
 		return false
+	# EVERY REFERENCE GOES WITH IT, as one ledger entry. Deleting a module and leaving its
+	# importers importing it turns a delete into a build that does not compile -- and the user
+	# discovers it later, in a file they did not touch, about a module that no longer exists.
+	ledger.begin("Delete %s" % file_path.get_file())
+	_strip_references_to(file_path)
 	if not workspace.delete(file_path):
+		ledger.end()
 		return false
 	ledger.record_deletion(file_path, module)
+	ledger.end()
 	reproject()
 	_source.refresh_from_model()
 	preview.request_refresh()
 	return true
+
+
+## Removes every import of `target` from every other module in the tree.
+##
+## Ported from the Unity leg's `StripReferencesTo`. Only the IMPORT is removed, not the usages
+## it bound: a `<Card />` left in the markup is a visible, locatable error the user can decide
+## about, while silently deleting rows of their layout because a module went away is a much
+## worse surprise. The reference strips attribute values too; that is a judgement I would rather
+## the user made, and the compiler names the rows either way.
+func _strip_references_to(target: String) -> void:
+	if workspace == null or graph == null:
+		return
+	for card in graph.cards:
+		if Paths.same(card.file_path, target):
+			continue
+		var module := workspace.try_get(card.file_path)
+		if module == null or module.read_only:
+			continue
+		var spec := Specifiers.relative(card.file_path.get_base_dir(), target)
+		if spec.is_empty():
+			continue
+		var after := Edits.remove_import(module.buffer_text, spec)
+		if after != module.buffer_text:
+			apply_edit(card.file_path, after,
+				"Remove the import of %s" % target.get_file())
 
 
 func _refresh_status() -> void:

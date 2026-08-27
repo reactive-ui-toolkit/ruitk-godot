@@ -184,6 +184,13 @@ jobs:
       - name: Addon .guitkx freshness tripwire (the shipped canvas .gd must match its source)
         run: godot --headless --path . --script res://tests/builder_view_build.gd
 
+      - name: Builder parity sweep (every Unity-leg feature has an answer here)
+        # The reference is ../ruitk-unity/Builder/Editor/, which is NOT in this repo — so this
+        # holds the checklist derived from it and fails when an entry stops being answered.
+        # Written after a run of user-found gaps that were all the same shape: a mechanism that
+        # existed with nothing wired to it. A list is the only thing that catches that.
+        run: godot --headless --path . --script res://tests/builder_parity.gd
+
       # Codemod tripwires (M8.6): both runners must be no-ops on the committed tree — a non-zero
       # count means pre-0.10 syntax (migrate) or wrapper keywords (modernize) were committed; the
       # runner exits 1 after fixing the files locally, so the fix is "commit what it rewrote".
