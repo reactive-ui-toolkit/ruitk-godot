@@ -41,6 +41,7 @@ const Parts = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/bu
 const SearchMenu = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_search_menu.gd")
 const Attributes = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_attributes.gd")
 const Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
+const Schema = preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_schema.gd")
 const PreviewPane = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_preview_pane.gd")
 const Palette = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
@@ -71,7 +72,7 @@ enum RowMenuId {
 	ADD_ATTRIBUTE = 200, ADD_CHILD = 201, REMOVE_ATTRIBUTE = 202,
 	WRAP_IF = 203, WRAP_FOR = 204, DELETE_ROW = 205, EDIT_HEADER = 206,
 	ADD_ELSE = 207, ADD_ELSE_IF = 208, DELETE_CLAUSE = 209, EDIT_ATTRIBUTE = 210,
-	APPLY_STYLE = 211, UNWRAP = 212,
+	APPLY_STYLE = 211, UNWRAP = 212, ADD_STYLE_ENTRY = 213,
 }
 
 var workspace: Workspace = null
@@ -850,6 +851,16 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 	_row_menu.clear()
 	_row_menu.add_separator(row.text.strip_edges())
 
+	if section == Metrics.Section.EXPORTS:
+		# A style entry's menu is about the DICTIONARY it lives in, not about markup.
+		_row_menu.add_item("Add entry...", RowMenuId.ADD_STYLE_ENTRY)
+		_row_menu.add_separator()
+		_row_menu.add_item("Delete this entry", RowMenuId.DELETE_ROW)
+		_row_menu.position = Vector2i(_canvas.get_screen_position() + at)
+		_row_menu.reset_size()
+		_row_menu.popup()
+		return
+
 	if row.kind == Graph.LineKind.DIRECTIVE:
 		_row_menu.add_item("Edit header...", RowMenuId.EDIT_HEADER)
 		# Clause operations belong to the CONSTRUCT head (@if), not to a bound continuation
@@ -937,6 +948,11 @@ func _on_row_menu(id: int) -> void:
 				Attributes.menu_for(tag, row, _component_named(tag)),
 				_menu_screen_at(), "add \"%s\" (untyped)")
 			return
+		RowMenuId.ADD_STYLE_ENTRY:
+			_search_purpose = "style_entry"
+			_search_menu.open_menu("add an entry to %s" % row.name, _style_key_items(row),
+				_menu_screen_at(), "add \"%s\"")
+			return
 		RowMenuId.APPLY_STYLE:
 			_search_purpose = "style"
 			_search_menu.open_menu("apply a style to %s" % row.text.strip_edges(),
@@ -989,6 +1005,28 @@ func _with_component_import(source: String, importer_path: String, tag: String) 
 		return Edits.ensure_import(source, importer_path, card.file_path,
 			PackedStringArray([tag]))
 	return source
+
+
+## The style keys a new entry can take, from the same catalogue the `.guitkx` editor completes
+## style dictionaries with -- so the builder offers what the style system actually understands
+## rather than a list kept beside it.
+func _style_key_items(row) -> Array:
+	var items: Array = []
+	var owner := str(row.name)
+	for key in Schema.style_keys():
+		items.append(SearchMenu.item(str(key), {
+			"export": owner, "key": str(key), "value": _style_seed(str(key)),
+		}))
+	return items
+
+
+## What a fresh style entry is worth. Seeded, like every other header this builder writes.
+func _style_seed(key: String) -> String:
+	if key.ends_with("_color"):
+		return "Color(0.2, 0.2, 0.24)"
+	if key.begins_with("font_size") or key.contains("width") or key.contains("radius") 			or key.contains("margin") or key.contains("separation"):
+		return "8"
+	return "null"
 
 
 ## Whether the open tree has a style module to offer at all.
@@ -1139,6 +1177,11 @@ func _on_search_picked(payload: Variant) -> void:
 			else:
 				after = Edits.wrap_in_directive(before, _menu_row, header)
 				what = "Wrap %s in %s" % [_menu_row.text.strip_edges(), header.split(" ")[0]]
+		"style_entry":
+			var pick := payload as Dictionary
+			after = Edits.insert_style_entry(before, str(pick["export"]),
+				str(pick["key"]), str(pick["value"]))
+			what = "Add %s to %s" % [str(pick["key"]), str(pick["export"])]
 		"style":
 			# THE IMPORT LANDS WITH THE ATTRIBUTE. `style={Palette.CARD}` with nothing importing
 			# `Palette` is a file that does not compile, and a style applied in two commits is a

@@ -160,7 +160,13 @@ are synchronous. Preserve these behaviors — they're faithful-to-reference, not
   keeps that cheap, and diagnostics are de-duplicated (Godot's Errors dock is append-only). Also hosts
   the in-editor `.guitkx` view, tokenizer/highlighter, and a headless LSP layer (`lsp/`).
 - **RUITK Builder (`addons/reactive_ui_toolkit_editor/builder/`)** — the visual editor for a
-  `.guitkx` tree, ported from the Unity leg (`plans/BUILDER_PORT_PLAN.md`). `document/` is the
+  `.guitkx` tree. **The reference is `../ruitk-unity/Builder/Editor/` (20k lines), not
+  `plans/BUILDER_PORT_PLAN.md`** — the plan says what to build, the source says how it behaves,
+  and the difference is where invented behaviour comes from. Read the C# for any question about
+  what a gesture does. Divergences that are deliberate: the language's own vocabulary wins
+  (`@elif`, not `@else if`; a directive body cannot be empty here — GUITKX0303), `Import .uxml`
+  has no Godot analogue, and the source pane reuses `guitkx_code_edit.gd` rather than porting
+  `CodeField.cs`. `document/` is the
   model layer: a tree of modules held **in memory**, with disk as a projection computed at Save
   (nothing is written until then — delete, rename and folder moves included). Deletion is
   ABSENCE: a module leaves the tree and Save finds the orphan by diffing the last projection,
