@@ -76,12 +76,14 @@ var _inline: InlineEditor = null
 var _toolbar: HBoxContainer = null
 var _status: Label = null
 var _card_menu: PopupMenu = null
+var _new_menu: PopupMenu = null
 var _canvas_menu: PopupMenu = null
 var _preview_pane: PreviewPane = null
 var _layers: OptionButton = null
 var _history_menu: PopupMenu = null
 var _hint: Label = null
 var _syncing_layer := false
+var _empty_state: Control = null
 
 var _focus_path := ""
 var _menu_target := ""
@@ -145,6 +147,13 @@ func _build_ui() -> void:
 	_inline = InlineEditor.new()
 	canvas_layer.add_child(_inline)
 
+	# The onboarding panel sits on the canvas layer and hides itself the moment a tree opens.
+	# A builder whose empty state is an empty grey rectangle has told a first-time user nothing:
+	# not what it is, not that nothing is written until Save, and not that the four things they
+	# might want to make are one click away.
+	_empty_state = _build_empty_state()
+	canvas_layer.add_child(_empty_state)
+
 	# The console gets a FLOOR, not half the column. It carries diagnostics, which are usually one
 	# line and occasionally many, and a split that opens at the middle gave a one-line console the
 	# same room as the canvas — the surface the whole window exists to show.
@@ -176,7 +185,21 @@ func _build_ui() -> void:
 	]))
 	column.add_child(_hint)
 
+	# A card's menu leads with CREATE, because the commonest thing to want next to a component is
+	# another module related to it -- and a create action reached from the card carries where it
+	# goes with it: a component becomes a CHILD of the one clicked, the companions land BESIDE it.
+	_new_menu = PopupMenu.new()
+	_new_menu.name = "New"
+	_new_menu.add_item("New component            child", Module.Kind.COMPONENT)
+	_new_menu.add_item("New style module        beside", Module.Kind.STYLE)
+	_new_menu.add_item("New hook module      beside", Module.Kind.HOOK)
+	_new_menu.add_item("New util module         beside", Module.Kind.UTIL)
+	_new_menu.id_pressed.connect(_on_card_new)
+
 	_card_menu = PopupMenu.new()
+	_card_menu.add_child(_new_menu)
+	_card_menu.add_submenu_item("New", "New")
+	_card_menu.add_separator()
 	_card_menu.add_item("Open", CardMenuId.OPEN)
 	_card_menu.add_item("Rename...", CardMenuId.RENAME)
 	_card_menu.add_separator()
@@ -191,6 +214,55 @@ func _build_ui() -> void:
 	_history_menu.add_item("Undo", MenuId.UNDO)
 	_history_menu.add_item("Redo", MenuId.REDO)
 	add_child(_history_menu)
+
+
+## The "nothing open yet" panel: what this is, what it will not do behind your back, and the four
+## things you can start.
+func _build_empty_state() -> Control:
+	var centre := CenterContainer.new()
+	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+	centre.mouse_filter = Control.MOUSE_FILTER_PASS
+
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 10)
+	centre.add_child(column)
+
+	var heading := Label.new()
+	heading.text = "Start a UI"
+	heading.add_theme_font_size_override("font_size", 26)
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(heading)
+
+	var subtitle := Label.new()
+	subtitle.text = "Nothing is written to disk until you press Save."
+	subtitle.add_theme_color_override("font_color", Parts.TITLE_COLOR)
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(subtitle)
+
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 8)
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	for entry in [
+		{ "label": "New component", "kind": Module.Kind.COMPONENT },
+		{ "label": "New style module", "kind": Module.Kind.STYLE },
+		{ "label": "New hook module", "kind": Module.Kind.HOOK },
+		{ "label": "New util module", "kind": Module.Kind.UTIL },
+	]:
+		var spec := entry as Dictionary
+		var button := Button.new()
+		button.text = str(spec["label"])
+		var kind := int(spec["kind"])
+		button.pressed.connect(func(): create_module(kind))
+		buttons.add_child(button)
+	column.add_child(buttons)
+
+	var hint := Label.new()
+	hint.text = "...or double-click a .guitkx file in the FileSystem dock to edit an existing tree."
+	hint.add_theme_font_size_override("font_size", Parts.HINT_FONT_SIZE)
+	hint.add_theme_color_override("font_color", Parts.HINT_COLOR)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(hint)
+	return centre
 
 
 ## The header: what tree is open, which layer it is drawn at, the commands, and the legend that
@@ -335,6 +407,13 @@ func open_tree(focus_path: String) -> void:
 ## The layout is applied and then TOPPED UP: what it already knows keeps its slot, and only a
 ## module it has never seen takes a seeded one. Re-seeding everything would move every card the
 ## user has ever dragged the moment one module is added.
+## Whether the onboarding panel should be on screen: only when there is genuinely nothing open.
+func _sync_empty_state() -> void:
+	if _empty_state == null:
+		return
+	_empty_state.visible = workspace == null or workspace.modules().is_empty()
+
+
 func reproject() -> void:
 	if workspace == null:
 		return
@@ -346,6 +425,7 @@ func reproject() -> void:
 		_canvas.camera = layout.camera
 		_canvas.zoom = layout.zoom
 	_canvas.show_graph(graph)
+	_sync_empty_state()
 	_folders.workspace = workspace
 	_folders.rebuild()
 	_library.graph = graph
@@ -519,6 +599,18 @@ func _on_card_add(index: int, what: String) -> void:
 			return
 	if after != before:
 		apply_edit(card.file_path, after, description)
+
+
+## Create, from a card's own menu: the clicked module is the anchor, so the new one lands in its
+## folder and -- for a component -- is imported by it, which is what "child" means here.
+func _on_card_new(kind: int) -> void:
+	if _menu_target.is_empty():
+		return
+	var previous := _focus_path
+	_focus_path = _menu_target
+	var created := create_module(kind)
+	if created.is_empty():
+		_focus_path = previous
 
 
 ## Creates a module of `kind` beside the focus, opens it, and points every surface at it.
@@ -699,6 +791,11 @@ func _open_card_menu(file_path: String, at: Vector2) -> void:
 		module == null or module.read_only)
 	_card_menu.set_item_disabled(_card_menu.get_item_index(CardMenuId.RENAME),
 		module == null or module.read_only)
+	# The menu says WHICH module it is about. "Delete" over a canvas of five cards is a question
+	# the user has to answer from memory of where they right-clicked.
+	var shown := file_path.get_file()
+	_card_menu.set_item_text(_card_menu.get_item_index(CardMenuId.RENAME), "Rename %s..." % shown)
+	_card_menu.set_item_text(_card_menu.get_item_index(CardMenuId.DELETE), "Delete %s" % shown)
 	_card_menu.position = Vector2i(at)
 	_card_menu.popup()
 

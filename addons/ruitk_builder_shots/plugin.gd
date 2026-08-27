@@ -31,8 +31,8 @@ const SHOT_SIZE := Vector2i(1920, 1010)
 ## same name -- a shot with no reference is a shot nobody compares.
 const SHOTS := [
 	{ "name": "empty", "tree": false },
-	{ "name": "cards", "tree": true, "zoom": 0.30, "select": "" },
-	{ "name": "cards_create_menu", "tree": true, "zoom": 0.30, "select": "", "menu": "library" },
+	{ "name": "cards", "tree": true, "zoom": 0.34, "select": "" },
+	{ "name": "cards_create_menu", "tree": true, "zoom": 0.34, "select": "", "menu": "library" },
 	{ "name": "edit", "tree": true, "zoom": 1.00, "select": FIXTURE_RIGHT },
 	{ "name": "edit_card_menu", "tree": true, "zoom": 1.00, "select": FIXTURE_RIGHT, "menu": "card" },
 	{ "name": "edit_zoomed", "tree": true, "zoom": 1.35, "select": FIXTURE_RIGHT },

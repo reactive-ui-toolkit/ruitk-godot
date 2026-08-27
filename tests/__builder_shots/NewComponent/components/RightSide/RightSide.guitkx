@@ -1,7 +1,7 @@
 export RightSide() -> RuitkVNode {
 	return (
-		<Control>
+		<VBoxContainer>
 			<Label text="Right Side" />
-		</Control>
+		</VBoxContainer>
 	)
 }

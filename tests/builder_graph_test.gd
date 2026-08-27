@@ -243,7 +243,7 @@ func _test_kinds_and_signatures() -> void:
 
 	_section("signatures are structural, and one line")
 	_eq(_card("app.guitkx").signature,
-		"App(level: int = 1, title: String = \"hi\") -> RuitkVNode",
+		"App(level: int = 1, title: String = \"hi\")",
 		"a head that wraps across lines collapses to one row")
 	_eq(_card("app.hooks.guitkx").signature, "use_facts(level: int) -> Array", "hook signature")
 	_eq(_card("util.guitkx").signature, "clamp01(v: float) -> float", "util signature")
@@ -528,19 +528,22 @@ func _test_positions() -> void:
 			drift += 1
 	_eq(drift, 0, "two projections of one tree lay it out identically -- nothing moves on its own")
 
-	_section("the root anchors the first column")
+	_section("the root anchors the first row")
+	# TOP-DOWN, not left-to-right: a level is a row and siblings spread along it, because most
+	# trees are one parent with several children and a column layout draws that as one card
+	# beside a tall stack of the rest.
 	var app := _card("app.guitkx")
-	_eq(app.x, 0.0, "the root sits in column zero")
+	_eq(app.y, 0.0, "the root sits in row zero")
 	var row := _card("components/row/row.guitkx")
-	_check(row.x > app.x, "what the root imports sits to its right")
+	_check(row.y > app.y, "what the root imports sits BELOW it")
 
-	_section("a module nothing imports gets a column of its own")
-	# Mixed into a column of real dependents, an unwired module reads as a dependency it does
+	_section("a module nothing imports gets a row of its own")
+	# Mixed into the row of real dependents, an unwired module reads as a dependency it does
 	# not have.
 	var util := _card("util.guitkx")
-	_check(util.x > row.x,
-		"the unwired module sits past the deepest reachable column (%f > %f)" % [util.x, row.x])
-	_eq(_card("data.guitkx").x, util.x, "and every unwired module shares that column")
+	_check(util.y > row.y,
+		"the unwired module sits past the deepest reachable row (%f > %f)" % [util.y, row.y])
+	_eq(_card("data.guitkx").y, util.y, "and every unwired module shares that row")
 
 	_section("no two cards share a slot")
 	var slots := {}
@@ -586,7 +589,7 @@ func _test_degenerate_buffers() -> void:
 	Service.populate_card(card, "export Broken() -> RuitkVNode {\n\treturn ( <Label \n")
 	_check(true, "projecting an unterminated buffer does not stop the run")
 	_eq(card.markup.size(), 0, "the markup section is empty -- there is no tree to show")
-	_eq(_render_detail(card), "Broken() -> RuitkVNode  export  [UTIL_BODY]",
+	_eq(_render_detail(card), "Broken()  export  [UTIL_BODY]",
 		"but the card falls back to its declaration, so it is not two empty sections")
 
 	_section("an empty buffer")

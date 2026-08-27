@@ -98,7 +98,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var detail = M.shows_detail(lod)
 	var __cf0 = null
-	if card.signature != "":
+	if card.signature != "" and card.kind != 2:
 		for __cf0_once in 1:
 			__cf0 = V.Label({ "text": card.signature, "style": P.signature() })
 			continue
@@ -136,7 +136,10 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 			for row in card.export_detail:
 				__cf8.append(V.Label({ "text": "  ".repeat(row.depth) + row.text, "style": P.export_row() }, [], str(row.at) + row.text))
 				continue
-			__cf7 = V.fc(CanvasCardSection, { "heading": "EXPORTS" }, [__cf8, V.HFlowContainer({ "style": {"separation": 4} }, [V.fc(CanvasAddChip, { "label": "+ style", "what": "style", "index": index, "on_add": on_add }), V.fc(CanvasAddChip, { "label": "+ entry", "what": "entry", "index": index, "on_add": on_add })])])
+			__cf7 = V.fc(CanvasCardSection, { "heading": "EXPORTS" }, [__cf8, V.Label({ "text": "# \"+ entry\" is NOT here: the projection already emits one per export, carrying
+						# which dictionary it adds to. A second, card-level one would be a button
+						# that has to guess. \"+ style\" adds a whole new export and has nothing to
+						# guess about." }), V.HFlowContainer({ "style": {"separation": 4} }, [V.fc(CanvasAddChip, { "label": "+ style", "what": "style", "index": index, "on_add": on_add })])])
 			continue
 	var __cf9 = null
 	if detail and not card.island_lines.is_empty():

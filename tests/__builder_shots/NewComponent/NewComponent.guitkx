@@ -5,16 +5,16 @@ import * as NewComponentStyle from "./newComponent.style"
 
 export NewComponent() -> RuitkVNode {
 	return (
-		<Control>
-			<Control style={ NewComponentStyle.container }>
+		<VBoxContainer>
+			<VBoxContainer style={ NewComponentStyle.container }>
 				<LeftSide />
 				<MiddleSide />
 				<RightSide />
-			</Control>
-			<Control>
+			</VBoxContainer>
+			<VBoxContainer>
 				<HSlider />
 				<Button text="Click" />
-			</Control>
-		</Control>
+			</VBoxContainer>
+		</VBoxContainer>
 	)
 }

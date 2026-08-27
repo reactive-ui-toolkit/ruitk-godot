@@ -57,7 +57,10 @@ static func project(modules: Array, focus_path: String) -> Graph:
 		# The file name minus `.guitkx`, NOT the module's bare name: the bare name has the
 		# companion infix stripped, so `app`, `app.style` and `app.hooks` all read as "app" and a
 		# family of three cards is three cards called the same thing.
-		card.title = card.file_path.get_file().trim_suffix(Paths.SUFFIX_PLAIN)
+		# The module's own name, WITHOUT the companion infix: a style card titled
+		# "newComponent.style" spends its widest line repeating what its badge already says, and
+		# the name a reader is looking for is the part in front.
+		card.title = _card_title(card.file_path)
 		card.read_only = module.read_only
 		index_by_key[Paths.key(card.file_path)] = graph.cards.size()
 		graph.cards.append(card)
@@ -228,7 +231,10 @@ static func _signature_of(decl: Dictionary) -> String:
 	var params := str(decl.get("params", "")).strip_edges()
 	var ret := str(decl.get("ret", "")).strip_edges()
 	var out := "%s(%s)" % [name, _collapse(params)]
-	if not ret.is_empty():
+	# A COMPONENT'S return type is not signature, it is ceremony: every component returns markup,
+	# so "-> RuitkVNode" on every card in the tree distinguishes nothing and costs the widest row
+	# on the card. A hook or a util returns something a caller has to know, and keeps it.
+	if not ret.is_empty() and str(decl["kind"]) != "component":
 		out += " -> " + ret
 	return out
 
@@ -973,16 +979,48 @@ static func seed_positions(graph: Graph, root_index: int) -> void:
 		if not level.has(i):
 			level[i] = deepest + 1
 
-	# Stacked by MEASURED height, not by a fixed pitch: a card taller than the pitch overlaps the
-	# one below it, and two overlapping cards make a click ambiguous.
-	var column_pitch := Metrics.CARD_WIDTH_FULL + LAYOUT_GAP
-	var next_y := {}
+	# A STYLE COMPANION IS NOT A CHILD. It is a dependency, so the walk above put it a level down
+	# with the components -- but a style module belongs to the component that uses it the way a
+	# companion file does, and dropped into the row of children it reads as a fourth sibling.
+	# It sits on its owner's own row instead.
 	for i in range(graph.cards.size()):
-		var card := graph.cards[i]
-		var col := int(level[i])
-		card.x = col * column_pitch
-		card.y = float(next_y.get(col, 0.0))
-		next_y[col] = card.y + Metrics.card_height(card) + LAYOUT_GAP
+		if graph.cards[i].kind != Module.Kind.STYLE:
+			continue
+		for e in graph.edges:
+			if e.to_index == i and level.has(e.from_index):
+				level[i] = int(level[e.from_index])
+				break
+
+	# TOP-DOWN: a level is a ROW, and siblings spread along it. Levels used to be columns, which
+	# made every tree a left-to-right chain -- and since most trees are one parent with several
+	# children, that is one card beside a tall vertical stack of the rest. A parent over its
+	# children is the shape the graph actually has.
+	var by_level := {}
+	for i in range(graph.cards.size()):
+		var lv := int(level[i])
+		if not by_level.has(lv):
+			by_level[lv] = []
+		(by_level[lv] as Array).append(i)
+
+	var levels := by_level.keys()
+	levels.sort()
+	var next_row_y := 0.0
+	for lv in levels:
+		var row: Array = by_level[lv]
+		# Centred on the row above it, so a parent sits over the middle of its children rather
+		# than over the leftmost one.
+		var span := float(row.size()) * (Metrics.CARD_WIDTH_FULL + LAYOUT_GAP) - LAYOUT_GAP
+		var x := -span * 0.5
+		var tallest := 0.0
+		for i in row:
+			var card := graph.cards[i]
+			card.x = x
+			card.y = next_row_y
+			x += Metrics.CARD_WIDTH_FULL + LAYOUT_GAP
+			# Measured, not a fixed pitch: a card taller than the pitch overlaps the row below it,
+			# and two overlapping cards make a click ambiguous.
+			tallest = maxf(tallest, Metrics.card_height(card))
+		next_row_y += tallest + LAYOUT_GAP
 
 
 # ── Row helpers ──────────────────────────────────────────────────────────────────────
@@ -1030,3 +1068,13 @@ static func _collapse(text: String) -> String:
 		space = false
 		out += c
 	return out
+
+
+## The name a card wears: the file name with the `.guitkx` suffix and any companion infix
+## (`.style`, `.hooks`, `.utils`) removed. The badge carries the kind; the title carries the name.
+static func _card_title(file_path: String) -> String:
+	var stem := file_path.get_file().trim_suffix(Paths.SUFFIX_PLAIN)
+	for infix in [".style", ".hooks", ".utils"]:
+		if stem.ends_with(infix):
+			return stem.trim_suffix(infix)
+	return stem

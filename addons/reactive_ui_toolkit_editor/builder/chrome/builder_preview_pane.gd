@@ -24,6 +24,7 @@ var _tag: Label = null
 var _stage: PanelContainer = null
 var _slot: MarginContainer = null
 var _note: Label = null
+var _origin: Label = null
 var _path := ""
 
 
@@ -49,6 +50,13 @@ func _init() -> void:
 		_slot.add_theme_constant_override("margin_" + side, 10)
 	_stage.add_child(_slot)
 
+	_origin = Label.new()
+	_origin.add_theme_font_size_override("font_size", NOTE_FONT_SIZE)
+	_origin.add_theme_color_override("font_color", NOTE_COLOR)
+	_origin.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_origin.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(_origin)
+
 	_note = Label.new()
 	_note.add_theme_font_size_override("font_size", NOTE_FONT_SIZE)
 	_note.add_theme_color_override("font_color", NOTE_COLOR)
@@ -71,6 +79,7 @@ func show_module(file_path: String) -> void:
 	_tag.text = _tag_for(_path)
 	if preview.mount(_slot, _path):
 		_note.text = "rendered from the real component — every edit re-renders"
+		_origin.text = "prop defaults taken from its usage in the tree"
 		return
 
 	# NOT BUILT YET is the common case, not an error: selecting a module the last round had no
@@ -98,6 +107,8 @@ func path() -> String:
 
 func _show_idle() -> void:
 	_note.text = "select a component to see it rendered"
+	if _origin != null:
+		_origin.text = ""
 
 
 ## `<RIGHTSIDE>` — the component named the way the markup that uses it names it, so the preview

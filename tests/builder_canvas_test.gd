@@ -120,8 +120,12 @@ func _test_lod_bands() -> void:
 	_eq(Metrics.lod_of(0.10), Metrics.Lod.PILL, "the smallest zoom is a pill")
 	_eq(Metrics.lod_of(0.44), Metrics.Lod.PILL, "just under the first band edge")
 	_eq(Metrics.lod_of(0.45), Metrics.Lod.SECTIONS, "at the edge it is sections")
-	_eq(Metrics.lod_of(1.04), Metrics.Lod.SECTIONS, "just under the second")
-	_eq(Metrics.lod_of(1.05), Metrics.Lod.FULL, "at the edge it is full")
+	# The FULL band starts BELOW 1:1: 100% zoom is where a user works and where the layer selector
+	# says "Edit", and with the edge above it that was the band showing everything except the
+	# markup -- the card at its largest, carrying the least.
+	_eq(Metrics.lod_of(0.74), Metrics.Lod.SECTIONS, "just under the second")
+	_eq(Metrics.lod_of(0.75), Metrics.Lod.FULL, "at the edge it is full")
+	_eq(Metrics.lod_of(1.0), Metrics.Lod.FULL, "and 1:1 -- where the work happens -- is full")
 	_eq(Metrics.lod_of(2.2), Metrics.Lod.FULL, "and stays full")
 
 	_eq(Metrics.card_width_for(Metrics.Lod.PILL), 300.0, "a pill is the narrowest")
@@ -412,16 +416,16 @@ func _test_host_renders_each_lod() -> void:
 	await process_frame
 
 	var counts := {}
-	for zoom in [0.3, 0.8, 1.5]:
+	for zoom in [0.3, 0.6, 1.5]:
 		host.set_camera(Vector2(40.0, 40.0), zoom)
 		await process_frame
 		await process_frame
 		counts[zoom] = _count(host.get_node("Cards"))
 	_check(int(counts[0.3]) > 0, "the pill LOD builds something")
-	_check(int(counts[0.8]) > int(counts[0.3]),
-		"the sections LOD builds more of it (%d > %d)" % [counts[0.8], counts[0.3]])
-	_check(int(counts[1.5]) > int(counts[0.8]),
-		"and the full LOD more again (%d > %d)" % [counts[1.5], counts[0.8]])
+	_check(int(counts[0.6]) > int(counts[0.3]),
+		"the sections LOD builds more of it (%d > %d)" % [counts[0.6], counts[0.3]])
+	_check(int(counts[1.5]) > int(counts[0.6]),
+		"and the full LOD more again (%d > %d)" % [counts[1.5], counts[0.6]])
 
 	_section("the card layer is rendered by the reconciler, from the dogfooded view")
 	_check(host.get_node("Cards").get_child_count() == 1,

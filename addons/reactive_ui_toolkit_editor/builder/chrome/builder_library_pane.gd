@@ -32,16 +32,17 @@ const ENTRY_COMPONENT := "component"
 
 ## The elements that lead the list. Everything a UI actually starts with -- a box, a label, a
 ## button -- ahead of the hundred and thirty that follow.
-const LEAD_ELEMENTS := [
-	"VBoxContainer", "HBoxContainer", "Label", "Button", "PanelContainer",
-	"LineEdit", "TextureRect", "ColorRect", "MarginContainer", "ScrollContainer",
-]
+## SHORT on purpose. The list used to lead with ten, and with 55 elements behind them the two
+## sections below -- the tree's own components, and the hooks the hint bar tells you to drag --
+## were pushed off the bottom of the pane where nobody could reach them. A palette that shows one
+## section shows one section.
+const LEAD_ELEMENTS := ["VBoxContainer", "HBoxContainer", "Label", "Button", "PanelContainer"]
 
 ## The hooks that lead the list, in the order a component usually needs them.
 const LEAD_HOOKS := ["useState", "useEffect", "useRef", "useMemo", "useCallback", "useContext"]
 
 ## How many rows a section shows before the rest fold away.
-const FOLD_AFTER := 10
+const FOLD_AFTER := 5
 
 var graph: Graph = null
 

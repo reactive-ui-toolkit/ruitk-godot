@@ -28,8 +28,13 @@ enum Lod { PILL, SECTIONS, FULL }
 
 ## The band edges. Below the first, a card is a pill; below the second, it shows its sections;
 ## above, everything.
+##
+## The FULL band starts below 1:1 on purpose. It used to start above it, which made 100% zoom --
+## where a user actually works, and where the layer selector says "Edit" -- the band that shows
+## everything EXCEPT the markup. The card was at its largest and carrying the least, and reaching
+## the markup meant zooming past the point where a second card fits on screen.
 const LOD_PILL_BELOW := 0.45
-const LOD_SECTIONS_BELOW := 1.05
+const LOD_SECTIONS_BELOW := 0.75
 
 ## Card width per LOD. A pill is narrower because it holds a title; the full card is wider
 ## because it is the only one that rides the attribute run on a markup row.

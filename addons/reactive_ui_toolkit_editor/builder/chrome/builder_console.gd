@@ -30,8 +30,11 @@ var _rows: Array = []
 func _init() -> void:
 	name = "Console"
 	add_theme_constant_override("separation", 2)
-	custom_minimum_size = Vector2(0, 140)
-	size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# NO FLOOR AND NO STRETCH. The console is a strip that grows when it has something to say and
+	# a single line when it does not: a fixed pane held a slab of empty black across the bottom of
+	# the canvas in every state, including the one where nothing has compiled yet, and clipped the
+	# lowest card in the tree to make room for it.
+	size_flags_vertical = Control.SIZE_SHRINK_END
 
 	_summary = Label.new()
 	_summary.text = "nothing compiled yet"
@@ -39,8 +42,9 @@ func _init() -> void:
 	add_child(Parts.pane_header("Console", _summary))
 
 	_list = ItemList.new()
-	_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_list.auto_height = false
+	_list.custom_minimum_size = Vector2(0, 0)
+	_list.auto_height = true
+	_list.visible = false
 	_list.item_activated.connect(_on_item_activated)
 	add_child(_list)
 
@@ -53,6 +57,7 @@ func report(summary) -> void:
 		return
 	_rows.clear()
 	_list.clear()
+	_sync_visibility()
 
 	for failure in summary.failures:
 		var f := failure as Dictionary
@@ -94,6 +99,7 @@ func _add_row(severity: int, file_path: String, message: String) -> void:
 	var mark := "ERROR" if severity == SEVERITY_ERROR else "warn "
 	var where := "" if file_path.is_empty() else file_path.get_file() + ": "
 	_list.add_item("%s  %s%s" % [mark, where, message])
+	_sync_visibility()
 	_list.set_item_tooltip(_list.item_count - 1, "%s\n%s" % [file_path, message])
 	if severity == SEVERITY_ERROR:
 		_list.set_item_custom_fg_color(_list.item_count - 1, Color(0.90, 0.45, 0.45))
@@ -107,6 +113,7 @@ func rows() -> Array:
 func clear() -> void:
 	_rows.clear()
 	_list.clear()
+	_sync_visibility()
 	_summary.text = "nothing compiled yet"
 
 
@@ -127,6 +134,7 @@ func _on_item_activated(index: int) -> void:
 func trace(workspace, ledger, preview) -> void:
 	_rows.clear()
 	_list.clear()
+	_sync_visibility()
 	if workspace == null:
 		_summary.text = "trace: no tree open"
 		return
@@ -158,6 +166,7 @@ func trace(workspace, ledger, preview) -> void:
 func show_help() -> void:
 	_rows.clear()
 	_list.clear()
+	_sync_visibility()
 	_summary.text = "how to drive it"
 	for line in [
 		"CANVAS — wheel zooms, drag pans, right-click for the canvas menu, Fit frames the tree.",
@@ -178,3 +187,10 @@ func show_help() -> void:
 func _add_line(text: String, file_path: String) -> void:
 	_list.add_item(text)
 	_rows.append({ "path": file_path })
+	_sync_visibility()
+
+
+## Shows the list only when it holds something, so an empty console is one line rather than a
+## region. Called by everything that fills or clears it.
+func _sync_visibility() -> void:
+	_list.visible = _list.item_count > 0

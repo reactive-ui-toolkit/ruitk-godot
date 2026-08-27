@@ -130,7 +130,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 
 	return (
 		<VBoxContainer style={ {"separation": 4} }>
-			@if (card.signature != "") {
+			@if (card.signature != "" and card.kind != 2) {
 				return (
 					<Label text={ card.signature } style={ P.signature() } />
 				)
@@ -183,9 +183,12 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 									text={ "  ".repeat(row.depth) + row.text } style={ P.export_row() } />
 							)
 						}
+						# "+ entry" is NOT here: the projection already emits one per export, carrying
+						# which dictionary it adds to. A second, card-level one would be a button
+						# that has to guess. "+ style" adds a whole new export and has nothing to
+						# guess about.
 						<HFlowContainer style={ {"separation": 4} }>
 							<CanvasAddChip label="+ style" what="style" index={ index } on_add={ on_add } />
-							<CanvasAddChip label="+ entry" what="entry" index={ index } on_add={ on_add } />
 						</HFlowContainer>
 					</CanvasCardSection>
 				)

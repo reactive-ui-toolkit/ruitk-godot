@@ -16,6 +16,7 @@ const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/docum
 const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_module.gd")
 const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_paths.gd")
 const GuitkxEditor = preload("res://addons/reactive_ui_toolkit_editor/editor/guitkx_code_edit.gd")
+const Parts = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_chrome_parts.gd")
 
 ## The buffer changed. `before`/`after` are the whole text either side, which is what the ledger
 ## records: a gesture is undone by putting the text back, not by replaying keystrokes.
@@ -34,11 +35,19 @@ func _init() -> void:
 
 	_title = Label.new()
 	_title.text = "no module selected"
-	add_child(_title)
+	_title.add_theme_font_size_override("font_size", Parts.TITLE_FONT_SIZE)
+	_title.add_theme_color_override("font_color", Parts.ACCENT_COLOR)
+	add_child(Parts.pane_header("Source — .guitkx", _title))
 
 	_editor = GuitkxEditor.new()
 	_editor.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_editor.configure()
+	# WRAP, and no minimap. The pane is a side column, not a main editor: at this width every
+	# line of real markup ran off the right edge mid-token, so reading the file meant scrolling
+	# it horizontally line by line, and the minimap spent a third of the remaining width drawing
+	# a thumbnail of text too narrow to read in the first place.
+	_editor.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	_editor.minimap_draw = false
 	_editor.text_changed.connect(_on_text_changed)
 	add_child(_editor)
 
