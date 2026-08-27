@@ -18,6 +18,9 @@ const Codegen = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_codegen.
 
 const ROOT := "res://tests/__builder_preview_tmp/ui"
 
+## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
+const ASSERTION_FLOOR := 82
+
 var _fails := 0
 var _passes := 0
 
@@ -43,6 +46,14 @@ func _run() -> void:
 	await _test_teardown_leaves_nothing()
 
 	print("")
+	# A FLOOR ON THE COUNT. A suite that stops at a broken dependency prints ALL PASS on however
+	# few assertions it reached before it stopped -- which is a green line for a run that never
+	# arrived at its own subject, and it has now hidden three separate defects in this builder.
+	# The number is the tell, so the number is checked.
+	if _passes < ASSERTION_FLOOR:
+		print("builder preview: only %d of at least %d assertions ran -- something stopped early"
+			% [_passes, ASSERTION_FLOOR])
+		quit(1)
 	if _fails == 0:
 		print("builder preview: ALL PASS (%d assertions)" % _passes)
 		quit(0)

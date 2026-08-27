@@ -23,6 +23,9 @@ const Journal = preload("res://addons/reactive_ui_toolkit_editor/builder/documen
 
 const SANDBOX := "res://tests/__builder_tmp"
 
+## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
+const ASSERTION_FLOOR := 347
+
 var _fails := 0
 var _passes := 0
 
@@ -57,6 +60,14 @@ func _initialize() -> void:
 	_test_no_residue()
 
 	print("")
+	# A FLOOR ON THE COUNT. A suite that stops at a broken dependency prints ALL PASS on however
+	# few assertions it reached before it stopped -- which is a green line for a run that never
+	# arrived at its own subject, and it has now hidden three separate defects in this builder.
+	# The number is the tell, so the number is checked.
+	if _passes < ASSERTION_FLOOR:
+		print("builder model: only %d of at least %d assertions ran -- something stopped early"
+			% [_passes, ASSERTION_FLOOR])
+		quit(1)
 	if _fails == 0:
 		print("builder model: ALL PASS (%d assertions)" % _passes)
 		quit(0)

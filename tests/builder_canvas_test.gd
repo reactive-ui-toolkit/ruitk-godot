@@ -28,6 +28,9 @@ const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document
 const ROOT := "res://tests/__builder_canvas_tmp/app"
 const VIEWPORT := Vector2(1280, 720)
 
+## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
+const ASSERTION_FLOOR := 125
+
 var _fails := 0
 var _passes := 0
 var _graph: Graph = null
@@ -56,6 +59,14 @@ func _run() -> void:
 	_test_cleanup()
 
 	print("")
+	# A FLOOR ON THE COUNT. A suite that stops at a broken dependency prints ALL PASS on however
+	# few assertions it reached before it stopped -- which is a green line for a run that never
+	# arrived at its own subject, and it has now hidden three separate defects in this builder.
+	# The number is the tell, so the number is checked.
+	if _passes < ASSERTION_FLOOR:
+		print("builder canvas: only %d of at least %d assertions ran -- something stopped early"
+			% [_passes, ASSERTION_FLOOR])
+		quit(1)
 	if _fails == 0:
 		print("builder canvas: ALL PASS (%d assertions)" % _passes)
 		quit(0)
