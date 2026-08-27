@@ -54,8 +54,9 @@ The suites: `core_test.gd` (reconciler/hooks/effects/bailout/context/keyed), `se
 every demo — the real check that generated `.gd` render without error), `doom_game_test.gd` (the
 Doom demo end-to-end), `guitkx_test.gd` (compiler + codegen + imports/resolver/codemod),
 `hmr_test.gd` (Fast Refresh), `guitkx_editor_test.gd` + `guitkx_lsp_test.gd` (editor addon),
-`builder_model_test.gd` + `builder_graph_test.gd` (the RUITK Builder — the document model, and
-the canvas projection with golden markup trees),
+`builder_model_test.gd` + `builder_graph_test.gd` + `builder_preview_test.gd` (the RUITK Builder
+— the document model, the canvas projection with golden markup trees, and the preview pipeline
+end to end),
 `contract_dump.gd -- --check` (GD↔TS grammar goldens). `tests/guitkx_migrate.gd` runs the 0.10.0
 import codemod over `examples/` (idempotent — a clean tree reports 0 migrated). `bench*.gd` /
 `microbench.gd` are benchmarks, not pass/fail tests.
@@ -165,6 +166,11 @@ are synchronous. Preserve these behaviors — they're faithful-to-reference, not
   what the canvas draws — a card per module, a row per line, an edge per import — entirely from
   the compiler's own analysis (`analyzed_decls`, `decl_structure`, `scan_imports`,
   `RuitkGuitkxJsxScan.element_end`), so a row's span is exactly what the compiler compiled.
+  `preview/` renders it: the whole tree is **mirrored** to `res://__ruitk_builder_preview__~/`
+  (the `~` makes Godot's importer skip it) and compiled there through the real compiler at real
+  paths, so the preview cannot compile differently from the build. Dirty means *changed since
+  last built*, not *unsaved*; a failure skips only its dependents; a broken edit keeps the last
+  good render. Cleared on teardown and on open.
 - **External IDE extensions (`ide-extensions/`)** — a shared TypeScript language server + a TextMate
   grammar, driven by both VS Code and VS2022. Markup intelligence is answered locally from the schema;
   embedded-GDScript intelligence builds a synthetic `.gd` virtual document with a length-preserving

@@ -162,6 +162,9 @@ jobs:
       - name: Builder graph-projection tests (C1 -- cards/rows/edges, golden markup projections)
         run: godot --headless --path . --script res://tests/builder_graph_test.gd
 
+      - name: Builder preview-pipeline tests (C2 -- scratch mirror, compile order, live mount)
+        run: godot --headless --path . --script res://tests/builder_preview_test.gd
+
       # Codemod tripwires (M8.6): both runners must be no-ops on the committed tree — a non-zero
       # count means pre-0.10 syntax (migrate) or wrapper keywords (modernize) were committed; the
       # runner exits 1 after fixing the files locally, so the fix is "commit what it rewrote".
