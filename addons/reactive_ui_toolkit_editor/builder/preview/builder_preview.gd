@@ -576,6 +576,10 @@ static func _rm_rf(path: String) -> void:
 	var d := DirAccess.open(path)
 	if d == null:
 		return
+	# HIDDEN FILES INCLUDED, or the root survives its own teardown. `.gdignore` is a dot-file, and
+	# on Linux DirAccess omits those by default while Windows lists them -- so a mirror that tore
+	# down cleanly on one platform left a non-empty, undeletable directory on the other.
+	d.include_hidden = true
 	for file in d.get_files():
 		DirAccess.remove_absolute(path.path_join(file))
 	for sub in d.get_directories():
