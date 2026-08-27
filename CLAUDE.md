@@ -54,6 +54,8 @@ The suites: `core_test.gd` (reconciler/hooks/effects/bailout/context/keyed), `se
 every demo — the real check that generated `.gd` render without error), `doom_game_test.gd` (the
 Doom demo end-to-end), `guitkx_test.gd` (compiler + codegen + imports/resolver/codemod),
 `hmr_test.gd` (Fast Refresh), `guitkx_editor_test.gd` + `guitkx_lsp_test.gd` (editor addon),
+`builder_model_test.gd` (the RUITK Builder's document model — paths/tree/naming/specifiers/
+workspace/ledger),
 `contract_dump.gd -- --check` (GD↔TS grammar goldens). `tests/guitkx_migrate.gd` runs the 0.10.0
 import codemod over `examples/` (idempotent — a clean tree reports 0 migrated). `bench*.gd` /
 `microbench.gd` are benchmarks, not pass/fail tests.
@@ -151,6 +153,15 @@ are synchronous. Preserve these behaviors — they're faithful-to-reference, not
   `.guitkx`-only external edit doesn't reliably flip Godot's changed flag; an mtime staleness guard
   keeps that cheap, and diagnostics are de-duplicated (Godot's Errors dock is append-only). Also hosts
   the in-editor `.guitkx` view, tokenizer/highlighter, and a headless LSP layer (`lsp/`).
+- **RUITK Builder (`addons/reactive_ui_toolkit_editor/builder/`)** — the visual editor for a
+  `.guitkx` tree, ported from the Unity leg (`plans/BUILDER_PORT_PLAN.md`). `document/` is the
+  model layer: a tree of modules held **in memory**, with disk as a projection computed at Save
+  (nothing is written until then — delete, rename and folder moves included). Deletion is
+  ABSENCE: a module leaves the tree and Save finds the orphan by diffing the last projection,
+  so there are no pending-intent lists for a consumer to forget to join. Everything here is
+  pure or `FileAccess`-only and headlessly testable; its files reference each other through
+  **preload consts**, never global `class_name`s, because `ProjectSettings.save()` truncates
+  the editor class cache to what the running process loaded.
 - **External IDE extensions (`ide-extensions/`)** — a shared TypeScript language server + a TextMate
   grammar, driven by both VS Code and VS2022. Markup intelligence is answered locally from the schema;
   embedded-GDScript intelligence builds a synthetic `.gd` virtual document with a length-preserving

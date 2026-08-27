@@ -150,6 +150,15 @@ jobs:
       - name: Editor addon tests (substrate, data safety, goto-def, find bar, deps handshake, schema sync)
         run: godot --headless --path . --script res://tests/guitkx_editor_test.gd
 
+      # The builder's document model: paths, tree, orphans, naming, specifier round trips,
+      # save/abort projection, cross-file ledger. Pure + FileAccess-only, so it needs no
+      # editor -- and it references its own files through preload consts rather than global
+      # class_names, because a suite that calls ProjectSettings.save() (the settings dialog
+      # above does) rewrites .godot/global_script_class_cache.cfg down to whatever THAT
+      # process had loaded. Order here is therefore free.
+      - name: Builder document-model tests (C0 -- module/tree/naming/specifiers/workspace/ledger)
+        run: godot --headless --path . --script res://tests/builder_model_test.gd
+
       # Codemod tripwires (M8.6): both runners must be no-ops on the committed tree — a non-zero
       # count means pre-0.10 syntax (migrate) or wrapper keywords (modernize) were committed; the
       # runner exits 1 after fixing the files locally, so the fix is "commit what it rewrote".
