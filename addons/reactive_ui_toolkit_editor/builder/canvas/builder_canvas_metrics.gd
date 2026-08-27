@@ -133,28 +133,74 @@ static func card_height(card: Graph.Card) -> float:
 	return card.cached_height
 
 
-static func estimate_card_height(card: Graph.Card) -> float:
+## Which section of a card a row belongs to. What a hit-test answers with, and what a drop
+## handler dispatches on -- a row in MARKUP takes an element, a row in IMPORTS does not.
+enum Section { SIGNATURE, IMPORTS, BODY, MARKUP, EXPORTS, ISLAND }
+
+
+## The card's sections, top to bottom, as [{ section, top, height, rows, row_height }] in
+## card-local units.
+##
+## ONE description, read by BOTH the height estimate and the hit-test. Written twice they drift,
+## and the symptom is a drop that lands on the row above the one under the cursor -- which reads
+## as the drag being imprecise rather than as two functions disagreeing.
+##
+## Measured at the SECTIONS layout whatever the LOD, because that is what the saved layout is
+## keyed on: a card that changed height with the zoom would reflow the whole canvas on a scroll.
+static func section_stack(card: Graph.Card) -> Array:
+	var out: Array = []
 	if card == null:
-		return PILL_H
+		return out
 	var inner := CARD_WIDTH_SECTIONS - CARD_PADDING
 	# A component or a hook has a body section even when it is empty -- the card offers to add
 	# the first hook there, and an affordance the card declines to show cannot be clicked.
 	var has_body := card.kind == Module.Kind.COMPONENT or card.kind == Module.Kind.HOOK
+	var top := HEADER_H
 
-	var height := HEADER_H
 	if not card.signature.is_empty():
-		height += SIGNATURE_LEAD_H \
-			+ wrap_lines(card.signature.length(), inner, MONO_ADVANCE) * SIGNATURE_LINE_H
+		var lines := wrap_lines(card.signature.length(), inner, MONO_ADVANCE)
+		out.append(_section_row(Section.SIGNATURE, top, SIGNATURE_LEAD_H, lines, SIGNATURE_LINE_H))
+		top += SIGNATURE_LEAD_H + lines * SIGNATURE_LINE_H
 	if not card.imports.is_empty():
-		height += SECTION_OVERHEAD_H + card.imports.size() * IMPORT_ROW_H
+		out.append(_section_row(Section.IMPORTS, top, SECTION_OVERHEAD_H,
+			card.imports.size(), IMPORT_ROW_H))
+		top += SECTION_OVERHEAD_H + card.imports.size() * IMPORT_ROW_H
 	if not card.body.is_empty() or has_body:
-		height += SECTION_OVERHEAD_H + _chip_rows(card, inner, has_body) * CHIP_ROW_H
+		var chips := _chip_rows(card, inner, has_body)
+		out.append(_section_row(Section.BODY, top, SECTION_OVERHEAD_H, chips, CHIP_ROW_H))
+		top += SECTION_OVERHEAD_H + chips * CHIP_ROW_H
 	if not card.markup.is_empty():
-		height += SECTION_OVERHEAD_H + card.markup.size() * MARKUP_ROW_H
+		out.append(_section_row(Section.MARKUP, top, SECTION_OVERHEAD_H,
+			card.markup.size(), MARKUP_ROW_H))
+		top += SECTION_OVERHEAD_H + card.markup.size() * MARKUP_ROW_H
 	if not card.export_detail.is_empty():
-		height += SECTION_OVERHEAD_H + card.export_detail.size() * MARKUP_ROW_H
+		out.append(_section_row(Section.EXPORTS, top, SECTION_OVERHEAD_H,
+			card.export_detail.size(), MARKUP_ROW_H))
+		top += SECTION_OVERHEAD_H + card.export_detail.size() * MARKUP_ROW_H
 	if not card.island_lines.is_empty():
-		height += SECTION_OVERHEAD_H + card.island_lines.size() * ISLAND_ROW_H
+		out.append(_section_row(Section.ISLAND, top, SECTION_OVERHEAD_H,
+			card.island_lines.size(), ISLAND_ROW_H))
+	return out
+
+
+static func _section_row(section: Section, top: float, lead: float, rows: int,
+		row_height: float) -> Dictionary:
+	return {
+		"section": section,
+		"top": top,
+		"lead": lead,
+		"rows": rows,
+		"row_height": row_height,
+		"height": lead + rows * row_height,
+	}
+
+
+static func estimate_card_height(card: Graph.Card) -> float:
+	if card == null:
+		return PILL_H
+	var height := HEADER_H
+	for entry in section_stack(card):
+		height += float((entry as Dictionary)["height"])
 	return height
 
 
@@ -263,3 +309,51 @@ static func edge_point(from: Vector2, to: Vector2, zoom: float, t: float) -> Vec
 		+ controls[0] * (3.0 * u * u * t) \
 		+ controls[1] * (3.0 * u * t * t) \
 		+ to * (t * t * t)
+
+
+# ── Row hit-testing ──────────────────────────────────────────────────────────────────
+
+## THE THREE BANDS. A drop resolves by where in a row's height it landed: the top third means
+## "before this row", the bottom third "after it", and the middle -- the widest target, because
+## it is the commonest intent -- means "inside it".
+const BAND_EDGE := 1.0 / 3.0
+
+
+## Which row of a card a card-local point is over: { section, index, band, found }.
+##
+## `found` is false for a point over the header, over a section's heading, or past the last row --
+## all of which are places a drop has no row to attach to, and all of which are different from
+## "row zero", which is what a hit-test that clamped would say.
+##
+## Read from `section_stack`, so the hit-test and the height model cannot disagree about where a
+## row is -- a disagreement there reads as an imprecise drag rather than as a defect.
+static func row_hit(card: Graph.Card, card_local: Vector2) -> Dictionary:
+	var miss := { "found": false, "section": Section.MARKUP, "index": -1, "band": 1 }
+	if card == null or card_local.y < 0.0:
+		return miss
+	for entry in section_stack(card):
+		var e := entry as Dictionary
+		var top := float(e["top"])
+		var height := float(e["height"])
+		if card_local.y < top or card_local.y >= top + height:
+			continue
+		var into := card_local.y - top - float(e["lead"])
+		if into < 0.0:
+			return miss   # over the section's own heading
+		var row_height := float(e["row_height"])
+		var index := int(into / row_height)
+		if index >= int(e["rows"]):
+			return miss
+		var fraction := fmod(into, row_height) / row_height
+		var band := 1
+		if fraction < BAND_EDGE:
+			band = 0
+		elif fraction > 1.0 - BAND_EDGE:
+			band = 2
+		return { "found": true, "section": e["section"], "index": index, "band": band }
+	return miss
+
+
+## The card-local point a SCREEN point falls on, for a card at its own position and zoom.
+static func card_local_of(card: Graph.Card, screen: Vector2, camera: Vector2, zoom: float) -> Vector2:
+	return screen_to_world(screen, camera, zoom) - Vector2(card.x, card.y)

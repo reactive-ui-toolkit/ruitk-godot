@@ -623,6 +623,7 @@ static func _walk_if(nd: Dictionary, depth: int, out: Array[Graph.Line],
 	var last_body_at := base + int(nd.get("else_body_at", 0)) if has_else \
 		else base + int((branches[branches.size() - 1] as Dictionary).get("body_at", 0))
 	var construct_close := _body_close_line(source, last_body_at)
+	var construct_close_at := _body_close_at(source, last_body_at)
 
 	for k in range(branches.size()):
 		var branch := branches[k] as Dictionary
@@ -637,8 +638,9 @@ static func _walk_if(nd: Dictionary, depth: int, out: Array[Graph.Line],
 		# The head's own close is the whole construct's; a continuation's is its own boundary,
 		# which is the range a delete-this-clause operates on.
 		var close_line := construct_close if k == 0 else _body_close_line(source, body_at)
+		var close_at := construct_close_at if k == 0 else _body_close_at(source, body_at)
 		out.append(_directive_head(label, badge, str(branch.get("cond", "")), head_at,
-			depth, k, close_line, source, lines))
+			depth, k, close_line, close_at, source, lines))
 		_walk_directive_body(str(branch.get("body_markup", "")), body_at,
 			depth + 1, out, source, lines)
 
@@ -646,7 +648,8 @@ static func _walk_if(nd: Dictionary, depth: int, out: Array[Graph.Line],
 		var else_body_at := base + int(nd.get("else_body_at", 0))
 		out.append(_directive_head("@else", Graph.Badge.ELSE, "",
 			_clause_keyword_at(source, else_body_at, ["@else"]),
-			depth, branches.size(), _body_close_line(source, else_body_at), source, lines))
+			depth, branches.size(), _body_close_line(source, else_body_at),
+			_body_close_at(source, else_body_at), source, lines))
 		_walk_directive_body(else_body, else_body_at, depth + 1, out, source, lines)
 
 
@@ -658,7 +661,7 @@ static func _walk_loop(nd: Dictionary, depth: int, out: Array[Graph.Line],
 		"@for" if is_for else "@while",
 		Graph.Badge.FOR if is_for else Graph.Badge.WHILE,
 		str(nd.get("header", "")), at, depth, 0,
-		_body_close_line(source, body_at), source, lines))
+		_body_close_line(source, body_at), _body_close_at(source, body_at), source, lines))
 	_walk_directive_body(str(nd.get("body_markup", "")), body_at, depth + 1, out, source, lines)
 
 
@@ -667,21 +670,21 @@ static func _walk_match(nd: Dictionary, depth: int, out: Array[Graph.Line],
 	# A `@match` DOES have an outer brace, so its own close is the construct's.
 	var construct_close := _line_of(source, _construct_end(source, at))
 	out.append(_directive_head("@match", Graph.Badge.MATCH, str(nd.get("subject", "")),
-		at, depth, 0, construct_close, source, lines))
+		at, depth, 0, construct_close, _construct_end(source, at) + 1, source, lines))
 	var cases: Array = nd.get("cases", [])
 	for k in range(cases.size()):
 		var c := cases[k] as Dictionary
 		var body_at := base + int(c.get("body_at", 0))
 		out.append(_directive_head("@case", Graph.Badge.CASE, str(c.get("value", "")),
 			_clause_keyword_at(source, body_at, ["@case"]), depth + 1, k + 1,
-			_body_close_line(source, body_at), source, lines))
+			_body_close_line(source, body_at), _body_close_at(source, body_at), source, lines))
 		_walk_directive_body(str(c.get("body_markup", "")), body_at, depth + 2, out, source, lines)
 	var default_body := _opt_string(nd.get("default_body"))
 	if not default_body.strip_edges().is_empty():
 		var default_at := base + int(nd.get("default_body_at", 0))
 		out.append(_directive_head("@default", Graph.Badge.DEFAULT, "",
 			_clause_keyword_at(source, default_at, ["@default"]), depth + 1, cases.size() + 1,
-			_body_close_line(source, default_at), source, lines))
+			_body_close_line(source, default_at), _body_close_at(source, default_at), source, lines))
 		_walk_directive_body(default_body, default_at, depth + 2, out, source, lines)
 
 
@@ -694,6 +697,16 @@ static func _clause_keyword_at(source: String, body_at: int, labels: Array) -> i
 	for label in labels:
 		best = maxi(best, source.rfind(str(label), maxi(0, body_at - 1)))
 	return best if best >= 0 else body_at
+
+
+## The 1-based line of the `}` that closes the body whose text starts at `body_at`.
+## The offset just past the `}` that closes the body whose text starts at `body_at`.
+static func _body_close_at(source: String, body_at: int) -> int:
+	var open := source.rfind("{", maxi(0, body_at))
+	if open == -1:
+		return body_at
+	var close := L.find_matching_markup(source, open)
+	return (close + 1) if close != -1 else body_at
 
 
 ## The 1-based line of the `}` that closes the body whose text starts at `body_at`.
@@ -757,11 +770,15 @@ static func _append_code_rows(body: String, from: int, to: int, body_at: int, de
 
 
 static func _directive_head(label: String, badge: Graph.Badge, header: String,
-		at: int, depth: int, clause_index: int, close_line: int,
+		at: int, depth: int, clause_index: int, close_line: int, close_at: int,
 		source: String, lines: PackedStringArray) -> Graph.Line:
 	var head := header.strip_edges()
 	var text := label if head.is_empty() else "%s (%s)" % [label, head]
-	var row := _line(Graph.LineKind.DIRECTIVE, text, at, at + label.length(), source, lines)
+	# The span is the WHOLE clause, not just the keyword. A row's span is what a delete removes
+	# and what a move carries -- sized to the keyword, deleting an `@if` takes its head and leaves
+	# the body behind as loose statements in the middle of the markup.
+	var row := _line(Graph.LineKind.DIRECTIVE, text, at,
+		maxi(close_at, at + label.length()), source, lines)
 	row.depth = depth
 	row.badge = badge
 	row.badge_text = label

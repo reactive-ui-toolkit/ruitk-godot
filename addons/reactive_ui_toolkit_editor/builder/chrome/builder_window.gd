@@ -34,6 +34,8 @@ const LibraryPane = preload("res://addons/reactive_ui_toolkit_editor/builder/chr
 const SourcePane = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_source_pane.gd")
 const Console = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_console.gd")
 const InlineEditor = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_inline_editor.gd")
+const Edits = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_edits.gd")
+const Drag = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_drag.gd")
 
 ## The tree changed in a way the host should know about -- for the plugin's title, or a prompt on
 ## close.
@@ -438,6 +440,92 @@ func _on_card_menu(id: int) -> void:
 			# The rename prompt itself is a chrome affordance; the model operation it drives is
 			# `move_to_path`, which is what the ledger replays.
 			select_module(_menu_target)
+
+
+# ── Gestures ─────────────────────────────────────────────────────────────────────────
+
+## Drops a library entry onto the canvas at a screen point.
+##
+## The target is resolved from the POINTER at the moment of the drop, against the graph as it is
+## then -- never from rows captured when the drag began. The canvas re-renders while a drag is in
+## flight, because the preview recompiles as the user works.
+func drop_library_entry(kind: String, name: String, at: Vector2) -> bool:
+	var hit := Drag.resolve(graph, at, _canvas.camera, _canvas.zoom)
+	if not bool(hit["found"]):
+		return false
+	var card: Graph.Card = hit["card"]
+	if kind == LibraryPane.ENTRY_HOOK:
+		return apply_edit(card.file_path,
+			Edits.insert_setup_line(_buffer_of(card.file_path), card, "var _ = %s()" % name),
+			"add %s" % name)
+
+	var row: Graph.Line = hit["row"]
+	if row == null or row.kind == Graph.LineKind.IMPORT:
+		return false
+	var placement: Edits.Placement = hit["placement"]
+	var verdict := Edits.can_place(card, row, placement)
+	if not bool(verdict["ok"]):
+		_console.add_diagnostics(card.file_path,
+			[{ "code": "", "severity": Console.SEVERITY_WARNING, "message": str(verdict["reason"]), "line": -1 }])
+		return false
+	return apply_edit(card.file_path,
+		Edits.insert(_buffer_of(card.file_path), card, row, Drag.markup_for(name), placement),
+		"add <%s>" % name)
+
+
+## Re-parents a markup row. The gesture the Unity leg lists as unreliable, and the one this whole
+## drag design exists for: both ends are re-resolved against the current graph.
+func drop_row(drag: Drag, at: Vector2) -> bool:
+	var card := drag.source_card(graph)
+	var row := drag.source_row(graph)
+	if card == null or row == null:
+		return false
+	var hit := Drag.resolve(graph, at, _canvas.camera, _canvas.zoom)
+	if not bool(hit["found"]) or hit["card"] != card:
+		# A row can only move within its own module: moving it to another would mean deciding
+		# what to do about every name its subtree references, which is a different operation.
+		return false
+	var target: Graph.Line = hit["row"]
+	if target == null or target == row:
+		return false
+	return apply_edit(card.file_path,
+		Edits.move(_buffer_of(card.file_path), card, row, target, hit["placement"]),
+		"move <%s>" % row.name)
+
+
+## Drops a MODULE onto an element: a style module applies itself, anything else adds an import.
+##
+## This is the whole style-application gesture. `style={ Name }` plus the import it needs -- two
+## edits, one action, so one undo takes both back. A style applied without its import is a file
+## that does not compile, and an import added without the use is GUITKX2304.
+func drop_module(module_path: String, at: Vector2) -> bool:
+	var hit := Drag.resolve(graph, at, _canvas.camera, _canvas.zoom)
+	if not bool(hit["found"]):
+		return false
+	var card: Graph.Card = hit["card"]
+	if Paths.same(card.file_path, module_path):
+		return false
+	var source_card := graph.card_of(module_path)
+	if source_card == null or source_card.exports.is_empty():
+		return false
+	var export_name := str(source_card.exports[0])
+
+	var row: Graph.Line = hit["row"]
+	var text := _buffer_of(card.file_path)
+	var described := ""
+	if source_card.kind == Module.Kind.STYLE and row != null \
+			and (row.kind == Graph.LineKind.ELEMENT or row.kind == Graph.LineKind.COMPONENT):
+		text = Edits.set_attribute(text, row, "style", export_name, false)
+		described = "style <%s>" % row.name
+	else:
+		described = "import %s" % export_name
+	text = Edits.ensure_import(text, card.file_path, module_path, PackedStringArray([export_name]))
+	return apply_edit(card.file_path, text, described)
+
+
+func _buffer_of(file_path: String) -> String:
+	var module := workspace.try_get(file_path) if workspace != null else null
+	return module.buffer_text if module != null else ""
 
 
 ## Deletes a module: it leaves the tree, and the ledger holds the module itself so undo puts the

@@ -113,6 +113,33 @@ class Line extends RefCounted:
 	## name. Kept apart from `text`, which is for display and may be decorated.
 	var name: String = ""
 
+	## The same row with its offsets moved by `delta`.
+	##
+	## An edit that removes text ahead of a row invalidates that row's span, and re-projecting to
+	## find out where it went is both expensive and circular when the edit is not finished yet --
+	## a move is a cut and a paste, and the paste needs the target's position AFTER the cut.
+	func shifted(delta: int) -> Line:
+		var copy := Line.new()
+		copy.text = text
+		copy.depth = depth
+		copy.kind = kind
+		copy.attrs_text = attrs_text
+		copy.attr_pairs = attr_pairs
+		copy.source_line = source_line
+		copy.end_line = end_line
+		copy.at = at + delta
+		copy.end_at = end_at + delta
+		copy.self_closing = self_closing
+		copy.badge = badge
+		copy.badge_text = badge_text
+		copy.directive_text = directive_text
+		copy.directive_line = directive_line
+		copy.close_line = close_line
+		copy.clause_index = clause_index
+		copy.source_text = source_text
+		copy.name = name
+		return copy
+
 
 ## One file card on the canvas.
 class Card extends RefCounted:

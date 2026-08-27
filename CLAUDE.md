@@ -55,10 +55,11 @@ every demo — the real check that generated `.gd` render without error), `doom_
 Doom demo end-to-end), `guitkx_test.gd` (compiler + codegen + imports/resolver/codemod),
 `hmr_test.gd` (Fast Refresh), `guitkx_editor_test.gd` + `guitkx_lsp_test.gd` (editor addon),
 `builder_model_test.gd` + `builder_graph_test.gd` + `builder_preview_test.gd` +
-`builder_canvas_test.gd` + `builder_chrome_test.gd` (the RUITK Builder — the document model,
+`builder_canvas_test.gd` + `builder_chrome_test.gd` + `builder_edits_test.gd` (the RUITK
+Builder — the document model,
 the canvas projection with
 golden markup trees, the preview pipeline end to end, the canvas metrics/layout/host, and the
-panes with the single edit funnel),
+panes with the single edit funnel, and every structural edit as a before/after string),
 `builder_view_build.gd` (the addon's own `.guitkx` output is committed and must stay fresh),
 `contract_dump.gd -- --check` (GD↔TS grammar goldens). `tests/guitkx_migrate.gd` runs the 0.10.0
 import codemod over `examples/` (idempotent — a clean tree reports 0 migrated). `bench*.gd` /

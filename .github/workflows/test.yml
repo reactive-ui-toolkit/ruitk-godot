@@ -171,6 +171,9 @@ jobs:
       - name: Builder chrome tests (C4 -- panes, the one funnel, undo across files, inline editor)
         run: godot --headless --path . --script res://tests/builder_chrome_test.gd
 
+      - name: Builder edit-operation tests (C5 -- structural edits, the three drop bands, drag)
+        run: godot --headless --path . --script res://tests/builder_edits_test.gd
+
       # The builder's canvas is written in .guitkx and its generated .gd is COMMITTED -- it has to
       # be, because a user who installs the addon gets the folder as-is and the plugin needs its
       # own canvas before the compile-on-scan sweep has run. Committed output goes stale; this
