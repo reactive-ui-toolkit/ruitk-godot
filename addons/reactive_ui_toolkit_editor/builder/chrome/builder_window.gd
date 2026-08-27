@@ -348,13 +348,13 @@ func _build_ui() -> void:
 	_empty_state = _build_empty_state()
 	canvas_layer.add_child(_empty_state)
 
-	# The console gets a FLOOR, not half the column. It carries diagnostics, which are usually one
-	# line and occasionally many, and a split that opens at the middle gave a one-line console the
-	# same room as the canvas — the surface the whole window exists to show.
+	# THE CONSOLE IS NOT A REGION OF THE WINDOW. It was mine, not the reference's, and it spent
+	# its life as a strip along the bottom of the canvas saying "no problems" -- a permanent
+	# fixture reporting the absence of news, in the space the canvas wanted. It lives behind
+	# Trace now, alongside the help, and comes forward on its own when a round actually fails.
 	_console = Console.new()
-	_console.custom_minimum_size = Vector2(0, 96)
+	_console.visible = false
 	middle.add_child(_console)
-	middle.split_offset = 10000   # clamped to the canvas's floor: console at its minimum
 
 	# The right column is TWO panes, the way the Unity leg has it: what the component looks like
 	# above what it says. Source alone answers "what did I write"; only the preview answers "what
@@ -673,6 +673,11 @@ func _wire() -> void:
 	_card_menu.id_pressed.connect(_on_card_menu)
 	_canvas_menu.id_pressed.connect(run_command)
 	ledger.changed.connect(_refresh_status)
+	# A FAILED round brings the console forward; a clean one leaves it away. That is the whole
+	# rule, and it is why the console does not need to be on screen the rest of the time.
+	preview.compile_finished.connect(func(_p: String, ok: bool, _e: String):
+		if not ok and _console != null:
+			_console.visible = true)
 	preview.compile_finished.connect(func(_p: String, _ok: bool, _e: String):
 		_refresh_status()
 		# The preview re-renders on the BUILD, not on the keystroke: mounting a script that has not
@@ -894,9 +899,11 @@ func run_command(id: int) -> void:
 			_history_menu.popup()
 			return
 		MenuId.TRACE:
+			_console.visible = true
 			_console.trace(workspace, ledger, preview)
 			return
 		MenuId.HELP:
+			_console.visible = true
 			_console.show_help()
 			return
 	match id:

@@ -70,6 +70,9 @@ var _grab_offset := Vector2.ZERO
 var _pressed_at := Vector2.ZERO
 var _press_index := -1
 
+## Bumped on every `show_graph`, so an in-place model change cannot be bailed out of.
+var _revision := 0
+
 
 func _init() -> void:
 	clip_contents = true
@@ -95,6 +98,13 @@ func _exit_tree() -> void:
 ## a re-render after an edit patches what changed rather than rebuilding the tree.
 func show_graph(new_graph: Graph) -> void:
 	graph = new_graph
+	# A NEW REVISION EVERY TIME. The graph is re-populated IN PLACE after an edit -- the same
+	# object, with different rows in it -- so the props the view is re-rendered with compare equal
+	# to the last ones and the reconciler's bailout correctly decides there is nothing to do.
+	# Correct, and wrong for us: the card then keeps showing the rows it had, so adding a hook put
+	# a line in the source pane and nothing on the card until some unrelated change forced a
+	# render. The revision is the one prop that is never the same twice.
+	_revision += 1
 	_render()
 
 
@@ -136,6 +146,27 @@ func unmount() -> void:
 		_root = null
 
 
+## Makes every card Control transparent to the mouse, except the ones that are buttons.
+##
+## THE BUG THIS FIXES BROKE EVERY CANVAS GESTURE AT ONCE. A card is a `PanelContainer` full of
+## `Label`s, and Godot's default `mouse_filter` for those is STOP -- so a press anywhere on a card
+## was consumed by the card's own Control and `_gui_input` on this host never saw it. Dragging a
+## card, clicking a row to jump the source, right-clicking a row for its menu: all of them worked
+## only in the gaps BETWEEN cards, which is to say none of them worked.
+##
+## Buttons are left alone: the `+ hook` / `+ code` chips are the one thing on a card that handles
+## its own press, and that is why they were the one thing that worked.
+##
+## Applied on every render rather than set per element in the view: the reconciler rebuilds this
+## subtree constantly, and a filter that has to be remembered on every new element in a growing
+## markup file is a filter that will be forgotten.
+func _pass_mouse_through(node: Node) -> void:
+	for child in node.get_children():
+		if child is Control and not (child is BaseButton):
+			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_pass_mouse_through(child)
+
+
 ## Relays a card's "+" to whoever owns the model. The view holds no model and edits nothing; it
 ## reports that a button was pressed and the window turns that into one `apply_edit`.
 func _on_card_add(index: int, what: String) -> void:
@@ -152,11 +183,13 @@ func _render() -> void:
 		"viewport": size,
 		"selected": selected,
 		"on_add": Callable(self, "_on_card_add"),
+		"revision": _revision,
 	}
 	if _root == null:
 		_root = RuitkRoot.create(_cards, V.fc(Callable(CanvasView, "render"), props))
 	else:
 		_root.set_root(V.fc(Callable(CanvasView, "render"), props))
+	_pass_mouse_through(_cards)
 	_edges.refresh(graph, camera, zoom, selected)
 	_settle_frames = SETTLE_FRAMES
 	set_process(true)
@@ -416,9 +449,10 @@ func card_at(screen_position: Vector2) -> int:
 	if graph == null:
 		return -1
 	var world := Metrics.screen_to_world(screen_position, camera, zoom)
-	var width := Metrics.card_width_for(Metrics.lod_of(zoom))
+	var lod := Metrics.lod_of(zoom)
+	var width := Metrics.card_width_for(lod)
 	for i in range(graph.cards.size() - 1, -1, -1):
 		var card := graph.cards[i]
-		if Rect2(card.x, card.y, width, Metrics.card_height(card)).has_point(world):
+		if Rect2(card.x, card.y, width, Metrics.drawn_height(card, lod)).has_point(world):
 			return i
 	return -1

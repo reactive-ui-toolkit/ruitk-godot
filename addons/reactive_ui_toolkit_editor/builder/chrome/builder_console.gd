@@ -204,4 +204,6 @@ func _sync_visibility() -> void:
 	# floating on the canvas background, in a state where nothing has compiled, is a panel that
 	# looks like it failed to draw itself -- and it was taking a strip off the bottom of the
 	# canvas to do it.
-	visible = _list.item_count > 0 or not _summary.text.is_empty()
+	# Whether the console is ON SCREEN is the window's call -- it brings it forward on a failed
+	# round and for Trace and Help. This only sizes the list inside it.
+	pass

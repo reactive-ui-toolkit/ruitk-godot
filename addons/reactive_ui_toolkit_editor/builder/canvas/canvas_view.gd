@@ -24,6 +24,7 @@ static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var viewport = props.get("viewport", Vector2(1280, 720))
 	var selected = props.get("selected", -1)
 	var on_add = props.get("on_add", null)
+	var revision = props.get("revision", 0)
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var lod = M.lod_of(zoom)
 	var card_w = M.card_width_for(lod)
@@ -38,7 +39,7 @@ static func render(props: Dictionary, children: Array) -> RuitkVNode:
 		# laid out once in card-local units whatever the zoom is -- a layout that had to
 		# re-measure every label at every zoom would re-wrap text as the user scrolled.
 		var pos = M.world_to_screen(Vector2(c.x, c.y), camera, zoom)
-		__cf0.append(V.fc(CanvasCard, { "card": c, "lod": lod, "index": i, "is_selected": i == selected, "at": pos, "zoom": zoom, "near": near, "on_add": on_add }, [], c.file_path))
+		__cf0.append(V.fc(CanvasCard, { "card": c, "lod": lod, "index": i, "is_selected": i == selected, "at": pos, "zoom": zoom, "near": near, "on_add": on_add, "revision": revision }, [], c.file_path))
 		continue
 	return V.Control({ "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [__cf0])
 
@@ -52,6 +53,7 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 	var near = props.get("near", true)
 	var index = props.get("index", -1)
 	var on_add = props.get("on_add", null)
+	var revision = props.get("revision", 0)
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var card_w = M.card_width_for(lod)
@@ -61,7 +63,7 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 			var __cf1 = null
 			if M.shows_sections(lod):
 				for __cf1_once in 1:
-					__cf1 = V.fc(CanvasCardSections, { "card": card, "lod": lod, "index": index, "on_add": on_add, "zoom": zoom })
+					__cf1 = V.fc(CanvasCardSections, { "card": card, "lod": lod, "index": index, "on_add": on_add, "zoom": zoom, "revision": revision })
 					continue
 			__cf0 = V.PanelContainer({ "position": at, "scale": Vector2(zoom, zoom), "custom_minimum_size": Vector2(card_w, 0), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_box_selected() if is_selected else P.card_box() }, [V.VBoxContainer({ "style": {"separation": 4} }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod }), __cf1])])
 			continue
@@ -95,6 +97,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 	var index = props.get("index", -1)
 	var on_add = props.get("on_add", null)
 	var zoom = props.get("zoom", 1.0)
+	var revision = props.get("revision", 0)
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var detail = M.shows_detail(lod)

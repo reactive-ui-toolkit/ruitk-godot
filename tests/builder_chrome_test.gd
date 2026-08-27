@@ -28,7 +28,7 @@ const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/bu
 const ROOT := "res://tests/__builder_chrome_tmp/app"
 
 ## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
-const ASSERTION_FLOOR := 165
+const ASSERTION_FLOOR := 168
 
 var _fails := 0
 var _passes := 0
@@ -51,6 +51,7 @@ func _run() -> void:
 	await _test_drag_and_drop_is_reachable()
 	await _test_every_signal_is_listened_to()
 	await _test_unplaced_tree_is_placed_before_written()
+	await _test_an_edit_reaches_the_card()
 	await _test_library_pane()
 	await _test_source_pane()
 	_test_console()
@@ -452,6 +453,53 @@ func _test_unplaced_tree_is_placed_before_written() -> void:
 
 ## Where the placement test puts its tree.
 const PLACED_ROOT := "res://tests/__builder_placed_tmp"
+
+
+# ── An edit reaches the card ─────────────────────────────────────────────────────────
+
+func _test_an_edit_reaches_the_card() -> void:
+	_section("adding a hook puts it on the CARD, not only in the source")
+	# The graph is re-populated IN PLACE after an edit -- the same object, different rows -- so
+	# the props the canvas view is re-rendered with compare equal to the last ones and the
+	# reconciler's bailout correctly decides there is nothing to do. Correct, and wrong here: the
+	# card kept showing the rows it had, so "+ hook" wrote a line into the source pane and put
+	# nothing on the card until some unrelated change forced a render.
+	var w := _window()
+	await process_frame
+	var card = w.graph.cards[0]
+	var before: int = card.body.size()
+
+	w._on_card_add(0, "hook")
+	# SEVERAL frames: update renders are time-sliced by default, so a commit lands a few frames
+	# after the edit. Two was not enough and the card looked stale in a way that had nothing to
+	# do with what was being tested.
+	for _i in range(8):
+		await process_frame
+
+	_eq(w.graph.cards[0].body.size(), before + 1, "the card's model gained the hook")
+	_check(w.workspace.try_get(card.file_path).buffer_text.contains("useState"),
+		"and so did the buffer")
+
+	# What the user actually looks at: the chip on the card. Counted off the RENDERED tree,
+	# because the model being right was never the half that was broken.
+	var chips := _labels_under(w.canvas().get_node("Cards"))
+	var chipped := false
+	for label in chips:
+		if str(label).begins_with("useState") and str(label).ends_with("state"):
+			chipped = true
+	_check(chipped, "and the new hook's chip is on the rendered card (saw %s)" % str(chips))
+
+	_drop(w)
+
+
+## Every label string in a rendered subtree.
+func _labels_under(node: Node) -> PackedStringArray:
+	var out := PackedStringArray()
+	for child in node.get_children():
+		if child is Label:
+			out.append((child as Label).text)
+		out.append_array(_labels_under(child))
+	return out
 
 
 # ── Folder pane ──────────────────────────────────────────────────────────────────────

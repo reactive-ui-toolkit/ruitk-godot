@@ -1,6 +1,13 @@
 
 ## The builder's canvas, written in `.guitkx` and rendered by the reconciler it is a builder for.
 ##
+## `revision` IS THREADED THROUGH EVERY LEVEL and read by none of them. A card is re-populated IN
+## PLACE after an edit -- the same `Card` object, with different rows in it -- so `CanvasCard`'s
+## props compare equal to last render's and the reconciler's bailout correctly decides there is
+## nothing to do. Correct, and wrong here: the card went on showing the rows it used to have, so
+## adding a hook wrote a line into the source pane and put nothing on the card. Passing it to the
+## VIEW alone was not enough, because the bailout that mattered was one level down.
+##
 ## DOGFOODED ON PURPOSE. The canvas is the largest, busiest, most re-rendered surface this project
 ## has, so it is also the strongest test the library gets: every keyed reorder, every bailout,
 ## every style key the cards use is exercised on every edit, in the editor, by the person building
@@ -26,7 +33,8 @@
 ## `canvas_palette.gd`, and `examples/demos/styles/` for the `.style.guitkx` a game would write.
 
 export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
-		viewport = Vector2(1280, 720), selected: int = -1, on_add = null) -> RuitkVNode {
+		viewport = Vector2(1280, 720), selected: int = -1, on_add = null,
+		revision: int = 0) -> RuitkVNode {
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var lod = M.lod_of(zoom)
 	var card_w = M.card_width_for(lod)
@@ -46,7 +54,7 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 				return (
 					<CanvasCard key={ c.file_path } card={ c } lod={ lod } index={ i }
 						is_selected={ i == selected } at={ pos } zoom={ zoom } near={ near }
-						on_add={ on_add } />
+						on_add={ on_add } revision={ revision } />
 				)
 			}
 		</Control>
@@ -68,7 +76,7 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 ## directive body is two roots, and GUITKX0108 says so. Notes about markup live out here.)
 export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 		at = Vector2.ZERO, zoom: float = 1.0, near: bool = true, index: int = -1,
-		on_add = null) -> RuitkVNode {
+		on_add = null, revision: int = 0) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var card_w = M.card_width_for(lod)
@@ -85,7 +93,7 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 						@if (M.shows_sections(lod)) {
 							return (
 								<CanvasCardSections card={ card } lod={ lod } index={ index } on_add={ on_add }
-				zoom={ zoom } />
+				zoom={ zoom } revision={ revision } />
 							)
 						}
 					</VBoxContainer>
@@ -143,7 +151,7 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 ## export, carrying which dictionary it adds to, and a second card-level one would be a button
 ## that has to guess which. "+ style" adds a whole new export and has nothing to guess about.
 export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = null,
-		zoom: float = 1.0) -> RuitkVNode {
+		zoom: float = 1.0, revision: int = 0) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var detail = M.shows_detail(lod)

@@ -153,6 +153,30 @@ static func card_height(card: Graph.Card) -> float:
 	return card.cached_height
 
 
+## The height the card is actually DRAWN at, in the given band.
+##
+## `card_height` answers with the tallest layout on purpose -- the gutter between rows has to
+## survive every zoom, so the layout reserves the full-band height whatever is showing. Anything
+## that asks "where is this card ON SCREEN" needs the other answer, and asking the wrong one put
+## the edge anchors and the click rectangle a long way below a pill: dots floating under cards,
+## and clicks landing on a card whose visible edge was a hundred pixels above the pointer.
+static func drawn_height(card: Graph.Card, lod: Lod) -> float:
+	if card == null:
+		return PILL_H
+	if lod == Lod.PILL:
+		return HEADER_H
+	var height := HEADER_H
+	for entry in section_stack(card):
+		var section := entry as Dictionary
+		# MARKUP, EXPORTS and the setup island only appear in the detail band.
+		var kind := int(section["section"])
+		if not shows_detail(lod) and kind in [int(Section.MARKUP), int(Section.EXPORTS),
+				int(Section.ISLAND)]:
+			continue
+		height += float(section["height"])
+	return height
+
+
 ## Which section of a card a row belongs to. What a hit-test answers with, and what a drop
 ## handler dispatches on -- a row in MARKUP takes an element, a row in IMPORTS does not.
 enum Section { SIGNATURE, IMPORTS, BODY, MARKUP, EXPORTS, ISLAND }
@@ -303,7 +327,7 @@ static func fit_to_view(graph: Graph, viewport: Vector2, margin := 40.0) -> Dict
 ## Where an edge leaves a card: the right edge of the import ROW it comes from, so a card with
 ## four imports has four distinct departure points rather than four lines out of one.
 static func edge_source_anchor(card: Graph.Card, import_index: int,
-		card_width: float) -> Vector2:
+		card_width: float, lod := Lod.FULL) -> Vector2:
 	# ON THE IMPORT ROW, when the card is showing its import rows.
 	#
 	# A fixed offset from the card top put every anchor in the header, so at the section and full
@@ -312,6 +336,11 @@ static func edge_source_anchor(card: Graph.Card, import_index: int,
 	# knows where that list starts and how tall a row is; asking it is the difference between an
 	# edge attached to a line and an edge attached to a box.
 	var y := card.y + EDGE_ANCHOR_Y + maxi(0, import_index) * ANCHOR_PITCH
+	# A PILL HAS NO ROWS to anchor on, so every edge leaves from its single header line. Walking
+	# the section stack there put the anchor where the imports WOULD be if the card were open --
+	# a dot hanging in space below a pill, joined to a curve that appeared to start at nothing.
+	if lod == Lod.PILL:
+		return Vector2(card.x + card_width, card.y + HEADER_H * 0.5)
 	for entry in section_stack(card):
 		var section := entry as Dictionary
 		if int(section["section"]) != int(Section.IMPORTS):

@@ -110,13 +110,13 @@ func _draw_anchors(card: Graph.Card, index: int, card_width: float) -> void:
 	# somewhere the line does not start.
 	var outgoing := graph.edges_from(index)
 	for k in range(outgoing.size()):
-		var source := Metrics.edge_source_anchor(card, k, card_width)
+		var source := Metrics.edge_source_anchor(card, k, card_width, Metrics.lod_of(zoom))
 		draw_circle(Metrics.world_to_screen(source, camera, zoom), ANCHOR_RADIUS, ANCHOR_COLOR)
 
 
 func _draw_edge(edge: Graph.Edge, ordinal: int, card_width: float) -> void:
 	var from_card := graph.cards[edge.from_index]
-	var from_world := Metrics.edge_source_anchor(from_card, ordinal, card_width)
+	var from_world := Metrics.edge_source_anchor(from_card, ordinal, card_width, Metrics.lod_of(zoom))
 	var from := Metrics.world_to_screen(from_world, camera, zoom)
 
 	if edge.is_broken():

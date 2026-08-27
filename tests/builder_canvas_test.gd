@@ -29,7 +29,7 @@ const ROOT := "res://tests/__builder_canvas_tmp/app"
 const VIEWPORT := Vector2(1280, 720)
 
 ## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
-const ASSERTION_FLOOR := 128
+const ASSERTION_FLOOR := 137
 
 var _fails := 0
 var _passes := 0
@@ -47,6 +47,8 @@ func _run() -> void:
 	_test_lod_bands()
 	await _test_card_can_be_moved()
 	await _test_canvas_can_be_panned()
+	await _test_cards_do_not_eat_the_mouse()
+	_test_anchors_land_on_the_drawn_card()
 	_test_camera()
 	_test_height_model()
 	_test_culling()
@@ -642,3 +644,73 @@ func _test_canvas_can_be_panned() -> void:
 
 	_check(host.camera != before, "the camera moved (%s -> %s)" % [before, host.camera])
 	host.unmount()
+
+
+# ── The mouse reaches the canvas ─────────────────────────────────────────────────────
+
+func _test_cards_do_not_eat_the_mouse() -> void:
+	_section("a card's own Controls are transparent to the mouse")
+	# THE BUG THAT BROKE EVERY CANVAS GESTURE AT ONCE. A card is a PanelContainer full of Labels,
+	# and Godot's default mouse_filter for those is STOP -- so a press anywhere on a card was
+	# consumed by the card and the host never saw it. Card dragging, row clicks and row menus all
+	# worked only in the gaps BETWEEN cards, which is to say none of them worked.
+	#
+	# The earlier drag test missed it entirely because it called `_gui_input` directly, which is
+	# the one path that cannot reproduce a filter problem: it IS the handler the filter prevents
+	# from being reached.
+	var host: Host = _mounted_host()
+	await process_frame
+	await process_frame
+
+	var cards := host.get_node("Cards")
+	var stoppers := PackedStringArray()
+	var buttons := 0
+	_collect_filters(cards, stoppers, [buttons])
+	_check(stoppers.is_empty(),
+		"nothing in a card stops the mouse (%s)" % ", ".join(stoppers))
+
+	# And the buttons that SHOULD take a press still do -- the "+ hook" chips are the one thing
+	# on a card that handles its own click, and blanket-ignoring would have killed them.
+	var takers := _count_buttons(cards)
+	_check(takers > 0, "the card's own buttons still take the mouse (%d of them)" % takers)
+	host.unmount()
+
+
+func _collect_filters(node: Node, out: PackedStringArray, _c: Array) -> void:
+	for child in node.get_children():
+		if child is Control and not (child is BaseButton) 				and (child as Control).mouse_filter == Control.MOUSE_FILTER_STOP:
+			out.append(child.get_class())
+		_collect_filters(child, out, _c)
+
+
+func _count_buttons(node: Node) -> int:
+	var n := 0
+	for child in node.get_children():
+		if child is BaseButton and (child as Control).mouse_filter != Control.MOUSE_FILTER_IGNORE:
+			n += 1
+		n += _count_buttons(child)
+	return n
+
+
+# ── Anchors land on the card you can see ─────────────────────────────────────────────
+
+func _test_anchors_land_on_the_drawn_card() -> void:
+	_section("an edge anchor is on the card AS DRAWN, in every band")
+	# `card_height` answers with the tallest layout on purpose -- the gutter has to survive every
+	# zoom. Anything asking "where is this card on SCREEN" needs the other answer, and asking the
+	# wrong one hung the anchors in space below a pill: a dot joined to a curve that appeared to
+	# start at nothing, which is exactly what it looked like.
+	var card := _card("app.guitkx")
+	var width_of := {}
+	for lod in [Metrics.Lod.PILL, Metrics.Lod.SECTIONS, Metrics.Lod.FULL]:
+		var w: float = Metrics.card_width_for(lod)
+		var drawn: float = Metrics.drawn_height(card, lod)
+		var anchor: Vector2 = Metrics.edge_source_anchor(card, 0, w, lod)
+		_eq(anchor.x, card.x + w, "the anchor is on the right edge at lod %d" % lod)
+		_check(anchor.y >= card.y and anchor.y <= card.y + drawn,
+			"and within the drawn height at lod %d (%f in %f..%f)"
+				% [lod, anchor.y, card.y, card.y + drawn])
+		width_of[lod] = drawn
+
+	_check(float(width_of[Metrics.Lod.PILL]) < float(width_of[Metrics.Lod.FULL]),
+		"a pill is drawn shorter than a full card, which is the whole point")
