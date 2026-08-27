@@ -123,6 +123,23 @@ func owns_folder() -> bool:
 ## A name rather than an empty field: a module has to be in the tree to be edited, has to have a
 ## path to be in the tree, and has to have a name to have a path. Asking first would mean a modal
 ## between "I want one of these" and having one -- and the rename is one click away on the card.
+## The kind, in the words a prompt titles itself with ("new component").
+static func kind_label(k: Kind) -> String:
+	match k:
+		Kind.HOOK:
+			return "hook module"
+		Kind.STYLE:
+			return "style module"
+		Kind.UTIL:
+			return "util module"
+		Kind.VALUE:
+			return "value module"
+		Kind.COMPONENT:
+			return "component"
+		_:
+			return "module"
+
+
 static func default_name_for(k: Kind) -> String:
 	match k:
 		Kind.HOOK:

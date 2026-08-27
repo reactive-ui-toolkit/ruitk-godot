@@ -36,7 +36,16 @@ const SHOTS := [
 	{ "name": "edit", "tree": true, "zoom": 1.00, "select": FIXTURE_RIGHT },
 	{ "name": "edit_card_menu", "tree": true, "zoom": 1.00, "select": FIXTURE_RIGHT, "menu": "card" },
 	{ "name": "edit_zoomed", "tree": true, "zoom": 1.35, "select": FIXTURE_RIGHT },
+	# A REAL FILE, not the fixture. The fixture is five files this harness's author wrote, with
+	# no comments and no setup code in them -- so it could not exhibit the bug where a source
+	# comment was drawn as a markup row, and six review rounds looked straight past it. Every
+	# shot set needs at least one picture of something nobody tidied first.
+	{ "name": "real_file", "tree": true, "zoom": 1.00, "select": REAL_FILE, "focus": REAL_FILE },
 ]
+
+## The builder's own canvas view: a real component, with real comments, real setup and a real
+## directive body.
+const REAL_FILE := "res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_view.guitkx"
 
 ## How long to let the tree settle before the first shot. The preview round is debounced and the
 ## canvas measures its cards over a few frames, so a shot taken too early is a picture of a layout
@@ -94,7 +103,8 @@ func _shoot(shot: Dictionary) -> bool:
 	await get_tree().process_frame
 
 	var want_tree := bool(shot.get("tree", true))
-	var builder = _open_builder(FIXTURE if want_tree else "")
+	var focus := str(shot.get("focus", FIXTURE))
+	var builder = _open_builder(focus if want_tree else "")
 	if builder == null:
 		return false
 	var win := _window

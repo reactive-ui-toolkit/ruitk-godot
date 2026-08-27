@@ -31,6 +31,7 @@ func _initialize() -> void:
 	_test_attributes()
 	_test_directive_headers()
 	_test_wrap_in_directive()
+	_test_clauses()
 	_test_imports()
 	_test_setup_lines()
 	_test_style_entries()
@@ -612,3 +613,52 @@ func _test_wrap_in_directive() -> void:
 	_section("wrapping is refused where there is nothing to wrap")
 	_eq(Edits.wrap_in_directive(src, null, "@if (true)"), src, "a null row changes nothing")
 	_eq(Edits.wrap_in_directive(src, label, "   "), src, "and neither does an empty header")
+
+
+# ── Clauses ──────────────────────────────────────────────────────────────────────────
+
+const IF_SRC := "export App(flag: bool = true) -> RuitkVNode {
+	return (
+		<VBoxContainer>
+			@if (flag) {
+				return (
+					<Label text=\"yes\" />
+				)
+			}
+		</VBoxContainer>
+	)
+}
+"
+
+func _test_clauses() -> void:
+	_section("an @if grows an @else, and the file still balances")
+	var head := _directive(IF_SRC, "@if")
+	_check(head != null, "the @if head is a row")
+
+	var with_else := Edits.add_if_clause(IF_SRC, head, false)
+	_check(with_else.contains("} @else {"),
+		"the construct's closing brace becomes the SHARED HEAD of the new clause")
+	var compiled: Dictionary = Compiler.compile(with_else, "App")
+	_check(bool(compiled["ok"]),
+		"and what it produces compiles (got %s)" % str(compiled.get("diagnostics", [])))
+
+	var with_elif := Edits.add_if_clause(IF_SRC, head, true)
+	# SEEDED WITH A LITERAL, like every other header this builder writes: `condition` names
+	# nothing, so the preview would report an error on a clause nobody has finished writing.
+	_check(with_elif.contains("@elif (true)"),
+		"spelled @elif -- this language's vocabulary, not the Unity leg's @else if")
+	_check(bool(Compiler.compile(with_elif, "App")["ok"]), "and it compiles too")
+
+	_section("a clause can be deleted, and the file still balances")
+	var clause := _directive(with_else, "@else")
+	_check(clause != null, "the @else is a row of its own")
+	var without := Edits.delete_clause(with_else, clause)
+	_check(not without.contains("@else"), "the clause is gone")
+	_check(bool(Compiler.compile(without, "App")["ok"]),
+		"and the braces it shared with the clause above it are put back")
+
+	_section("a clause the buffer does not agree with is refused")
+	var lying := Graph.Line.new()
+	lying.directive_line = 0
+	_eq(Edits.delete_clause(IF_SRC, lying), IF_SRC, "a row with no directive line changes nothing")
+	_eq(Edits.add_if_clause(IF_SRC, lying, false), IF_SRC, "and neither does one with no close")

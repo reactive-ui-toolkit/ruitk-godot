@@ -38,6 +38,9 @@ const Edits = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/bui
 const Drag = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_drag.gd")
 const AddonSettings = preload("res://addons/reactive_ui_toolkit_editor/editor/ruitk_editor_settings.gd")
 const Parts = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_chrome_parts.gd")
+const SearchMenu = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_search_menu.gd")
+const Attributes = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_attributes.gd")
+const Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 const PreviewPane = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_preview_pane.gd")
 const Palette = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
@@ -67,6 +70,7 @@ enum CardMenuId { OPEN = 100, RENAME = 101, DELETE = 102, REVEAL_CARD = 103 }
 enum RowMenuId {
 	ADD_ATTRIBUTE = 200, ADD_CHILD = 201, REMOVE_ATTRIBUTE = 202,
 	WRAP_IF = 203, WRAP_FOR = 204, DELETE_ROW = 205, EDIT_HEADER = 206,
+	ADD_ELSE = 207, ADD_ELSE_IF = 208, DELETE_CLAUSE = 209,
 }
 
 var workspace: Workspace = null
@@ -87,6 +91,11 @@ var _status: Label = null
 var _card_menu: PopupMenu = null
 var _new_menu: PopupMenu = null
 var _row_menu: PopupMenu = null
+var _search_menu: SearchMenu = null
+## What the open search menu is choosing. One field, because only one menu is open at a time.
+var _search_purpose := ""
+## The module kind a create prompt is naming.
+var _pending_kind := -1
 var _menu_row = null
 var _menu_card := -1
 var _menu_at := Vector2.ZERO
@@ -100,6 +109,9 @@ var _history_menu: PopupMenu = null
 var _hint: Label = null
 var _syncing_layer := false
 var _empty_state: Control = null
+var _toast: Label = null
+## When the toast should go, in milliseconds since start. 0 = nothing showing.
+var _toast_until := 0
 
 var _focus_path := ""
 var _menu_target := ""
@@ -108,6 +120,8 @@ var _was_dirty := false
 
 
 func _init() -> void:
+	# Focusable, or the window never sees a key at all.
+	focus_mode = Control.FOCUS_ALL
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build_ui()
 	_wire()
@@ -115,6 +129,110 @@ func _init() -> void:
 
 func _exit_tree() -> void:
 	preview.teardown()
+
+
+## Says something, briefly, over the canvas.
+##
+## Ported from the Unity leg's `Toast`. Every refusal in this builder used to be silent: a drop
+## that could not be placed, an edit on a read-only module, a rename that collided. Silence reads
+## as a bug in the tool rather than an answer from it.
+func toast(message: String) -> void:
+	if _toast == null or message.strip_edges().is_empty():
+		return
+	_toast.text = message
+	_toast.visible = true
+	_toast.reset_size()
+	_toast_until = Time.get_ticks_msec() + TOAST_MSEC
+
+
+## How long a toast stays up.
+const TOAST_MSEC := 3200
+
+
+func _tick_toast() -> void:
+	if _toast == null or not _toast.visible:
+		return
+	if Time.get_ticks_msec() >= _toast_until:
+		_toast.visible = false
+
+
+## The keyboard model, ported from the Unity leg's `OnKeyDown`.
+##
+## Ctrl+S saves, Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y walk the ACTION LEDGER -- not the focused file's
+## own undo stack, so a gesture that touched two files reverts as one step and from whichever
+## file happens to be in focus. Unmodified Delete deletes the selection and Escape cancels the
+## edit in progress.
+##
+## ALL OF IT IS OFF WHILE A TEXT SURFACE HAS FOCUS. Delete inside the source pane means "delete a
+## character" and Escape there is the field's own cancel; a canvas keyboard model that fired
+## under one would eat both.
+func _gui_input(event: InputEvent) -> void:
+	if not (event is InputEventKey) or not (event as InputEventKey).pressed:
+		return
+	var key := event as InputEventKey
+	if _typing_focused():
+		return
+
+	if key.ctrl_pressed or key.meta_pressed:
+		match key.keycode:
+			KEY_S:
+				save()
+			KEY_Z:
+				redo() if key.shift_pressed else undo()
+			KEY_Y:
+				redo()
+			_:
+				return
+		accept_event()
+		return
+
+	match key.keycode:
+		KEY_DELETE:
+			_delete_selection()
+		KEY_ESCAPE:
+			_cancel_active_edit()
+		_:
+			return
+	accept_event()
+
+
+## True while something that takes typing owns the keyboard.
+func _typing_focused() -> bool:
+	var focused := get_viewport().gui_get_focus_owner() if get_viewport() != null else null
+	if focused == null:
+		return false
+	return focused is TextEdit or focused is LineEdit or focused is CodeEdit
+
+
+## Delete: the selected ROW when one is selected, else the selected MODULE.
+##
+## The row first, because it is the more specific selection and the one the user most recently
+## made. Deleting a whole module on a keypress meant for one element is not a mistake a builder
+## should let happen quietly.
+func _delete_selection() -> void:
+	if _menu_row != null and not _menu_target.is_empty() and workspace != null:
+		var module := workspace.try_get(_menu_target)
+		if module != null and not module.read_only:
+			var after := Edits.remove(module.buffer_text, _menu_row)
+			if after != module.buffer_text:
+				apply_edit(_menu_target, after, "Delete %s" % _menu_row.text.strip_edges())
+				_menu_row = null
+				return
+	if not _focus_path.is_empty():
+		delete_module(_focus_path)
+
+
+## Escape: close whatever is open, innermost first.
+func _cancel_active_edit() -> void:
+	if _search_menu != null and _search_menu.visible:
+		_search_menu.hide()
+		return
+	if _inline != null and _inline.is_open():
+		_inline.cancel()
+		return
+	if _canvas != null:
+		_canvas.select_card(-1)
+	_menu_row = null
 
 
 ## The builder drives its own idle work: the debounced preview round and the crash journal.
@@ -204,6 +322,24 @@ func _build_ui() -> void:
 	_folders.rebuild()
 	_refresh_status()
 
+	# A toast layer over everything, for the things that are neither a diagnostic nor a dialog:
+	# an operation that declined, a save that wrote nothing, a placement that could not be made.
+	# Without one those either go to the console, where nobody is looking during a drag, or
+	# nowhere at all -- which is how a refused gesture becomes "the builder ignored me".
+	_toast = Label.new()
+	_toast.visible = false
+	_toast.z_index = 100
+	_toast.add_theme_color_override("font_color", Color(0.95, 0.95, 0.98))
+	var toast_box := StyleBoxFlat.new()
+	toast_box.bg_color = Color(0.16, 0.16, 0.20, 0.96)
+	toast_box.border_color = Color(0.36, 0.59, 0.96)
+	toast_box.set_border_width_all(1)
+	toast_box.set_corner_radius_all(6)
+	toast_box.set_content_margin_all(10)
+	_toast.add_theme_stylebox_override("normal", toast_box)
+	_toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	add_child(_toast)
+
 	_hint = Parts.hint_bar(PackedStringArray([
 		"Wheel: zoom",
 		"Drag Library items onto rows (top=before, bottom=after, middle=inside)",
@@ -243,6 +379,11 @@ func _build_ui() -> void:
 	_canvas_menu = PopupMenu.new()
 	_canvas_menu.add_item("Fit to view", MenuId.FIT_VIEW)
 	add_child(_canvas_menu)
+
+	_search_menu = SearchMenu.new()
+	_search_menu.picked.connect(_on_search_picked)
+	_search_menu.submitted.connect(_on_search_submitted)
+	add_child(_search_menu)
 
 	_row_menu = PopupMenu.new()
 	_row_menu.id_pressed.connect(_on_row_menu)
@@ -290,7 +431,7 @@ func _build_empty_state() -> Control:
 		var button := Button.new()
 		button.text = str(spec["label"])
 		var kind := int(spec["kind"])
-		button.pressed.connect(func(): create_module(kind))
+		button.pressed.connect(func(): prompt_create(kind))
 		buttons.add_child(button)
 	column.add_child(buttons)
 
@@ -405,7 +546,7 @@ func _wire() -> void:
 		_canvas_menu.position = Vector2i(get_global_mouse_position())
 		_canvas_menu.popup())
 
-	_library.create_requested.connect(create_module)
+	_library.create_requested.connect(prompt_create)
 	_source.buffer_edited.connect(_on_buffer_edited)
 	_console.location_activated.connect(select_module)
 	_card_menu.id_pressed.connect(_on_card_menu)
@@ -466,6 +607,8 @@ func reproject() -> void:
 		_canvas.camera = layout.camera
 		_canvas.zoom = layout.zoom
 	_canvas.show_graph(graph)
+	if _preview_pane != null:
+		_preview_pane.graph = graph
 	_sync_empty_state()
 	_folders.workspace = workspace
 	_folders.rebuild()
@@ -528,6 +671,7 @@ func _on_buffer_edited(file_path: String, before: String, after: String) -> void
 ## Runs a preview round if the debounce has settled, and journals unsaved work on its own
 ## cadence. Called from the host's idle tick.
 func tick() -> void:
+	_tick_toast()
 	_journal_tick()
 	if not preview.is_due():
 		return
@@ -633,7 +777,10 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 		return
 	var card = graph.cards[card_index]
 	var module := workspace.try_get(card.file_path) if workspace != null else null
-	if module == null or module.read_only:
+	if module == null:
+		return
+	if module.read_only:
+		toast("%s is read-only — it lives under addons/." % card.title)
 		return
 
 	_menu_target = card.file_path
@@ -645,7 +792,15 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 
 	if row.kind == Graph.LineKind.DIRECTIVE:
 		_row_menu.add_item("Edit header...", RowMenuId.EDIT_HEADER)
+		# Clause operations belong to the CONSTRUCT head (@if), not to a bound continuation
+		# (@else) -- adding an else to an else is not a thing the language has.
+		if row.badge_text == "@if" and row.clause_index == 0:
+			_row_menu.add_separator()
+			_row_menu.add_item("Add @elif", RowMenuId.ADD_ELSE_IF)
+			_row_menu.add_item("Add @else", RowMenuId.ADD_ELSE)
 		_row_menu.add_separator()
+		if row.clause_index > 0:
+			_row_menu.add_item("Delete this %s clause" % row.badge_text, RowMenuId.DELETE_CLAUSE)
 		_row_menu.add_item("Delete " + row.badge_text, RowMenuId.DELETE_ROW)
 	else:
 		_row_menu.add_item("Add attribute...", RowMenuId.ADD_ATTRIBUTE)
@@ -683,6 +838,15 @@ func _on_row_menu(id: int) -> void:
 		RowMenuId.DELETE_ROW:
 			after = Edits.remove(before, row)
 			what = "Delete %s" % row.text.strip_edges()
+		RowMenuId.ADD_ELSE:
+			after = Edits.add_if_clause(before, row, false)
+			what = "Add @else"
+		RowMenuId.ADD_ELSE_IF:
+			after = Edits.add_if_clause(before, row, true)
+			what = "Add @elif"
+		RowMenuId.DELETE_CLAUSE:
+			after = Edits.delete_clause(before, row)
+			what = "Delete the %s clause" % row.badge_text
 		RowMenuId.WRAP_IF:
 			after = Edits.wrap_in_directive(before, row, "@if (true)")
 			what = "Wrap %s in @if" % row.text.strip_edges()
@@ -690,19 +854,28 @@ func _on_row_menu(id: int) -> void:
 			after = Edits.wrap_in_directive(before, row, "@for (item in [])")
 			what = "Wrap %s in @for" % row.text.strip_edges()
 		RowMenuId.ADD_CHILD:
-			after = Edits.insert(before, card, row, "<Label text=\"\" />", Edits.Placement.INSIDE)
-			what = "Add a child to %s" % row.text.strip_edges()
+			_search_purpose = "child"
+			_search_menu.open_menu("add a child to %s" % row.text.strip_edges(),
+				_tag_items(), _menu_screen_at(), "add <%s>")
+			return
 		RowMenuId.ADD_ATTRIBUTE:
-			# Seeded and then edited in place, rather than behind a dialog that asks which
-			# attribute before it will put anything in the file.
-			after = Edits.set_attribute(before, row, "name", "value", true)
-			what = "Add an attribute to %s" % row.text.strip_edges()
+			_search_purpose = "attribute"
+			var tag := str(row.name)
+			_search_menu.open_menu(
+				"attributes of <%s>" % tag,
+				Attributes.menu_for(tag, row, _component_named(tag)),
+				_menu_screen_at(), "add \"%s\" (untyped)")
+			return
 		RowMenuId.REMOVE_ATTRIBUTE:
-			var first := str(row.attr_pairs[0]).split("=")[0] if not row.attr_pairs.is_empty() else ""
-			if first.is_empty():
-				return
-			after = Edits.remove_attribute(before, row, first)
-			what = "Remove %s from %s" % [first, row.text.strip_edges()]
+			_search_purpose = "remove_attribute"
+			var present: Array = []
+			for pair in row.attr_pairs:
+				var text := str(pair)
+				var equals := text.find("=")
+				present.append(SearchMenu.item(
+					text.substr(0, equals) if equals >= 0 else text, text.substr(0, equals)))
+			_search_menu.open_menu("remove an attribute", present, _menu_screen_at())
+			return
 		RowMenuId.EDIT_HEADER:
 			# Edited in place over the row, not behind a dialog: the header is one line of the
 			# user's own code and they are already looking at it.
@@ -714,6 +887,94 @@ func _on_row_menu(id: int) -> void:
 
 	if after != before:
 		apply_edit(_menu_target, after, what)
+
+
+## Where a menu opened from the last row gesture belongs, in screen coordinates.
+func _menu_screen_at() -> Vector2:
+	return _canvas.get_screen_position() + _menu_at
+
+
+## Every tag the library offers, as menu items -- the same vocabulary, because two lists of legal
+## tags is one list that is wrong.
+func _tag_items() -> Array:
+	var items: Array = []
+	items.append({ "heading": "elements" })
+	for tag in Compiler.host_tags().keys():
+		items.append(SearchMenu.item("<%s>" % str(tag), str(tag)))
+	if graph != null:
+		var components: Array = []
+		for card in graph.cards:
+			if card.kind != Module.Kind.COMPONENT:
+				continue
+			for export_name in card.exports:
+				components.append(str(export_name))
+		if not components.is_empty():
+			components.sort()
+			items.append({ "separator": true })
+			items.append({ "heading": "components in this tree" })
+			for name in components:
+				items.append(SearchMenu.item("<%s>" % name, name))
+	return items
+
+
+## The card whose component is named `tag`, or null when the tag is a host element.
+func _component_named(tag: String):
+	if graph == null:
+		return null
+	for card in graph.cards:
+		if card.kind == Module.Kind.COMPONENT and tag in card.exports:
+			return card
+	return null
+
+
+## A choice from the search menu. Dispatched by what the menu was opened FOR.
+func _on_search_picked(payload: Variant) -> void:
+	if workspace == null or _menu_target.is_empty() or _menu_row == null:
+		return
+	var module := workspace.try_get(_menu_target)
+	if module == null or module.read_only:
+		return
+	var card = graph.cards[_menu_card] if graph != null and _menu_card >= 0 		and _menu_card < graph.cards.size() else null
+	var before := module.buffer_text
+	var after := before
+	var what := ""
+
+	match _search_purpose:
+		"child":
+			var tag := str(payload)
+			after = Edits.insert(before, card, _menu_row, "<%s />" % tag, Edits.Placement.INSIDE)
+			what = "Add <%s> to %s" % [tag, _menu_row.text.strip_edges()]
+		"attribute":
+			var name := ""
+			var seed := { "value": "", "quoted": true }
+			if payload is Dictionary:
+				name = str((payload as Dictionary)["name"])
+				seed = Attributes.default_value(str((payload as Dictionary).get("type", "")))
+			else:
+				name = str(payload)
+				seed = Attributes.default_value("")
+			after = Edits.set_attribute(before, _menu_row, name,
+				str(seed["value"]), bool(seed["quoted"]))
+			what = "Add %s to %s" % [name, _menu_row.text.strip_edges()]
+		"remove_attribute":
+			after = Edits.remove_attribute(before, _menu_row, str(payload))
+			what = "Remove %s from %s" % [str(payload), _menu_row.text.strip_edges()]
+		_:
+			return
+
+	if after == before:
+		toast("Nothing changed — %s could not be applied here." % what.to_lower())
+		return
+	apply_edit(_menu_target, after, what)
+
+
+## A name prompt was submitted.
+func _on_search_submitted(text: String) -> void:
+	match _search_purpose:
+		"create":
+			_create_named(_pending_kind, text)
+		"rename":
+			_rename_to(text)
 
 
 ## An inline edit was committed. Dispatched by the token the editor was opened with, so one
@@ -802,11 +1063,9 @@ func _on_card_add(index: int, what: String) -> void:
 func _on_card_new(kind: int) -> void:
 	if _menu_target.is_empty():
 		return
-	var previous := _focus_path
+	# The clicked card is the anchor, so the new module is born in ITS folder.
 	_focus_path = _menu_target
-	var created := create_module(kind)
-	if created.is_empty():
-		_focus_path = previous
+	prompt_create(kind)
 
 
 ## Creates a module of `kind` beside the focus, opens it, and points every surface at it.
@@ -814,6 +1073,95 @@ func _on_card_new(kind: int) -> void:
 ## THROUGH THE WORKSPACE, like everything else: the module lands in the tree in memory with a
 ## template buffer and nothing is written until Save, so creating one and thinking better of it
 ## costs a Ctrl+Z rather than a file on disk to go and delete.
+## Asks for a name, then creates. A module's name is its export, its file, often its folder and
+## every importer's specifier -- auto-naming it "NewComponent2" and making the user rename it is
+## four edits to undo one decision they were never offered.
+func prompt_create(kind: int) -> void:
+	if workspace == null:
+		return
+	_pending_kind = kind
+	_search_purpose = "create"
+	_search_menu.open_name_prompt(
+		"new %s" % Module.kind_label(kind), "name...",
+		func(name: String) -> String: return _validate_name(kind, name),
+		_menu_screen_at() if _menu_at != Vector2.ZERO else get_screen_position() + size * 0.3,
+		Module.default_name_for(kind))
+
+
+## Why a name cannot be used, or "" when it can.
+##
+## Ported from the Unity leg's `ValidateNewName`, including its two rules that are easy to miss:
+## a name is taken only when the FILE it would produce is taken (a style module `card` and a
+## component `Card` are the pairing the folder convention is built around, not a collision), and
+## a COMPONENT name is a name in the WHOLE TREE -- two components exporting `Card` in different
+## folders make every import of it ambiguous, and the path was free so nothing refused it.
+func _validate_name(kind: int, name: String) -> String:
+	if name.strip_edges().is_empty():
+		return "name required"
+	if kind == Module.Kind.HOOK:
+		if not RegEx.create_from_string("^use[A-Z][A-Za-z0-9]*$").search(name):
+			return "hook names start with 'use' (useSomething)"
+	elif kind == Module.Kind.COMPONENT:
+		if not RegEx.create_from_string("^[A-Z][A-Za-z0-9]*$").search(name):
+			return "PascalCase identifier required"
+	elif not RegEx.create_from_string("^[a-z][A-Za-z0-9]*$").search(name):
+		return "camelCase identifier required"
+
+	var folder := _create_folder()
+	if folder.is_empty():
+		return "no folder to create in"
+	if workspace.try_get(folder.path_join(name + Module.suffix_for(kind))) != null:
+		return "%s already exists" % name
+	if kind == Module.Kind.COMPONENT:
+		for module in workspace.modules():
+			if module.kind == Module.Kind.COMPONENT and module.name.to_lower() == name.to_lower():
+				return "%s already exists in this tree" % name
+	return ""
+
+
+## Where a new module is born: beside the focused one.
+func _create_folder() -> String:
+	return _focus_path.get_base_dir()
+
+
+## Creates `name` once the prompt accepted it.
+func _create_named(kind: int, name: String) -> String:
+	if workspace == null or name.strip_edges().is_empty():
+		return ""
+	var folder := _create_folder()
+	if folder.is_empty():
+		return ""
+	var path := folder.path_join(name + Module.suffix_for(kind))
+	var module := workspace.create_new(path, Edits.template_for(kind, name))
+	if module == null:
+		return ""
+	ledger.record_creation(path)
+	reproject()
+	select_module(path)
+	preview.request_refresh()
+	return path
+
+
+## Renames the module the card menu was opened on.
+func _rename_to(name: String) -> void:
+	if workspace == null or _menu_target.is_empty() or name.strip_edges().is_empty():
+		return
+	var module := workspace.try_get(_menu_target)
+	if module == null or module.read_only:
+		return
+	# THROUGH `move_to`, which is the one operation that knows a rename is four edits that land
+	# together or not at all: the export, the file, the folder when the module owns one, and every
+	# importer's specifier. Renaming the module object alone would leave the tree importing a name
+	# nothing exports any more.
+	var folder := module.folder
+	var rewrites := workspace.move_to(module.file_path(), folder, name)
+	if rewrites.is_empty() and module.name != name:
+		return
+	reproject()
+	select_module(folder.path_join(name + Module.suffix_for(module.kind)))
+	preview.request_refresh()
+
+
 func create_module(kind: int) -> String:
 	if workspace == null:
 		return ""
@@ -1009,6 +1357,15 @@ func _on_card_menu(id: int) -> void:
 		CardMenuId.DELETE:
 			delete_module(_menu_target)
 		CardMenuId.RENAME:
+			_search_purpose = "rename"
+			var current := workspace.try_get(_menu_target) if workspace != null else null
+			if current == null:
+				return
+			_search_menu.open_name_prompt("rename %s" % current.name, "name...",
+				func(name: String) -> String: return _validate_name(current.kind, name),
+				_menu_screen_at(), current.name)
+			return
+		CardMenuId.REVEAL_CARD:
 			# The rename prompt itself is a chrome affordance; the model operation it drives is
 			# `move_to_path`, which is what the ledger replays.
 			select_module(_menu_target)
@@ -1037,6 +1394,10 @@ func drop_library_entry(kind: String, name: String, at: Vector2) -> bool:
 	var placement: Edits.Placement = hit["placement"]
 	var verdict := Edits.can_place(card, row, placement)
 	if not bool(verdict["ok"]):
+		# A TOAST as well as the console line. A refused drop is answered while the user is still
+		# holding the thing they dropped, and the console is at the bottom of the window where
+		# nobody is looking mid-drag.
+		toast(str(verdict["reason"]))
 		_console.add_diagnostics(card.file_path,
 			[{ "code": "", "severity": Console.SEVERITY_WARNING, "message": str(verdict["reason"]), "line": -1 }])
 		return false

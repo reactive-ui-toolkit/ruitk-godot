@@ -456,6 +456,77 @@ static func _is_space(c: String) -> bool:
 ## an error-tier diagnostic on this leg (GUITKX2304) -- so a create that helpfully wired the
 ## module up would produce a tree that does not compile until the user finishes the thought.
 ## Creation states PLACEMENT; wiring states USAGE, and they are separate gestures.
+## Adds an `@else` / `@else if` clause to an `@if` construct, and returns the new source.
+##
+## Ported from the Unity leg's `AddIfClause`. The construct's closing brace becomes the SHARED
+## HEAD of the new clause -- `} @else {` -- and a fresh `}` closes it. Written any other way the
+## file no longer balances, and the parser is strict about it.
+static func add_if_clause(source: String, head: Graph.Line, with_condition: bool) -> String:
+	if head == null or head.close_line <= 0:
+		return source
+	var lines := source.split("
+")
+	var close_index := head.close_line - 1
+	if close_index < 0 or close_index >= lines.size():
+		return source
+	# Refused rather than guessed at: if the line the row says closes the block is not a closing
+	# brace, the row and the buffer disagree, and writing into it on that basis corrupts the file.
+	if str(lines[close_index]).strip_edges() != "}":
+		return source
+	var indent := _indent_of_line(str(lines[close_index]))
+	# `@elif`, not `@else if`. The Unity leg spells it the C# way; this language's directive
+	# vocabulary is `if` / `elif` / `else`, and `@else if` is two directives with no body between
+	# them -- GUITKX0303 on the clause the moment it is written.
+	var header := "@elif (true)" if with_condition else "@else"
+	# A BODY, not an empty clause. The Unity leg leaves the new clause empty because its language
+	# permits that; ours does not -- GUITKX0303 rejects a directive with no `{ ... }` body, so a
+	# clause added that way puts the file into an error state the moment it is written. `<Control />`
+	# is the closest thing this language has to "renders nothing", and it is one click to replace.
+	var unit := _indent_unit(source)
+	var out := PackedStringArray()
+	for i in range(lines.size()):
+		if i == close_index:
+			out.append("%s} %s {" % [indent, header])
+			out.append(indent + unit + "return (")
+			out.append(indent + unit + unit + "<Control />")
+			out.append(indent + unit + ")")
+			out.append(indent + "}")
+			continue
+		out.append(str(lines[i]))
+	return "
+".join(out)
+
+
+## Removes one clause of a directive construct, and returns the new source.
+##
+## Ported from the Unity leg's `DeleteClause`, including its brace bookkeeping. A clause's head is
+## written one of two legal ways -- SHARED (`} @else {`, the head line carries the previous
+## clause's closer) or SEPARATE (`@else {` on its own line, the previous clause already closed
+## itself) -- and deleting without accounting for which leaves the file unbalanced.
+static func delete_clause(source: String, row: Graph.Line) -> String:
+	if row == null or row.directive_line <= 0:
+		return source
+	var lines := source.split("
+")
+	var head := row.directive_line - 1
+	var close := row.close_line - 1
+	if head < 0 or close < head or close >= lines.size():
+		return source
+
+	var shared_head := str(lines[head]).strip_edges().begins_with("}")
+	var out := PackedStringArray()
+	for i in range(lines.size()):
+		if i >= head and i <= close:
+			continue
+		out.append(str(lines[i]))
+	# A SHARED head carried the previous clause's closing brace away with it, so one has to go
+	# back; a SEPARATE head carried nothing, and adding one would unbalance the file the other way.
+	if shared_head:
+		out.insert(head, _indent_of_line(str(lines[head])) + "}")
+	return "
+".join(out)
+
+
 ## Wraps a row's whole span in a directive, and returns the new source.
 ##
 ## Ported from the Unity leg's `WrapRowInDirective`. The scaffolding is the house form every

@@ -19,6 +19,8 @@ const NOTE_FONT_SIZE := 10
 const NOTE_COLOR := Color(0.478, 0.478, 0.545)
 
 var preview: Preview = null
+## The projected graph, so the pane can find where this component is USED.
+var graph = null
 
 var _tag: Label = null
 var _stage: PanelContainer = null
@@ -96,7 +98,7 @@ func show_module(file_path: String) -> void:
 	_tag.text = _tag_for(_path)
 	if preview.mount(_slot, _path):
 		_note.text = "rendered from the real component — every edit re-renders"
-		_origin.text = "prop defaults taken from its usage in the tree"
+		_origin.text = _usage_note(_path)
 		return
 
 	# NOT BUILT YET is the common case, not an error: selecting a module the last round had no
@@ -134,3 +136,29 @@ func _tag_for(file_path: String) -> String:
 	if file_path.is_empty():
 		return ""
 	return "<%s>" % file_path.get_file().trim_suffix(Paths.SUFFIX_PLAIN).to_upper()
+
+
+## Where this component is used, and with what.
+##
+## Ported from the Unity leg's `UsageFor`. A component is previewed with its DEFAULT props, and
+## defaults are usually the least interesting values it ever takes -- a card with no title, a list
+## with no items. Naming the component that uses it, and the attributes it passes, is the
+## difference between "this renders" and "this is what it looks like where it actually appears".
+func _usage_note(file_path: String) -> String:
+	if graph == null:
+		return "rendered with its own default props"
+	var index: int = graph.index_of(file_path)
+	if index < 0:
+		return "rendered with its own default props"
+	var title := str(graph.cards[index].title)
+	for card in graph.cards:
+		if card.file_path == file_path:
+			continue
+		for row in card.markup:
+			if str(row.name) != title:
+				continue
+			var attrs := str(row.attrs_text).strip_edges()
+			if attrs.is_empty():
+				return "used by %s, which passes no props" % card.title
+			return "prop defaults taken from its usage in %s: %s" % [card.title, attrs]
+	return "nothing in this tree uses it yet — rendered with its own defaults"
