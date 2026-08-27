@@ -42,6 +42,7 @@ func _run() -> void:
 	await _test_folder_pane()
 	await _test_source_edit_cycle()
 	await _test_row_spine()
+	await _test_attribute_round_trip()
 	await _test_library_pane()
 	await _test_source_pane()
 	_test_console()
@@ -219,8 +220,6 @@ func _test_row_spine() -> void:
 	_section("a row is a target: clicking one points the source pane at its line")
 	var w := _window()
 	await process_frame
-	w.open_tree(ROOT.path_join("app.guitkx"))
-	await process_frame
 	var canvas := w.canvas()
 	canvas.set_camera(Vector2.ZERO, 1.2)
 	await process_frame
@@ -234,6 +233,53 @@ func _test_row_spine() -> void:
 	_eq(w.source_pane().path(), card.file_path, "the click focused the row's module")
 	_eq(w.source_pane().editor().get_caret_line() + 1, card.markup[0].source_line,
 		"and put the caret on the line that produced the row")
+
+	_drop(w)
+
+
+# ── Attribute editing ────────────────────────────────────────────────────────────────
+
+func _test_attribute_round_trip() -> void:
+	_section("an attribute is split the way it was WRITTEN, and put back the same way")
+	var w := _window()
+	await process_frame
+	if w.graph == null or w.graph.cards.is_empty():
+		_check(false, "the tree opened with cards to inspect")
+		_drop(w)
+		return
+
+	var card = w.graph.cards[0]
+	var row = null
+	for candidate in card.markup:
+		if not str(candidate.attrs_text).is_empty():
+			row = candidate
+			break
+	_check(row != null, "a row with attributes to edit")
+
+	var items: Array = w._attribute_items(row)
+	_check(not items.is_empty(), "its attributes are offered one at a time")
+	for entry in items:
+		var payload: Dictionary = (entry as Dictionary)["payload"]
+		var name := str(payload["name"])
+		var value := str(payload["value"])
+		# The wrapper is OUTSIDE the value: a quoted attribute yields the string without its
+		# quotes, an expression yields the code without its braces. Writing one back as the
+		# other is a compile error, and the pair is the only place that knows which it was.
+		_check(not value.begins_with("\""), "%s's value carries no quotes (%s)" % [name, value])
+		_check(not value.begins_with("{"), "%s's value carries no braces (%s)" % [name, value])
+
+	_section("an emptied value takes the attribute with it")
+	var first: Dictionary = (items[0] as Dictionary)["payload"]
+	var before: String = w.workspace.try_get(card.file_path).buffer_text
+	w._menu_target = card.file_path
+	w._menu_row = row
+	w._on_inline_committed(
+		{ "kind": "attribute", "path": card.file_path, "row": row,
+			"name": str(first["name"]), "quoted": bool(first["quoted"]) }, "")
+	var after: String = w.workspace.try_get(card.file_path).buffer_text
+	_check(after != before, "clearing the field changed the buffer")
+	_check(not after.contains(str(first["name"]) + "="),
+		"and removed the attribute rather than writing an empty one back")
 
 	_drop(w)
 

@@ -70,7 +70,7 @@ enum CardMenuId { OPEN = 100, RENAME = 101, DELETE = 102, REVEAL_CARD = 103 }
 enum RowMenuId {
 	ADD_ATTRIBUTE = 200, ADD_CHILD = 201, REMOVE_ATTRIBUTE = 202,
 	WRAP_IF = 203, WRAP_FOR = 204, DELETE_ROW = 205, EDIT_HEADER = 206,
-	ADD_ELSE = 207, ADD_ELSE_IF = 208, DELETE_CLAUSE = 209,
+	ADD_ELSE = 207, ADD_ELSE_IF = 208, DELETE_CLAUSE = 209, EDIT_ATTRIBUTE = 210,
 }
 
 var workspace: Workspace = null
@@ -99,6 +99,7 @@ var _pending_kind := -1
 var _menu_row = null
 var _menu_card := -1
 var _menu_at := Vector2.ZERO
+var _pending_attribute := {}
 
 ## The card menu's header row: the only item addressed positionally.
 const _HEADER_ITEM := 0
@@ -864,6 +865,7 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 		_row_menu.add_item("Add attribute...", RowMenuId.ADD_ATTRIBUTE)
 		_row_menu.add_item("Add child element...", RowMenuId.ADD_CHILD)
 		if not str(row.attrs_text).is_empty():
+			_row_menu.add_item("Edit attribute...", RowMenuId.EDIT_ATTRIBUTE)
 			_row_menu.add_item("Remove attribute...", RowMenuId.REMOVE_ATTRIBUTE)
 		_row_menu.add_separator()
 		_row_menu.add_item("Wrap in @if", RowMenuId.WRAP_IF)
@@ -924,6 +926,10 @@ func _on_row_menu(id: int) -> void:
 				Attributes.menu_for(tag, row, _component_named(tag)),
 				_menu_screen_at(), "add \"%s\" (untyped)")
 			return
+		RowMenuId.EDIT_ATTRIBUTE:
+			_search_purpose = "edit_attribute"
+			_search_menu.open_menu("edit an attribute", _attribute_items(row), _menu_screen_at())
+			return
 		RowMenuId.REMOVE_ATTRIBUTE:
 			_search_purpose = "remove_attribute"
 			var present: Array = []
@@ -945,6 +951,31 @@ func _on_row_menu(id: int) -> void:
 
 	if after != before:
 		apply_edit(_menu_target, after, what)
+
+
+## A row's attributes, split into name / value / how the value was written.
+##
+## The SPELLING matters: `text="hi"` is a quoted string and `style={s}` is an expression, and
+## writing one back as the other is a compile error. The pair already carries which it was.
+func _attribute_items(row) -> Array:
+	var items: Array = []
+	for pair in row.attr_pairs:
+		var text := str(pair)
+		var equals := text.find("=")
+		if equals < 0:
+			items.append(SearchMenu.item(text, { "name": text, "value": "", "quoted": false }))
+			continue
+		var name := text.substr(0, equals)
+		var raw := text.substr(equals + 1).strip_edges()
+		var quoted := raw.begins_with("\"")
+		var value := raw
+		if quoted:
+			value = raw.trim_prefix("\"").trim_suffix("\"")
+		elif raw.begins_with("{"):
+			value = raw.trim_prefix("{").trim_suffix("}").strip_edges()
+		items.append(SearchMenu.item(name, { "name": name, "value": value, "quoted": quoted },
+			raw))
+	return items
 
 
 ## Where a menu opened from the last row gesture belongs, in screen coordinates.
@@ -1018,6 +1049,17 @@ func _on_search_picked(payload: Variant) -> void:
 			after = Edits.set_attribute(before, _menu_row, name,
 				str(seed["value"]), bool(seed["quoted"]))
 			what = "Add %s to %s" % [name, _menu_row.text.strip_edges()]
+		"edit_attribute":
+			# The WRAPPER STAYS OUTSIDE THE FIELD: the user edits the value, not the quotes or
+			# the braces around it, so typing an expression into a string attribute cannot
+			# produce `text=""{x}""`.
+			var spec := payload as Dictionary
+			_pending_attribute = spec
+			_search_purpose = "attribute_value"
+			_inline.open_at(Rect2(_menu_at, Vector2(260, 24)), str(spec["value"]),
+				{ "kind": "attribute", "path": _menu_target, "row": _menu_row,
+					"name": str(spec["name"]), "quoted": bool(spec["quoted"]) })
+			return
 		"remove_attribute":
 			after = Edits.remove_attribute(before, _menu_row, str(payload))
 			what = "Remove %s from %s" % [str(payload), _menu_row.text.strip_edges()]
@@ -1058,8 +1100,17 @@ func _on_inline_committed(token: Variant, text: String) -> void:
 			after = Edits.set_directive_header(before, row, text)
 			what = "Edit %s" % row.badge_text
 		"attribute":
-			after = Edits.set_attribute(before, row, str(spec.get("name", "")), text, true)
-			what = "Edit %s on %s" % [str(spec.get("name", "")), row.text.strip_edges()]
+			var attr_name := str(spec.get("name", ""))
+			# AN EMPTIED VALUE TAKES THE ATTRIBUTE WITH IT. Writing `text=""` back would leave a
+			# dead attribute nobody asked for, and clearing a field is the obvious way to say
+			# "I do not want this one".
+			if text.strip_edges().is_empty():
+				after = Edits.remove_attribute(before, row, attr_name)
+				what = "Remove %s from %s" % [attr_name, row.text.strip_edges()]
+			else:
+				after = Edits.set_attribute(before, row, attr_name, text,
+					bool(spec.get("quoted", true)))
+				what = "Edit %s on %s" % [attr_name, row.text.strip_edges()]
 		_:
 			return
 	if after != before:
