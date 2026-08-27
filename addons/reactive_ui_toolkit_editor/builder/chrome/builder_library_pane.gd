@@ -214,6 +214,41 @@ func _show_all(kind: String, entries: PackedStringArray) -> void:
 		_body.add_child(_entry_row(kind, str(entries[i])))
 
 
+## Godot's drag protocol, on the pane rather than on each row: the pane knows which row the
+## pointer is over, and one implementation beats one per button.
+##
+## THE HINT BAR HAS ADVERTISED THIS SINCE THE FIRST CHROME COMMIT and nothing implemented it.
+## `drop_library_entry` existed, `builder_drag.gd` existed to resolve where a drop landed, and no
+## gesture in the builder could start a drag -- so the primary interaction of a
+## direct-manipulation surface was a function nobody could reach.
+func _get_drag_data(at_position: Vector2) -> Variant:
+	var row: Control = _row_under(at_position)
+	if row == null:
+		return null
+	var kind := str(row.get_meta("entry_kind", ""))
+	var name := str(row.get_meta("entry_name", ""))
+	if name.is_empty():
+		return null
+
+	var ghost := Label.new()
+	ghost.text = row.text.strip_edges()
+	ghost.add_theme_color_override("font_color", Parts.ACCENT_COLOR)
+	set_drag_preview(ghost)
+	return { "source": "library", "kind": kind, "name": name }
+
+
+## The entry row under a point in this pane's coordinates.
+func _row_under(at_position: Vector2):
+	for child in _body.get_children():
+		if not (child is Button) or not child.has_meta("entry_name"):
+			continue
+		var control := child as Control
+		if Rect2(control.get_global_rect().position - get_global_rect().position,
+				control.size).has_point(at_position):
+			return control
+	return null
+
+
 func _entry_row(kind: String, name: String) -> Button:
 	var row := Button.new()
 	# NOT flat. A palette entry is a drag handle and a click target, and flat text on a panel
@@ -227,6 +262,7 @@ func _entry_row(kind: String, name: String) -> Button:
 	row.text = "    " + (name if kind == ENTRY_HOOK else "<%s>" % name)
 	row.tooltip_text = "%s -- drag onto a card, or click to insert" % name
 	row.set_meta("entry_kind", kind)
+	row.set_meta("entry_name", name)
 	if kind == ENTRY_COMPONENT and name == _selected_component:
 		row.button_pressed = true
 		row.toggle_mode = true

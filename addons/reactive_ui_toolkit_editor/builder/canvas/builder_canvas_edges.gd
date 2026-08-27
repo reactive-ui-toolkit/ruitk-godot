@@ -42,9 +42,9 @@ const GRID_DOT := 2.0
 const GRID_COLOR := Color(0.34, 0.34, 0.40, 0.55)
 
 const EDGE_COLOR := Color(0.482, 0.545, 0.647, 0.85)
-const EDGE_COLOR_SELECTED := Color(0.361, 0.588, 0.965, 1.0)
+const EDGE_COLOR_SELECTED := Color(0.50, 0.74, 1.0, 1.0)
 const BROKEN_COLOR := Color(0.902, 0.451, 0.451, 0.9)
-const ANCHOR_COLOR := Color(0.635, 0.729, 0.910, 1.0)
+const ANCHOR_COLOR := Color(0.62, 0.78, 1.0, 1.0)
 const ANCHOR_UNSATISFIED_COLOR := Color(0.902, 0.451, 0.451, 1.0)
 
 var graph: Graph = null
@@ -72,31 +72,7 @@ func refresh(new_graph: Graph, new_camera: Vector2, new_zoom: float, new_selecte
 	queue_redraw()
 
 
-## The canvas's dot grid, in world space, drawn under everything.
-##
-## A flat empty field gives a pan no reference and a zoom no scale: the cards move and nothing
-## says how far or how much. The grid is the cheapest possible answer -- one dot per world cell,
-## culled to the viewport, fading out as the cells collapse past the point of being readable.
-func _draw_grid() -> void:
-	var spacing := GRID_SPACING * zoom
-	if spacing < GRID_MIN_SCREEN_SPACING:
-		return
-	var alpha: float = clampf((spacing - GRID_MIN_SCREEN_SPACING) / GRID_MIN_SCREEN_SPACING, 0.0, 1.0)
-	var tint := Color(GRID_COLOR, GRID_COLOR.a * alpha)
-	# Start at the first grid line left of and above the viewport, so panning does not make the
-	# pattern crawl.
-	var first := Vector2(fposmod(camera.x, spacing), fposmod(camera.y, spacing))
-	var y := first.y
-	while y < size.y:
-		var x := first.x
-		while x < size.x:
-			draw_rect(Rect2(Vector2(x, y), Vector2(GRID_DOT, GRID_DOT)), tint)
-			x += spacing
-		y += spacing
-
-
 func _draw() -> void:
-	_draw_grid()
 	if graph == null or graph.cards.is_empty():
 		return
 	var lod := Metrics.lod_of(zoom)

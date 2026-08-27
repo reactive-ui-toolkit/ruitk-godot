@@ -20,12 +20,35 @@ static func bg() -> Dictionary:
 	return { "bg_color": Color(0.086, 0.086, 0.098) }
 
 
+## The editor's own monospace face, or null outside the editor.
+##
+## CODE CONTENT MUST LOOK LIKE CODE. A card's markup rows, its import lines and a style module's
+## entries are all source text, and set in the UI font they read as prose -- so a tree of tags
+## and a list of labels look the same, and the one thing the canvas is showing is the difference
+## between them. The Unity leg sets all of it in mono for exactly this reason.
+static func mono() -> Font:
+	if not Engine.is_editor_hint():
+		return null
+	var base := EditorInterface.get_editor_theme() if Engine.has_singleton("EditorInterface") 		or ClassDB.class_exists("EditorInterface") else null
+	if base == null:
+		return null
+	return base.get_font("source", "EditorFonts") if base.has_font("source", "EditorFonts") else null
+
+
+## A code style with the mono face folded in, when there is one to fold.
+static func _code(style: Dictionary) -> Dictionary:
+	var face := mono()
+	if face != null:
+		style["font"] = face
+	return style
+
+
 static func card_box() -> Dictionary:
 	return {
 		"bg_color": Color(0.137, 0.137, 0.161),
 		"corner_radius_all": 10,
 		"border_width_all": 1,
-		"border_color": Color(0.188, 0.188, 0.220),
+		"border_color": Color(0.30, 0.30, 0.36),
 		"content_margin_all": 10,
 	}
 
@@ -45,7 +68,7 @@ static func card_placeholder() -> Dictionary:
 		"bg_color": Color(0.137, 0.137, 0.161),
 		"corner_radius_all": 10,
 		"border_width_all": 1,
-		"border_color": Color(0.188, 0.188, 0.220),
+		"border_color": Color(0.30, 0.30, 0.36),
 	}
 
 
@@ -58,7 +81,7 @@ static func pill_title() -> Dictionary:
 
 
 static func signature() -> Dictionary:
-	return { "font_size": 11, "font_color": Color(0.588, 0.588, 0.647) }
+	return _code({ "font_size": 11, "font_color": Color(0.588, 0.588, 0.647) })
 
 
 static func section_head() -> Dictionary:
@@ -66,7 +89,7 @@ static func section_head() -> Dictionary:
 
 
 static func import_row() -> Dictionary:
-	return { "font_size": 11, "font_color": Color(0.635, 0.729, 0.910) }
+	return _code({ "font_size": 11, "font_color": Color(0.635, 0.729, 0.910) })
 
 
 static func chip() -> Dictionary:
@@ -74,31 +97,31 @@ static func chip() -> Dictionary:
 
 
 static func chip_text() -> Dictionary:
-	return { "font_size": 11, "font_color": Color(0.749, 0.851, 1.0) }
+	return _code({ "font_size": 11, "font_color": Color(0.749, 0.851, 1.0) })
 
 
 static func markup_row() -> Dictionary:
-	return { "font_size": 11, "font_color": Color(0.831, 0.878, 0.784) }
+	return _code({ "font_size": 11, "font_color": Color(0.831, 0.878, 0.784) })
 
 
 static func component_row() -> Dictionary:
-	return { "font_size": 11, "font_color": Color(0.949, 0.831, 0.639) }
+	return _code({ "font_size": 11, "font_color": Color(0.949, 0.831, 0.639) })
 
 
 static func directive_row() -> Dictionary:
-	return { "font_size": 11, "font_color": Color(0.902, 0.729, 0.949) }
+	return _code({ "font_size": 11, "font_color": Color(0.902, 0.729, 0.949) })
 
 
 static func attrs() -> Dictionary:
-	return { "font_size": 10, "font_color": Color(0.541, 0.573, 0.612) }
+	return _code({ "font_size": 10, "font_color": Color(0.541, 0.573, 0.612) })
 
 
 static func island_row() -> Dictionary:
-	return { "font_size": 10, "font_color": Color(0.612, 0.635, 0.678) }
+	return _code({ "font_size": 10, "font_color": Color(0.612, 0.635, 0.678) })
 
 
 static func export_row() -> Dictionary:
-	return { "font_size": 11, "font_color": Color(0.729, 0.902, 0.835) }
+	return _code({ "font_size": 11, "font_color": Color(0.729, 0.902, 0.835) })
 
 
 static func read_only() -> Dictionary:
@@ -129,11 +152,14 @@ static func kind_tint(kind: int) -> Color:
 ## to say so: an import of a component puts an element in the tree, an import of a style module
 ## puts a look on one. Drawn the same, a reader has to open both files to tell which is which.
 static func edge_component() -> Color:
-	return Color(0.482, 0.545, 0.647, 0.85)
+	# Bright enough to READ AS A CONNECTION. At 0.48/0.55/0.65 the edges were a shade off the
+	# canvas ground and behind the cards in weight -- the one thing on the surface that carries
+	# the graph's structure was the faintest thing on it.
+	return Color(0.42, 0.66, 0.95, 0.95)
 
 
 static func edge_style() -> Color:
-	return Color(0.831, 0.647, 0.925, 0.85)
+	return Color(0.86, 0.60, 0.98, 0.95)
 
 
 

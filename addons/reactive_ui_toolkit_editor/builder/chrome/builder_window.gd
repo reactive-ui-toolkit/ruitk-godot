@@ -307,9 +307,16 @@ func _build_ui() -> void:
 	var left := VSplitContainer.new()
 	left.custom_minimum_size = Vector2(260, 0)
 	body.add_child(left)
+	# The tree, under a header of its own, so the left column reads as two named sections the way
+	# the reference's does.
+	var folders_column := VBoxContainer.new()
+	folders_column.add_theme_constant_override("separation", 4)
+	folders_column.custom_minimum_size = Vector2(0, 240)
+	folders_column.add_child(Parts.pane_header("Folders"))
+	left.add_child(folders_column)
 	_folders = FolderPane.new()
-	_folders.custom_minimum_size = Vector2(0, 240)
-	left.add_child(_folders)
+	_folders.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	folders_column.add_child(_folders)
 	_library = LibraryPane.new()
 	left.add_child(_library)
 	# NEGATIVE: a VSplitContainer's offset is measured from the centre, so a positive one hands
@@ -578,6 +585,7 @@ func _wire() -> void:
 	_canvas.card_add_requested.connect(_on_card_add)
 	_canvas.row_clicked.connect(_on_row_clicked)
 	_canvas.row_context_requested.connect(_on_row_context)
+	_canvas.dropped.connect(_on_canvas_drop)
 	_inline.committed.connect(_on_inline_committed)
 	_canvas.camera_changed.connect(_on_camera_changed)
 	_canvas.camera_changed.connect(func(_c: Vector2, _z: float): _sync_layer_selector())
@@ -824,6 +832,28 @@ func _on_row_clicked(card_index: int, _section: int, row_index: int) -> void:
 		return
 	select_module(graph.cards[card_index].file_path)
 	_source.goto_line(row.source_line)
+
+
+## Something was dropped on the canvas. Routes it to the operation that already existed for it.
+##
+## The three payloads are the three the reference has: a LIBRARY entry becomes an element or a
+## hook, a ROW is re-parented, and a MODULE card moves into a folder. Each was implemented and
+## unreachable, because nothing could start a drag.
+func _on_canvas_drop(data: Dictionary, at: Vector2) -> void:
+	match str(data.get("source", "")):
+		"library":
+			if not drop_library_entry(str(data.get("kind", "")), str(data.get("name", "")), at):
+				toast("Couldn't place <%s> there." % str(data.get("name", "")))
+		"row":
+			var drag := Drag.new()
+			drag.begin(Drag.Source.ROW, "", str(data.get("card_id", "")),
+				int(data.get("row_at", -1)), int(data.get("row_index", -1)), at)
+			drag.started = true
+			if not drop_row(drag, at):
+				toast("Couldn't move that row there.")
+		"module":
+			if not drop_module(str(data.get("path", "")), at):
+				toast("Couldn't move that module there.")
 
 
 ## Right-click on a row: the operations that apply to THAT row.

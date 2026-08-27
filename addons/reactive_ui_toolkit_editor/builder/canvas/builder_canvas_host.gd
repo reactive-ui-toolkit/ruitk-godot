@@ -16,6 +16,7 @@ extends Control
 const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
 const Edges = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_edges.gd")
+const Palette = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 const CanvasView = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_view.gd")
 const V = preload("res://addons/reactive_ui_toolkit/core/v.gd")
 const RuitkRoot = preload("res://addons/reactive_ui_toolkit/core/reactive_root.gd")
@@ -43,6 +44,9 @@ signal row_context_requested(card_index: int, section: int, row_index: int, at: 
 ## belongs -- a builder whose only way to add state is a menu three levels into the chrome is a
 ## builder people go back to the text editor to use.
 signal card_add_requested(index: int, what: String)
+
+## Something was dropped on the canvas. `data` is whatever the source put in it; `at` is where.
+signal dropped(data: Dictionary, at: Vector2)
 
 var graph: Graph = null
 var camera := Vector2.ZERO
@@ -86,6 +90,7 @@ func show_graph(new_graph: Graph) -> void:
 func set_camera(new_camera: Vector2, new_zoom: float) -> void:
 	camera = new_camera
 	zoom = Metrics.clamp_zoom(new_zoom)
+	queue_redraw()
 	_render()
 	# ANNOUNCED, like `fit_to_view` does. Only the fit emitted, so everything downstream of the
 	# camera -- the saved layout, and the layer selector that is supposed to name the band on
@@ -195,6 +200,42 @@ func _notification(what: int) -> void:
 
 # ── Input ────────────────────────────────────────────────────────────────────────────
 
+## The canvas's own ground and grid, UNDER everything.
+##
+## On the host rather than on the edge overlay, because a Control draws before its children and
+## the overlay is one of them -- painted there, the ground covered every card on the canvas and
+## the grid dotted the tops of them.
+##
+## The palette has defined a dark canvas colour since the first canvas commit and NOTHING EVER
+## PAINTED IT, so the canvas showed the editor's own panel grey: the same value as the panes
+## beside it and lighter than the cards on top of it. Everything read as one flat sheet, which
+## is the single biggest reason this did not look like a canvas.
+func _draw() -> void:
+	draw_rect(Rect2(Vector2.ZERO, size), Palette.bg()["bg_color"])
+
+	var spacing := GRID_SPACING * zoom
+	if spacing < GRID_MIN_SCREEN_SPACING:
+		return
+	var alpha: float = clampf((spacing - GRID_MIN_SCREEN_SPACING) / GRID_MIN_SCREEN_SPACING, 0.0, 1.0)
+	var tint := Color(GRID_COLOR, GRID_COLOR.a * alpha)
+	var first := Vector2(fposmod(camera.x, spacing), fposmod(camera.y, spacing))
+	var y := first.y
+	while y < size.y:
+		var x := first.x
+		while x < size.x:
+			draw_rect(Rect2(Vector2(x, y), Vector2(GRID_DOT, GRID_DOT)), tint)
+			x += spacing
+		y += spacing
+
+
+## The canvas grid: world-space cell size, the screen spacing below which it stops being drawn,
+## and the dot itself.
+const GRID_SPACING := 64.0
+const GRID_MIN_SCREEN_SPACING := 14.0
+const GRID_DOT := 2.0
+const GRID_COLOR := Color(0.34, 0.34, 0.40, 0.55)
+
+
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		_handle_button(event as InputEventMouseButton)
@@ -253,6 +294,44 @@ func _handle_button(event: InputEventMouseButton) -> void:
 			else:
 				canvas_context_requested.emit(world)
 			accept_event()
+
+
+## Anything can be dropped here; the window decides whether it lands.
+##
+## Answered `true` for every payload this builder produces rather than resolving the target
+## here: the resolve is the window's, it needs the model, and a canvas that said "no" from a
+## partial view would refuse drops the window would have accepted.
+func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
+	return data is Dictionary and (data as Dictionary).has("source")
+
+
+func _drop_data(at_position: Vector2, data: Variant) -> void:
+	dropped.emit(data as Dictionary, at_position)
+
+
+## A markup ROW is draggable, which is how a subtree is re-parented.
+func _get_drag_data(at_position: Vector2) -> Variant:
+	var index := card_at(at_position)
+	if index < 0:
+		return null
+	var hit := row_at(index, at_position)
+	if not bool(hit.get("found", false)):
+		return null
+	var card := graph.cards[index]
+	var rows: Array = card.markup if int(hit["section"]) == int(Metrics.Section.MARKUP) else []
+	var row_index := int(hit["index"])
+	if row_index < 0 or row_index >= rows.size():
+		return null
+
+	var ghost := Label.new()
+	ghost.text = str(rows[row_index].text)
+	set_drag_preview(ghost)
+	return {
+		"source": "row",
+		"card_id": card.module_id,
+		"row_at": int(rows[row_index].at),
+		"row_index": row_index,
+	}
 
 
 ## The row under a SCREEN point within card `index`, as `Metrics.row_hit` reports it.

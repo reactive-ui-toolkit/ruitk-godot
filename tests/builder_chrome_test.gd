@@ -28,7 +28,7 @@ const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/bu
 const ROOT := "res://tests/__builder_chrome_tmp/app"
 
 ## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
-const ASSERTION_FLOOR := 139
+const ASSERTION_FLOOR := 148
 
 var _fails := 0
 var _passes := 0
@@ -48,6 +48,7 @@ func _run() -> void:
 	await _test_row_spine()
 	await _test_attribute_round_trip()
 	await _test_component_child_brings_its_import()
+	await _test_drag_and_drop_is_reachable()
 	await _test_library_pane()
 	await _test_source_pane()
 	_test_console()
@@ -326,6 +327,38 @@ func _test_component_child_brings_its_import() -> void:
 	_eq(w._with_component_import(before, host, "Label"), before, "a Godot class needs no import")
 	_eq(w._with_component_import(before, host, "NotAThing"), before,
 		"and neither does a name nothing in the tree exports")
+
+	_drop(w)
+
+
+# ── Drag and drop ────────────────────────────────────────────────────────────────────
+
+func _test_drag_and_drop_is_reachable() -> void:
+	_section("the surfaces the hint bar names can actually START a drag")
+	# This existed as a promise and not as a gesture: `drop_library_entry` was implemented,
+	# `builder_drag.gd` was implemented to resolve where a drop landed, the hint bar said "Drag
+	# Library items onto rows" -- and nothing in the builder implemented Godot's drag protocol,
+	# so the primary interaction of a direct-manipulation surface was unreachable.
+	var w := _window()
+	await process_frame
+
+	_check(w.library_pane().has_method("_get_drag_data"), "the library is a drag SOURCE")
+	_check(w.folder_pane().has_method("_get_drag_data"), "and so is the folder tree")
+	_check(w.canvas().has_method("_get_drag_data"), "a markup row can be picked up")
+	_check(w.canvas().has_method("_can_drop_data"), "and the canvas is a drop TARGET")
+	_check(w.canvas().has_method("_drop_data"), "that accepts one")
+
+	_section("the canvas takes every payload this builder produces")
+	var canvas := w.canvas()
+	for payload in [
+		{ "source": "library", "kind": "element", "name": "Label" },
+		{ "source": "row", "card_id": "x", "row_at": 0, "row_index": 0 },
+		{ "source": "module", "path": ROOT.path_join("app.guitkx") },
+	]:
+		_check(canvas._can_drop_data(Vector2.ZERO, payload),
+			"a %s payload is accepted" % str((payload as Dictionary)["source"]))
+	_check(not canvas._can_drop_data(Vector2.ZERO, "a bare string"),
+		"and something that is not a payload at all is not")
 
 	_drop(w)
 

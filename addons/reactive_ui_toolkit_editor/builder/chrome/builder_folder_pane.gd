@@ -52,8 +52,8 @@ var _rows := {}
 
 func _init() -> void:
 	columns = 2
-	set_column_title(0, "Folders")
-	set_column_title(1, "State")
+	set_column_title(0, "")
+	set_column_title(1, "")
 	# The NAME column takes what it needs and the state column takes what is left. Both columns
 	# expanding split the pane in half, so every file name ellipsised at ten characters -- with a
 	# third of the pane sitting empty beside it, and the two modules that differ only by their
@@ -62,7 +62,10 @@ func _init() -> void:
 	set_column_clip_content(0, false)
 	set_column_expand(1, false)
 	set_column_custom_minimum_width(1, 72)
-	column_titles_visible = true
+	# NO COLUMN TITLES. Rendered as two buttons over the tree they read as a TAB BAR -- "Folders"
+	# and "State" looked like two views to switch between rather than one tree with a status
+	# column, and the pane's real name is on the header above it.
+	column_titles_visible = false
 	hide_root = true
 	allow_rmb_select = true
 	select_mode = Tree.SELECT_ROW
@@ -71,6 +74,20 @@ func _init() -> void:
 	item_selected.connect(_on_item_selected)
 	item_activated.connect(_on_item_activated)
 	item_mouse_selected.connect(_on_item_mouse_selected)
+
+
+## A module row is draggable: onto the canvas to place it, onto another folder row to move it.
+func _get_drag_data(at_position: Vector2) -> Variant:
+	var item := get_item_at_position(at_position)
+	if item == null:
+		return null
+	var path := str(item.get_metadata(0))
+	if path.is_empty():
+		return null
+	var ghost := Label.new()
+	ghost.text = path.get_file()
+	set_drag_preview(ghost)
+	return { "source": "module", "path": path }
 
 
 ## Rebuilds from the workspace. Cheap enough to run on every model change: a tree of a few dozen

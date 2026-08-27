@@ -87,8 +87,18 @@ func _init() -> void:
 	# line of real markup ran off the right edge mid-token, so reading the file meant scrolling
 	# it horizontally line by line, and the minimap spent a third of the remaining width drawing
 	# a thumbnail of text too narrow to read in the first place.
-	_editor.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	# NO WRAPPING. It was on to stop long lines running off a pane crowded with furniture; with
+	# the gutter and the fold arrows gone there is room for the code, and a wrapped line makes the
+	# displayed line count disagree with the source's -- which matters here, because clicking a
+	# card row jumps this pane to a LINE NUMBER.
+	_editor.wrap_mode = TextEdit.LINE_WRAPPING_NONE
 	_editor.minimap_draw = false
+	# NO GUTTER AND NO FOLD ARROWS. A side column has room for the code or for its furniture,
+	# not both: between the line numbers, the fold chevrons and the indent markers a third of the
+	# width went to things that are not the source, and every real line wrapped.
+	_editor.gutters_draw_line_numbers = false
+	_editor.gutters_draw_fold_gutter = false
+	_editor.draw_tabs = false
 	_editor.editable = false
 	_editor.text_changed.connect(_on_text_changed)
 	add_child(_editor)
