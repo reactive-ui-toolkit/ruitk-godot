@@ -50,7 +50,7 @@ const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/
 signal dirty_changed(has_unsaved: bool)
 
 ## Menu ids. Named rather than positional, so inserting an item cannot silently re-point another.
-enum MenuId { SAVE, ABORT, UNDO, REDO, FIT_VIEW, REVEAL, HISTORY, TRACE, HELP }
+enum MenuId { SAVE, ABORT, UNDO, REDO, FIT_VIEW, REVEAL, HISTORY, TRACE, HELP, _HISTORY_OLD }
 
 ## The three detail bands, NAMED. The canvas already had them — as a zoom threshold nobody could
 ## see, so a user could not tell which band they were in or ask for one. The Unity leg puts them
@@ -129,6 +129,48 @@ func _init() -> void:
 
 func _exit_tree() -> void:
 	preview.teardown()
+
+
+## The history, as a list you can jump into.
+##
+## Ported from the Unity leg's `ToggleHistory` / `JumpHistoryTo`. Undo and Redo alone make the
+## ledger a stack you can only step through one entry at a time and cannot see -- so "put it back
+## the way it was five edits ago" means pressing Ctrl+Z five times and hoping, with no way to know
+## where you are until you look at the file.
+func _show_history() -> void:
+	var rows: Array = []
+	var entries := ledger.entries()
+	if entries.is_empty():
+		rows.append(SearchMenu.item("no actions yet", -1))
+	else:
+		var at := ledger.cursor()
+		for i in range(entries.size()):
+			# Entries BELOW the cursor are applied. The one AT the cursor is what redo would do
+			# next, so the marker sits on the last applied row.
+			var marker := "•  " if i == at - 1 else "    "
+			rows.append(SearchMenu.item(
+				"%s%s" % [marker, entries[i].description], i + 1,
+				"applied" if i < at else "undone"))
+		rows.append(SearchMenu.separator())
+		rows.append(SearchMenu.item("    (before everything)", 0, "undone"))
+	_search_purpose = "history"
+	_search_menu.open_menu("history — click a row to jump there", rows, _toolbar_screen_at())
+
+
+## Walks the ledger to `target` applied entries, in whichever direction gets there.
+func _jump_history_to(target: int) -> void:
+	var moved := false
+	while ledger.cursor() > target and undo():
+		moved = true
+	while ledger.cursor() < target and redo():
+		moved = true
+	if moved:
+		toast("History — %d action(s) applied" % ledger.cursor())
+
+
+## Under the toolbar, where the command that opened the menu lives.
+func _toolbar_screen_at() -> Vector2:
+	return _toolbar.get_screen_position() + Vector2(0, _toolbar.size.y)
 
 
 ## Says something, briefly, over the canvas.
@@ -341,12 +383,12 @@ func _build_ui() -> void:
 	add_child(_toast)
 
 	_hint = Parts.hint_bar(PackedStringArray([
-		"Wheel: zoom",
-		"Drag Library items onto rows (top=before, bottom=after, middle=inside)",
+		"Wheel: zoom (Ctrl+wheel over a scrolling section)",
+		"Drag Library items onto rows (top=before, bottom=after, middle=inside) or BODY (hooks)",
 		"Drag rows to reorder",
-		"Right-click rows / cards / canvas to edit, delete, create",
-		"Click attributes and badges to edit in place",
-		"Source pane: edits apply as you type",
+		"Right-click rows / cards / canvas for typed attributes, directives, delete, create",
+		"L3: click attrs / badges / style entries to edit",
+		"Source pane: edit → apply re-parses",
 		"Drag splitters to resize",
 	]))
 	column.add_child(_hint)
@@ -548,6 +590,11 @@ func _wire() -> void:
 
 	_library.create_requested.connect(prompt_create)
 	_source.buffer_edited.connect(_on_buffer_edited)
+	_source.edit_applied.connect(func(path: String, text: String):
+		apply_edit(path, text, "Edit %s" % path.get_file()))
+	_source.edit_cancelled.connect(func(path: String, restore: String):
+		apply_edit(path, restore, "Revert %s" % path.get_file()))
+	_source.complained.connect(toast)
 	_console.location_activated.connect(select_module)
 	_card_menu.id_pressed.connect(_on_card_menu)
 	_canvas_menu.id_pressed.connect(run_command)
@@ -660,7 +707,15 @@ func _after_model_change(file_path: String) -> void:
 	_refresh_status()
 
 
+## A keystroke in the source pane.
+##
+## IGNORED WHILE THE PANE IS IN EDIT MODE: the pane hands the buffer over once, on apply, after
+## it has parsed. Funnelling every keystroke meant half a tag name was a state the preview
+## compiled and the canvas re-projected -- so typing produced a stream of errors about text
+## nobody had finished writing, and deleting a line to retype it blanked the card.
 func _on_buffer_edited(file_path: String, before: String, after: String) -> void:
+	if _source != null and _source.is_editing():
+		return
 	# The source pane has already written the buffer, so the funnel records rather than re-applies.
 	ledger.record_typing(file_path, before, after)
 	_after_model_change(file_path)
@@ -728,6 +783,9 @@ func discard_recovery() -> void:
 func run_command(id: int) -> void:
 	match id:
 		MenuId.HISTORY:
+			_show_history()
+			return
+		MenuId._HISTORY_OLD:
 			# The ledger, as a menu. Undo and Redo are the whole of it today; the entries they
 			# would walk are already named in `ledger.entries`, which is what a fuller list draws from.
 			_history_menu.position = Vector2i(get_screen_position() + Vector2(0, 32))
@@ -940,6 +998,10 @@ func _on_search_picked(payload: Variant) -> void:
 	var what := ""
 
 	match _search_purpose:
+		"history":
+			if payload is int and int(payload) >= 0:
+				_jump_history_to(int(payload))
+			return
 		"child":
 			var tag := str(payload)
 			after = Edits.insert(before, card, _menu_row, "<%s />" % tag, Edits.Placement.INSIDE)
@@ -1066,6 +1128,79 @@ func _on_card_new(kind: int) -> void:
 	# The clicked card is the anchor, so the new module is born in ITS folder.
 	_focus_path = _menu_target
 	prompt_create(kind)
+
+
+## Moves a whole folder under another, and returns whether it went.
+##
+## Ported from the Unity leg's `MoveFolderToFolder`. Two things in it are worth keeping:
+##
+## The component that OWNS the folder carries it, so when one exists the move is delegated to
+## moving that module -- the same move by a shorter route, and the one that keeps the house
+## layout intact instead of scattering a family across two parents.
+##
+## A read-only module anywhere inside REFUSES THE WHOLE MOVE, before anything has moved. Moving
+## what can move and stopping at the first package file would leave a folder half here and half
+## there, which is worse than not starting.
+func move_folder(source_folder: String, target_folder: String) -> bool:
+	if workspace == null:
+		return false
+	var source := Paths.canon(source_folder)
+	var leaf := source.get_file()
+	if leaf.is_empty():
+		return false
+	var destination := Paths.canon(target_folder.path_join(leaf))
+	if Paths.same(destination, source):
+		return false
+	if Paths.is_under(destination, source):
+		toast("Can't move %s into itself." % leaf)
+		return false
+
+	for module in workspace.modules():
+		if module.owns_folder() and Paths.same(module.folder, source):
+			return _move_one(module, target_folder, leaf)
+
+	var movers: Array = []
+	for module in workspace.modules():
+		var folder := Paths.canon(module.folder)
+		if not Paths.same(folder, source) and not Paths.is_under(folder, source):
+			continue
+		if module.read_only:
+			toast("Can't move %s — it holds a read-only module." % leaf)
+			return false
+		var relative := folder.trim_prefix(source).trim_prefix("/")
+		movers.append({ "module": module, "to": destination.path_join(relative) })
+	if movers.is_empty():
+		return false
+
+	ledger.begin("Move %s" % leaf)
+	var snapshot := workspace.capture_imports()
+	for entry in movers:
+		var spec := entry as Dictionary
+		var module = spec["module"]
+		var from: String = module.file_path()
+		workspace.move_to(from, str(spec["to"]), module.name)
+		if layout != null:
+			layout.repath(from, module.file_path(), false)
+		if Paths.same(_focus_path, from):
+			_focus_path = module.file_path()
+	for rewrite in workspace.reconcile_imports(snapshot):
+		var r := rewrite as Dictionary
+		ledger.record(str(r["file_path"]), str(r["before"]), str(r["after"]))
+	ledger.end()
+	reproject()
+	preview.request_refresh()
+	toast("Moved %s — applies on Save" % leaf)
+	return true
+
+
+## One module carrying its own folder.
+func _move_one(module, target_folder: String, leaf: String) -> bool:
+	var moved := workspace.place_at(module, target_folder)
+	if moved.is_empty():
+		return false
+	reproject()
+	toast("Moved %s — applies on Save" % leaf)
+	return true
 
 
 ## Creates a module of `kind` beside the focus, opens it, and points every surface at it.

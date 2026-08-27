@@ -14,6 +14,7 @@ const BuilderWindow = preload("res://addons/reactive_ui_toolkit_editor/builder/c
 const FolderPane = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_folder_pane.gd")
 const LibraryPane = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_library_pane.gd")
 const SourcePane = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_source_pane.gd")
+const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 const Console = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_console.gd")
 const InlineEditor = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_inline_editor.gd")
 const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
@@ -39,6 +40,8 @@ func _run() -> void:
 
 	await _test_window_assembles()
 	await _test_folder_pane()
+	await _test_source_edit_cycle()
+	await _test_row_spine()
 	await _test_library_pane()
 	await _test_source_pane()
 	_test_console()
@@ -155,6 +158,82 @@ func _test_window_assembles() -> void:
 	_eq(w.source_pane().path(), ROOT.path_join("components/row/row.guitkx"), "so did the source pane")
 	_eq(w.folder_pane().selected_path(), ROOT.path_join("components/row/row.guitkx"),
 		"and so did the folder pane")
+
+	_drop(w)
+
+
+# ── The source pane's edit cycle ─────────────────────────────────────────────────────
+
+func _test_source_edit_cycle() -> void:
+	_section("the source pane hands its buffer over ONCE, after it parses")
+	var w := _window()
+	await process_frame
+	var pane := w.source_pane()
+	var path := ROOT.path_join("app.guitkx")
+	w.select_module(path)
+	await process_frame
+
+	_check(not pane.is_editing(), "it opens read-only -- the toggle is what unlocks it")
+	_check(not pane.editor().editable, "and the editor says so")
+
+	pane._set_editing(true)
+	_check(pane.is_editing(), "the toggle opens an edit")
+
+	# A buffer mid-keystroke is not a state to hand anyone. Applying it PARSES FIRST.
+	var complaint := [""]
+	pane.complained.connect(func(m: String): complaint[0] = m)
+	pane.editor().text = "export App() -> RuitkVNode {
+	return ( <Label"
+	pane.apply_edit()
+	_check(pane.is_editing(), "a buffer that does not parse is refused, and the edit stays open")
+	_check(complaint[0].begins_with("Parse failed"), "and it says why (%s)" % complaint[0])
+
+	var applied := [""]
+	pane.edit_applied.connect(func(_p: String, text: String): applied[0] = text)
+	pane.editor().text = "export App() -> RuitkVNode {
+	return (
+		<Label text=\"ok\" />
+	)
+}
+"
+	pane.apply_edit()
+	_check(not pane.is_editing(), "one that parses is applied and closes the edit")
+	_check(applied[0].contains("ok"), "and the text reaches the window")
+
+	_section("revert puts back what was there when the edit began")
+	pane._set_editing(true)
+	var before := pane.editor().text
+	pane.editor().text = "throw it all away"
+	var restored := [""]
+	pane.edit_cancelled.connect(func(_p: String, text: String): restored[0] = text)
+	pane.cancel_edit()
+	_eq(restored[0], before, "the snapshot, not the last good parse")
+	_check(not pane.is_editing(), "and the edit closes")
+
+	_drop(w)
+
+
+# ── The row spine ────────────────────────────────────────────────────────────────────
+
+func _test_row_spine() -> void:
+	_section("a row is a target: clicking one points the source pane at its line")
+	var w := _window()
+	await process_frame
+	w.open_tree(ROOT.path_join("app.guitkx"))
+	await process_frame
+	var canvas := w.canvas()
+	canvas.set_camera(Vector2.ZERO, 1.2)
+	await process_frame
+
+	var card = w.graph.cards[0]
+	_check(not card.markup.is_empty(), "the card has markup rows to aim at")
+
+	# Straight at the signal the canvas emits, rather than through a synthetic click: the
+	# hit-test has its own coverage, and what matters here is that the WINDOW answers it.
+	w._on_row_clicked(0, Metrics.Section.MARKUP, 0)
+	_eq(w.source_pane().path(), card.file_path, "the click focused the row's module")
+	_eq(w.source_pane().editor().get_caret_line() + 1, card.markup[0].source_line,
+		"and put the caret on the line that produced the row")
 
 	_drop(w)
 

@@ -17,10 +17,18 @@ const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document
 const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_paths.gd")
 const GuitkxEditor = preload("res://addons/reactive_ui_toolkit_editor/editor/guitkx_code_edit.gd")
 const Parts = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_chrome_parts.gd")
+const Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 
 ## The buffer changed. `before`/`after` are the whole text either side, which is what the ledger
 ## records: a gesture is undone by putting the text back, not by replaying keystrokes.
 signal buffer_edited(file_path: String, before: String, after: String)
+
+## An edit was applied, or abandoned. The window re-projects on the first and restores on the
+## second.
+signal edit_applied(file_path: String, text: String)
+signal edit_cancelled(file_path: String, restore: String)
+## Something the user should be told, from a pane that has no toast of its own.
+signal complained(message: String)
 
 var workspace: Workspace = null
 
@@ -28,6 +36,11 @@ var _title: Label = null
 var _editor: GuitkxEditor = null
 var _path := ""
 var _edit_toggle: Button = null
+var _apply: Button = null
+var _revert: Button = null
+## The buffer as it was when editing began, so `revert` has something to put back.
+var _snapshot := ""
+var _editing := false
 
 
 func _init() -> void:
@@ -46,12 +59,24 @@ func _init() -> void:
 	_edit_toggle = Button.new()
 	_edit_toggle.text = "edit"
 	_edit_toggle.toggle_mode = true
-	_edit_toggle.button_pressed = true
+	_edit_toggle.button_pressed = false
 	_edit_toggle.flat = true
-	_edit_toggle.toggled.connect(func(on: bool):
-		if _editor != null:
-			_editor.editable = on)
+	_edit_toggle.toggled.connect(_set_editing)
 	trailing.add_child(_edit_toggle)
+
+	_apply = Button.new()
+	_apply.text = "apply"
+	_apply.flat = true
+	_apply.visible = false
+	_apply.pressed.connect(apply_edit)
+	trailing.add_child(_apply)
+
+	_revert = Button.new()
+	_revert.text = "revert"
+	_revert.flat = true
+	_revert.visible = false
+	_revert.pressed.connect(cancel_edit)
+	trailing.add_child(_revert)
 	trailing.add_child(_title)
 	add_child(Parts.pane_header("Source — .guitkx", trailing))
 
@@ -64,6 +89,7 @@ func _init() -> void:
 	# a thumbnail of text too narrow to read in the first place.
 	_editor.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	_editor.minimap_draw = false
+	_editor.editable = false
 	_editor.text_changed.connect(_on_text_changed)
 	add_child(_editor)
 
@@ -103,7 +129,14 @@ func show_module(file_path: String) -> void:
 	_path = module.file_path()
 	_title.text = "%s%s" % [_path.get_file(), "  (read-only)" if module.read_only else ""]
 	_editor.file_path = _path
-	_editor.editable = not module.read_only
+	# Showing a module does not OPEN it. The edit toggle is what unlocks the buffer, and
+	# switching files while an edit was open would otherwise carry the unlocked state onto a
+	# file the user never asked to change.
+	_editing = false
+	_editor.editable = false
+	_edit_toggle.button_pressed = false
+	_apply.visible = false
+	_revert.visible = false
 	_editor.text = module.buffer_text
 
 
@@ -152,3 +185,68 @@ func _on_text_changed() -> void:
 	if not workspace.apply_edit(_path, after):
 		return
 	buffer_edited.emit(_path, before, after)
+
+
+## EDIT -> APPLY, the cycle the reference has and the hint bar already promised.
+##
+## Typing straight into the live buffer means every intermediate keystroke is a state the
+## preview compiles and the canvas re-projects -- so half a tag name is an error report, and
+## deleting a line to retype it blanks the card. The snapshot makes `revert` mean something,
+## and applying PARSES FIRST: a buffer that does not parse is not a state to hand the rest of
+## the builder.
+func _set_editing(on: bool) -> void:
+	if _editor == null:
+		return
+	if on:
+		var module := workspace.try_get(_path) if workspace != null else null
+		if module == null or module.read_only:
+			_edit_toggle.button_pressed = false
+			complained.emit("%s is read-only." % _path.get_file())
+			return
+		_snapshot = module.buffer_text
+	_editing = on
+	_editor.editable = on
+	_apply.visible = on
+	_revert.visible = on
+	if on:
+		_editor.grab_focus()
+
+
+func is_editing() -> bool:
+	return _editing
+
+
+## Hands the edited text back, but only if it parses.
+func apply_edit() -> void:
+	if not _editing or _editor == null:
+		return
+	var text := _editor.text
+	var parsed: Dictionary = Compiler.compile(text, _path.get_file().get_basename())
+	if not bool(parsed.get("ok", false)):
+		var first := ""
+		for d in (parsed.get("diagnostics", []) as Array):
+			if int((d as Dictionary).get("severity", 0)) == 0:
+				first = str((d as Dictionary).get("message", ""))
+				break
+		complained.emit("Parse failed: %s" % first)
+		return
+	_editing = false
+	_editor.editable = false
+	_edit_toggle.button_pressed = false
+	_apply.visible = false
+	_revert.visible = false
+	edit_applied.emit(_path, text)
+
+
+## Puts the buffer back the way it was when editing began.
+func cancel_edit() -> void:
+	if not _editing:
+		return
+	var restore := _snapshot
+	_editing = false
+	_editor.editable = false
+	_edit_toggle.button_pressed = false
+	_apply.visible = false
+	_revert.visible = false
+	_editor.text = restore
+	edit_cancelled.emit(_path, restore)
