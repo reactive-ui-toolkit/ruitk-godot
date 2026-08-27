@@ -1174,7 +1174,7 @@ func _test_bughunt_fixes() -> void:
 
 	# BH-17: resolver and codegen agree on the binding for a two-@class_name file (both take the LAST).
 	var bh17 := "@class_name First\n@class_name Second\ncomponent A() { return ( <Label /> ) }\n"
-	_check_true(Codegen._binding_name(bh17) == Resolve._binding_of(bh17), "BH-17: resolver/codegen agree on binding with two @class_name (%s vs %s)" % [Codegen._binding_name(bh17), Resolve._binding_of(bh17)])
+	_check_true(Codegen._binding_name(bh17) == Resolve.binding_of(bh17), "BH-17: resolver/codegen agree on binding with two @class_name (%s vs %s)" % [Codegen._binding_name(bh17), Resolve.binding_of(bh17)])
 	_check_true(Codegen._binding_name(bh17) == "Second", "BH-17: last @class_name wins (matches the emitter)")
 
 	# BH-03: codemod inserts the import block at the decl START, not the keyword -- an already-exported

@@ -27,7 +27,7 @@ static func find_markup_ranges(src: String, start: int, end: int) -> Array:
 	# markup at the very start of the expression (e.g. an attr value that IS markup)
 	var s0 := _skip_ws(src, start, end)
 	if _markup_at(src, s0, end):
-		var e0 := _find_element_end(src, s0, end)
+		var e0 := element_end(src, s0, end)
 		if e0 == -1:
 			return [{ "start": s0, "end": -1, "op": "", "op_pos": start }]
 		out.append({ "start": s0, "end": e0, "op": "", "op_pos": start })
@@ -83,7 +83,7 @@ static func find_markup_ranges(src: String, start: int, end: int) -> Array:
 static func _try(src: String, after: int, end: int, op: String, op_pos: int, out: Array, fallback: int) -> int:
 	var p := _skip_ws(src, after, end)
 	if _markup_at(src, p, end):
-		var e := _find_element_end(src, p, end)
+		var e := element_end(src, p, end)
 		if e == -1:
 			out.append({ "start": p, "end": -1, "op": op, "op_pos": op_pos })
 			return end
@@ -99,9 +99,12 @@ static func _markup_at(src: String, i: int, end: int) -> bool:
 	var c := src.unicode_at(i + 1)
 	return c == L.C_GT or c == 95 or (c >= 97 and c <= 122) or (c >= 65 and c <= 90)
 
-## From a `<` at `open`, find the index just past the outermost element close. Tracks tag depth,
+## From a `<` at `open`, the index just past the outermost element close. Tracks tag depth,
 ## routing strings/comments + balanced `{…}` attribute/child holes through the lexer. -1 if unbalanced.
-static func _find_element_end(src: String, open: int, end: int) -> int:
+## Public because a structural consumer needs the same answer: the builder projects one card row
+## per element and has to know where each element ENDS to give the row its line range, and a second
+## tag scanner would disagree with this one on exactly the attribute expressions that are hard.
+static func element_end(src: String, open: int, end: int) -> int:
 	var depth := 0
 	var i := open
 	while i < end:
@@ -137,7 +140,7 @@ static func _find_element_end(src: String, open: int, end: int) -> int:
 			if _markup_at(src, i, end):
 				# opening tag: scan to its '>' / '/>' skipping attribute {…} holes + strings, so a
 				# '<'/'>' inside an attribute expr is never mistaken for the tag terminator.
-				var t := _scan_open_tag(src, i, end)
+				var t := scan_open_tag(src, i, end)
 				if t["gt"] == -1:
 					return -1
 				i = t["gt"] + 1
@@ -152,12 +155,12 @@ static func _find_element_end(src: String, open: int, end: int) -> int:
 
 ## Scan an opening tag from its `<` to its terminating `>` / `/>`, treating every attribute `{…}` hole
 ## (via find_matching) and quoted string (via skip_noncode) as opaque. Returns { gt, self_closing }.
-static func _scan_open_tag(src: String, lt: int, end: int) -> Dictionary:
+static func scan_open_tag(src: String, lt: int, end: int) -> Dictionary:
 	var i := lt + 1
 	while i < end and L._is_ident_code(src.unicode_at(i)):
 		i += 1   # tag name
 	while i < end:
-		# G-01: markup lexis over the attribute list (see _find_element_end).
+		# G-01: markup lexis over the attribute list (see element_end).
 		var j := L.skip_noncode_markup(src, i)
 		if j != i:
 			i = j

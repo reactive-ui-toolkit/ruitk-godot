@@ -57,7 +57,7 @@ static func decl_table(guitkx_path: String) -> Dictionary:
 	var key := guitkx_path + "#" + str(hash(src))
 	if _table_cache.has(key):
 		return _table_cache[key]
-	var binding := _binding_of(src)
+	var binding := binding_of(src)
 	# analyzed_decls applies the E-07/E-09 export markers so list-exported / default-marked decls
 	# read as exported here exactly as the emitter sees them (M1.3 single-source-of-truth).
 	var analyzed := Compiler.analyzed_decls(src, 0)
@@ -75,7 +75,7 @@ static func decl_table(guitkx_path: String) -> Dictionary:
 
 ## The binding name of a source (mirrors codegen._binding_name without the FileAccess round-trip):
 ## @class_name override, else first exported decl (marker-applied -- M1.3), else first decl, else "".
-static func _binding_of(src: String) -> String:
+static func binding_of(src: String) -> String:
 	var override := _class_name_override(src)
 	if override != "":
 		return override

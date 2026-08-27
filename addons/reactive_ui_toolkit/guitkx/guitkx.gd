@@ -1083,6 +1083,29 @@ static func analyzed_decls(source: String, from: int = 0) -> Dictionary:
 	var throwaway: Array = []
 	return apply_export_markers(_enumerate_decls(source, from), throwaway)
 
+## The parsed STRUCTURE of one declaration row from `analyzed_decls` — for a consumer that needs
+## the shape of a component rather than its generated code: the visual builder's card projection,
+## an outline, a refactoring tool. Emits nothing and reports nothing; diagnostics belong to
+## compile().
+##
+## Returns `_parse_component_at`'s shape for a component (`{ ok, name, params, setup, parts, root,
+## window_nodes, body_at, … }`, markup offsets relative to `body`, rebased with `body_at`), and
+## `{ ok: false, kind }` for every other declaration kind — a hook, util, value or module has no
+## markup window to hand back.
+##
+## This exists so a structural consumer does not have to rediscover where a component's markup
+## window IS. That means re-implementing `_split_return`'s early/final-return choice, and a second
+## copy of that rule would disagree with the emitter on exactly the files where it matters.
+static func decl_structure(source: String, decl: Dictionary) -> Dictionary:
+	var kind := str(decl.get("kind", ""))
+	if kind != "component":
+		return { "ok": false, "kind": kind }
+	var throwaway: Array = []
+	if bool(decl.get("deprecated", false)):
+		return _parse_component_at(source, int(decl["at"]), throwaway)
+	return _parse_plain_component_body(source, str(decl.get("name", "")), int(decl.get("name_at", -1)),
+		str(decl.get("params", "")), int(decl.get("params_at", -1)), int(decl.get("body_open", -1)), throwaway)
+
 ## Index just past a declaration's closing `}` given `name_end` (the char after the decl name), or
 ## -1 if the body is missing/unterminated. Mirrors the parsers' shape: `[(params)] [-> Type(hook)] { … }`,
 ## with `(…)`/`{…}` brace-matched so nested braces in params or the body never fool the scan.
@@ -2443,7 +2466,7 @@ static func _split_return(body: String) -> Dictionary:
 			# an early top-level VALUE return (`return (x + 1)`) -- plain GDScript, stays verbatim
 			continue
 		if r["shape"] == "bare":
-			var be := JsxScan._find_element_end(body, int(r["m_start"]), int(chosen["at"]))
+			var be := JsxScan.element_end(body, int(r["m_start"]), int(chosen["at"]))
 			if be == -1:
 				return { "error": D.make("GUITKX0304", D.ERROR, "unclosed markup in an early `return`", int(r["m_start"]), 1) }
 			r["m_end"] = be
@@ -2552,7 +2575,7 @@ static func _split_body(body: String) -> Dictionary:
 			if at_stmt and not in_lambda:
 				if legacy_at == -1:
 					legacy_at = i
-			var ee := JsxScan._find_element_end(body, i, n)
+			var ee := JsxScan.element_end(body, i, n)
 			i = n if ee == -1 else ee
 			continue
 		if c == L.C_AT and at_stmt and not in_lambda and (L.keyword_at(body, i + 1, "if") or L.keyword_at(body, i + 1, "for") or L.keyword_at(body, i + 1, "while") or L.keyword_at(body, i + 1, "match")):
@@ -2582,7 +2605,7 @@ static func _split_body(body: String) -> Dictionary:
 				i = lc + 1
 				continue
 			if p < n and body.unicode_at(p) == L.C_LT:
-				var lb := JsxScan._find_element_end(body, p, n)
+				var lb := JsxScan.element_end(body, p, n)
 				if lb == -1:
 					return { "error": D.make("GUITKX0304", D.ERROR, "unclosed markup in a `return`", p, 1) }
 				_push_body_ret(parts, cursor, { "at": i, "end": lb, "m_start": p, "m_end": lb, "shape": "bare", "depth": depth, "markup": true, "rewrite": false })
@@ -2608,7 +2631,7 @@ static func _split_body(body: String) -> Dictionary:
 			i = pc + 1
 			continue
 		if body.unicode_at(p) == L.C_LT:
-			var bb := JsxScan._find_element_end(body, p, n)
+			var bb := JsxScan.element_end(body, p, n)
 			if bb == -1:
 				return { "error": D.make("GUITKX0304", D.ERROR, "unclosed markup in a `return`", p, 1) }
 			_push_body_ret(parts, cursor, { "at": i, "end": bb, "m_start": p, "m_end": bb, "shape": "bare", "depth": depth, "markup": true, "rewrite": true })

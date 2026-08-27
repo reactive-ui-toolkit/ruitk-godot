@@ -54,8 +54,8 @@ The suites: `core_test.gd` (reconciler/hooks/effects/bailout/context/keyed), `se
 every demo — the real check that generated `.gd` render without error), `doom_game_test.gd` (the
 Doom demo end-to-end), `guitkx_test.gd` (compiler + codegen + imports/resolver/codemod),
 `hmr_test.gd` (Fast Refresh), `guitkx_editor_test.gd` + `guitkx_lsp_test.gd` (editor addon),
-`builder_model_test.gd` (the RUITK Builder's document model — paths/tree/naming/specifiers/
-workspace/ledger),
+`builder_model_test.gd` + `builder_graph_test.gd` (the RUITK Builder — the document model, and
+the canvas projection with golden markup trees),
 `contract_dump.gd -- --check` (GD↔TS grammar goldens). `tests/guitkx_migrate.gd` runs the 0.10.0
 import codemod over `examples/` (idempotent — a clean tree reports 0 migrated). `bench*.gd` /
 `microbench.gd` are benchmarks, not pass/fail tests.
@@ -161,7 +161,10 @@ are synchronous. Preserve these behaviors — they're faithful-to-reference, not
   so there are no pending-intent lists for a consumer to forget to join. Everything here is
   pure or `FileAccess`-only and headlessly testable; its files reference each other through
   **preload consts**, never global `class_name`s, because `ProjectSettings.save()` truncates
-  the editor class cache to what the running process loaded.
+  the editor class cache to what the running process loaded. `canvas/` projects that model into
+  what the canvas draws — a card per module, a row per line, an edge per import — entirely from
+  the compiler's own analysis (`analyzed_decls`, `decl_structure`, `scan_imports`,
+  `RuitkGuitkxJsxScan.element_end`), so a row's span is exactly what the compiler compiled.
 - **External IDE extensions (`ide-extensions/`)** — a shared TypeScript language server + a TextMate
   grammar, driven by both VS Code and VS2022. Markup intelligence is answered locally from the schema;
   embedded-GDScript intelligence builds a synthetic `.gd` virtual document with a length-preserving
