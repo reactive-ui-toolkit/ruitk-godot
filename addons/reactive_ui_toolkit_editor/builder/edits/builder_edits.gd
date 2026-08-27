@@ -527,6 +527,100 @@ static func delete_clause(source: String, row: Graph.Line) -> String:
 ".join(out)
 
 
+## Every directive a row can be wrapped in, and the header each one is seeded with.
+##
+## The seeds are LITERALS that compile. Ported from the Unity leg's `AddWrapItems`, including its
+## reason: a placeholder identifier ("condition", "count") is a name the compiler can only reject,
+## so the preview reports an error on a wrap the user has not begun to type. `@while` seeds FALSE
+## deliberately -- a true-seeded render loop would not terminate.
+const WRAPS := [
+	{ "label": "@if", "header": "@if (true)" },
+	{ "label": "@for", "header": "@for (item in [])" },
+	{ "label": "@while", "header": "@while (false)" },
+]
+
+
+## Wraps a row in a `@match` with one `@case` around it.
+##
+## Its own operation rather than another `WRAPS` entry: a match's body is a container of clauses,
+## not markup, so the row has to land inside a `@case` -- wrapping it the way the others wrap
+## produces a match whose body is an element, which the parser refuses.
+static func wrap_in_match(source: String, row: Graph.Line) -> String:
+	if row == null:
+		return source
+	var lines := source.split("
+")
+	var from: int = clampi(row.source_line - 1, 0, lines.size() - 1)
+	var to: int = clampi((row.end_line if row.end_line > 0 else row.source_line) - 1,
+		from, lines.size() - 1)
+	var indent := _indent_of_line(str(lines[from]))
+	var unit := _indent_unit(source)
+
+	var out := PackedStringArray()
+	for i in range(lines.size()):
+		if i == from:
+			out.append(indent + "@match (0) {")
+			out.append(indent + unit + "@case (0) {")
+			out.append(indent + unit + unit + "return (")
+		if i >= from and i <= to:
+			out.append(unit + unit + unit + str(lines[i]))
+		else:
+			out.append(str(lines[i]))
+		if i == to:
+			out.append(indent + unit + unit + ")")
+			out.append(indent + unit + "}")
+			out.append(indent + "}")
+	return "
+".join(out)
+
+
+## Replaces a component's SETUP island -- the code between its body open and its markup return.
+##
+## Ported from the Unity leg's `OnIslandEdited`, including its normalisation: leading and
+## trailing blank lines go, the block's common indent is stripped, and one unit is put back. An
+## island pasted from somewhere else otherwise carries that file's indentation into this one.
+static func set_island(source: String, row_start: int, row_end: int, text: String) -> String:
+	if row_start <= 0:
+		return source
+	var lines := source.split("
+")
+	var from: int = clampi(row_start - 1, 0, lines.size() - 1)
+	var to: int = clampi(row_end - 1, from, lines.size() - 1)
+	var unit := _indent_unit(source)
+
+	var replacement := PackedStringArray()
+	for line in text.replace("
+", "
+").split("
+"):
+		replacement.append(str(line))
+	while replacement.size() > 0 and str(replacement[replacement.size() - 1]).strip_edges().is_empty():
+		replacement.remove_at(replacement.size() - 1)
+	while replacement.size() > 0 and str(replacement[0]).strip_edges().is_empty():
+		replacement.remove_at(0)
+
+	var shallowest := 1 << 30
+	for line in replacement:
+		if not str(line).strip_edges().is_empty():
+			shallowest = mini(shallowest, _indent_of_line(str(line)).length())
+	if shallowest == (1 << 30):
+		shallowest = 0
+
+	var out := PackedStringArray()
+	for i in range(lines.size()):
+		if i == from:
+			for line in replacement:
+				var text_line := str(line)
+				out.append("" if text_line.strip_edges().is_empty()
+					else unit + text_line.substr(shallowest))
+			continue
+		if i > from and i <= to:
+			continue
+		out.append(str(lines[i]))
+	return "
+".join(out)
+
+
 ## Removes a directive WRAPPER, keeping what it wrapped. The inverse of `wrap_in_directive`.
 ##
 ## Ported from the Unity leg's `RemoveDirectiveBlock`. The header, its `return (` / `)`

@@ -872,8 +872,7 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 			_row_menu.add_item("Edit attribute...", RowMenuId.EDIT_ATTRIBUTE)
 			_row_menu.add_item("Remove attribute...", RowMenuId.REMOVE_ATTRIBUTE)
 		_row_menu.add_separator()
-		_row_menu.add_item("Wrap in @if", RowMenuId.WRAP_IF)
-		_row_menu.add_item("Wrap in @for", RowMenuId.WRAP_FOR)
+		_row_menu.add_item("Wrap in...", RowMenuId.WRAP_IF)
 		# The FIRST element row is the component's return root: deleting it leaves a component
 		# with nothing to return, which is a compile error rather than an edit.
 		if row_index > 0 or section != Metrics.Section.MARKUP:
@@ -915,11 +914,16 @@ func _on_row_menu(id: int) -> void:
 			after = Edits.delete_clause(before, row)
 			what = "Delete the %s clause" % row.badge_text
 		RowMenuId.WRAP_IF:
-			after = Edits.wrap_in_directive(before, row, "@if (true)")
-			what = "Wrap %s in @if" % row.text.strip_edges()
-		RowMenuId.WRAP_FOR:
-			after = Edits.wrap_in_directive(before, row, "@for (item in [])")
-			what = "Wrap %s in @for" % row.text.strip_edges()
+			_search_purpose = "wrap"
+			var wraps: Array = []
+			for entry in Edits.WRAPS:
+				var spec := entry as Dictionary
+				wraps.append(SearchMenu.item(str(spec["label"]), str(spec["header"]),
+					str(spec["header"])))
+			wraps.append(SearchMenu.item("@match", "@match", "with one @case"))
+			_search_menu.open_menu("wrap %s in" % row.text.strip_edges(), wraps,
+				_menu_screen_at())
+			return
 		RowMenuId.ADD_CHILD:
 			_search_purpose = "child"
 			_search_menu.open_menu("add a child to %s" % row.text.strip_edges(),
@@ -1127,6 +1131,14 @@ func _on_search_picked(payload: Variant) -> void:
 				{ "kind": "attribute", "path": _menu_target, "row": _menu_row,
 					"name": str(spec["name"]), "quoted": bool(spec["quoted"]) })
 			return
+		"wrap":
+			var header := str(payload)
+			if header == "@match":
+				after = Edits.wrap_in_match(before, _menu_row)
+				what = "Wrap %s in @match" % _menu_row.text.strip_edges()
+			else:
+				after = Edits.wrap_in_directive(before, _menu_row, header)
+				what = "Wrap %s in %s" % [_menu_row.text.strip_edges(), header.split(" ")[0]]
 		"style":
 			# THE IMPORT LANDS WITH THE ATTRIBUTE. `style={Palette.CARD}` with nothing importing
 			# `Palette` is a file that does not compile, and a style applied in two commits is a
@@ -1177,6 +1189,9 @@ func _on_inline_committed(token: Variant, text: String) -> void:
 		"directive":
 			after = Edits.set_directive_header(before, row, text)
 			what = "Edit %s" % row.badge_text
+		"island":
+			after = Edits.set_island(before, int(spec.get("from", 0)), int(spec.get("to", 0)), text)
+			what = "Edit the setup of %s" % path.get_file()
 		"attribute":
 			var attr_name := str(spec.get("name", ""))
 			# AN EMPTIED VALUE TAKES THE ATTRIBUTE WITH IT. Writing `text=""` back would leave a
@@ -1210,6 +1225,10 @@ func _row_of(card_index: int, section: int, row_index: int):
 			rows = card.markup
 		Metrics.Section.EXPORTS:
 			rows = card.export_detail
+		Metrics.Section.ISLAND:
+			# The SETUP block is edited whole, not row by row: it is GDScript, and half a
+			# statement is not a thing to write back.
+			return card.markup[0] if not card.markup.is_empty() else null
 		_:
 			return null
 	return rows[row_index] if row_index >= 0 and row_index < rows.size() else null

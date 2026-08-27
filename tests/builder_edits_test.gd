@@ -33,6 +33,8 @@ func _initialize() -> void:
 	_test_wrap_in_directive()
 	_test_clauses()
 	_test_unwrap()
+	_test_wrap_variants()
+	_test_island()
 	_test_imports()
 	_test_setup_lines()
 	_test_style_entries()
@@ -695,3 +697,63 @@ func _test_unwrap() -> void:
 	var lying := Graph.Line.new()
 	lying.directive_line = 0
 	_eq(Edits.unwrap_directive(IF_SRC, lying), IF_SRC, "no directive line, no change")
+
+
+# ── Every wrap the menu offers ───────────────────────────────────────────────────────
+
+func _test_wrap_variants() -> void:
+	_section("every directive the wrap menu offers produces something that COMPILES")
+	# The whole reason the headers are seeded with literals. A placeholder identifier is a name
+	# the compiler can only reject, so the preview would report an error on a wrap nobody has
+	# begun to type.
+	var src := "export App() -> RuitkVNode {
+	return (
+		<VBoxContainer>
+			<Label text=\"hi\" />
+		</VBoxContainer>
+	)
+}
+"
+	for entry in Edits.WRAPS:
+		var spec := entry as Dictionary
+		var out := Edits.wrap_in_directive(src, _row(src, "Label"), str(spec["header"]))
+		var compiled: Dictionary = Compiler.compile(out, "App")
+		_check(bool(compiled["ok"]), "%s compiles (got %s)"
+			% [str(spec["label"]), str(compiled.get("diagnostics", []))])
+
+	_section("@match wraps the row in a @case, because a match body is clauses")
+	var matched := Edits.wrap_in_match(src, _row(src, "Label"))
+	_check(matched.contains("@case"), "the row landed inside a case")
+	var m: Dictionary = Compiler.compile(matched, "App")
+	_check(bool(m["ok"]), "and the match compiles (got %s)" % str(m.get("diagnostics", [])))
+
+
+# ── The setup island ─────────────────────────────────────────────────────────────────
+
+func _test_island() -> void:
+	_section("a component's setup can be replaced wholesale")
+	var src := "export App() -> RuitkVNode {
+	var a = 1
+	var b = 2
+	return (
+		<Label text=\"hi\" />
+	)
+}
+"
+	var out := Edits.set_island(src, 2, 3, "var only = 3")
+	_check(out.contains("var only = 3"), "the new text is in")
+	_check(not out.contains("var a = 1"), "and the old island is out")
+	_check(bool(Compiler.compile(out, "App")["ok"]), "and it still compiles")
+
+	_section("pasted text is normalised, not carried in as it was")
+	var messy := Edits.set_island(src, 2, 3, "
+
+        var deep = 1
+        var also = 2
+
+")
+	# Blank edges gone, the block's OWN common indent stripped, one unit put back -- an island
+	# pasted from another file otherwise carries that file's indentation into this one.
+	_check(messy.contains("	var deep = 1"), "one unit of this file's indent, not the source's")
+	_check(messy.contains("	var also = 2"), "for every line, relative to the block")
+	_check(bool(Compiler.compile(messy, "App")["ok"]), "and it compiles")
