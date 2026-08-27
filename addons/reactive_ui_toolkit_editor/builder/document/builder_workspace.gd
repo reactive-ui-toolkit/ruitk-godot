@@ -31,6 +31,7 @@ const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/
 const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_module.gd")
 const BuilderTree = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_tree.gd")
 const Specifiers = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_specifiers.gd")
+const Formatter = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_formatter.gd")
 
 signal changed
 
@@ -40,6 +41,20 @@ var _tree := BuilderTree.new()
 ## filesystem; a headless run leaves it unset and nothing tries to reach an editor that
 ## is not there.
 var rescan := Callable()
+
+## Whether Save normalises each buffer through the formatter before writing it.
+##
+## ON by default, matching the editor's own `format_on_save`. Save is the right moment and the
+## only right moment: formatting on every edit would re-flow text the user is in the middle of
+## typing, and formatting never would let a canvas-authored file drift from a hand-authored one
+## until they no longer look like the same language.
+##
+## The formatted text becomes the BUFFER, not just the bytes -- otherwise the card and the file
+## disagree the instant the save lands, and the module reads as dirty again immediately.
+var format_on_save := true
+
+## Options handed to the formatter. Empty means its own defaults, which are the family's.
+var formatter_options := {}
 
 ## How a retired file leaves the project, as `(path) -> bool`. Unset means the real thing:
 ## the platform trash, falling back to a plain remove where there is none. It is a seam
@@ -487,6 +502,12 @@ func save_all() -> int:
 		# and is invisible, which is worse than not writing it at all.
 		if module.read_only or is_unlocated(module.file_path()):
 			continue
+		# A blank module is not written either. An empty `.guitkx` is a file that cannot compile
+		# and a card with nothing on it -- almost always a module the user created and then
+		# thought better of. It stays in the tree, unsaved, and `blank_modules` lets the caller
+		# offer to delete it; writing it and letting the compiler complain is the worse answer.
+		if _is_blank(module):
+			continue
 		var target := module.file_path()
 		if target.is_empty():
 			continue
@@ -507,6 +528,7 @@ func save_all() -> int:
 			touched_disk = true
 
 		if not module.is_on_disk() or module.is_dirty():
+			_format(module)
 			_ensure_directory(target)
 			touched_disk = touched_disk or not module.is_on_disk()
 			if not _write_text(target, module.to_disk_text()):
@@ -690,3 +712,37 @@ static func _import_targets_of(module: Module) -> PackedStringArray:
 		if not mapped.is_empty():
 			out.append(mapped)
 	return out
+
+
+## Every module whose buffer holds nothing but whitespace.
+##
+## Save skips these, so the caller can ask about them first: almost always a module that was
+## created and then thought better of, and offering to delete it is a better answer than writing
+## a file that cannot compile.
+func blank_modules() -> Array[Module]:
+	var out: Array[Module] = []
+	for module in _tree.modules():
+		if not module.read_only and _is_blank(module):
+			out.append(module)
+	return out
+
+
+static func _is_blank(module: Module) -> bool:
+	return module.buffer_text.strip_edges().is_empty()
+
+
+## Normalises a buffer through the formatter, in place.
+##
+## A file the formatter cannot parse is LEFT ALONE. Mid-edit a buffer is unparseable most of the
+## time, and a save is not the moment to refuse the user's work over it -- the compiler will say
+## so on its own, with a position.
+func _format(module: Module) -> void:
+	if not format_on_save:
+		return
+	var result: Dictionary = Formatter.format(module.buffer_text, formatter_options)
+	if bool(result.get("fell_back", false)) or not bool(result.get("ok", false)):
+		return
+	var text := str(result.get("text", ""))
+	if text.is_empty() or text == module.buffer_text:
+		return
+	module.buffer_text = text

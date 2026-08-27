@@ -36,6 +36,7 @@ const Console = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/
 const InlineEditor = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_inline_editor.gd")
 const Edits = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_edits.gd")
 const Drag = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_drag.gd")
+const AddonSettings = preload("res://addons/reactive_ui_toolkit_editor/editor/ruitk_editor_settings.gd")
 
 ## The tree changed in a way the host should know about -- for the plugin's title, or a prompt on
 ## close.
@@ -191,6 +192,7 @@ func open_tree(focus_path: String) -> void:
 	# On open, not only on teardown: a crashed editor leaves a mirror behind, and compiling
 	# against a shadow tree is worse than compiling against nothing.
 	Preview.clear_scratch()
+	workspace.format_on_save = AddonSettings.is_enabled(AddonSettings.KEY_FORMAT_ON_SAVE)
 	workspace.load_tree(focus_path)
 	preview.workspace = workspace
 	ledger.clear()
@@ -278,14 +280,58 @@ func _on_buffer_edited(file_path: String, before: String, after: String) -> void
 
 # ── Preview ──────────────────────────────────────────────────────────────────────────
 
-## Runs a preview round if the debounce has settled. Called from the host's idle tick.
+## Runs a preview round if the debounce has settled, and journals unsaved work on its own
+## cadence. Called from the host's idle tick.
 func tick() -> void:
+	_journal_tick()
 	if not preview.is_due():
 		return
 	var summary = preview.compile_dirty(_focus_path)
 	if summary != null:
 		_console.report(summary)
 	_refresh_status()
+
+
+## How often unsaved work is written to the crash journal, in milliseconds.
+##
+## On a TIMER, not on every change: the journal is the whole tree serialised, and writing it per
+## keystroke would put a file write in the typing path. Five seconds is the most work a crash can
+## cost, which against losing a whole session is the trade worth making.
+const JOURNAL_INTERVAL_MSEC := 5000
+
+var _journalled_at := 0
+
+
+func _journal_tick() -> void:
+	if workspace == null or not workspace.has_unsaved_changes():
+		return
+	var now := Time.get_ticks_msec()
+	if now - _journalled_at < JOURNAL_INTERVAL_MSEC:
+		return
+	_journalled_at = now
+	Journal.capture(workspace, Time.get_datetime_string_from_system(true))
+
+
+## What a crashed session left behind, or {} -- { modules, saved_at }.
+##
+## The journal exists ONLY while there is unsaved work, so the file being there means exactly one
+## thing and the offer needs no other evidence to be sure it is not noise.
+func pending_recovery() -> Dictionary:
+	return Journal.peek()
+
+
+## Takes the recovered tree. The caller asks first: restoring over an open tree replaces it.
+func restore_recovery() -> bool:
+	if workspace == null or not Journal.try_restore(workspace):
+		return false
+	reproject()
+	_source.refresh_from_model()
+	preview.request_refresh()
+	return true
+
+
+func discard_recovery() -> void:
+	Journal.clear()
 
 
 # ── Commands ─────────────────────────────────────────────────────────────────────────
@@ -304,10 +350,23 @@ func run_command(id: int) -> void:
 			_canvas.fit_to_view()
 
 
+## Writes the tree.
+##
+## A BLANK module is not written and does not block the save: it stays pending, and the console
+## says so, because it is almost always a module someone created and then thought better of.
+## Deleting it is the user's call, and refusing the whole save over it would hold every other
+## change hostage to a decision about one empty file.
 func save() -> int:
 	if workspace == null:
 		return 0
+	for blank in workspace.blank_modules():
+		_console.add_diagnostics(blank.file_path(), [{
+			"code": "", "severity": Console.SEVERITY_WARNING, "line": -1,
+			"message": "empty, so it was not written -- delete it, or give it something to hold",
+		}])
 	var written := workspace.save_all()
+	# Cleared HERE, not on a clean tree: the journal being there has to mean exactly one thing --
+	# work existed that never reached disk -- or the recovery offer becomes noise.
 	Journal.clear()
 	_capture_layout()
 	_folders.rebuild()
