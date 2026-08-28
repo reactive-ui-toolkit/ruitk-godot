@@ -1486,6 +1486,12 @@ func _with_component_import(source: String, importer_path: String, tag: String) 
 			continue
 		if Paths.same(card.file_path, importer_path):
 			return source
+		# ALREADY IMPORTED, IN WHATEVER SPELLING. `ensure_import` matches on the specifier STRING,
+		# so a file importing `./components/row/row` got a SECOND import when this builder wrote
+		# the same module as `~/app/components/row/row` -- two imports of one module, and the
+		# compiler rejects the duplicate binding.
+		if not _spec_importing(source, importer_path, card.file_path).is_empty():
+			return source
 		return Edits.ensure_import(source, importer_path, card.file_path,
 			PackedStringArray([tag]))
 	return source
@@ -2368,7 +2374,11 @@ func _rename_to(name: String) -> void:
 		var importer := workspace.try_get(card.file_path)
 		if importer == null or importer.read_only:
 			continue
-		var spec := Specifiers.relative(card.file_path.get_base_dir(), module.file_path())
+		# THE SPECIFIER THE IMPORTER ACTUALLY WROTE. `Specifiers.relative` returns the spelling
+		# THIS builder would choose, and an importer written by hand -- or by an earlier version --
+		# says the same path differently. Looking for the wrong string found nothing and the
+		# rename silently left every importer pointing at a name that no longer exists.
+		var spec := _spec_importing(importer.buffer_text, card.file_path, module.file_path())
 		if spec.is_empty():
 			continue
 		var rebound := Edits.rename_binding(importer.buffer_text, spec, old_export, name)
@@ -2932,6 +2942,38 @@ func _buffer_of(file_path: String) -> String:
 ##
 ## The question deletion asks before it does anything. Answered from the MODEL's import scan rather
 ## than by matching text, so an import written across two lines or with an alias still counts.
+## The specifier `source` uses to import `target`, whatever spelling it is written in, or "".
+func _spec_importing(source: String, importer_path: String, target: String) -> String:
+	# RESOLVED WITHOUT TOUCHING DISK. `Specifiers.map` goes through the compiler's resolver, which
+	# checks that the file EXISTS -- and nothing in this builder exists until Save, so on the tree
+	# the user is actually working in it answers "" for every import. Comparing the specifier
+	# STRING instead is no better: the same module reads `./components/row/row`, `../row/row` or
+	# `~/app/components/row/row` depending on who wrote it.
+	#
+	# So the join is done here, against the importer's own folder, and matched on the target's
+	# stem -- a specifier never carries the module suffix.
+	var stem := target
+	for suffix in [".style.guitkx", ".hooks.guitkx", ".guitkx"]:
+		if stem.ends_with(suffix):
+			stem = stem.substr(0, stem.length() - suffix.length())
+			break
+	var stem_key := Paths.key(stem)
+	var folder := importer_path.get_base_dir()
+	for imp in Compiler.scan_imports(source):
+		var spec := str(imp.get("spec", ""))
+		if spec.is_empty():
+			continue
+		if spec.begins_with("~/"):
+			# Root-relative: the walk-up root is a disk question too, so match on the tail, which
+			# is what makes two spellings of one path the same file.
+			if stem_key.ends_with(Paths.key(spec.substr(2))):
+				return spec
+			continue
+		if Paths.key(Paths.canon(folder.path_join(spec))) == stem_key:
+			return spec
+	return ""
+
+
 func referrers_to(target: String) -> PackedStringArray:
 	var out := PackedStringArray()
 	if workspace == null or graph == null:
@@ -2939,13 +2981,11 @@ func referrers_to(target: String) -> PackedStringArray:
 	for card in graph.cards:
 		if Paths.same(card.file_path, target):
 			continue
-		var spec := Specifiers.relative(card.file_path.get_base_dir(), target)
-		if spec.is_empty():
-			continue
 		var module := workspace.try_get(card.file_path)
 		if module == null:
 			continue
-		if Edits.imports_specifier(module.buffer_text, spec):
+		# Asked by RESOLVED PATH, so an import written `./x`, `../y/x` or `~/a/b/x` all count.
+		if not _spec_importing(module.buffer_text, card.file_path, target).is_empty():
 			out.append(card.file_path)
 	return out
 
@@ -2966,15 +3006,22 @@ func delete_module(file_path: String) -> bool:
 	if module == null or module.read_only:
 		return false
 
+	# DELETE AND STRIP, one ledger entry -- verified against the Unity source rather than taken
+	# from the capability document, which the two disagree about.
+	#
+	# The spec (§2) says "deleting is refused while another module still imports it, naming the
+	# referrers", and this port did that for a while on the strength of it. `BuilderWindow.cs:851`
+	# does the opposite and says why: "One entry covers the module AND every reference to it, so a
+	# single undo puts the tree back exactly as it was." The defect register records the refusal
+	# as a design Unity RETIRED. The source is the reference, so the source wins; the spec line is
+	# stale.
+	#
+	# Only the IMPORT is removed, not the usages it bound: a `<Card />` left in the markup is a
+	# visible, locatable error the user can decide about, and silently deleting rows of their
+	# layout because a module went away is a much worse surprise.
 	var referrers := referrers_to(file_path)
-	if not referrers.is_empty():
-		var names := PackedStringArray()
-		for path in referrers:
-			names.append(str(path).get_file())
-		toast("Can't delete %s — still imported by %s" % [file_path.get_file(), ", ".join(names)])
-		return false
-
 	ledger.begin("Delete %s" % file_path.get_file())
+	_strip_references_to(file_path)
 	if not workspace.delete(file_path):
 		ledger.end()
 		return false
@@ -2983,7 +3030,47 @@ func delete_module(file_path: String) -> bool:
 	reproject()
 	_source.refresh_from_model()
 	preview.request_refresh()
+	if referrers.is_empty():
+		toast("Deleted %s — applies on Save" % file_path.get_file())
+	else:
+		toast("Deleted %s — dropped the import from %d file(s)"
+			% [file_path.get_file(), referrers.size()])
 	return true
+
+
+## Removes every import of `target` from every other module in the tree.
+##
+## Ported from `StripReferencesTo` (BuilderWindow.cs:1578). Inside the caller's ledger
+## transaction, so one undo puts back the module AND every import that went with it.
+func _strip_references_to(target: String) -> void:
+	if workspace == null or graph == null:
+		return
+	for card in graph.cards:
+		if Paths.same(card.file_path, target):
+			continue
+		var module := workspace.try_get(card.file_path)
+		if module == null or module.read_only:
+			continue
+		# BY RESOLVED PATH, not by comparing specifier strings. The same module can be imported as
+		# `./components/row/row`, `../row/row` or `~/tests/.../row`, and only the compiler's own
+		# resolution knows those are one file -- so a string compare against the spelling this
+		# builder happens to write missed every import written any other way.
+		# EVERY import of the target, not the first. One module can be imported twice under two
+		# spellings -- `./x` and `~/a/b/x` are the same file and `ensure_import` matched on the
+		# STRING, so it was possible to end up with both.
+		var text := module.buffer_text
+		var guard := 0
+		while guard < 8:
+			guard += 1
+			var spec := _spec_importing(text, card.file_path, target)
+			if spec.is_empty():
+				break
+			var stripped := Edits.remove_import(text, spec)
+			if stripped == text:
+				break
+			text = stripped
+		if text != module.buffer_text:
+			apply_edit(card.file_path, text, "Drop the import of %s" % target.get_file())
 
 
 ## The last toast the builder raised -- where a refusal says why it refused.

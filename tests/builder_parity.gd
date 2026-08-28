@@ -43,7 +43,8 @@ const PARITY := [
 	["RenameTargetPath (shared by prompt and rename)", "func rename_target"],
 	["RenameModule (export + bindings + uses)", "func rename_export"],
 	["ValidateRenameName", "func _validate_rename"],
-	["ReferrersTo (delete refused while imported)", "func referrers_to"],
+	["StripReferencesTo (delete takes its imports with it)", "func _strip_references_to"],
+	["an import matched by RESOLVED PATH, not by spelling", "func _spec_importing"],
 	# The source pane
 	["BeginSourceEdit", "func _set_editing"],
 	["ApplySourceEdit", "func apply_edit"],

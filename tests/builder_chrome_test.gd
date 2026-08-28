@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 314
+const ASSERTION_FLOOR := 316
 
 var _fails := 0
 var _passes := 0
@@ -85,7 +85,7 @@ func _run() -> void:
 	await _test_selection_and_delete()
 	await _test_save_confirms_deletions()
 	await _test_create_placement()
-	await _test_delete_refused_while_imported()
+	await _test_delete_strips_references()
 	await _test_delete_and_undo()
 	await _test_read_only()
 	_test_cleanup()
@@ -340,14 +340,31 @@ func _test_component_child_brings_its_import() -> void:
 		_drop(w)
 		return
 
-	# The nested child, dropped into the root component that does not import it yet.
 	var host: String = ROOT.path_join("app.guitkx")
 	var before: String = w.workspace.try_get(host).buffer_text
-	var after: String = w._with_component_import(before, host, "Row")
 
+	# A COMPONENT ALREADY IMPORTED IS NOT IMPORTED AGAIN, whatever spelling the existing import
+	# uses. The fixture imports Row as `./components/row/row`; this builder writes the same module
+	# as `~/app/components/row/row`, and `ensure_import` matches on the specifier STRING -- so
+	# asking for it produced a SECOND import of one module and a duplicate binding.
+	_eq(w._with_component_import(before, host, "Row"), before,
+		"Row is already imported, under a different spelling")
+
+	# And one that is NOT imported does get a line.
+	# NOT "Panel" -- that is a real Godot class, so it is a HOST tag and needs no import at all.
+	w.workspace.create_new(ROOT.path_join("components/side/side.guitkx"),
+		"export SidePanel() -> RuitkVNode {
+	return (
+		<Label />
+	)
+}
+")
+	w.reproject()
+	await process_frame
+	var after: String = w._with_component_import(before, host, "SidePanel")
 	_check(after != before, "the import was added")
 	_check(after.contains("import"), "and it is an import line")
-	_check(after.contains("Row"), "naming the component that was dropped")
+	_check(after.contains("SidePanel"), "naming the component that was dropped")
 
 	# A file that does not compile for a moment is a file the preview reports on, about an edit
 	# the builder itself was halfway through making. The import lands with the tag or not at all.
@@ -1641,8 +1658,15 @@ func _test_create_placement() -> void:
 	_drop(w)
 
 
-func _test_delete_refused_while_imported() -> void:
-	_section("a module another one imports cannot just be deleted")
+## DELETING A MODULE TAKES ITS IMPORTS WITH IT, as one undoable action.
+##
+## Checked against the Unity SOURCE, not the capability document -- the two disagree. The spec
+## (§2) says the delete is refused while something imports it; `BuilderWindow.cs:851` strips and
+## deletes, and says why: "One entry covers the module AND every reference to it, so a single undo
+## puts the tree back exactly as it was." The defect register records the refusal as a design
+## Unity RETIRED. The source is the reference, so the spec line is the stale one.
+func _test_delete_strips_references() -> void:
+	_section("a module another one imports still deletes")
 	var w := _window()
 	await process_frame
 	var host := ROOT.path_join("app.guitkx")
@@ -1657,19 +1681,17 @@ func _test_delete_refused_while_imported() -> void:
 	_eq(referrers.size(), 1, "the importer is found")
 	_eq(str(referrers[0]), host, "and it is named by path")
 
-	_check(not w.delete_module(target), "so the delete is refused")
-	_check(w.workspace.try_get(target) != null, "and the module is still in the tree")
-	_check(w.toast_text().contains("row.guitkx"), "the refusal names what was refused")
-	_check(w.toast_text().contains("app.guitkx"), "and names the module that still imports it")
+	_check(w.delete_module(target), "the delete goes through")
+	_check(w.workspace.try_get(target) == null, "and the module leaves the tree")
+	_check(not w._buffer_of(host).contains("components/row/row"),
+		"the importer's import went with it")
+	_check(w.toast_text().contains("1 file"), "and the toast says how many files it touched")
 
-	_section("unwire it and the same delete goes through")
-	# The unwiring is the USER's edit, in their own undo history, on a file they chose -- which is
-	# the whole difference between this and stripping it for them.
-	var spec := Specifiers.relative(host.get_base_dir(), target)
-	w.apply_edit(host, Edits.remove_import(w._buffer_of(host), spec), "drop the import")
+	_section("one undo puts back the module AND the import")
+	_check(w.undo(), "undo runs")
 	await process_frame
-	_eq(w.referrers_to(target).size(), 0, "nothing imports it now")
-	_check(w.delete_module(target), "and now it deletes")
+	_check(w.workspace.try_get(target) != null, "the module is back")
+	_check(w._buffer_of(host).contains("components/row/row"), "and so is the import")
 
 	_drop(w)
 
