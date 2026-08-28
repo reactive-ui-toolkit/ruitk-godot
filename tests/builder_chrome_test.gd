@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 321
+const ASSERTION_FLOOR := 328
 
 var _fails := 0
 var _passes := 0
@@ -67,6 +67,7 @@ func _run() -> void:
 	await _test_add_chip_opens_the_editor()
 	await _test_preview_anchor_and_knobs()
 	await _test_double_click_edits_in_place()
+	await _test_island_editor_is_multiline()
 	await _test_diagnostics_reach_the_surface()
 	await _test_source_pane_keyboard()
 	await _test_delete_refuses_what_it_must()
@@ -1072,6 +1073,49 @@ func _test_double_click_edits_in_place() -> void:
 ## `GuitkxCodeEdit` owns a diagnostics gutter, a per-line store and a hover composer, and the
 ## builder called NONE of it: the gutter it embeds was permanently blank, so an error in the file
 ## being edited was invisible on the surface it was being edited on.
+## A SETUP ISLAND IS EDITED IN A MULTILINE FIELD, and Enter in it is a newline.
+##
+## The island had no editor at all, and when double-click was wired up it reached the SINGLE-LINE
+## editor -- which would have flattened a multi-statement island into one line on commit.
+func _test_island_editor_is_multiline() -> void:
+	var w := _window()
+	await process_frame
+	var editor := w.island_editor()
+	# A TextEdit, so Enter is a newline rather than a commit. The parser already knows the type,
+	# so the assertion that matters is BEHAVIOURAL: it holds more than one line.
+	_check(editor is TextEdit, "the island editor is a TextEdit")
+
+	_section("it round-trips a multi-line island")
+	var body := "var a = 1
+var b = 2
+var c = a + b"
+	var got := []
+	editor.committed.connect(func(_t: Variant, text: String): got.append(text))
+	editor.open_at(Rect2(0, 0, 400, 120), body, { "kind": "island" })
+	_eq(editor.text, body, "seeded with every line")
+	_eq(editor.get_line_count(), 3, "as three lines")
+	editor.commit()
+	_eq(got.size(), 0, "committing unchanged text reports nothing")
+
+	_section("Ctrl+Enter commits, Escape cancels")
+	editor.open_at(Rect2(0, 0, 400, 120), body, { "kind": "island" })
+	editor.text = body + "
+var d = 4"
+	var apply := InputEventKey.new()
+	apply.keycode = KEY_ENTER
+	apply.pressed = true
+	apply.ctrl_pressed = true
+	editor._gui_input(apply)
+	_eq(got.size(), 1, "the edit committed")
+	if got.size() > 0:
+		_check(str(got[0]).contains("var d = 4"), "with the new line in it")
+		_eq(str(got[0]).split("
+").size(), 4, "and all four lines intact")
+
+	editor.queue_free()
+	_drop(w)
+
+
 func _test_diagnostics_reach_the_surface() -> void:
 	var w := _window()
 	await process_frame

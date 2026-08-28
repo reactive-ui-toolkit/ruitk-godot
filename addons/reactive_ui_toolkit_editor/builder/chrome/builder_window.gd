@@ -34,6 +34,7 @@ const LibraryPane = preload("res://addons/reactive_ui_toolkit_editor/builder/chr
 const SourcePane = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_source_pane.gd")
 const Console = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_console.gd")
 const InlineEditor = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_inline_editor.gd")
+const IslandEditor = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_island_editor.gd")
 const Edits = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_edits.gd")
 const Specifiers = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_specifiers.gd")
 const Drag = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_drag.gd")
@@ -90,6 +91,9 @@ var _library: LibraryPane = null
 var _source: SourcePane = null
 var _console: Console = null
 var _inline: InlineEditor = null
+
+## The multiline editor, for a card's setup island.
+var _island: IslandEditor = null
 var _toolbar: HBoxContainer = null
 var _status: Label = null
 var _card_menu: PopupMenu = null
@@ -336,6 +340,9 @@ func _cancel_active_edit() -> void:
 	if _search_menu != null and _search_menu.visible:
 		_search_menu.hide()
 		return
+	if _island != null and _island.is_open():
+		_island.cancel()
+		return
 	if _inline != null and _inline.is_open():
 		_inline.cancel()
 		return
@@ -410,6 +417,12 @@ func _build_ui() -> void:
 	canvas_layer.add_child(_canvas)
 	_inline = InlineEditor.new()
 	canvas_layer.add_child(_inline)
+	# A SEPARATE MULTILINE EDITOR for the setup island. The two differ in what Enter means -- a
+	# single-line field commits on it, GDScript takes it as a new statement -- and routing an
+	# island through the single-line one would flatten a multi-statement island into one line the
+	# moment it committed.
+	_island = IslandEditor.new()
+	canvas_layer.add_child(_island)
 
 	# The onboarding panel sits on the canvas layer and hides itself the moment a tree opens.
 	# A builder whose empty state is an empty grey rectangle has told a first-time user nothing:
@@ -752,6 +765,12 @@ func _wire() -> void:
 	_canvas.dropped.connect(_on_canvas_drop)
 	_canvas.card_moved.connect(_on_card_moved)
 	_inline.committed.connect(_on_inline_committed)
+	# The same funnel: an island commit is an edit like any other.
+	_island.committed.connect(_on_inline_committed)
+	_island.cancelled.connect(func(_token: Variant, undo_seeding: bool):
+		_menu_row = null
+		if undo_seeding:
+			undo())
 	# An ABANDONED inline edit still has to clear what it was about: leaving `_menu_row` pointing
 	# at a row after the user pressed Escape means the next Delete acts on a row they walked away
 	# from.
@@ -1236,7 +1255,7 @@ func _on_row_activated(card_index: int, section: int, row_index: int, at: Vector
 			_inline.open_at(rect, row.source_text,
 				{ "kind": "body", "path": card.file_path, "row": row })
 		Metrics.Section.ISLAND:
-			_inline.open_at(rect, _LF.join(card.island_lines),
+			_island.open_at(rect, _LF.join(card.island_lines),
 				{ "kind": "island", "path": card.file_path, "row": row,
 					"from": card.island_start_line, "to": card.island_end_line })
 		Metrics.Section.EXPORTS:
@@ -3197,6 +3216,11 @@ func source_pane() -> SourcePane:
 
 func console() -> Console:
 	return _console
+
+
+## The multiline island editor, for a test that needs to drive it.
+func island_editor() -> IslandEditor:
+	return _island
 
 
 func inline_editor() -> InlineEditor:
