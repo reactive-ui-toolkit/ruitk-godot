@@ -250,11 +250,26 @@ static func find_menu_bar(node: Node, depth_budget: int) -> MenuBar:
 ## Godot asks every plugin for unsaved state before quitting: a non-empty string joins the editor's
 ## own quit-confirmation dialog (parity plan L4 — without this, quit silently drops buffers).
 func _get_unsaved_status(for_scene: String) -> String:
-	if for_scene.is_empty() and _view != null:
+	if not for_scene.is_empty():
+		return ""
+	var parts := PackedStringArray()
+	if _view != null:
 		var dirty: Array = _view.dirty_files()
 		if not dirty.is_empty():
-			return "Reactive UI Toolkit — Godot Editor: unsaved changes in %s." % ", ".join(dirty)
-	return ""
+			parts.append("unsaved changes in %s" % ", ".join(dirty))
+	# THE BUILDER IS ASKED TOO. Its whole contract is that NOTHING reaches disk until Save, so a
+	# quit with a tree open discards more than any other surface here can -- and it was the one
+	# surface Godot's own save door never asked. The builder even declares a `dirty_changed`
+	# signal "for the plugin's title, or a prompt on close" that nothing had ever connected.
+	if _builder != null and _builder.workspace != null 			and _builder.workspace.has_unsaved_changes():
+		var count := 0
+		for module in _builder.workspace.modules():
+			if module.is_dirty() or not module.is_on_disk() or module.has_moved():
+				count += 1
+		parts.append("the RUITK Builder holds %d unwritten module(s)" % count)
+	if parts.is_empty():
+		return ""
+	return "Reactive UI Toolkit — Godot Editor: %s." % "; ".join(parts)
 
 ## Session persistence across editor restarts (G17): open files, current tab, carets, zoom, wrap
 ## ride Godot's own editor-layout store.
@@ -434,6 +449,11 @@ func _open_builder() -> void:
 		# Hidden, not freed: a session with unsaved work has to survive the window closing.
 		_builder_window.close_requested.connect(func(): _builder_window.hide())
 		_builder_window.add_child(_builder)
+		# THE TITLE CARRIES THE STATE. A save-only builder that looks identical whether or not it
+		# holds unwritten work gives the user nothing to notice before they close the window.
+		_builder.dirty_changed.connect(func(has_unsaved: bool):
+			if _builder_window != null:
+				_builder_window.title = "RUITK Builder *" if has_unsaved else "RUITK Builder")
 		EditorInterface.get_base_control().add_child(_builder_window)
 
 	# A session already open is shown as it is. Only a builder with NOTHING open needs a file to

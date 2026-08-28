@@ -132,6 +132,7 @@ const PARITY := [
 	["Save names every file it would delete", "func _confirmed_deletions"],
 	["AbortAll", "func abort_all"],
 	["OfferJournalRestore", "func _offer_recovery"],
+	["the editor's quit door knows the builder is dirty", "dirty_changed.connect"],
 	["LoadTreeFor (keeps unsaved work)", "func load_tree_for"],
 	["FormatDirtyBuffers through the funnel", "func _format_dirty_buffers"],
 ]
