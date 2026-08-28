@@ -96,6 +96,7 @@ const PARITY := [
 	["OnKeyDown", "func _typing_focused"],
 	["DeleteSelection", "func _delete_selection"],
 	["row selection, one thing at a time", "func select_row"],
+	["hovering a hook chip highlights its usages", "func row_mentions"],
 	["a copyable diagnostics console", "func copy_text"],
 	["CancelActiveEdit", "func _cancel_active_edit"],
 	# Save

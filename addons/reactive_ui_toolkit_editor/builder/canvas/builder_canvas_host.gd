@@ -61,6 +61,9 @@ var selected := -1
 var selected_row_section := -1
 var selected_row_index := -1
 
+## The identifiers the hovered hook chip binds. Empty when nothing is hovered.
+var highlight_names := PackedStringArray()
+
 var _cards: Control = null
 var _edges: Edges = null
 var _root: RuitkRoot = null
@@ -141,6 +144,46 @@ func select_card(index: int) -> void:
 	_render()
 
 
+## HOVERING A HOOK CHIP HIGHLIGHTS EVERY USAGE of what it returns (capability reference §4).
+##
+## A hook chip reads `useState  →  count`, and the question it raises is the one the card cannot
+## otherwise answer: where does `count` actually get used. Rendering the answer on hover keeps it
+## out of the way until it is asked for.
+func _track_hover(at: Vector2) -> void:
+	var names := PackedStringArray()
+	var index := card_at(at)
+	if index >= 0:
+		var hit := row_at(index, at)
+		if bool(hit.get("found", false)) and int(hit["section"]) == int(Metrics.Section.BODY):
+			var rows: Array[Graph.Line] = graph.cards[index].body
+			var row_index := int(hit["index"])
+			if row_index >= 0 and row_index < rows.size():
+				names = _bound_names(rows[row_index])
+	if names == highlight_names:
+		return
+	highlight_names = names
+	_render()
+
+
+## The identifiers a hook chip introduces, read off its own text.
+##
+## The chip is projected as `useState  →  count, set_count`, so the bindings are what follows the
+## arrow. Taken from the projected row rather than re-parsed: the row is what the user is pointing
+## at, and a second parse of the same line is a second thing to keep in step.
+static func _bound_names(row: Graph.Line) -> PackedStringArray:
+	var out := PackedStringArray()
+	if row == null:
+		return out
+	var arrow := row.text.find("→")
+	if arrow < 0:
+		return out
+	for part in row.text.substr(arrow + "→".length()).split(","):
+		var name := str(part).strip_edges()
+		if not name.is_empty():
+			out.append(name)
+	return out
+
+
 ## Selects one ROW on one card -- a markup row, a hook chip, an import row, a code island line or
 ## a style entry. Any row the canvas lists is selectable, because each is backed by a line range
 ## that knows how to remove itself.
@@ -217,6 +260,7 @@ func _render() -> void:
 		"zoom": zoom,
 		"viewport": size,
 		"selected": selected,
+		"highlight_names": highlight_names,
 		"selected_row_section": selected_row_section,
 		"selected_row_index": selected_row_index,
 		"on_add": Callable(self, "_on_card_add"),
@@ -442,6 +486,8 @@ func _handle_motion(motion: InputEventMouseMotion) -> void:
 		_render()
 		accept_event()
 		return
+
+	_track_hover(motion.position)
 
 	if _panning:
 		camera += motion.position - _pan_from

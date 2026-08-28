@@ -192,6 +192,19 @@ static func add_chip() -> Dictionary:
 
 
 
+## The band behind a row that USES what the hovered hook chip binds.
+##
+## Warmer and fainter than selection: this is a transient answer to "where is this used", not a
+## thing the user has picked, and the two must not read as the same state.
+static func row_highlighted() -> Dictionary:
+	return {
+		"bg_color": Color(0.925, 0.706, 0.416, 0.16),
+		"corner_radius_all": 4,
+		"content_margin_left": 3,
+		"content_margin_right": 3,
+	}
+
+
 ## The band behind the SELECTED row -- a warm fill and an accent outline.
 ##
 ## Selection has to be visible on the row itself, not only in the panes that follow it. Delete acts

@@ -35,7 +35,7 @@
 export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 		viewport = Vector2(1280, 720), selected: int = -1, on_add = null,
 		revision: int = 0, selected_row_section: int = -1,
-		selected_row_index: int = -1) -> RuitkVNode {
+		selected_row_index: int = -1, highlight_names = null) -> RuitkVNode {
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var lod = M.lod_of(zoom)
 	var card_w = M.card_width_for(lod)
@@ -57,7 +57,8 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 						is_selected={ i == selected } at={ pos } zoom={ zoom } near={ near }
 						on_add={ on_add } revision={ revision }
 						sel_section={ selected_row_section if i == selected else -1 }
-						sel_row={ selected_row_index if i == selected else -1 } />
+						sel_row={ selected_row_index if i == selected else -1 }
+						highlight_names={ highlight_names } />
 				)
 			}
 		</Control>
@@ -80,7 +81,7 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 		at = Vector2.ZERO, zoom: float = 1.0, near: bool = true, index: int = -1,
 		on_add = null, revision: int = 0, sel_section: int = -1,
-		sel_row: int = -1) -> RuitkVNode {
+		sel_row: int = -1, highlight_names = null) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var card_w = M.card_width_for(lod)
@@ -98,7 +99,8 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 						@if (M.shows_sections(lod)) {
 							return (
 								<CanvasCardSections card={ card } lod={ lod } index={ index } on_add={ on_add }
-				zoom={ zoom } revision={ revision } sel_section={ sel_section } sel_row={ sel_row } />
+				zoom={ zoom } revision={ revision } sel_section={ sel_section } sel_row={ sel_row }
+				highlight_names={ highlight_names } />
 							)
 						}
 					</VBoxContainer>
@@ -157,7 +159,7 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 ## that has to guess which. "+ style" adds a whole new export and has nothing to guess about.
 export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = null,
 		zoom: float = 1.0, revision: int = 0, sel_section: int = -1,
-		sel_row: int = -1) -> RuitkVNode {
+		sel_row: int = -1, highlight_names = null) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var detail = M.shows_detail(lod)
@@ -213,7 +215,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 							var row = card.markup[i]
 							return (
 								<PanelContainer key={ str(row.at) }
-										style={ P.row_selected() if (sel_section == 3 and sel_row == i) else P.row_plain() }>
+										style={ P.row_selected() if (sel_section == 3 and sel_row == i) else (P.row_highlighted() if M.row_mentions(row, highlight_names) else P.row_plain()) }>
 									<CanvasMarkupRow row={ row } zoom={ zoom } />
 								</PanelContainer>
 							)

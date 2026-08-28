@@ -33,7 +33,7 @@ const VIEWPORT := Vector2(1280, 720)
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 141
+const ASSERTION_FLOOR := 151
 
 var _fails := 0
 var _passes := 0
@@ -48,6 +48,7 @@ func _run() -> void:
 	Layout.clear_all()
 	_graph = _build_graph()
 
+	_test_hook_usage_highlighting()
 	_test_lod_bands()
 	await _test_card_can_be_moved()
 	await _test_canvas_can_be_panned()
@@ -130,6 +131,40 @@ func _card(name: String) -> Graph.Card:
 
 
 # ── Metrics ──────────────────────────────────────────────────────────────────────────
+
+## HOVERING A HOOK CHIP HIGHLIGHTS EVERY USAGE of what it returns.
+func _test_hook_usage_highlighting() -> void:
+	_section("a chip's bindings are read off its own text")
+	var chip := Graph.Line.new()
+	chip.text = "useState  →  count, set_count"
+	var bound := Host._bound_names(chip)
+	_eq(", ".join(bound), "count, set_count", "everything after the arrow")
+
+	var plain := Graph.Line.new()
+	plain.text = "useEffect"
+	_eq(Host._bound_names(plain).size(), 0, "a hook that binds nothing highlights nothing")
+	_eq(Host._bound_names(null).size(), 0, "and no row at all is not an error")
+
+	_section("a row mentions a name only on WORD BOUNDARIES")
+	var row := Graph.Line.new()
+	row.text = "<Label"
+	row.attrs_text = "text={ count }"
+	_check(Metrics.row_mentions(row, PackedStringArray(["count"])), "the row uses count")
+	_check(not Metrics.row_mentions(row, PackedStringArray(["oun"])),
+		"a fragment inside the word does not count")
+
+	var near := Graph.Line.new()
+	near.text = "<Label"
+	near.attrs_text = "text={ counter }"
+	_check(not Metrics.row_mentions(near, PackedStringArray(["count"])),
+		"and `counter` is not a usage of `count`")
+	_check(Metrics.row_mentions(near, PackedStringArray(["counter"])), "but `counter` is")
+
+	_section("nothing hovered highlights nothing")
+	_check(not Metrics.row_mentions(row, PackedStringArray()), "an empty name list")
+	_check(not Metrics.row_mentions(row, null), "and no list at all")
+	_check(not Metrics.row_mentions(null, PackedStringArray(["count"])), "and no row at all")
+
 
 func _test_lod_bands() -> void:
 	_section("one LOD definition, and every consumer asks it")

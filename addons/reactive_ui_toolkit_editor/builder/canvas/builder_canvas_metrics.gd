@@ -378,6 +378,37 @@ static func edge_source_anchor(card: Graph.Card, import_index: int,
 	return Vector2(card.x + card_width, y)
 
 
+## Whether a markup row references any of `names` -- what makes it a USAGE of a hook's state.
+##
+## Matched on WORD BOUNDARIES, so `count` does not light up a row mentioning `counter`. Asked of
+## the row's projected text and its attribute run together, because a state name is used in an
+## attribute far more often than in a tag.
+static func row_mentions(row: Graph.Line, names) -> bool:
+	if row == null or names == null:
+		return false
+	var list := names as PackedStringArray
+	if list.is_empty():
+		return false
+	var haystack := row.text + " " + row.attrs_text
+	for name in list:
+		var word := str(name)
+		if word.is_empty():
+			continue
+		var at := haystack.find(word)
+		while at >= 0:
+			var before_ok := at == 0 or not _is_word_char(haystack[at - 1])
+			var after := at + word.length()
+			var after_ok := after >= haystack.length() or not _is_word_char(haystack[after])
+			if before_ok and after_ok:
+				return true
+			at = haystack.find(word, at + 1)
+	return false
+
+
+static func _is_word_char(ch: String) -> bool:
+	return ch == "_" or (ch >= "0" and ch <= "9") 		or (ch >= "a" and ch <= "z") or (ch >= "A" and ch <= "Z")
+
+
 ## Whether a world point is on a card's TITLE BAR -- the band a card is dragged by.
 ##
 ## CARDS ARE DRAGGED BY THE TITLE BAR (capability reference §2), not from anywhere on their face.
