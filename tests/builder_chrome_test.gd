@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 330
+const ASSERTION_FLOOR := 341
 
 var _fails := 0
 var _passes := 0
@@ -67,6 +67,7 @@ func _run() -> void:
 	await _test_add_chip_opens_the_editor()
 	await _test_preview_anchor_and_knobs()
 	await _test_double_click_edits_in_place()
+	await _test_row_menu_fits_its_section()
 	await _test_island_editor_is_multiline()
 	await _test_diagnostics_reach_the_surface()
 	await _test_source_pane_keyboard()
@@ -1081,6 +1082,65 @@ func _test_double_click_edits_in_place() -> void:
 ##
 ## The island had no editor at all, and when double-click was wired up it reached the SINGLE-LINE
 ## editor -- which would have flattened a multi-statement island into one line on commit.
+## THE ROW MENU IS SHAPED BY THE SECTION THE ROW LIVES IN.
+##
+## It branched on exactly two things -- the EXPORTS section and a DIRECTIVE row -- and served
+## everything else the ELEMENT menu, so an import row and a hook chip were both offered "Add
+## attribute...", "Add child element..." and "Wrap in...". Every one of those computes an
+## insertion point from a markup span the row does not have.
+func _test_row_menu_fits_its_section() -> void:
+	var w := _window()
+	await process_frame
+	var index := w.graph.index_of(ROOT.path_join("app.guitkx"))
+	var card: Graph.Card = w.graph.cards[index]
+
+	var element_only := ["Add attribute", "Add child element", "Wrap in", "Apply style"]
+
+	_section("an import row is offered import operations, and no markup ones")
+	if not card.imports.is_empty():
+		w._on_row_context(index, int(Metrics.Section.IMPORTS), 0, Vector2(10, 10))
+		var items := _menu_labels(w.row_menu())
+		_check(_mentions(items, "import"), "it names the import (%s)" % ", ".join(items))
+		for banned in element_only:
+			_check(not _mentions(items, str(banned)), "and never offers \"%s\"" % banned)
+
+	_section("a hook chip is offered line operations, and no markup ones")
+	if not card.body.is_empty():
+		w._on_row_context(index, int(Metrics.Section.BODY), 0, Vector2(10, 10))
+		var items := _menu_labels(w.row_menu())
+		_check(_mentions(items, "line"), "it talks about the line (%s)" % ", ".join(items))
+		for banned in element_only:
+			_check(not _mentions(items, str(banned)), "and never offers \"%s\"" % banned)
+
+	_section("a markup row still gets the element menu")
+	var root := Edits.first_element_row(card)
+	if root >= 0:
+		w._on_row_context(index, int(Metrics.Section.MARKUP), root, Vector2(10, 10))
+		var items := _menu_labels(w.row_menu())
+		_check(_mentions(items, "Add child element"),
+			"the element operations are there (%s)" % ", ".join(items))
+
+	_drop(w)
+
+
+## Whether any label in `items` contains `needle`. `PackedStringArray` has no `any`.
+func _mentions(items: PackedStringArray, needle: String) -> bool:
+	for text in items:
+		if str(text).contains(needle):
+			return true
+	return false
+
+
+## Every enabled label in a PopupMenu, separators excluded.
+func _menu_labels(menu: PopupMenu) -> PackedStringArray:
+	var out := PackedStringArray()
+	for i in menu.item_count:
+		if menu.is_item_separator(i):
+			continue
+		out.append(menu.get_item_text(i))
+	return out
+
+
 func _test_island_editor_is_multiline() -> void:
 	var w := _window()
 	await process_frame

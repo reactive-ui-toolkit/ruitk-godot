@@ -76,6 +76,7 @@ enum RowMenuId {
 	ADD_ELSE = 207, ADD_ELSE_IF = 208, DELETE_CLAUSE = 209, EDIT_ATTRIBUTE = 210,
 	APPLY_STYLE = 211, UNWRAP = 212, ADD_STYLE_ENTRY = 213,
 	ADD_CASE = 214, ADD_DEFAULT = 215,
+	OPEN_IMPORT = 216, REMOVE_IMPORT = 217, EDIT_BODY_LINE = 218, EDIT_ISLAND = 219,
 }
 
 var workspace: Workspace = null
@@ -1344,6 +1345,30 @@ func _on_canvas_drop(data: Dictionary, at: Vector2) -> void:
 ## element row gets attributes, children, wrapping and deletion. This is the builder's primary
 ## editing gesture and it did not exist -- the canvas offered a card menu (open / rename / delete
 ## the FILE) and nothing that could touch what is inside one.
+## Positions the row menu at the click and shows it.
+##
+## One place, because the menu is now built five different ways and every one of them ended with
+## the same three lines -- which is exactly how two of them come to disagree about which
+## coordinate space `at` is in.
+func _show_row_menu(at: Vector2) -> void:
+	_show_row_menu(at)
+
+
+## The module an import row names, or "" when the specifier resolves to nothing in this tree.
+func _import_target(card, row_index: int) -> String:
+	if graph == null or card == null or row_index < 0 or row_index >= card.imports.size():
+		return ""
+	# Asked of the EDGES, which are already resolved: the import row carries a specifier, and the
+	# edge builder has done the work of turning that into a card. An unresolved import has a
+	# broken edge, and an asset directive has none at all -- both correctly answer "nothing to
+	# open", which is why the menu omits the item rather than offering a dead one.
+	for edge in graph.edges_from(graph.index_of(card.file_path)):
+		if edge.is_usage or edge.from_row != row_index or edge.is_broken():
+			continue
+		return graph.cards[edge.to_index].file_path
+	return ""
+
+
 func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2) -> void:
 	var row = _row_of(card_index, section, row_index)
 	if row == null or graph == null:
@@ -1365,14 +1390,47 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 	_row_menu.clear()
 	_row_menu.add_separator(row.text.strip_edges())
 
+	# THE MENU IS SHAPED BY THE SECTION THE ROW LIVES IN.
+	#
+	# This branched on exactly two things -- the EXPORTS section and a DIRECTIVE row -- and served
+	# everything else the ELEMENT menu. So an import row and a hook chip were both offered "Add
+	# attribute...", "Add child element...", "Apply style from a module..." and "Wrap in...", and
+	# every one of those computes an insertion point from a markup span the row does not have.
+	# The capability reference is explicit that rows, cards, import rows and the empty canvas each
+	# get their own menu.
 	if section == Metrics.Section.EXPORTS:
 		# A style entry's menu is about the DICTIONARY it lives in, not about markup.
 		_row_menu.add_item("Add entry...", RowMenuId.ADD_STYLE_ENTRY)
+		if Edits.has_span(row):
+			_row_menu.add_separator()
+			_row_menu.add_item("Delete this entry", RowMenuId.DELETE_ROW)
+		_show_row_menu(at)
+		return
+
+	if section == Metrics.Section.IMPORTS:
+		# An import names a MODULE. What you can do with it is go to that module, or stop
+		# importing it -- never "add a child element to it".
+		if _import_target(card, row_index) != "":
+			_row_menu.add_item("Open the module it names", RowMenuId.OPEN_IMPORT)
+			_row_menu.add_separator()
+		_row_menu.add_item("Remove this import", RowMenuId.REMOVE_IMPORT)
+		_show_row_menu(at)
+		return
+
+	if section == Metrics.Section.BODY:
+		# A hook chip is a SETUP LINE. Unity ignores a right-click on the chip itself; this offers
+		# the two things that are unambiguously about the line, and nothing that is about markup.
+		_row_menu.add_item("Edit this line...", RowMenuId.EDIT_BODY_LINE)
 		_row_menu.add_separator()
-		_row_menu.add_item("Delete this entry", RowMenuId.DELETE_ROW)
-		_row_menu.position = Vector2i(_canvas.get_screen_position() + at)
-		_row_menu.reset_size()
-		_row_menu.popup()
+		_row_menu.add_item("Delete this line", RowMenuId.DELETE_ROW)
+		_show_row_menu(at)
+		return
+
+	if section == Metrics.Section.ISLAND:
+		_row_menu.add_item("Edit setup...", RowMenuId.EDIT_ISLAND)
+		_row_menu.add_separator()
+		_row_menu.add_item("Delete the setup", RowMenuId.DELETE_ROW)
+		_show_row_menu(at)
 		return
 
 	if row.kind == Graph.LineKind.DIRECTIVE:
@@ -1452,6 +1510,24 @@ func _on_row_menu(id: int) -> void:
 		RowMenuId.ADD_ELSE_IF:
 			after = Edits.add_if_clause(before, row, true)
 			what = "Add @elif"
+		RowMenuId.OPEN_IMPORT:
+			var target := _import_target(card, _menu_row_index)
+			if not target.is_empty():
+				select_module(target)
+			return
+		RowMenuId.REMOVE_IMPORT:
+			after = Edits.remove_import(before, row.name)
+			what = "Remove the import of %s" % row.name
+		RowMenuId.EDIT_BODY_LINE:
+			_inline.open_at(_row_rect_on_screen(card, _menu_section, _menu_row_index),
+				row.source_text, { "kind": "body", "path": _menu_target, "row": row })
+			return
+		RowMenuId.EDIT_ISLAND:
+			_island.open_at(_row_rect_on_screen(card, _menu_section, _menu_row_index),
+				_LF.join(card.island_lines),
+				{ "kind": "island", "path": _menu_target, "row": row,
+					"from": card.island_start_line, "to": card.island_end_line })
+			return
 		RowMenuId.ADD_CASE:
 			after = Edits.add_match_clause(before, card, row, false)
 			what = "Add @case"
@@ -3219,6 +3295,11 @@ func console() -> Console:
 ## The multiline island editor, for a test that needs to drive it.
 func island_editor() -> IslandEditor:
 	return _island
+
+
+## The row context menu, for a test that needs to read what it offered.
+func row_menu() -> PopupMenu:
+	return _row_menu
 
 
 func inline_editor() -> InlineEditor:

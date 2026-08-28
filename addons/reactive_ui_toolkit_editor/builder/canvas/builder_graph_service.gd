@@ -22,6 +22,11 @@ const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document
 const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_paths.gd")
 ## `Metrics.Section` values an edge can leave from. Held as plain ints: the metrics preload the
 ## canvas view, which projects from this service, and naming the enum here closes that ring.
+## A newline, built rather than written: an escape in a source literal has to survive every layer
+## between here and the file.
+const _LF := "
+"
+
 const SECTION_IMPORTS := 1
 const SECTION_MARKUP := 3
 
@@ -213,6 +218,16 @@ static func populate_card(card: Graph.Card, text: String) -> void:
 
 	_fill_imports(card, source, lines)
 	_fill_hook_chips(card, source, lines, decls)
+
+	# A HOOK OR A UTIL HAS SETUP TOO, and hiding it means the card lies about what the module does.
+	# `decl_structure` is component-shaped -- it answers `{ok: false}` for anything else -- so the
+	# island for those kinds is sliced from the declaration's own body span, which
+	# `analyzed_decls` already carries. Unity runs its extraction for Component OR Hook for the
+	# same reason.
+	if card.kind != Module.Kind.COMPONENT and not binding.is_empty():
+		var plain := _plain_body_structure(source, binding)
+		if bool(plain.get("ok", false)):
+			_fill_island(card, source, plain)
 
 	var projected_markup := false
 	if card.kind == Module.Kind.COMPONENT and not binding.is_empty():
@@ -548,6 +563,33 @@ static func _inside_any(spans: Array, index: int) -> bool:
 ## The component's setup lines that are not hook calls -- the card's code island -- with the
 ## common indent stripped and the 1-based source range they occupy, so an island edit replaces
 ## exactly that range and nothing around it.
+## A `structure`-shaped answer for a declaration that has no markup: a hook, a util, a value.
+##
+## The same two keys `_fill_island` reads from `decl_structure` -- `setup` and `body_at` -- so the
+## island is filtered, indent-stripped and given a write-back range by exactly the code that does
+## it for a component, rather than by a second implementation that would drift from it.
+##
+## The trailing `return` is dropped: it is the declaration's RESULT, which the card shows as the
+## exposed signature, not part of its setup.
+static func _plain_body_structure(source: String, decl: Dictionary) -> Dictionary:
+	var body_open := int(decl.get("body_open", -1))
+	var next := int(decl.get("next", -1))
+	if body_open < 0 or next <= body_open or next > source.length():
+		return { "ok": false }
+	var close := source.rfind("}", next)
+	if close <= body_open:
+		return { "ok": false }
+	var body := source.substr(body_open + 1, close - body_open - 1)
+
+	var lines := body.split(_LF)
+	var last := lines.size() - 1
+	while last >= 0 and str(lines[last]).strip_edges().is_empty():
+		last -= 1
+	if last >= 0 and str(lines[last]).strip_edges().begins_with("return"):
+		lines.remove_at(last)
+	return { "ok": true, "setup": _LF.join(lines), "body_at": body_open }
+
+
 static func _fill_island(card: Graph.Card, source: String, structure: Dictionary) -> void:
 	var setup := str(structure.get("setup", ""))
 	if setup.strip_edges().is_empty():

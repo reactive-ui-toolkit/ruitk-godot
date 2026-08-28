@@ -27,7 +27,7 @@ const ROOT := "res://tests/__builder_graph_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 173
+const ASSERTION_FLOOR := 178
 
 var _fails := 0
 var _passes := 0
@@ -390,8 +390,18 @@ func _test_island() -> void:
 		"the hook-call lines are chips, so the island holds what is left")
 	_eq(app.island_start_line, 10, "and the range it occupies starts where that line is")
 	_eq(app.island_end_line, 10, "and ends there")
-	_eq(_card("app.hooks.guitkx").island_lines.size(), 0,
-		"a non-component has no island -- its body is its export detail")
+	_section("a HOOK module has one too -- hiding it makes the card lie")
+	# `decl_structure` is component-shaped and answers `{ok: false}` for anything else, so a hook's
+	# plain setup lines were nowhere on its card: the body showed a chip per hook call and the
+	# statements between them were invisible. Unity runs its extraction for Component OR Hook.
+	var hooks := _card("app.hooks.guitkx")
+	_check(hooks.island_lines.size() > 0,
+		"the hook module's plain setup is on the card (%d line(s))" % hooks.island_lines.size())
+	_check(hooks.island_start_line > 0, "with a write-back range that starts somewhere real")
+	_check(hooks.island_end_line >= hooks.island_start_line, "and ends at or after it")
+	for line in hooks.island_lines:
+		_check(not str(line).strip_edges().begins_with("return"),
+			"and the trailing return is not part of the setup -- it is the result")
 
 
 # ── Markup ───────────────────────────────────────────────────────────────────────────
