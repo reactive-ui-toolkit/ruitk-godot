@@ -33,7 +33,7 @@ const VIEWPORT := Vector2(1280, 720)
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 166
+const ASSERTION_FLOOR := 171
 
 var _fails := 0
 var _passes := 0
@@ -171,6 +171,29 @@ func _test_hit_test_matches_what_is_drawn() -> void:
 		if lod != Metrics.Lod.PILL:
 			_check(reported > 0, "and at %s there are rows to aim at"
 				% ["Architecture", "Cards", "Edit"][int(lod)])
+
+	_section("a pill's rectangle is the height it draws at")
+	# At the Architecture band the loop above is VACUOUS -- a pill reports no rows, so "nothing
+	# outside" and "nothing undrawn" both pass trivially. The real question there is the card's
+	# own rectangle, and it answered 38 against a card that draws 73.
+	_eq(Metrics.drawn_height(card, Metrics.Lod.PILL), Metrics.PILL_H,
+		"a pill measures PILL_H, not the header alone")
+	_check(Metrics.PILL_H > Metrics.HEADER_H, "and a pill is taller than a header")
+
+	_section("framing a card solves the WIDTH")
+	# Fitting both axes made a long card frame itself tiny: 40 markup rows solved to the minimum
+	# zoom, so "show me this card" answered with a pill.
+	var tall := _card_with_everything()
+	for i in 40:
+		tall.markup.append(_line(Graph.LineKind.ELEMENT, "<Label>"))
+	var short_frame: Dictionary = Metrics.frame_card(card, Vector2(900, 600))
+	var tall_frame: Dictionary = Metrics.frame_card(tall, Vector2(900, 600))
+	_eq(float(short_frame["zoom"]), float(tall_frame["zoom"]),
+		"a card's height does not change the zoom it frames at")
+	_check(int(Metrics.lod_of(float(tall_frame["zoom"]))) != int(Metrics.Lod.PILL),
+		"and a long card does not frame as a pill")
+	_check(float(tall_frame["camera"].y) > -tall.y * float(tall_frame["zoom"]) - 1.0,
+		"a card taller than the viewport is aligned to its top, not centred off-screen")
 
 	_section("the Cards layer draws markup rows -- that is what makes it the Cards layer")
 	# Capability reference §2: Layer 2 shows "signature, imports, hook chips, markup rows"; Layer 3

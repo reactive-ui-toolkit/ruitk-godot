@@ -317,8 +317,11 @@ func _entry_row(kind: String, name: String) -> Button:
 	row.set_meta("entry_kind", kind)
 	row.set_meta("entry_name", name)
 	if kind == ENTRY_COMPONENT and name == _selected_component:
-		row.button_pressed = true
+		# TOGGLE MODE FIRST. Godot's `BaseButton::set_pressed` early-returns while `toggle_mode`
+		# is false, so setting them the other way round was a no-op and the selection mirror never
+		# painted at all.
 		row.toggle_mode = true
+		row.button_pressed = true
 	row.set_meta("entry_name", name)
 	row.pressed.connect(func(): entry_activated.emit(kind, name))
 	if _is_workspace_kind(kind):

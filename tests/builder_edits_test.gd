@@ -25,7 +25,7 @@ const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/docum
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 256
+const ASSERTION_FLOOR := 260
 
 var _fails := 0
 var _passes := 0
@@ -642,12 +642,24 @@ func _test_row_bands() -> void:
 
 	var top := float(markup["top"]) + float(markup["lead"])
 	var row_h := float(markup["row_height"])
-	_eq(int(Metrics.row_hit(card, Vector2(10, top + row_h * 0.1))["band"]), 0,
+	# Measured on the SECOND markup row: the first is the component's return root, whose bands are
+	# deliberately coerced (below).
+	_eq(int(Metrics.row_hit(card, Vector2(10, top + row_h * 1.1))["band"]), 0,
 		"the top third is BEFORE")
-	_eq(int(Metrics.row_hit(card, Vector2(10, top + row_h * 0.5))["band"]), 1,
+	_eq(int(Metrics.row_hit(card, Vector2(10, top + row_h * 1.5))["band"]), 1,
 		"the middle is INSIDE")
-	_eq(int(Metrics.row_hit(card, Vector2(10, top + row_h * 0.9))["band"]), 2,
+	_eq(int(Metrics.row_hit(card, Vector2(10, top + row_h * 1.9))["band"]), 2,
 		"the bottom third is AFTER")
+
+	_section("two rows have no sides, so their bands are coerced to INSIDE")
+	# A component returns ONE node, so nothing can go beside its return root; a continuation
+	# clause belongs to its head, so nothing can go beside that either. Refusing the drop
+	# downstream -- which is what happened -- reads as the drag being broken, when the only wrong
+	# part was which third of the row the cursor was over.
+	_eq(Metrics.first_element_row(card), 0, "the fixture's root is markup row 0")
+	for third in [0.1, 0.5, 0.9]:
+		_eq(int(Metrics.row_hit(card, Vector2(10, top + row_h * third))["band"]), 1,
+			"the return root is INSIDE at %.1f of its height" % third)
 
 	_section("the bottom band's MEANING depends on what is listed next")
 	# Same band, same pixel, two different edits -- and both land in the same place on screen,

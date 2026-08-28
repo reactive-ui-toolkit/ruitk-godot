@@ -2620,9 +2620,19 @@ func drop_library_entry(kind: String, name: String, at: Vector2) -> bool:
 		return drop_module_export(card, hit["row"], kind, name)
 
 	var row: Graph.Line = hit["row"]
-	if row == null or row.kind == Graph.LineKind.IMPORT:
-		return false
 	var placement: Edits.Placement = hit["placement"]
+	# NO ROW UNDER THE CURSOR MEANS THE ROOT'S CHILDREN, not a refusal. Releasing on a card's
+	# header, on a section heading, in the padding under the last row, or anywhere on a pill hit
+	# this -- which is a large share of a card's area, and every one of them answered "couldn't
+	# place that there".
+	if row == null:
+		var root_at := Edits.first_element_row(card)
+		if root_at < 0:
+			return false
+		row = card.markup[root_at]
+		placement = Edits.Placement.INSIDE
+	if row.kind == Graph.LineKind.IMPORT:
+		return false
 	var verdict := Edits.can_place(card, row, placement)
 	if not bool(verdict["ok"]):
 		# A TOAST as well as the console line. A refused drop is answered while the user is still

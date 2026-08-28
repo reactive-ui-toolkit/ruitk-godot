@@ -194,7 +194,11 @@ static func drawn_height(card: Graph.Card, lod: Lod) -> float:
 	if card == null:
 		return PILL_H
 	if lod == Lod.PILL:
-		return HEADER_H
+		# PILL_H, NOT HEADER_H. A pill draws at 73 units and this reported 38, so the bottom half
+		# of every Architecture-layer card was dead to the mouse -- the same
+		# model-disagrees-with-the-view defect as CANVAS-01, in the one band the measured
+		# hit-test cannot help with, because a pill has no rows to measure.
+		return PILL_H
 	var height := HEADER_H
 	for entry in section_stack(card):
 		var section := entry as Dictionary
@@ -361,11 +365,25 @@ static func fit_to_view(graph: Graph, viewport: Vector2, margin := 40.0) -> Dict
 static func frame_card(card: Graph.Card, viewport: Vector2, margin := 60.0) -> Dictionary:
 	if card == null or viewport.x <= 0.0 or viewport.y <= 0.0:
 		return { "camera": Vector2.ZERO, "zoom": 1.0 }
-	var size := Vector2(card_width_for(Lod.SECTIONS), maxf(drawn_height(card, Lod.SECTIONS), 1.0))
+	# THE WIDTH DECIDES THE ZOOM, not the smaller of the two axes. Fitting the height as well means
+	# a long card frames itself tiny -- 40 markup rows solved to the minimum zoom, which is the
+	# Architecture band, so "show me this card" answered with a pill. Unity found and fixed this
+	# once already.
 	var usable := viewport - Vector2(margin, margin) * 2.0
-	var zoom := clamp_zoom(minf(usable.x / size.x, usable.y / size.y))
-	var centre := Vector2(card.x, card.y) + size * 0.5
-	return { "camera": viewport * 0.5 - centre * zoom, "zoom": zoom }
+	var zoom := clamp_zoom(usable.x / card_width_for(Lod.SECTIONS))
+	# Twice, because the width itself depends on the band the zoom lands in. Three bands, so it
+	# converges immediately.
+	zoom = clamp_zoom(usable.x / card_width_for(lod_of(zoom)))
+	var lod := lod_of(zoom)
+	var size := Vector2(card_width_for(lod), maxf(drawn_height(card, lod), 1.0))
+	var camera := Vector2(
+		viewport.x * 0.5 - (card.x + size.x * 0.5) * zoom,
+		viewport.y * 0.5 - (card.y + size.y * 0.5) * zoom)
+	# A CARD TALLER THAN THE VIEWPORT IS ALIGNED TO ITS TOP. Centring one vertically puts its name
+	# off-screen, which is the half a reader needs most.
+	if size.y * zoom > viewport.y:
+		camera.y = margin - card.y * zoom
+	return { "camera": camera, "zoom": zoom }
 
 
 # ── Anchors ──────────────────────────────────────────────────────────────────────────
@@ -395,6 +413,19 @@ static func edge_source_anchor(card: Graph.Card, import_index: int,
 		y = card.y + float(spec["top"]) + SECTION_OVERHEAD_H 			+ (float(maxi(0, import_index)) + 0.5) * pitch
 		break
 	return Vector2(card.x + card_width, y)
+
+
+## The index of the row that IS the component's return root, or -1.
+##
+## Keyed on the first NON-DIRECTIVE row, never on literal index 0: a directive wrapping the root
+## takes index 0 and the root becomes row 1.
+static func first_element_row(card: Graph.Card) -> int:
+	if card == null:
+		return -1
+	for i in card.markup.size():
+		if (card.markup[i] as Graph.Line).kind != Graph.LineKind.DIRECTIVE:
+			return i
+	return -1
 
 
 ## Whether a markup row references any of `names` -- what makes it a USAGE of a hook's state.
@@ -532,6 +563,18 @@ static func row_hit(card: Graph.Card, card_local: Vector2, lod := Lod.FULL) -> D
 			band = 0
 		elif fraction > 1.0 - BAND_EDGE:
 			band = 2
+		# TWO ROWS HAVE NO SIDES, so their bands are coerced to INSIDE rather than refused
+		# downstream. A component returns one node, so nothing can go beside its return root; a
+		# continuation clause belongs to its head, so nothing can go beside that either. Refusing
+		# the drop instead -- which is what happened -- reads as the drag being broken, when the
+		# only wrong part was which third of the row the cursor was over.
+		if int(e["section"]) == int(Section.MARKUP) and band != 1:
+			if index == first_element_row(card):
+				band = 1
+			else:
+				var row: Graph.Line = card.markup[index]
+				if row.kind == Graph.LineKind.DIRECTIVE and row.clause_index > 0:
+					band = 1
 		return { "found": true, "section": e["section"], "index": index, "band": band }
 	return miss
 

@@ -80,6 +80,7 @@ func _init() -> void:
 	select_mode = Tree.SELECT_ROW
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
+	item_collapsed.connect(_on_item_collapsed)
 	item_selected.connect(_on_item_selected)
 	item_activated.connect(_on_item_activated)
 	item_mouse_selected.connect(_on_item_mouse_selected)
@@ -237,6 +238,24 @@ func _folder_item(root_item: TreeItem, folders: Dictionary, base: String, folder
 	return parent
 
 
+## Which folders the user has folded, by path key. Kept on the pane rather than on the items,
+## because the items do not survive a rebuild.
+var _collapsed := {}
+
+
+func _on_item_collapsed(item: TreeItem) -> void:
+	if item == null:
+		return
+	var meta: Variant = item.get_metadata(0)
+	if not (meta is Dictionary) or not (meta as Dictionary).has("folder"):
+		return
+	var key := Paths.key(str((meta as Dictionary)["folder"]))
+	if item.collapsed:
+		_collapsed[key] = true
+	else:
+		_collapsed.erase(key)
+
+
 func _ensure_folder(parent: TreeItem, folders: Dictionary, path: String, label: String) -> TreeItem:
 	if folders.has(path):
 		return folders[path]
@@ -248,6 +267,10 @@ func _ensure_folder(parent: TreeItem, folders: Dictionary, path: String, label: 
 	# A FOLDER carries its path as a Dictionary, a module as a plain String. The two are told
 	# apart by TYPE rather than by a second lookup, so no caller can read one as the other.
 	item.set_metadata(0, { "folder": path })
+	# FOLDING SURVIVES THE REBUILD. `rebuild()` runs on every model change -- every keystroke that
+	# reaches the funnel -- and `Tree.clear()` frees every item, so a folded folder sprang open on
+	# the next character typed.
+	item.collapsed = _collapsed.has(Paths.key(path))
 	folders[path] = item
 	return item
 
