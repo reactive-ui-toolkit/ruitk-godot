@@ -513,6 +513,19 @@ static func _write(path: String, text: String) -> bool:
 	return true
 
 
+## Whether a built script is a COMPONENT -- something with a `render` the reconciler can call.
+##
+## Asked of the script's own method list rather than `has_method`, which does not report a
+## GDScript's statics on the script object itself.
+static func has_render(script: GDScript) -> bool:
+	if script == null:
+		return false
+	for method in script.get_script_method_list():
+		if str((method as Dictionary).get("name", "")) == "render":
+			return true
+	return false
+
+
 # ── Rendering ────────────────────────────────────────────────────────────────────────
 
 ## Mounts the focus component into `container`, replacing whatever was there.
@@ -525,6 +538,12 @@ func mount(container: Node, focus_path: String, props := {}) -> bool:
 		return false
 	var script := built_script(focus_path)
 	if script == null:
+		return false
+	# ONLY A COMPONENT HAS A `render`. A style, util or hook module compiles to a script of plain
+	# statics, and mounting one asked the reconciler to call a function that is not there -- so
+	# merely SELECTING a style companion, which is half of what a tree contains, logged an engine
+	# error and left the stage on the last component. The pane shows the module's own note instead.
+	if not has_render(script):
 		return false
 	unmount()
 	# `V.comp` caches by path, so a Callable bound to the PREVIOUS build of a child survives a

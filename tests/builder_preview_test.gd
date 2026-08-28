@@ -23,7 +23,7 @@ const ROOT := "res://tests/__builder_preview_tmp/ui"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 82
+const ASSERTION_FLOOR := 86
 
 var _fails := 0
 var _passes := 0
@@ -47,6 +47,7 @@ func _run() -> void:
 	await _test_budget()
 	await _test_degenerate_input()
 	await _test_scratch_hygiene()
+	await _test_only_components_mount()
 	await _test_teardown_leaves_nothing()
 
 	print("")
@@ -484,6 +485,32 @@ func _test_scratch_hygiene() -> void:
 	_check(Preview.scratch_path_of("res://a/b/c.guitkx") == Preview.SCRATCH_ROOT + "/a/b/c.guitkx",
 		"with the tree's own shape preserved, so relative specifiers fold identically")
 
+	preview.teardown()
+
+
+## A STYLE MODULE IS NOT A COMPONENT, and the preview must not try to mount one.
+##
+## Selecting a style companion -- half of what a tree contains -- asked the reconciler to call a
+## `render` that a module of plain statics does not have, so merely clicking one logged an engine
+## error.
+func _test_only_components_mount() -> void:
+	_section("a component's script has a render; a style module's does not")
+	var preview := _fresh()
+	preview.compile_dirty(_focus())
+	_check(Preview.has_render(preview.built_script(_focus())),
+		"the focus component is mountable")
+
+	var style_path := ROOT.path_join("s.style.guitkx")
+	preview.compile_dirty(style_path)
+	var style := preview.built_script(style_path)
+	_check(style != null, "the style module builds")
+	_check(not Preview.has_render(style), "and has no render to call")
+
+	var stage := Control.new()
+	root.add_child(stage)
+	_check(not preview.mount(stage, style_path),
+		"so mount reports false rather than asking for a function that is not there")
+	stage.queue_free()
 	preview.teardown()
 
 

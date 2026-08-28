@@ -192,6 +192,27 @@ static func add_chip() -> Dictionary:
 
 
 
+## The band behind the SELECTED row -- a warm fill and an accent outline.
+##
+## Selection has to be visible on the row itself, not only in the panes that follow it. Delete acts
+## on the selection, and a selection you cannot see is a key you press hoping.
+static func row_selected() -> Dictionary:
+	return {
+		"bg_color": Color(0.361, 0.588, 0.965, 0.20),
+		"border_width_all": 1,
+		"border_color": Color(0.361, 0.588, 0.965, 0.85),
+		"corner_radius_all": 4,
+		"content_margin_left": 3,
+		"content_margin_right": 3,
+	}
+
+
+## The same row, unselected: no fill, and the SAME margins, so selecting a row does not shift the
+## text under it by three pixels.
+static func row_plain() -> Dictionary:
+	return { "content_margin_left": 3, "content_margin_right": 3 }
+
+
 ## The tinted strip behind a card's identity row.
 ##
 ## A card with no banding is one continuous column of text in which the name, the signature and

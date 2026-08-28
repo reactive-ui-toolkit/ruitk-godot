@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 207
+const ASSERTION_FLOOR := 220
 
 var _fails := 0
 var _passes := 0
@@ -64,6 +64,8 @@ func _run() -> void:
 	await _test_inline_editor()
 	await _test_one_funnel()
 	await _test_undo_across_files()
+	await _test_selection_and_delete()
+	await _test_save_confirms_deletions()
 	await _test_create_placement()
 	await _test_delete_refused_while_imported()
 	await _test_delete_and_undo()
@@ -878,6 +880,71 @@ func _test_undo_across_files() -> void:
 ## used to read `_focus_path.get_base_dir()`, which is neither the card you right-clicked nor the
 ## tree root, and on a fresh tree was the empty string -- the "no folder to create in" refusal that
 ## made the start screen's own buttons dead.
+## SAVE ASKS BEFORE IT DELETES, and names what it would delete.
+##
+## Deletion is the one thing a save does that cannot be taken back from inside the builder --
+## every other part of it is a write the ledger still remembers.
+## SELECTION IS ONE THING AT A TIME, and Delete acts on it before it falls through to the module.
+func _test_selection_and_delete() -> void:
+	_section("clicking a row selects it")
+	var w := _window()
+	await process_frame
+	var card_index := w.graph.index_of(ROOT.path_join("app.guitkx"))
+	var card := w.graph.cards[card_index]
+	_check(not card.markup.is_empty(), "the card has markup to select")
+
+	w._on_row_clicked(card_index, int(Metrics.Section.MARKUP), 1)
+	_eq(w.canvas().selected_row_index, 1, "the row is selected on the canvas")
+	_eq(w.canvas().selected_row_section, int(Metrics.Section.MARKUP), "in its own section")
+	_eq(w.canvas().selected, card_index, "and its card is the selected card")
+
+	_section("selecting the CARD clears the row")
+	# Exactly one thing at a time, so Delete can never be ambiguous about which it means.
+	w.canvas().select_card(card_index)
+	_eq(w.canvas().selected_row_index, -1, "no row is selected any more")
+
+	_section("Delete removes the SELECTED ROW, not the module")
+	w._on_row_clicked(card_index, int(Metrics.Section.MARKUP), 1)
+	var before: String = w.workspace.try_get(card.file_path).buffer_text
+	w._delete_selection()
+	await process_frame
+	_check(w.workspace.try_get(card.file_path) != null, "the module is still here")
+	_check(w.workspace.try_get(card.file_path).buffer_text != before, "and the row is gone from it")
+
+	_section("with no row selected it falls through to the module")
+	w._menu_row = null
+	w.select_module(ROOT.path_join("app.style.guitkx"))
+	await process_frame
+	w._delete_selection()
+	await process_frame
+	_check(w.workspace.try_get(ROOT.path_join("app.style.guitkx")) == null,
+		"the focused module is what Delete means when nothing inside one is selected")
+
+	_drop(w)
+
+
+func _test_save_confirms_deletions() -> void:
+	_section("with nothing to delete, a save just runs")
+	var w := _window()
+	await process_frame
+	_check(w._confirmed_deletions(), "no deletions, nothing to ask about")
+
+	_section("a pending deletion stops the save until it is agreed")
+	# The module has to have been PROJECTED once for its absence to read as a deletion: an orphan
+	# is a path the last projection claimed and no module claims any more.
+	var doomed := ROOT.path_join("app.style.guitkx")
+	var module := w.workspace.try_get(doomed)
+	module.mark_projected(module.file_path())
+	w.workspace.tree().set_projection(PackedStringArray([doomed]))
+	_check(w.delete_module(doomed), "the module is deleted")
+	_eq(w.workspace.tree().orphaned_paths().size(), 1, "and its file is now an orphan")
+
+	_check(not w._confirmed_deletions(), "so the save stops to ask")
+	_eq(w.save(), 0, "and writes nothing while the question is open")
+
+	_drop(w)
+
+
 func _test_create_placement() -> void:
 	_section("the tree root is derived from membership")
 	var w := _window()

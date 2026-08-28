@@ -104,6 +104,10 @@ var _menu_row = null
 ## The header text a wrap just seeded, waiting for the editor to open on it once the edit has been
 ## applied and the card re-projected. Empty when the pending action is not a wrap.
 var _seed_header_edit := ""
+
+## Set only while a save is resuming from its own deletion confirmation, so the second pass does
+## not ask again.
+var _deletions_agreed := false
 var _menu_card := -1
 var _menu_at := Vector2.ZERO
 var _pending_attribute := {}
@@ -977,6 +981,15 @@ func _on_row_clicked(card_index: int, _section: int, row_index: int) -> void:
 	var row = _row_of(card_index, _section, row_index)
 	if row == null:
 		return
+	# CLICKING A ROW SELECTS IT. Selection was only ever set by the row MENU, so a row could be
+	# clicked -- moving the source pane, highlighting on the card -- and still not be what Delete
+	# acted on: the key fell through to the module instead, deleting the whole file. Any row the
+	# canvas lists is selectable, not only markup: a hook chip, an import row, a code island and a
+	# style entry are each backed by a line range and each know how to remove themselves.
+	_menu_target = graph.cards[card_index].file_path
+	_menu_row = row
+	_menu_card = card_index
+	_canvas.select_row(card_index, _section, row_index)
 	select_module(graph.cards[card_index].file_path)
 	_source.goto_line(row.source_line)
 
@@ -1822,6 +1835,14 @@ func save() -> int:
 	if not workspace.unlocated_modules().is_empty():
 		_ask_where_the_tree_lives()
 		return 0
+	# SAVE NAMES EVERY FILE IT WOULD DELETE, and asks first. Deletion is the one thing a save does
+	# that cannot be taken back from inside the builder -- everything else is a write the ledger
+	# still remembers. A module leaves the tree the moment it is deleted, so by the time Save runs
+	# the only trace of it is a path in the last projection that no module claims any more; a
+	# confirmation that just said "3 files will be removed" would be naming nothing the user could
+	# check.
+	if not _confirmed_deletions():
+		return 0
 	for blank in workspace.blank_modules():
 		_console.add_diagnostics(blank.file_path(), [{
 			"code": "", "severity": Console.SEVERITY_WARNING, "line": -1,
@@ -1835,6 +1856,40 @@ func save() -> int:
 	_folders.rebuild()
 	_refresh_status()
 	return written
+
+
+## Whether the user has agreed to the deletions this save would perform.
+##
+## Returns true when there are none, which is the ordinary case. The dialog is raised once and the
+## save resumes through `save()` when it is accepted, so the answer is not remembered between
+## saves -- a later save deleting a different file has to ask about that one.
+func _confirmed_deletions() -> bool:
+	if workspace == null:
+		return true
+	var doomed := workspace.tree().orphaned_paths()
+	if doomed.is_empty() or _deletions_agreed:
+		return true
+
+	var names := PackedStringArray()
+	for path in doomed:
+		names.append("    " + str(path).trim_prefix("res://"))
+	var dialog := ConfirmationDialog.new()
+	dialog.title = "Save will delete %d file(s)" % doomed.size()
+	dialog.dialog_text = "These files leave the project:
+
+%s
+
+They go to the system trash." 		% "
+".join(names)
+	dialog.ok_button_text = "Delete and save"
+	dialog.confirmed.connect(func():
+		_deletions_agreed = true
+		save()
+		_deletions_agreed = false)
+	dialog.close_requested.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered()
+	return false
 
 
 ## Asks for a folder, then moves every unplaced module into it.

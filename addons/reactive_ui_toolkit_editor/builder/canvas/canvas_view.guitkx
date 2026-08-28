@@ -34,7 +34,8 @@
 
 export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 		viewport = Vector2(1280, 720), selected: int = -1, on_add = null,
-		revision: int = 0) -> RuitkVNode {
+		revision: int = 0, selected_row_section: int = -1,
+		selected_row_index: int = -1) -> RuitkVNode {
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var lod = M.lod_of(zoom)
 	var card_w = M.card_width_for(lod)
@@ -54,7 +55,9 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 				return (
 					<CanvasCard key={ c.file_path } card={ c } lod={ lod } index={ i }
 						is_selected={ i == selected } at={ pos } zoom={ zoom } near={ near }
-						on_add={ on_add } revision={ revision } />
+						on_add={ on_add } revision={ revision }
+						sel_section={ selected_row_section if i == selected else -1 }
+						sel_row={ selected_row_index if i == selected else -1 } />
 				)
 			}
 		</Control>
@@ -76,7 +79,8 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 ## directive body is two roots, and GUITKX0108 says so. Notes about markup live out here.)
 export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 		at = Vector2.ZERO, zoom: float = 1.0, near: bool = true, index: int = -1,
-		on_add = null, revision: int = 0) -> RuitkVNode {
+		on_add = null, revision: int = 0, sel_section: int = -1,
+		sel_row: int = -1) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var card_w = M.card_width_for(lod)
@@ -93,7 +97,7 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 						@if (M.shows_sections(lod)) {
 							return (
 								<CanvasCardSections card={ card } lod={ lod } index={ index } on_add={ on_add }
-				zoom={ zoom } revision={ revision } />
+				zoom={ zoom } revision={ revision } sel_section={ sel_section } sel_row={ sel_row } />
 							)
 						}
 					</VBoxContainer>
@@ -151,7 +155,8 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 ## export, carrying which dictionary it adds to, and a second card-level one would be a button
 ## that has to guess which. "+ style" adds a whole new export and has nothing to guess about.
 export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = null,
-		zoom: float = 1.0, revision: int = 0) -> RuitkVNode {
+		zoom: float = 1.0, revision: int = 0, sel_section: int = -1,
+		sel_row: int = -1) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var detail = M.shows_detail(lod)
@@ -166,10 +171,14 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 			@if (not card.imports.is_empty()) {
 				return (
 					<CanvasCardSection heading="IMPORTS">
-						@for (row in card.imports) {
+						@for (i in range(card.imports.size())) {
+							var row = card.imports[i]
 							return (
-								<Label key={ str(row.at) } text={ row.text } style={ P.import_row() }
-									text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
+								<PanelContainer key={ str(row.at) }
+										style={ P.row_selected() if (sel_section == 1 and sel_row == i) else P.row_plain() }>
+									<Label text={ row.text } style={ P.import_row() }
+										text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
+								</PanelContainer>
 							)
 						}
 					</CanvasCardSection>
@@ -179,9 +188,11 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 				return (
 					<CanvasCardSection heading="BODY — HOOKS & STATE">
 						<HFlowContainer style={ {"separation": 4} }>
-							@for (row in card.body) {
+							@for (i in range(card.body.size())) {
+								var row = card.body[i]
 								return (
-									<PanelContainer key={ str(row.at) } style={ P.chip() }>
+									<PanelContainer key={ str(row.at) }
+											style={ P.row_selected() if (sel_section == 2 and sel_row == i) else P.chip() }>
 										<Label text={ row.text } style={ P.chip_text() } />
 									</PanelContainer>
 								)
@@ -195,9 +206,13 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 			@if (detail and not card.markup.is_empty()) {
 				return (
 					<CanvasCardSection heading="RETURN — MARKUP">
-						@for (row in card.markup) {
+						@for (i in range(card.markup.size())) {
+							var row = card.markup[i]
 							return (
-								<CanvasMarkupRow key={ str(row.at) } row={ row } zoom={ zoom } />
+								<PanelContainer key={ str(row.at) }
+										style={ P.row_selected() if (sel_section == 3 and sel_row == i) else P.row_plain() }>
+									<CanvasMarkupRow row={ row } zoom={ zoom } />
+								</PanelContainer>
 							)
 						}
 					</CanvasCardSection>
@@ -206,10 +221,13 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 			@if (card.kind == 2) {
 				return (
 					<CanvasCardSection heading="EXPORTS">
-						@for (row in card.export_detail) {
+						@for (i in range(card.export_detail.size())) {
+							var row = card.export_detail[i]
 							return (
-								<Label key={ str(row.at) + row.text }
-									text={ "  ".repeat(row.depth) + row.text } style={ P.export_row() } />
+								<PanelContainer key={ str(row.at) + row.text }
+										style={ P.row_selected() if (sel_section == 4 and sel_row == i) else P.row_plain() }>
+									<Label text={ "  ".repeat(row.depth) + row.text } style={ P.export_row() } />
+								</PanelContainer>
 							)
 						}
 						<HFlowContainer style={ {"separation": 4} }>
@@ -223,7 +241,10 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 					<CanvasCardSection heading="SETUP">
 						@for (i in range(card.island_lines.size())) {
 							return (
-								<Label key={ str(i) } text={ card.island_lines[i] } style={ P.island_row() } />
+								<PanelContainer key={ str(i) }
+										style={ P.row_selected() if (sel_section == 5 and sel_row == i) else P.row_plain() }>
+									<Label text={ card.island_lines[i] } style={ P.island_row() } />
+								</PanelContainer>
 							)
 						}
 					</CanvasCardSection>

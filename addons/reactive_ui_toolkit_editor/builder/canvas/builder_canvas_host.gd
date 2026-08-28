@@ -56,6 +56,11 @@ var camera := Vector2.ZERO
 var zoom := 1.0
 var selected := -1
 
+## The selected ROW within `selected`, as (section, index). Both -1 when the selection is the card
+## itself rather than something inside it.
+var selected_row_section := -1
+var selected_row_index := -1
+
 var _cards: Control = null
 var _edges: Edges = null
 var _root: RuitkRoot = null
@@ -125,15 +130,30 @@ func set_camera(new_camera: Vector2, new_zoom: float) -> void:
 
 
 func select_card(index: int) -> void:
-	if selected == index:
+	if selected == index and selected_row_index < 0:
 		return
 	selected = index
+	# EXACTLY ONE THING IS SELECTED AT A TIME. Selecting a card clears any row selection, so
+	# Delete can never be ambiguous about which of the two it means.
+	selected_row_section = -1
+	selected_row_index = -1
 	card_selected.emit(index)
 	_render()
 
 
-## Frames the whole graph. What "reset view" does, and what a freshly opened tree with no saved
-## layout comes up as.
+## Selects one ROW on one card -- a markup row, a hook chip, an import row, a code island line or
+## a style entry. Any row the canvas lists is selectable, because each is backed by a line range
+## that knows how to remove itself.
+func select_row(card_index: int, section: int, row_index: int) -> void:
+	if selected == card_index and selected_row_section == section 			and selected_row_index == row_index:
+		return
+	selected = card_index
+	selected_row_section = section
+	selected_row_index = row_index
+	card_selected.emit(card_index)
+	_render()
+
+
 ## Brings ONE card up to fill the surface, and selects it.
 func frame_card(index: int) -> void:
 	if graph == null or index < 0 or index >= graph.cards.size() or size.x <= 0.0:
@@ -143,6 +163,8 @@ func frame_card(index: int) -> void:
 	select_card(index)
 
 
+## Frames the whole graph. What "reset view" does, and what a freshly opened tree with no saved
+## layout comes up as.
 func fit_to_view() -> void:
 	if graph == null:
 		return
@@ -195,6 +217,8 @@ func _render() -> void:
 		"zoom": zoom,
 		"viewport": size,
 		"selected": selected,
+		"selected_row_section": selected_row_section,
+		"selected_row_index": selected_row_index,
 		"on_add": Callable(self, "_on_card_add"),
 		"revision": _revision,
 	}
