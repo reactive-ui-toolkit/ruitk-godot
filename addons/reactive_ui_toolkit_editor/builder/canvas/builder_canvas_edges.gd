@@ -75,6 +75,74 @@ func refresh(new_graph: Graph, new_camera: Vector2, new_zoom: float, new_selecte
 	queue_redraw()
 
 
+## Where a drag is hovering, in canvas coordinates, or negative when there is none.
+var _drop_at := Vector2(-1.0, -1.0)
+
+const Edits = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_edits.gd")
+const Drag = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_drag.gd")
+const DROP_FILL := Color(0.361, 0.588, 0.965, 0.22)
+const DROP_LINE := Color(0.361, 0.588, 0.965, 0.95)
+
+
+func set_drop_hint(at: Vector2) -> void:
+	if _drop_at.is_equal_approx(at):
+		return
+	_drop_at = at
+	queue_redraw()
+
+
+## Paints where the drop will land: a filled band for INSIDE, a caret for the three edge cases.
+##
+## Drawn from `Drag.resolve` -- the SAME call the drop itself makes -- so the hint cannot promise
+## one thing and the edit do another. That is the defect the Unity leg records as UB-110, where a
+## separately-computed caret disagreed with the insert it previewed.
+func _draw_drop_hint() -> void:
+	if _drop_at.x < 0.0 or graph == null:
+		return
+	var hit := Drag.resolve(graph, _drop_at, camera, zoom)
+	if not bool(hit["found"]):
+		return
+	var card: Graph.Card = hit["card"]
+	var row: Graph.Line = hit["row"]
+	if card == null or row == null:
+		return
+	var width := Metrics.card_width_for(Metrics.lod_of(zoom))
+	var section := int(hit["section"])
+	var index := int(hit["index"])
+	var stack_top := Metrics.HEADER_H
+	var found := false
+	var row_h := 0.0
+	for entry in Metrics.section_stack(card):
+		var spec := entry as Dictionary
+		if not Metrics.draws_section(int(spec["section"]), Metrics.lod_of(zoom)):
+			continue
+		if int(spec["section"]) == section:
+			row_h = float(spec["row_height"])
+			stack_top += float(spec["lead"]) + index * row_h
+			found = true
+			break
+		stack_top += float(spec["height"])
+	if not found:
+		return
+
+	var top_left := Metrics.world_to_screen(
+		Vector2(card.x, card.y + stack_top), camera, zoom)
+	var size := Vector2(width * zoom, row_h * zoom)
+	var placement := int(hit["placement"])
+	if placement == int(Edits.Placement.INSIDE):
+		draw_rect(Rect2(top_left, size), DROP_FILL, true)
+		draw_rect(Rect2(top_left, size), DROP_LINE, false, 1.0)
+		return
+	# A CARET, and which edge it sits on is the whole answer. FIRST_CHILD draws under the row and
+	# indented, because that is where the child will appear.
+	var y := top_left.y if placement == int(Edits.Placement.BEFORE) else top_left.y + size.y
+	var inset := 0.0
+	if placement == int(Edits.Placement.FIRST_CHILD):
+		inset = 16.0 * zoom
+	draw_line(Vector2(top_left.x + inset, y), Vector2(top_left.x + size.x, y), DROP_LINE, 2.0)
+	draw_circle(Vector2(top_left.x + inset, y), 3.0, DROP_LINE)
+
+
 func _draw() -> void:
 	if graph == null or graph.cards.is_empty():
 		return
@@ -92,6 +160,7 @@ func _draw() -> void:
 		var ordinal := int(seen_per_card.get(edge.from_index, 0))
 		seen_per_card[edge.from_index] = ordinal + 1
 		_draw_edge(edge, ordinal, card_width)
+	_draw_drop_hint()
 
 
 func _draw_anchors(card: Graph.Card, index: int, card_width: float) -> void:

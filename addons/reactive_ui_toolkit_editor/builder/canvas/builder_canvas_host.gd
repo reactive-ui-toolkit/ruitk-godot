@@ -38,6 +38,14 @@ signal card_context_requested(index: int, world_position: Vector2)
 signal row_clicked(card_index: int, section: int, row_index: int)
 signal row_context_requested(card_index: int, section: int, row_index: int, at: Vector2)
 
+## A row was DOUBLE-CLICKED: edit it in place.
+##
+## The reference's primary editing gesture, and it had no route here at all -- the whole builder
+## contained one `double_click` read, in the library. So a hook chip, a code island, a style entry
+## and an element row could each be looked at and none of them edited without going through a
+## context menu or the source pane.
+signal row_activated(card_index: int, section: int, row_index: int, at: Vector2)
+
 ## A card's own "+" affordance was used: `what` is one of "hook", "code", "style", "entry".
 ##
 ## The card is where the user is LOOKING when they want another hook, so it is where the button
@@ -92,6 +100,9 @@ var _press_index := -1
 ## Whether the press that may become a drag landed on a card's TITLE BAR. Recorded at press rather
 ## than asked at motion, because by then the pointer has left the bar it started on.
 var _press_on_title := false
+
+## Where a drag is hovering, in this Control's coordinates, or negative when there is none.
+var _drop_at := Vector2(-1.0, -1.0)
 
 ## Bumped on every `show_graph`, so an in-place model change cannot be bailed out of.
 var _revision := 0
@@ -464,6 +475,15 @@ func _gui_input(event: InputEvent) -> void:
 		_handle_motion(event as InputEventMouseMotion)
 
 
+## Takes the drop hint down. Called when the drop lands and when the drag leaves the canvas.
+func _clear_drop_hint() -> void:
+	if _drop_at.x < 0.0:
+		return
+	_drop_at = Vector2(-1.0, -1.0)
+	if _edges != null:
+		_edges.set_drop_hint(_drop_at)
+
+
 func _handle_button(event: InputEventMouseButton) -> void:
 	match event.button_index:
 		MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN:
@@ -501,6 +521,9 @@ func _handle_button(event: InputEventMouseButton) -> void:
 				var hit := row_at(_press_index, event.position)
 				if bool(hit.get("found", false)):
 					row_clicked.emit(_press_index, int(hit["section"]), int(hit["index"]))
+					if event.double_click:
+						row_activated.emit(_press_index, int(hit["section"]),
+							int(hit["index"]), event.position)
 			else:
 				# A card that was dragged tells the window where it ended up; one that was only
 				# clicked has already been handled by the press.
@@ -535,11 +558,20 @@ func _handle_button(event: InputEventMouseButton) -> void:
 ## Answered `true` for every payload this builder produces rather than resolving the target
 ## here: the resolve is the window's, it needs the model, and a canvas that said "no" from a
 ## partial view would refuse drops the window would have accepted.
-func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
-	return data is Dictionary and (data as Dictionary).has("source")
+func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
+	# A DROP THAT SHOWS NOTHING is a drop the user has to guess at. The three-band rule was
+	# resolved live and correctly here and then drawn NOWHERE, so before / inside / after -- and
+	# the first-child case -- were invisible until after the edit had happened. Godot calls this
+	# on every motion of a drag, which is exactly the cadence a hint needs.
+	var ok: bool = data is Dictionary and (data as Dictionary).has("source")
+	_drop_at = at_position if ok else Vector2(-1.0, -1.0)
+	if _edges != null:
+		_edges.set_drop_hint(_drop_at)
+	return ok
 
 
 func _drop_data(at_position: Vector2, data: Variant) -> void:
+	_clear_drop_hint()
 	dropped.emit(data as Dictionary, at_position)
 
 
@@ -583,6 +615,9 @@ func _handle_motion(motion: InputEventMouseMotion) -> void:
 		accept_event()
 		return
 
+	# A drag that left the canvas takes its hint with it.
+	if _drop_at.x >= 0.0 and not (motion.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		_clear_drop_hint()
 	_track_hover(motion.position)
 
 	if _panning:

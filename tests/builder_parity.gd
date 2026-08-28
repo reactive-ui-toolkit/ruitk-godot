@@ -80,6 +80,10 @@ const PARITY := [
 	["OnDirectiveEdited", "RowMenuId.EDIT_HEADER"],
 	# Islands and style entries
 	["OnIslandEdited", "func set_island"],
+	["double-click to edit a row in place", "signal row_activated"],
+	["the editor takes the size of what it edits", "func _row_rect_on_screen"],
+	["drop hint (band + caret)", "func _draw_drop_hint"],
+	["source pane chords (Ctrl+Enter / Esc)", "func _unhandled_key_input"],
 	["AdvanceStyleEntry", "RowMenuId.ADD_STYLE_ENTRY"],
 	# Drag and drop
 	["OnCanvasRowDrop", "func _on_canvas_drop"],

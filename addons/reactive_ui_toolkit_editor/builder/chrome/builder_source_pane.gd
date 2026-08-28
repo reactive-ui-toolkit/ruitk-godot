@@ -65,14 +65,14 @@ func _init() -> void:
 	trailing.add_child(_edit_toggle)
 
 	_apply = Button.new()
-	_apply.text = "apply"
+	_apply.text = "apply  (Ctrl+Enter)"
 	_apply.flat = true
 	_apply.visible = false
 	_apply.pressed.connect(apply_edit)
 	trailing.add_child(_apply)
 
 	_revert = Button.new()
-	_revert.text = "revert"
+	_revert.text = "cancel  (Esc)"
 	_revert.flat = true
 	_revert.visible = false
 	_revert.pressed.connect(cancel_edit)
@@ -208,6 +208,33 @@ func _leave_edit() -> void:
 ## emit `text_changed` at all, so a load cannot arrive here today -- and if that ever changed, a
 ## load is by definition text that already equals the model's, so it would still be rejected here.
 ## A flag would have to be right about the engine's behaviour; this does not.
+## Ctrl+Enter applies, Escape cancels.
+##
+## The pane had NO keyboard at all: the only routes to apply or cancel were clicking the two
+## buttons. The window's own key model deliberately stands down while a text surface holds focus,
+## which is right -- but it left the editing surface with no chords of its own, so an edit could
+## only be finished with the mouse.
+##
+## `_unhandled_key_input` rather than `_gui_input`, because the focus is on the CodeEdit inside
+## this pane, not on the pane.
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not _editing or not (event is InputEventKey):
+		return
+	var key := event as InputEventKey
+	if not key.pressed:
+		return
+	if not _editor.has_focus() and not has_focus():
+		return
+	if key.keycode == KEY_ESCAPE:
+		cancel_edit()
+	elif (key.ctrl_pressed or key.meta_pressed) \
+			and (key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER):
+		apply_edit()
+	else:
+		return
+	get_viewport().set_input_as_handled()
+
+
 func _on_text_changed() -> void:
 	if workspace == null or _path.is_empty():
 		return

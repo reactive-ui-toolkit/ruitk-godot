@@ -747,6 +747,7 @@ func _wire() -> void:
 	_canvas.card_selected.connect(_on_card_selected)
 	_canvas.card_add_requested.connect(_on_card_add)
 	_canvas.row_clicked.connect(_on_row_clicked)
+	_canvas.row_activated.connect(_on_row_activated)
 	_canvas.row_context_requested.connect(_on_row_context)
 	_canvas.dropped.connect(_on_canvas_drop)
 	_canvas.card_moved.connect(_on_card_moved)
@@ -1170,6 +1171,88 @@ func _on_row_clicked(card_index: int, _section: int, row_index: int) -> void:
 ## The layout store, its per-tree keying and the "top up rather than re-seed" rule were all
 ## written before anything could move a card -- so the whole persistence path had never once run
 ## on a position a user chose.
+## Double-clicking a row edits it IN PLACE, which is the reference's primary editing gesture.
+##
+## Dispatched by section, because what "edit this" means differs: a hook chip and a code island
+## are setup lines, a style entry is a dictionary line, and a directive head is its header
+## expression. Each token is one `_on_inline_committed` already knows how to write back.
+func _on_row_activated(card_index: int, section: int, row_index: int, at: Vector2) -> void:
+	if graph == null or card_index < 0 or card_index >= graph.cards.size():
+		return
+	var card = graph.cards[card_index]
+	var module := workspace.try_get(card.file_path) if workspace != null else null
+	if module == null or module.read_only:
+		return
+	var row = _row_of(card_index, section, row_index)
+	if row == null:
+		return
+	_menu_target = card.file_path
+	_menu_row = row
+	_menu_card = card_index
+	_menu_section = section
+	_menu_row_index = row_index
+	_menu_at = at
+
+	var rect := _row_rect_on_screen(card, section, row_index)
+	match section:
+		Metrics.Section.BODY:
+			_inline.open_at(rect, row.source_text,
+				{ "kind": "body", "path": card.file_path, "row": row })
+		Metrics.Section.ISLAND:
+			_inline.open_at(rect, _LF.join(card.island_lines),
+				{ "kind": "island", "path": card.file_path, "row": row,
+					"from": card.island_start_line, "to": card.island_end_line })
+		Metrics.Section.EXPORTS:
+			if Edits.has_span(row):
+				_inline.open_at(rect, row.source_text,
+					{ "kind": "island", "path": card.file_path, "row": row,
+						"from": row.source_line, "to": row.source_line })
+			else:
+				_on_card_add(card_index, "entry")
+		Metrics.Section.MARKUP:
+			if row.kind == Graph.LineKind.DIRECTIVE:
+				_inline.open_at(rect, row.directive_text,
+					{ "kind": "directive", "path": card.file_path, "row": row })
+			else:
+				_search_purpose = "attribute"
+				_search_menu.open_menu("add an attribute to <%s>" % row.name,
+					Attributes.menu_for(row.name, row, _component_named(row.name)),
+					_menu_screen_at(), "add \"%s\"")
+		_:
+			return
+
+
+## Where a row sits on screen, so an editor can open OVER the thing it edits rather than at
+## whatever point the last menu used.
+##
+## Measured where the canvas has measured it, estimated otherwise -- the same order every other
+## consumer of row geometry now follows.
+func _row_rect_on_screen(card, section: int, row_index: int) -> Rect2:
+	var card_index := graph.index_of(card.file_path) if graph != null else -1
+	var lod := Metrics.lod_of(_canvas.zoom)
+	var measured: Rect2 = _canvas.measured_row(card_index, section, row_index) 		if card_index >= 0 else Rect2()
+	var local := measured
+	if local.size.y <= 0.0:
+		var top := Metrics.HEADER_H
+		for entry in Metrics.section_stack(card):
+			var spec := entry as Dictionary
+			if not Metrics.draws_section(int(spec["section"]), lod):
+				continue
+			if int(spec["section"]) == section:
+				top += float(spec["lead"]) + row_index * float(spec["row_height"])
+				local = Rect2(Vector2(0.0, top),
+					Vector2(Metrics.card_width_for(lod), float(spec["row_height"])))
+				break
+			top += float(spec["height"])
+	if local.size.y <= 0.0:
+		return Rect2(_menu_screen_at(), Vector2(260, 24))
+	var at := _canvas.get_global_rect().position + Metrics.world_to_screen(
+		Vector2(card.x, card.y) + local.position, _canvas.camera, _canvas.zoom)
+	return Rect2(at, Vector2(
+		clampf(local.size.x * _canvas.zoom, 260.0, 720.0),
+		maxf(local.size.y * _canvas.zoom, 22.0)))
+
+
 func _on_card_moved(index: int, to: Vector2) -> void:
 	if graph == null or layout == null or index < 0 or index >= graph.cards.size():
 		return

@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 300
+const ASSERTION_FLOOR := 309
 
 var _fails := 0
 var _passes := 0
@@ -65,6 +65,8 @@ func _run() -> void:
 	await _test_one_funnel()
 	await _test_undo_across_files()
 	await _test_add_chip_opens_the_editor()
+	await _test_double_click_edits_in_place()
+	await _test_source_pane_keyboard()
 	await _test_delete_refuses_what_it_must()
 	await _test_selection_survives_an_edit()
 	await _test_load_does_not_destroy_unsaved_work()
@@ -960,6 +962,89 @@ func _test_add_chip_opens_the_editor() -> void:
 ## `before` already equalled `after` and the window's funnel rejected the whole thing as a no-op.
 ## UNSAVED WORK SURVIVES SOMEONE OPENING ANOTHER FILE.
 ## THE THINGS DELETE MUST NOT DELETE.
+## DOUBLE-CLICKING A ROW EDITS IT IN PLACE -- the reference's primary editing gesture, which had
+## no route here at all. The whole builder contained one `double_click` read, in the library.
+func _test_double_click_edits_in_place() -> void:
+	var w := _window()
+	await process_frame
+	var path := ROOT.path_join("app.guitkx")
+	var index := w.graph.index_of(path)
+	var card: Graph.Card = w.graph.cards[index]
+
+	_section("a hook chip opens on its own setup line")
+	if not card.body.is_empty():
+		w._on_row_activated(index, int(Metrics.Section.BODY), 0, Vector2(100, 100))
+		await process_frame
+		_check(w.inline_editor().is_open(), "the editor opened")
+		_eq(w.inline_editor().text, card.body[0].source_text, "seeded with the line it edits")
+		w.inline_editor().cancel()
+		await process_frame
+
+	_section("a directive head opens on its EXPRESSION, so committing it is the identity")
+	var directive := -1
+	for i in card.markup.size():
+		if card.markup[i].kind == Graph.LineKind.DIRECTIVE:
+			directive = i
+			break
+	if directive >= 0:
+		var before: String = w._buffer_of(path)
+		w._on_row_activated(index, int(Metrics.Section.MARKUP), directive, Vector2(100, 100))
+		await process_frame
+		_check(w.inline_editor().is_open(), "the editor opened")
+		_eq(w.inline_editor().text, card.markup[directive].directive_text,
+			"seeded with the expression alone")
+		w.inline_editor().commit()
+		await process_frame
+		_eq(w._buffer_of(path), before, "and committing it unchanged changes nothing")
+
+	_section("the editor opens OVER the row, not wherever the last menu was")
+	var rect: Rect2 = w._row_rect_on_screen(card, int(Metrics.Section.MARKUP), 0)
+	_check(rect.size.x >= 260.0, "at least the minimum width")
+	_check(rect.size.y >= 22.0, "and a real height")
+
+	_drop(w)
+
+
+## THE SOURCE PANE HAS CHORDS: Ctrl+Enter applies, Escape cancels.
+func _test_source_pane_keyboard() -> void:
+	var w := _window()
+	await process_frame
+	var path := ROOT.path_join("app.guitkx")
+	w.select_module(path)
+	await process_frame
+	var pane := w.source_pane()
+	var original: String = w._buffer_of(path)
+
+	_section("Escape cancels an open edit")
+	pane._set_editing(true)
+	await process_frame
+	pane.editor().text = original.replace("\"one\"", "\"escaped\"")
+	var escape := InputEventKey.new()
+	escape.keycode = KEY_ESCAPE
+	escape.pressed = true
+	pane.editor().grab_focus()
+	pane._unhandled_key_input(escape)
+	await process_frame
+	_check(not pane.is_editing(), "edit mode is closed")
+	_eq(w._buffer_of(path), original, "and the buffer is untouched")
+
+	_section("Ctrl+Enter applies one")
+	pane._set_editing(true)
+	await process_frame
+	pane.editor().text = original.replace("\"one\"", "\"chorded\"")
+	var apply := InputEventKey.new()
+	apply.keycode = KEY_ENTER
+	apply.pressed = true
+	apply.ctrl_pressed = true
+	pane.editor().grab_focus()
+	pane._unhandled_key_input(apply)
+	await process_frame
+	_check(not pane.is_editing(), "edit mode is closed")
+	_check(w._buffer_of(path).contains("chorded"), "and the edit landed")
+
+	_drop(w)
+
+
 func _test_delete_refuses_what_it_must() -> void:
 	var w := _window()
 	await process_frame
