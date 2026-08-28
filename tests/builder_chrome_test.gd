@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 271
+const ASSERTION_FLOOR := 281
 
 var _fails := 0
 var _passes := 0
@@ -65,6 +65,8 @@ func _run() -> void:
 	await _test_one_funnel()
 	await _test_undo_across_files()
 	await _test_add_chip_opens_the_editor()
+	await _test_source_edit_reaches_the_funnel()
+	await _test_abandoned_edit_is_not_kept()
 	await _test_rename_is_complete()
 	await _test_rename_validation()
 	await _test_move_guards()
@@ -948,6 +950,71 @@ func _test_add_chip_opens_the_editor() -> void:
 
 ## A RENAME MUST RENAME: the export, the file, the folder when owned, and every importer's
 ## specifier, binding and uses. This did only the file and the specifiers.
+## A SOURCE EDIT MUST REACH THE LEDGER, THE CANVAS AND THE PREVIEW.
+##
+## It reached none of them. The pane wrote the model on every keystroke, so by the time Apply ran
+## `before` already equalled `after` and the window's funnel rejected the whole thing as a no-op.
+func _test_source_edit_reaches_the_funnel() -> void:
+	_section("typing does not touch the model while an edit is open")
+	var w := _window()
+	await process_frame
+	var path := ROOT.path_join("app.guitkx")
+	w.select_module(path)
+	await process_frame
+	var pane := w.source_pane()
+	var original: String = w._buffer_of(path)
+
+	pane._set_editing(true)
+	await process_frame
+	_check(pane.is_editing(), "the pane is in edit mode")
+	pane.editor().text = original.replace("\"one\"", "\"typed\"")
+	pane._on_text_changed()
+	await process_frame
+	_eq(w._buffer_of(path), original,
+		"half-typed text stays out of the model -- it is what Save writes")
+
+	_section("apply is the one write, and it is a real one")
+	var entries_before: int = w.ledger.entries().size()
+	pane.apply_edit()
+	await process_frame
+	_check(w._buffer_of(path) != original, "the model has the edit")
+	_check(w._buffer_of(path).contains("typed"), "with the typed text in it")
+	_check(w.ledger.entries().size() > entries_before, "and the ledger has an entry for it")
+	_check(w.ledger.can_undo(), "so it can be taken back")
+
+	_section("and undo takes it back")
+	_check(w.undo(), "undo runs")
+	await process_frame
+	_eq(w._buffer_of(path), original, "the file is as it was")
+
+	_drop(w)
+
+
+## LEAVING AN EDIT BY SELECTING SOMETHING ELSE MUST NOT STRAND THE TYPED TEXT.
+func _test_abandoned_edit_is_not_kept() -> void:
+	_section("switching module while editing restores the buffer")
+	var w := _window()
+	await process_frame
+	var path := ROOT.path_join("app.guitkx")
+	w.select_module(path)
+	await process_frame
+	var pane := w.source_pane()
+	var original: String = w._buffer_of(path)
+
+	pane._set_editing(true)
+	await process_frame
+	pane.editor().text = "this is not guitkx at all <<<"
+	pane._on_text_changed()
+	await process_frame
+
+	w.select_module(ROOT.path_join("components/row/row.guitkx"))
+	await process_frame
+	_eq(w._buffer_of(path), original, "the abandoned edit did not survive the switch")
+	_check(not pane.is_editing(), "and the pane is not still in edit mode")
+
+	_drop(w)
+
+
 func _test_rename_is_complete() -> void:
 	_section("wire an importer up first, so the rename has references to follow")
 	var w := _window()

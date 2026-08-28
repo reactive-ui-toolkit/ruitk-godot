@@ -142,11 +142,10 @@ func show_module(file_path: String) -> void:
 	# Showing a module does not OPEN it. The edit toggle is what unlocks the buffer, and
 	# switching files while an edit was open would otherwise carry the unlocked state onto a
 	# file the user never asked to change.
-	_editing = false
-	_editor.editable = false
-	_edit_toggle.button_pressed = false
-	_apply.visible = false
-	_revert.visible = false
+	# ABANDONING AN EDIT PUTS THE BUFFER BACK. Switching module used to reset the flags and drop
+	# the snapshot without restoring anything, so typed text stayed in the model with no ledger
+	# entry and no way back -- and Save would have written it.
+	_leave_edit()
 	_editor.text = module.buffer_text
 
 
@@ -171,9 +170,36 @@ func refresh_from_model() -> void:
 
 
 func clear() -> void:
+	_leave_edit()
 	_path = ""
 	_title.text = "no module selected"
 	_editor.text = ""
+
+
+## Leaves edit mode, restoring the buffer the edit began from.
+##
+## THE ONE PLACE that resets the edit state. It was spelled out four times -- in `show_module`,
+## `apply_edit`, `cancel_edit` and nowhere in `clear` -- and the exit that mattered most, leaving
+## the pane by selecting something else, was the one that restored nothing.
+func _leave_edit() -> void:
+	var was_editing := _editing
+	var restore := _snapshot
+	var path := _path
+	_editing = false
+	_snapshot = ""
+	_editor.editable = false
+	_edit_toggle.button_pressed = false
+	_apply.visible = false
+	_revert.visible = false
+	if not was_editing or path.is_empty() or workspace == null:
+		return
+	var module := workspace.try_get(path)
+	if module == null or module.read_only or module.buffer_text == restore:
+		return
+	# The model can only differ here if something wrote it behind the pane's back; put it back the
+	# way the edit began, and say so rather than discarding the difference silently.
+	workspace.apply_edit(path, restore)
+	complained.emit("Abandoned the edit in %s" % path.get_file())
 
 
 ## Writes a real edit back to the model.
@@ -187,6 +213,16 @@ func _on_text_changed() -> void:
 		return
 	var module := workspace.try_get(_path)
 	if module == null or module.read_only:
+		return
+	# WHILE AN EDIT IS OPEN THE MODEL IS NOT TOUCHED. This wrote every keystroke straight into
+	# the module, which is what made the whole source-edit path silently historyless: by the time
+	# Apply ran, `before` already equalled `after`, so the window's funnel rejected it as a no-op
+	# -- no ledger entry, no card re-projection, no preview round. The class comment below has
+	# always said "the pane hands the buffer over ONCE, on apply"; now it does.
+	#
+	# Half-typed text also has no business in the model: it is what Save writes and what the crash
+	# journal snapshots.
+	if _editing:
 		return
 	var before := module.buffer_text
 	var after := _editor.text
@@ -240,7 +276,10 @@ func apply_edit() -> void:
 				break
 		complained.emit("Parse failed: %s" % first)
 		return
+	# The snapshot is dropped WITHOUT restoring: this text is the edit, and it goes out through
+	# `edit_applied` to the window's one funnel, which records it and re-projects.
 	_editing = false
+	_snapshot = ""
 	_editor.editable = false
 	_edit_toggle.button_pressed = false
 	_apply.visible = false
@@ -254,6 +293,7 @@ func cancel_edit() -> void:
 		return
 	var restore := _snapshot
 	_editing = false
+	_snapshot = ""
 	_editor.editable = false
 	_edit_toggle.button_pressed = false
 	_apply.visible = false

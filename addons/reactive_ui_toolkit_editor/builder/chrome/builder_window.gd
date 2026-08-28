@@ -920,8 +920,11 @@ func _after_model_change(file_path: String) -> void:
 ## compiled and the canvas re-projected -- so typing produced a stream of errors about text
 ## nobody had finished writing, and deleting a line to retype it blanked the card.
 func _on_buffer_edited(file_path: String, before: String, after: String) -> void:
-	if _source != null and _source.is_editing():
-		return
+	# The `is_editing()` short-circuit that used to guard this is gone along with the reason for
+	# it. The pane no longer writes the model per keystroke, so anything arriving here is a real
+	# committed change -- and while it DID write per keystroke, this early return meant the ledger
+	# never saw a source edit at all and the canvas kept showing the old file.
+	#
 	# The source pane has already written the buffer, so the funnel records rather than re-applies.
 	ledger.record_typing(file_path, before, after)
 	_after_model_change(file_path)
