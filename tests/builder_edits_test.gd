@@ -25,7 +25,7 @@ const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/docum
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 260
+const ASSERTION_FLOOR := 271
 
 var _fails := 0
 var _passes := 0
@@ -40,6 +40,8 @@ func _initialize() -> void:
 	_test_directive_headers()
 	_test_wrap_in_directive()
 	_test_clauses()
+	_test_match_clauses()
+	_test_style_entry_is_not_duplicated()
 	_test_delete_clause_positions()
 	_test_unwrap_is_refused_where_it_would_corrupt()
 	_test_unwrap()
@@ -842,6 +844,68 @@ const THREE_SRC := """export App(count: int = 0) -> RuitkVNode {
 
 
 ## DELETING A CLAUSE MUST LEAVE A FILE THAT COMPILES -- first, middle or last.
+## A @match GROWS ARMS. Its head had no clause operations at all, so the one construct whose whole
+## purpose is several arms could not be given a second one from the canvas.
+const MATCH_SRC := """export App(level: int = 1) -> RuitkVNode {
+	return (
+		<VBoxContainer>
+			@match (level) {
+				@case (0) {
+					return (
+						<Label text="a" />
+					)
+				}
+				@default {
+					return (
+						<Label text="d" />
+					)
+				}
+			}
+		</VBoxContainer>
+	)
+}
+"""
+
+
+func _test_match_clauses() -> void:
+	_section("the next case label is the next unused integer")
+	var card := _card(MATCH_SRC)
+	var head := _directive(MATCH_SRC, "@match")
+	_check(head != null, "the @match head is a row")
+	_eq(Edits.next_case_label(card, head), 1, "0 is taken, so 1 is next")
+
+	_section("a new @case lands ABOVE @default")
+	# A default that is not last matches everything after it.
+	var with_case := Edits.add_match_clause(MATCH_SRC, card, head, false)
+	_check(with_case.contains("@case (1)"), "the case is added under the next label")
+	_check(with_case.find("@case (1)") < with_case.find("@default"),
+		"and sits above the default")
+	var cased: Dictionary = Compiler.compile(with_case, "App")
+	_check(bool(cased["ok"]), "and it compiles (got %s)" % str(cased.get("diagnostics", [])))
+
+	_section("a second @default is refused")
+	_check(Edits.construct_has_clause(card, head, "@default"), "this match already has one")
+	_eq(Edits.add_match_clause(MATCH_SRC, card, head, true), MATCH_SRC, "so adding one does nothing")
+
+
+## A DUPLICATE DICTIONARY KEY IS A FILE THAT WILL NOT LOAD, and the "+ style" chip wrote one on
+## every second press.
+func _test_style_entry_is_not_duplicated() -> void:
+	_section("a key already present is recognised")
+	var style := "export Card := {
+	\"bg_color\": Color(0.1, 0.1, 0.1),
+}
+"
+	_check(Edits.style_entry_exists(style, "Card", "bg_color"), "bg_color is there")
+	_check(not Edits.style_entry_exists(style, "Card", "border_width_all"), "border_width_all is not")
+
+	_section("and inserting it again does nothing")
+	_eq(Edits.insert_style_entry(style, "Card", "bg_color", "Color(0.2, 0.2, 0.2)"), style,
+		"the edit refuses it whatever the caller believes")
+	_check(Edits.insert_style_entry(style, "Card", "border_width_all", "1") != style,
+		"a new key still lands")
+
+
 func _test_delete_clause_positions() -> void:
 	_section("deleting the MIDDLE clause keeps the next clause's head")
 	# A continuation's close IS the next clause's head line in the shared form, so removing

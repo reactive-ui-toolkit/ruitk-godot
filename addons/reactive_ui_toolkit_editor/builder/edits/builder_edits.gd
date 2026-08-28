@@ -551,8 +551,43 @@ static func _body_open_of(source: String, card: Graph.Card) -> int:
 # ── Style entries ────────────────────────────────────────────────────────────────────
 
 ## Adds a `"key": value` pair to a style module's exported dictionary. What `+ entry` does.
+## Whether an export's dictionary already carries `key`.
+##
+## The vocabulary menu filters on this, and `insert_style_entry` refuses on it -- a duplicate key
+## in a GDScript dictionary literal is a file that will not load, and it took two clicks of the
+## same chip to produce one.
+static func style_entry_exists(source: String, export_name: String, key: String) -> bool:
+	var re := RegEx.create_from_string("(?m)^\\s*[\"']" + key + "[\"']\\s*:")
+	var body := _export_body(source, export_name)
+	return not body.is_empty() and re.search(body) != null
+
+
+## The text between an export's braces, or "" when it cannot be found.
+static func _export_body(source: String, export_name: String) -> String:
+	var head := source.find("export " + export_name)
+	if head < 0:
+		return ""
+	var open := source.find("{", head)
+	if open < 0:
+		return ""
+	var depth := 0
+	for i in range(open, source.length()):
+		var ch := source[i]
+		if ch == "{":
+			depth += 1
+		elif ch == "}":
+			depth -= 1
+			if depth == 0:
+				return source.substr(open, i - open)
+	return source.substr(open)
+
+
 static func insert_style_entry(source: String, export_name: String, key: String,
 		value: String) -> String:
+	# A DUPLICATE KEY IS A DICTIONARY THAT WILL NOT LOAD, so the edit refuses one whatever the
+	# caller believes.
+	if style_entry_exists(source, export_name, key):
+		return source
 	for dm in (Compiler.analyzed_decls(source)["decls"] as Array):
 		if str(dm["name"]) != export_name or str(dm["kind"]) != "value":
 			continue
@@ -594,6 +629,69 @@ static func _is_space(c: String) -> bool:
 ## Ported from the Unity leg's `AddIfClause`. The construct's closing brace becomes the SHARED
 ## HEAD of the new clause -- `} @else {` -- and a fresh `}` closes it. Written any other way the
 ## file no longer balances, and the parser is strict about it.
+## The next unused `@case` label for a `@match`, as an integer.
+##
+## The arms sit one level deeper than the head, and this language writes them with PARENTHESES --
+## `@case (1)` -- not the colon form the Unity leg uses. Their labels arrive on the row as the
+## directive text.
+static func next_case_label(card: Graph.Card, head: Graph.Line) -> int:
+	var used := {}
+	for clause in clauses_of(card, head):
+		var row := clause as Graph.Line
+		if row.badge != Graph.Badge.CASE:
+			continue
+		var text := row.directive_text.strip_edges()
+		if text.is_valid_int():
+			used[text.to_int()] = true
+	var next := 0
+	while used.has(next):
+		next += 1
+	return next
+
+
+## Adds a `@case` or the `@default` to a `@match`.
+##
+## A new `@case` goes ABOVE `@default`, because a default that is not last matches everything
+## after it. The `@match` head had no clause operations at all -- its menu offered only edit,
+## remove and delete -- so the one construct whose whole purpose is several arms could not be
+## given a second one from the canvas.
+static func add_match_clause(source: String, card: Graph.Card, head: Graph.Line,
+		is_default: bool) -> String:
+	if head == null or head.close_line <= 0:
+		return source
+	var lines := source.split(_lf())
+	var close_index := head.close_line - 1
+	if close_index < 0 or close_index >= lines.size():
+		return source
+	if str(lines[close_index]).strip_edges() != "}":
+		return source
+
+	# A CASE LANDS ABOVE @default. Asked of the projection, so it is the arm's real line rather
+	# than a guess about where the default sits.
+	var insert_at := close_index
+	if not is_default:
+		for clause in clauses_of(card, head):
+			var row := clause as Graph.Line
+			if row.badge == Graph.Badge.DEFAULT and row.directive_line > 0:
+				insert_at = mini(insert_at, row.directive_line - 1)
+	if is_default and construct_has_clause(card, head, "@default"):
+		return source
+
+	var indent := _indent_of_line(str(lines[close_index])) + _indent_unit(source)
+	var header := "@default" if is_default else "@case (%d)" % next_case_label(card, head)
+	var unit := _indent_unit(source)
+	var out := PackedStringArray()
+	for i in range(lines.size()):
+		if i == insert_at:
+			out.append("%s%s {" % [indent, header])
+			out.append(indent + unit + "return (")
+			out.append(indent + unit + unit + "<Control />")
+			out.append(indent + unit + ")")
+			out.append(indent + "}")
+		out.append(str(lines[i]))
+	return _lf().join(out)
+
+
 static func add_if_clause(source: String, head: Graph.Line, with_condition: bool) -> String:
 	if head == null or head.close_line <= 0:
 		return source
@@ -802,16 +900,22 @@ static func clauses_of(card: Graph.Card, head: Graph.Line) -> Array:
 			break
 	if at < 0:
 		return out
+	# A @match's ARMS SIT ONE LEVEL DEEPER than its head, because the match's body is a container
+	# of clauses rather than markup. Every other construct's continuations are siblings of the
+	# head. Walking at the head's own depth therefore found nothing for a @match and treated its
+	# arms as body.
+	var arm_depth := head.depth + 1 if head.badge == Graph.Badge.MATCH else head.depth
 	for i in range(at + 1, card.markup.size()):
 		var other: Graph.Line = card.markup[i]
-		if other.depth > head.depth:
-			continue
-		if other.depth < head.depth:
-			break
+		if other.depth < head.depth or (other.depth == head.depth and arm_depth > head.depth):
+			break                       # left the match entirely
+		if other.depth != arm_depth:
+			continue                    # a clause's own body
 		if other.kind == Graph.LineKind.DIRECTIVE and other.clause_index > head.clause_index:
 			out.append(other)
 			continue
-		break
+		if arm_depth == head.depth:
+			break                       # a sibling that is not a continuation ends the construct
 	return out
 
 

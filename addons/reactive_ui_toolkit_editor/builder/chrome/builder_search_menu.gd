@@ -38,6 +38,10 @@ var _freeform_label := ""
 var _validate: Callable = Callable()
 var _prompting := false
 
+## Which pickable row the keyboard is on, or -1. The menu that offers 140 attributes and 55 tags
+## had no keyboard at all: Enter always fired the FIRST match, and nothing could reach the second.
+var _highlight := -1
+
 
 func _init() -> void:
 	var column := VBoxContainer.new()
@@ -123,6 +127,8 @@ func open_name_prompt(title: String, placeholder: String, validate: Callable, at
 
 
 func _rebuild() -> void:
+	# The rows this indexed are about to be freed.
+	_highlight = -1
 	for child in _list.get_children():
 		_list.remove_child(child)
 		child.queue_free()
@@ -205,16 +211,87 @@ func _submit() -> void:
 		hide()
 		submitted.emit(typed)
 		return
-	for child in _list.get_children():
-		if child is Button:
-			(child as Button).pressed.emit()
-			return
+	# THE HIGHLIGHTED ROW, falling back to the first match when the keyboard has not been used --
+	# which keeps "type three letters and press return" working exactly as before.
+	var rows := _rows()
+	if rows.is_empty():
+		return
+	var index: int = _highlight if _highlight >= 0 and _highlight < rows.size() else 0
+	(rows[index] as Button).pressed.emit()
 
 
 func _input(event: InputEvent) -> void:
 	if not visible or not (event is InputEventKey):
 		return
 	var key := event as InputEventKey
-	if key.pressed and key.keycode == KEY_ESCAPE:
-		hide()
-		get_viewport().set_input_as_handled()
+	if not key.pressed:
+		return
+	match key.keycode:
+		KEY_ESCAPE:
+			hide()
+		KEY_DOWN:
+			_move_highlight(1)
+		KEY_UP:
+			_move_highlight(-1)
+		KEY_HOME:
+			_set_highlight(0)
+		KEY_END:
+			_set_highlight(_rows().size() - 1)
+		_:
+			return
+	get_viewport().set_input_as_handled()
+
+
+## The pickable rows, in the order they are shown. Headings and separators are not among them --
+## a keyboard that can land on a heading is a keyboard that appears to be stuck.
+func _rows() -> Array:
+	var out: Array = []
+	for child in _list.get_children():
+		if child is Button:
+			out.append(child)
+	return out
+
+
+func _move_highlight(delta: int) -> void:
+	var rows := _rows()
+	if rows.is_empty():
+		return
+	# WRAPS, because a list you can walk off the end of makes the user look for the end.
+	var next := _highlight + delta
+	if next < 0:
+		next = rows.size() - 1
+	elif next >= rows.size():
+		next = 0
+	_set_highlight(next)
+
+
+func _set_highlight(index: int) -> void:
+	var rows := _rows()
+	_highlight = clampi(index, -1, rows.size() - 1)
+	for i in rows.size():
+		var row: Button = rows[i]
+		if i == _highlight:
+			var box := StyleBoxFlat.new()
+			box.bg_color = Color(Parts.ACCENT_COLOR, 0.16)
+			box.corner_radius_top_left = 4
+			box.corner_radius_top_right = 4
+			box.corner_radius_bottom_left = 4
+			box.corner_radius_bottom_right = 4
+			row.add_theme_stylebox_override("normal", box)
+			_scroll_to(row)
+		else:
+			row.remove_theme_stylebox_override("normal")
+
+
+## Keeps the highlighted row on screen. A highlight that scrolls off is a selection the user
+## cannot see, which is the same defect as no highlight at all.
+func _scroll_to(row: Control) -> void:
+	var scroll := _list.get_parent() as ScrollContainer
+	if scroll == null:
+		return
+	var top := row.position.y
+	var bottom := top + row.size.y
+	if top < scroll.scroll_vertical:
+		scroll.scroll_vertical = int(top)
+	elif bottom > scroll.scroll_vertical + scroll.size.y:
+		scroll.scroll_vertical = int(bottom - scroll.size.y)

@@ -72,6 +72,10 @@ const PARITY := [
 	["WrapRowInSwitch", "func wrap_in_match"],
 	["RemoveDirectiveBlock", "func unwrap_directive"],
 	["AddIfClause", "func add_if_clause"],
+	["AddSwitchClause + next case label", "func add_match_clause"],
+	["ConstructClause walk", "func clauses_of"],
+	["ExternalChangeSweep", "func adopt_external_changes"],
+	["menu keyboard navigation", "func _move_highlight"],
 	["DeleteClause", "func delete_clause"],
 	["OnDirectiveEdited", "RowMenuId.EDIT_HEADER"],
 	# Islands and style entries

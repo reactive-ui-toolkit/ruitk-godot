@@ -74,6 +74,7 @@ enum RowMenuId {
 	WRAP_IF = 203, WRAP_FOR = 204, DELETE_ROW = 205, EDIT_HEADER = 206,
 	ADD_ELSE = 207, ADD_ELSE_IF = 208, DELETE_CLAUSE = 209, EDIT_ATTRIBUTE = 210,
 	APPLY_STYLE = 211, UNWRAP = 212, ADD_STYLE_ENTRY = 213,
+	ADD_CASE = 214, ADD_DEFAULT = 215,
 }
 
 var workspace: Workspace = null
@@ -348,6 +349,13 @@ func _cancel_active_edit() -> void:
 ## Here rather than in the host that opened it, because the cadence is the builder's own business
 ## and a host that forgot to pump it would leave the preview permanently one edit behind -- with
 ## nothing to show for it, since a missed tick looks exactly like an edit that changed nothing.
+## Coming back to the builder is when a file is most likely to have changed underneath it.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN or what == NOTIFICATION_VISIBILITY_CHANGED:
+		if is_visible_in_tree():
+			adopt_external_changes()
+
+
 func _process(_delta: float) -> void:
 	tick()
 
@@ -1239,6 +1247,12 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 			# that does not compile.
 			if not Edits.construct_has_clause(card, row, "@else"):
 				_row_menu.add_item("Add @else", RowMenuId.ADD_ELSE)
+		# A @match's whole purpose is several arms, and its menu offered none of them.
+		if row.badge == Graph.Badge.MATCH and row.clause_index == 0:
+			_row_menu.add_separator()
+			_row_menu.add_item("Add @case", RowMenuId.ADD_CASE)
+			if not Edits.construct_has_clause(card, row, "@default"):
+				_row_menu.add_item("Add @default", RowMenuId.ADD_DEFAULT)
 		_row_menu.add_separator()
 		# OFFERED ONLY WHERE IT IS SAFE. Unwrap splices a construct's body up a level, which is
 		# only sound for a single-clause, non-match HEAD -- from anywhere else it corrupts the
@@ -1299,6 +1313,12 @@ func _on_row_menu(id: int) -> void:
 		RowMenuId.ADD_ELSE_IF:
 			after = Edits.add_if_clause(before, row, true)
 			what = "Add @elif"
+		RowMenuId.ADD_CASE:
+			after = Edits.add_match_clause(before, card, row, false)
+			what = "Add @case"
+		RowMenuId.ADD_DEFAULT:
+			after = Edits.add_match_clause(before, card, row, true)
+			what = "Add @default"
 		RowMenuId.UNWRAP:
 			after = Edits.unwrap_directive(before, row)
 			what = "Remove %s, keeping its contents" % row.badge_text
@@ -1398,10 +1418,15 @@ func _style_key_items(row) -> Array:
 	# the menu label -- and then the DICTIONARY KEY written into the style module -- the literal
 	# text `{ "name": "bg_color", "type": "Color", "detail": "..." }`. Every "Add entry..."
 	# produced a style module that does not parse.
+	# KEYS THE EXPORT ALREADY HAS ARE NOT OFFERED. A dictionary literal with a duplicate key does
+	# not load, and offering one is offering to break the file.
+	var source := _buffer_of(_menu_target)
 	for key in Schema.style_keys():
 		var spec := key as Dictionary
 		var key_name := str(spec.get("name", ""))
 		if key_name.is_empty():
+			continue
+		if not source.is_empty() and Edits.style_entry_exists(source, owner, key_name):
 			continue
 		var key_type := str(spec.get("type", ""))
 		items.append(SearchMenu.item(key_name, {
@@ -1534,6 +1559,12 @@ func _component_named(tag: String):
 
 ## A choice from the search menu. Dispatched by what the menu was opened FOR.
 func _on_search_picked(payload: Variant) -> void:
+	# THE HISTORY BRANCH RUNS FIRST. Everything below needs a row menu's state -- `_menu_target`
+	# and a selected row -- and the history menu sets neither, so every history row was
+	# unclickable: the guard rejected the pick before the branch that handles it was reached.
+	if _search_purpose == "history":
+		_jump_history_to(int(payload))
+		return
 	if workspace == null or _menu_target.is_empty() or _menu_row == null:
 		return
 	var module := workspace.try_get(_menu_target)
@@ -1793,11 +1824,21 @@ func _on_card_add(index: int, what: String) -> void:
 			after = Edits.insert_setup_line(before, card, seeded_body)
 			description = "Add a setup line to %s" % card.title
 		"style", "entry":
+			# THE SAME MENU THE ROW MENU OPENS. This hardcoded `bg_color` into `exports[0]`, so
+			# pressing it twice wrote the key twice and the module stopped loading -- and it never
+			# asked which export, nor opened an editor, unlike the "+ hook" and "+ code" chips
+			# beside it. One route, one vocabulary.
 			var export_name := str(card.exports[0]) if not card.exports.is_empty() else ""
 			if export_name.is_empty():
 				return
-			after = Edits.insert_style_entry(before, export_name, "bg_color", "Color(0.2, 0.2, 0.24)")
-			description = "Add a style entry to %s" % card.title
+			var anchor := Graph.Line.new()
+			anchor.name = export_name
+			_menu_target = card.file_path
+			_menu_row = anchor
+			_search_purpose = "style_entry"
+			_search_menu.open_menu("add an entry to %s" % export_name,
+				_style_key_items(anchor), _menu_screen_at(), "add \"%s\"")
+			return
 		_:
 			return
 	if after == before:
@@ -2816,6 +2857,34 @@ func delete_module(file_path: String) -> bool:
 ## The last toast the builder raised -- where a refusal says why it refused.
 func toast_text() -> String:
 	return _toast.text if _toast != null else ""
+
+
+## Adopts `.guitkx` files that changed on disk while the builder was away.
+##
+## `reload_clean_from_disk` was written, tested and had ZERO callers -- so a file edited in another
+## editor was never noticed, and Save wrote the builder's stale buffer straight over it. Coming
+## back to the window is exactly when that is likely to have happened, and it costs nothing on the
+## frames where it has not; polling disk on a tick would cost more than it is worth.
+##
+## Only CLEAN modules are adopted -- the sweep skips dirty ones itself -- because a buffer with
+## unsaved work in it is a conflict, not a stale copy, and silently discarding the user's typing
+## to take the disk's version is the failure this is meant to prevent.
+func adopt_external_changes() -> void:
+	if workspace == null or workspace.modules().is_empty():
+		return
+	var paths := PackedStringArray()
+	for module in workspace.modules():
+		paths.append(module.file_path())
+	var touched := workspace.reload_clean_from_disk(paths)
+	if touched.is_empty():
+		return
+	reproject()
+	_source.refresh_from_model()
+	preview.request_refresh()
+	var names := PackedStringArray()
+	for path in touched:
+		names.append(str(path).get_file())
+	toast("Reloaded %s from disk." % ", ".join(names))
 
 
 func _refresh_status() -> void:

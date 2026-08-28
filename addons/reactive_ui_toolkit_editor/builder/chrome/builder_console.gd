@@ -198,7 +198,7 @@ func trace(workspace, ledger, preview) -> void:
 		_add_line("%s%s" % [module.file_path(), suffix], module.file_path())
 	if ledger != null:
 		_add_line("history: %d entry(s)%s"
-			% [ledger.entries.size(), ("  next undo: " + ledger.undo_label()) if ledger.can_undo() else ""], "")
+			% [ledger.entries().size(), ("  next undo: " + ledger.undo_label()) if ledger.can_undo() else ""], "")
 	if preview != null:
 		_add_line("preview: %s" % ("mounted " + preview.mounted_path() if preview.is_mounted() else "nothing mounted"), "")
 
