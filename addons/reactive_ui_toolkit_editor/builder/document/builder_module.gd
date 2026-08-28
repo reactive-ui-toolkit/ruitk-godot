@@ -140,18 +140,24 @@ static func kind_label(k: Kind) -> String:
 			return "module"
 
 
+## SNAKE_CASE, because that is what these name: a FILE.
+##
+## The defaults were Unity's PascalCase/camelCase, which is that leg's file convention and not
+## this one -- every file under `examples/` is snake_case, and `template_for` already derives the
+## PascalCase EXPORT from the snake_case file name and says so in its own comment. The two were
+## contradicting each other.
 static func default_name_for(k: Kind) -> String:
 	match k:
 		Kind.HOOK:
-			return "newHook"
+			return "use_new_hook"
 		Kind.STYLE:
-			return "newStyle"
+			return "new_style"
 		Kind.UTIL:
-			return "newUtil"
+			return "new_util"
 		Kind.VALUE:
-			return "newValue"
+			return "new_value"
 		_:
-			return "NewComponent"
+			return "new_component"
 
 
 static func suffix_for(k: Kind) -> String:

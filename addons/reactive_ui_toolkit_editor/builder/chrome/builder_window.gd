@@ -2238,14 +2238,15 @@ func prompt_create(kind: int) -> void:
 func _validate_name(kind: int, name: String) -> String:
 	if name.strip_edges().is_empty():
 		return "name required"
-	if kind == Module.Kind.HOOK:
-		if not RegEx.create_from_string("^use[A-Z][A-Za-z0-9]*$").search(name):
-			return "hook names start with 'use' (useSomething)"
-	elif kind == Module.Kind.COMPONENT:
-		if not RegEx.create_from_string("^[A-Z][A-Za-z0-9]*$").search(name):
-			return "PascalCase identifier required"
-	elif not RegEx.create_from_string("^[a-z][A-Za-z0-9]*$").search(name):
-		return "camelCase identifier required"
+	# A FILE NAME, in this leg's convention: snake_case. The three regexes here were Unity's --
+	# PascalCase for a component, camelCase for a companion -- which is THAT leg's file convention
+	# and not this one. Every file under `examples/` is snake_case, and `template_for` already
+	# derives the PascalCase EXPORT from the snake_case file name, saying so in its own comment.
+	# The validator and the template were contradicting each other, and the template was right.
+	if not RegEx.create_from_string("^[a-z][a-z0-9_]*$").search(name):
+		return "snake_case file name required"
+	if kind == Module.Kind.HOOK and not name.begins_with("use_"):
+		return "hook file names start with 'use_' (use_something)"
 
 	var folder := _create_folder(kind, name)
 	if folder.is_empty():
@@ -2368,14 +2369,11 @@ func _validate_rename(module, name: String) -> String:
 		return "name required"
 	if trimmed == module.name:
 		return "that is the current name"
-	if module.kind == Module.Kind.HOOK:
-		if not RegEx.create_from_string("^use[A-Z][A-Za-z0-9]*$").search(trimmed):
-			return "hook names start with 'use' (useSomething)"
-	elif module.kind == Module.Kind.COMPONENT:
-		if not RegEx.create_from_string("^[A-Z][A-Za-z0-9]*$").search(trimmed):
-			return "PascalCase identifier required"
-	elif not RegEx.create_from_string("^[a-z][A-Za-z0-9]*$").search(trimmed):
-		return "camelCase identifier required"
+	# The same file-name rule the create validator applies -- see `_validate_name`.
+	if not RegEx.create_from_string("^[a-z][a-z0-9_]*$").search(trimmed):
+		return "snake_case file name required"
+	if module.kind == Module.Kind.HOOK and not trimmed.begins_with("use_"):
+		return "hook file names start with 'use_' (use_something)"
 
 	if not workspace.is_path_available(rename_target(module, trimmed)):
 		return "%s already exists" % trimmed

@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 328
+const ASSERTION_FLOOR := 330
 
 var _fails := 0
 var _passes := 0
@@ -472,8 +472,12 @@ func _test_unplaced_tree_is_placed_before_written() -> void:
 	w.open_tree("")
 	await process_frame
 
-	_eq(w._validate_name(Module.Kind.COMPONENT, "Fresh"), "",
+	# SNAKE_CASE: these name a FILE, and every file in this leg is snake_case. `template_for`
+	# derives the PascalCase EXPORT from it.
+	_eq(w._validate_name(Module.Kind.COMPONENT, "fresh"), "",
 		"a name is accepted with no tree open")
+	_check(not w._validate_name(Module.Kind.COMPONENT, "Fresh").is_empty(),
+		"and PascalCase is refused -- that is the export's convention, not the file's")
 	var made: String = w._create_named(Module.Kind.COMPONENT, "Fresh")
 	_check(made.begins_with(Workspace.UNSAVED_ROOT),
 		"a first module is born at the provisional root (%s)" % made)
@@ -1463,8 +1467,11 @@ func _test_rename_validation() -> void:
 		"taking a sibling's file name is refused")
 
 	_section("shape rules still apply, by kind")
-	_check(not w._validate_rename(app, "lowercase").is_empty(), "a component must be PascalCase")
-	_check(w._validate_rename(app, "Renamed").is_empty(), "and a free PascalCase name is allowed")
+	_check(not w._validate_rename(app, "NotSnake").is_empty(),
+		"a file name is snake_case, not PascalCase")
+	_check(w._validate_rename(app, "renamed").is_empty(), "and a free snake_case name is allowed")
+	var hook = w.workspace.try_get(ROOT.path_join("app.guitkx"))
+	_check(not w._validate_rename(app, "has-dashes").is_empty(), "and a dash is not an identifier")
 
 	_drop(w)
 
