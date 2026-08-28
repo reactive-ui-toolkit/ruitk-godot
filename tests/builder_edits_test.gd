@@ -25,7 +25,7 @@ const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/docum
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 271
+const ASSERTION_FLOOR := 278
 
 var _fails := 0
 var _passes := 0
@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_test_directive_headers()
 	_test_wrap_in_directive()
 	_test_clauses()
+	_test_drop_into_a_directive()
 	_test_match_clauses()
 	_test_style_entry_is_not_duplicated()
 	_test_delete_clause_positions()
@@ -865,6 +866,35 @@ const MATCH_SRC := """export App(level: int = 1) -> RuitkVNode {
 	)
 }
 """
+
+
+## DROPPING AN ELEMENT ON A DIRECTIVE PUTS IT INSIDE THE CLAUSE.
+##
+## `_insert_inside` looks for a close TAG to write above and a `@if (…) {` line has none, so it
+## returned the source unchanged -- the drop silently did nothing and the window reported
+## "couldn't place that there" with no reason and no way in.
+func _test_drop_into_a_directive() -> void:
+	_section("a directive row has no sides, so any band lands inside")
+	var card := _card(IF_SRC)
+	var head := _directive(IF_SRC, "@if")
+	_check(head != null, "the @if head is a row")
+	var at := -1
+	for i in card.markup.size():
+		if card.markup[i].kind == Graph.LineKind.DIRECTIVE:
+			at = i
+			break
+	for band in [0, 1, 2]:
+		_eq(int(Drag._placement_of(band, card, int(Metrics.Section.MARKUP), at)),
+			int(Edits.Placement.INSIDE),
+			"band %d on a directive resolves INSIDE" % band)
+
+	_section("and the element lands in the clause body")
+	var after := Edits.insert(IF_SRC, card, head, "<ColorRect />", Edits.Placement.INSIDE)
+	_check(after != IF_SRC, "the edit does something")
+	_check(after.contains("<ColorRect />"), "the element is there")
+	var compiled: Dictionary = Compiler.compile(after, "App")
+	_check(bool(compiled["ok"]),
+		"and the file compiles (got %s)" % str(compiled.get("diagnostics", [])))
 
 
 func _test_match_clauses() -> void:

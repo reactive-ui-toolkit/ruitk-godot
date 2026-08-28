@@ -114,7 +114,10 @@ func goto_line(line: int) -> void:
 		return
 	_editor.set_caret_line(line - 1)
 	_editor.set_caret_column(0)
-	_editor.center_viewport_to_caret()
+	# ADJUST, DO NOT CENTRE. `center_viewport_to_caret` scrolls the line to the middle whether or
+	# not it was already visible, so clicking three adjacent rows on a card made the pane jump
+	# three times for no reason. UB-86 in the Unity register, by name.
+	_editor.adjust_viewport_to_caret()
 
 
 func editor() -> GuitkxEditor:

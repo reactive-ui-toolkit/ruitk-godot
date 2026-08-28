@@ -27,7 +27,7 @@ const ROOT := "res://tests/__builder_graph_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 171
+const ASSERTION_FLOOR := 173
 
 var _fails := 0
 var _passes := 0
@@ -46,6 +46,7 @@ func _initialize() -> void:
 	_test_hook_chips()
 	_test_island()
 	_test_markup_golden()
+	_test_root_is_not_the_focus()
 	_test_directive_round_trip()
 	_test_directive_families()
 	_test_spans_address_the_source()
@@ -677,6 +678,21 @@ func _test_degenerate_buffers() -> void:
 ## header `@if (true)` and the commit replaced only what sits INSIDE the parentheses, so one
 ## round trip wrote `@if (@if (true))`. The compiler accepted that file and the generated .gd
 ## then failed at load, which is why nothing caught it.
+## THE TREE ELECTS ITS OWN ROOT, so the canvas does not rearrange because somebody clicked.
+##
+## `_resolve_root` fell straight through to the FOCUS when no module owned the root folder, so the
+## same module list re-rooted itself every time the selection moved. UB-185's mechanism, one
+## fallback earlier than where Unity found it.
+func _test_root_is_not_the_focus() -> void:
+	_section("the same tree roots the same way whatever is focused")
+	var modules := _ws.modules()
+	var first := Service.project(modules, ROOT.path_join("app.guitkx"))
+	var second := Service.project(modules, ROOT.path_join("util.guitkx"))
+	var third := Service.project(modules, "")
+	_eq(second.root_path, first.root_path, "focusing a different module does not move the root")
+	_eq(third.root_path, first.root_path, "and neither does focusing nothing")
+
+
 func _test_directive_round_trip() -> void:
 	_section("opening a directive header and committing it unchanged changes nothing")
 	var card := _card("app.guitkx")

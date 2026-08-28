@@ -163,7 +163,25 @@ static func _resolve_root(ordered: Array[Module], focus_path: String) -> String:
 		if module.owns_folder() and Paths.same(module.folder, root_folder):
 			return module.file_path()
 	# No component owns the root folder, so the focus is as good an anchor as there is.
-	return focus if not focus.is_empty() else ordered[0].file_path()
+	# THE TREE ELECTS ITS OWN ROOT, and only then the focus. Falling straight through to the focus
+	# means the same module list re-roots itself every time the user selects a different card --
+	# the canvas rearranges because somebody clicked. UB-185's mechanism, one fallback earlier.
+	#
+	# Unity's order: a module that OWNS the root folder (above); else the ordinally-smallest module
+	# that LIVES in the root folder; else the first of the path-sorted inventory; and the focus
+	# only when there is no inventory to ask.
+	var shallowest := ""
+	for module in ordered:
+		if not Paths.same(module.folder, root_folder):
+			continue
+		var candidate: String = module.file_path()
+		if shallowest.is_empty() or candidate < shallowest:
+			shallowest = candidate
+	if not shallowest.is_empty():
+		return shallowest
+	if not ordered.is_empty():
+		return ordered[0].file_path()
+	return focus
 
 
 

@@ -142,6 +142,13 @@ static func resolve(graph: Graph, screen: Vector2, camera: Vector2,
 ##                   this row's whole block, which is also the same place on screen.
 static func _placement_of(band: int, card: Graph.Card = null, section := -1,
 		index := -1) -> Edits.Placement:
+	# A DIRECTIVE ROW HAS NO SIDES either: its head and its close brace are the construct, so
+	# "before" and "after" write a bare element between two braces. The metrics coerce the markup
+	# root and the continuations; a construct HEAD is coerced here, where the placement is decided.
+	if card != null and section == int(Metrics.Section.MARKUP) and index >= 0 \
+			and index < card.markup.size() \
+			and (card.markup[index] as Graph.Line).kind == Graph.LineKind.DIRECTIVE:
+		return Edits.Placement.INSIDE
 	match band:
 		0:
 			return Edits.Placement.BEFORE

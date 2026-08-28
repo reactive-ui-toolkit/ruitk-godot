@@ -106,6 +106,19 @@ static func insert(source: String, card: Graph.Card, row: Graph.Line, markup: St
 			return _insert_line_before(source, row.at, markup, _indent_of(source, row.at))
 		Placement.AFTER:
 			return _insert_line_after(source, row.end_at, markup, _indent_of(source, row.at))
+		Placement.INSIDE when row.kind == Graph.LineKind.DIRECTIVE:
+			# A DIRECTIVE'S BODY IS ITS CLAUSE, not a tag pair. `_insert_inside` looks for a close
+			# tag to write above, finds none on a `@if (…) {` line, and returned the source
+			# UNCHANGED -- so dropping an element on a directive silently did nothing and the
+			# window reported "couldn't place that there" with no reason.
+			#
+			# A clause that already has a root element takes the drop as that element's CHILD: its
+			# `return` must return exactly one node (GUITKX0108), so a sibling there is not a
+			# thing the language has.
+			var inner := _clause_root(card, row)
+			if inner != null:
+				return _insert_inside(source, inner, markup)
+			return _insert_into_clause(source, row, markup)
 		Placement.FIRST_CHILD:
 			# Under the OPEN TAG, which is where the caret was drawn. A self-closing target has no
 			# inside to be first in, so it falls back to the append path that rewrites `/>` into
@@ -141,6 +154,58 @@ static func _open_tag_end(source: String, row: Graph.Line) -> int:
 			return i + 1
 		i += 1
 	return row.at
+
+
+## The element a directive clause already returns, or null when the clause is empty.
+##
+## Found by SPAN rather than by depth: a clause's body sits inside the head's own `at`..`end_at`,
+## and that holds however deeply the projection happens to indent it.
+static func _clause_root(card: Graph.Card, head: Graph.Line) -> Graph.Line:
+	if card == null or head == null:
+		return null
+	for row in card.markup:
+		var line := row as Graph.Line
+		if line == head or line.kind == Graph.LineKind.DIRECTIVE:
+			continue
+		if line.at > head.at and line.end_at <= head.end_at:
+			return line
+	return null
+
+
+## Puts `markup` inside a directive clause: after its `return (` when it has one, and as the
+## clause's whole body when it is empty.
+static func _insert_into_clause(source: String, row: Graph.Line, markup: String) -> String:
+	var open := _open_brace_of(source, row)
+	if open < 0:
+		return source
+	var indent := _indent_of(source, row.at)
+	var unit := _indent_unit(source)
+	# A clause body in this language is `return ( … )`, so an element goes inside those
+	# parentheses. Written whole when the clause has no body yet -- GUITKX0303 refuses an empty
+	# one, so there is always something there to write beside in practice, but a caller may be
+	# holding a row from a buffer mid-edit.
+	var close := source.find(")", open)
+	var body_open := source.find("return", open)
+	if body_open < 0 or (close >= 0 and close < body_open):
+		var block := "\n" + indent + unit + "return (" \
+			+ "\n" + indent + unit + unit + markup.strip_edges() \
+			+ "\n" + indent + unit + ")"
+		return source.substr(0, open + 1) + block + source.substr(open + 1)
+	var paren := source.find("(", body_open)
+	if paren < 0:
+		return source
+	return source.substr(0, paren + 1) \
+		+ "\n" + indent + unit + unit + markup.strip_edges() \
+		+ source.substr(paren + 1)
+
+
+## The offset of the `{` that opens a directive's body.
+static func _open_brace_of(source: String, row: Graph.Line) -> int:
+	var limit: int = mini(row.end_at, source.length())
+	for i in range(row.at, limit):
+		if source[i] == "{":
+			return i
+	return -1
 
 
 static func _insert_inside(source: String, row: Graph.Line, markup: String) -> String:
