@@ -101,6 +101,8 @@ const PARITY := [
 	["UsageFor", "func _usage_note"],
 	["ModuleInfoFor", "func _module_note"],
 	["BuildKnobs", "func _build_knobs"],
+	["knob values carry across a rebuild", "func _knob_signature"],
+	["the render anchor is not the focus", "func rendered_path"],
 	["OnPreviewComponentPicked", "signal component_picked"],
 	["state panel", "func _refresh_state"],
 	# Chrome

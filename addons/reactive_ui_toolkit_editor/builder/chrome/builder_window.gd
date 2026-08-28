@@ -1020,7 +1020,7 @@ func tick() -> void:
 	_journal_tick()
 	if not preview.is_due():
 		return
-	var summary = preview.compile_dirty(_focus_path)
+	var summary = preview.compile_dirty(_preview_pane.rendered_path() if _preview_pane != null else _focus_path)
 	if summary != null:
 		_console.report(summary)
 	_refresh_status()
@@ -2706,7 +2706,7 @@ func select_module(file_path: String) -> void:
 		# "select a component to see it rendered" while a component was selected, until some later
 		# edit happened to rebuild it. Selecting IS the request.
 		if preview.built_script(_focus_path) == null:
-			preview.compile_dirty(_focus_path)
+			preview.compile_dirty(_preview_pane.rendered_path() if _preview_pane != null else _focus_path)
 		_preview_pane.show_module(_focus_path)
 	preview.request_refresh()
 	_refresh_status()
@@ -3060,6 +3060,11 @@ func folder_pane() -> FolderPane:
 
 func library_pane() -> LibraryPane:
 	return _library
+
+
+## The live-preview pane, for a test that needs to ask what it is rendering.
+func preview_pane() -> PreviewPane:
+	return _preview_pane
 
 
 func source_pane() -> SourcePane:

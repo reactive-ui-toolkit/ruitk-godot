@@ -35,6 +35,14 @@ var _path := ""
 var _knobs: VBoxContainer = null
 ## What the knobs currently say. Passed to every mount.
 var _props := {}
+
+## The module actually mounted, as opposed to the one being SHOWN.
+var _rendered_path := ""
+
+## The component signature the current knob widgets were built for, and the values the previous
+## set held -- so a rebuild can carry across everything the new signature still accepts.
+var _knob_signature_seen := ""
+var _carried_props := {}
 var _state_panel: VBoxContainer = null
 
 
@@ -157,6 +165,11 @@ func show_module(file_path: String) -> void:
 	_tag.text = _tag_for(_path)
 	_build_knobs()
 	if preview.mount(_slot, _path, _props):
+		# THE RENDER ANCHOR MOVES ONLY WHEN SOMETHING ACTUALLY MOUNTED. `_path` was overwritten
+		# with whatever module the pane was handed, renderable or not, so the compile anchor
+		# followed the FOCUS -- selecting a style companion re-pointed the pipeline at a module
+		# that cannot be rendered, and the last good component stopped being rebuilt.
+		_rendered_path = _path
 		_note.text = "rendered from the real component — every edit re-renders"
 		_origin.text = _usage_note(_path)
 		_refresh_state()
@@ -188,8 +201,21 @@ func clear() -> void:
 	_show_idle()
 
 
+## The knob values currently driving the mount. Exposed so a test can assert they survive.
+func props() -> Dictionary:
+	return _props
+
+
 func path() -> String:
 	return _path
+
+
+## The module actually ON the stage, which is not always the one being shown.
+##
+## Selecting a hook or a style companion shows its note; it does not put anything on the stage, so
+## the compile pipeline must keep building the component that IS on it.
+func rendered_path() -> String:
+	return _rendered_path if not _rendered_path.is_empty() else _path
 
 
 func _show_idle() -> void:
@@ -238,11 +264,39 @@ func _usage_note(file_path: String) -> String:
 ## real usage passes -- so previewing `Card` shows the title the app actually gives it, not an
 ## empty string -- and falls back to the prop's own default when the usage passes an expression
 ## rather than a literal, because `title={state[0]}` is not a value this pane can know.
+## A component's identity for knob purposes: its path plus its declared props.
+##
+## Two components with the same props still need different knobs, and the same component with a
+## changed prop list needs new ones -- so both go in.
+func _knob_signature() -> String:
+	if graph == null:
+		return _path
+	var card = graph.card_of(_path)
+	if card == null:
+		return _path
+	var parts := PackedStringArray([_path])
+	for prop in Attributes.props_of_component(card):
+		var spec := prop as Dictionary
+		parts.append("%s:%s" % [str(spec.get("name", "")), str(spec.get("type", ""))])
+	return "|".join(parts)
+
+
 func _build_knobs() -> void:
+	# REBUILT ONLY WHEN THE COMPONENT'S SIGNATURE CHANGES. This ran unconditionally on every
+	# `show_module`, and the window re-shows the pane on every compile round -- so any edit
+	# anywhere in the tree wiped every knob the user had set and re-seeded them from the literals
+	# in the usage row. Values typed into the preview lasted until the next keystroke.
+	var signature := _knob_signature()
+	if signature == _knob_signature_seen and not _props.is_empty():
+		return
+	# Carried across by NAME, so a signature change keeps the values the new signature still has.
+	var carried := _props.duplicate()
 	for child in _knobs.get_children():
 		_knobs.remove_child(child)
 		child.queue_free()
 	_props.clear()
+	_knob_signature_seen = signature
+	_carried_props = carried
 	if graph == null:
 		return
 	var index: int = graph.index_of(_path)
@@ -259,6 +313,13 @@ func _build_knobs() -> void:
 		var name := str(spec["name"])
 		var seeded := _seeded_literal(usage, name)
 		if seeded.is_empty():
+			continue
+		# A VALUE THE USER TYPED WINS over the literal in the usage row. Rebuilding the knobs is
+		# sometimes unavoidable -- a prop was added or renamed -- and when it happens the values
+		# that still have a home should survive it.
+		if _carried_props.has(name):
+			_props[name] = _carried_props[name]
+			_knobs.add_child(_knob_row(name, str(_carried_props[name]), str(spec.get("type", ""))))
 			continue
 		_props[name] = _typed(seeded, str(spec.get("type", "")))
 		_knobs.add_child(_knob_row(name, seeded, str(spec.get("type", ""))))

@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 313
+const ASSERTION_FLOOR := 314
 
 var _fails := 0
 var _passes := 0
@@ -65,6 +65,7 @@ func _run() -> void:
 	await _test_one_funnel()
 	await _test_undo_across_files()
 	await _test_add_chip_opens_the_editor()
+	await _test_preview_anchor_and_knobs()
 	await _test_double_click_edits_in_place()
 	await _test_source_pane_keyboard()
 	await _test_delete_refuses_what_it_must()
@@ -965,6 +966,47 @@ func _test_add_chip_opens_the_editor() -> void:
 ## THE THINGS DELETE MUST NOT DELETE.
 ## DOUBLE-CLICKING A ROW EDITS IT IN PLACE -- the reference's primary editing gesture, which had
 ## no route here at all. The whole builder contained one `double_click` read, in the library.
+## THE PREVIEW KEEPS RENDERING THE COMPONENT WHEN YOU SELECT A COMPANION, and keeps the values
+## you typed into its knobs.
+func _test_preview_anchor_and_knobs() -> void:
+	var w := _window()
+	w.size = Vector2(1400, 800)
+	await process_frame
+	var component := ROOT.path_join("app.guitkx")
+	w.select_module(component)
+	for i in 6:
+		await process_frame
+	var pane = w.preview_pane()
+	var anchored: String = pane.rendered_path()
+
+	_section("selecting a style companion does not move the render anchor")
+	# `_path` was overwritten with whatever the pane was handed, renderable or not, so the compile
+	# pipeline followed the FOCUS and stopped rebuilding the component actually on the stage.
+	w.select_module(ROOT.path_join("app.style.guitkx"))
+	for i in 4:
+		await process_frame
+	if not anchored.is_empty():
+		_eq(pane.rendered_path(), anchored,
+			"the anchor is still the component that mounted")
+
+	_section("a knob keeps its value across a rebuild")
+	# The window re-shows the pane on every compile round, and the knobs were rebuilt
+	# unconditionally -- so any edit anywhere wiped every value the user had typed.
+	w.select_module(component)
+	for i in 4:
+		await process_frame
+	var before: Dictionary = pane.props().duplicate()
+	if not before.is_empty():
+		var key: String = before.keys()[0]
+		pane.props()[key] = "typed-by-hand"
+		pane.show_module(component)
+		await process_frame
+		_eq(str(pane.props().get(key, "")), "typed-by-hand",
+			"the value survived a re-show")
+
+	_drop(w)
+
+
 func _test_double_click_edits_in_place() -> void:
 	var w := _window()
 	await process_frame
