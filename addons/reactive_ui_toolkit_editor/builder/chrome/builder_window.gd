@@ -1731,9 +1731,13 @@ func move_folder(source_folder: String, target_folder: String) -> bool:
 		toast("Can't move %s into itself." % leaf)
 		return false
 
+	# THE OWNER CARRIES THE FOLDER, and `place_module` is where that rule lives now -- this passed
+	# `target_folder` where it had just computed `destination` two lines above, so moving
+	# `Card/` into `Pages/` produced `Pages/Card.guitkx` and dissolved the folder it was supposed
+	# to carry. One implementation, reached from both routes.
 	for module in workspace.modules():
 		if module.owns_folder() and Paths.same(module.folder, source):
-			return _move_one(module, target_folder, leaf)
+			return place_module(module.file_path(), target_folder)
 
 	var movers: Array = []
 	for module in workspace.modules():
@@ -1747,6 +1751,16 @@ func move_folder(source_folder: String, target_folder: String) -> bool:
 		movers.append({ "module": module, "to": destination.path_join(relative) })
 	if movers.is_empty():
 		return false
+	# EVERY DESTINATION IS CHECKED BEFORE ANYTHING MOVES, which is the all-or-nothing rule this
+	# function already applies to read-only modules. A collision found halfway through would leave
+	# the folder half here and half there, with two modules claiming one path.
+	for entry in movers:
+		var spec := entry as Dictionary
+		var mover = spec["module"]
+		var lands := str(spec["to"]).path_join(mover.name + Module.suffix_for(mover.kind))
+		if not workspace.is_path_available(lands):
+			toast("Can't move %s — %s is already there." % [leaf, lands.get_file()])
+			return false
 
 	ledger.begin("Move %s" % leaf)
 	var snapshot := workspace.capture_imports()
@@ -1782,10 +1796,25 @@ func place_module(module_path: String, target_folder: String) -> bool:
 		return false
 	if Paths.same(module.folder, target_folder):
 		return false
-	var destination := Paths.canon(target_folder.path_join(module_path.get_file()))
+
+	# A COMPONENT THAT OWNS ITS FOLDER CARRIES IT. Passing the target folder straight through
+	# dissolved the folder instead: `Card/Card.guitkx` dropped on `Pages` became
+	# `Pages/Card.guitkx` and its children were orphaned where the folder used to be.
+	var into: String = target_folder.path_join(module.name) if module.owns_folder() \
+		else target_folder
+	if module.owns_folder() and Paths.is_under(target_folder, module.folder):
+		toast("Can't move %s inside itself." % module.name)
+		return false
+
+	var destination := Paths.canon(into.path_join(module_path.get_file()))
+	# NOTHING MAY CLAIM A PATH TWICE. The model refuses this too, but refusing here is what lets
+	# the user be told why rather than watching a drag do nothing.
+	if not workspace.is_path_available(destination):
+		toast("%s is already in %s." % [module_path.get_file(), target_folder.get_file()])
+		return false
 	ledger.begin("Move %s" % module_path.get_file())
 	var snapshot := workspace.capture_imports()
-	var ok := _move_one(module, target_folder, module_path.get_file())
+	var ok := _move_one(module, into, module_path.get_file())
 	if ok:
 		# RECORDED, so the move is undoable like every other structural edit. `_move_one` is the
 		# shared mechanics of moving; the ledger entry belongs to the ACTION, which is what the
@@ -1952,22 +1981,108 @@ func _create_named(kind: int, name: String) -> String:
 
 
 ## Renames the module the card menu was opened on.
+## Where a rename lands: the module's own folder, or a folder renamed with it when it owns one.
+##
+## Shared by the validator and the rename, exactly as Unity shares `RenameTargetPath`, so the
+## prompt and the operation can never disagree about what a name would produce.
+func rename_target(module, new_name: String) -> String:
+	var folder: String = module.folder
+	if module.owns_folder():
+		folder = folder.get_base_dir().path_join(new_name)
+	return folder.path_join(new_name + Module.suffix_for(module.kind))
+
+
+## Why a RENAME cannot use this name, or "" when it can.
+##
+## Separate from `_validate_name`, which is the CREATE validator: that one asks where a NEW module
+## of this kind would be BORN relative to the card you right-clicked, and for a component being
+## renamed it answered `<parent>/components/<NewName>/` -- a folder that does not exist. So no
+## collision was ever reported, and Save then wrote one module over another.
+func _validate_rename(module, name: String) -> String:
+	var trimmed := name.strip_edges()
+	if trimmed.is_empty():
+		return "name required"
+	if trimmed == module.name:
+		return "that is the current name"
+	if module.kind == Module.Kind.HOOK:
+		if not RegEx.create_from_string("^use[A-Z][A-Za-z0-9]*$").search(trimmed):
+			return "hook names start with 'use' (useSomething)"
+	elif module.kind == Module.Kind.COMPONENT:
+		if not RegEx.create_from_string("^[A-Z][A-Za-z0-9]*$").search(trimmed):
+			return "PascalCase identifier required"
+	elif not RegEx.create_from_string("^[a-z][A-Za-z0-9]*$").search(trimmed):
+		return "camelCase identifier required"
+
+	if not workspace.is_path_available(rename_target(module, trimmed)):
+		return "%s already exists" % trimmed
+	if module.kind == Module.Kind.COMPONENT:
+		for other in workspace.modules():
+			if other != module and other.kind == Module.Kind.COMPONENT \
+					and other.name.to_lower() == trimmed.to_lower():
+				return "%s already exists in this tree" % trimmed
+	return ""
+
+
 func _rename_to(name: String) -> void:
 	if workspace == null or _menu_target.is_empty() or name.strip_edges().is_empty():
 		return
 	var module := workspace.try_get(_menu_target)
 	if module == null or module.read_only:
 		return
-	# THROUGH `move_to`, which is the one operation that knows a rename is four edits that land
-	# together or not at all: the export, the file, the folder when the module owns one, and every
-	# importer's specifier. Renaming the module object alone would leave the tree importing a name
-	# nothing exports any more.
-	var folder := module.folder
-	var rewrites := workspace.move_to(module.file_path(), folder, name)
-	if rewrites.is_empty() and module.name != name:
+	# A RENAME IS FIVE EDITS THAT LAND TOGETHER OR NOT AT ALL: the module's own export declaration,
+	# its file name, the folder when it owns one, every importer's specifier, and every importer's
+	# BINDING AND USES. This did only the file name and the specifiers -- `move_to` never touched
+	# the export, despite the comment that used to sit here saying it did -- so a renamed module
+	# kept `export OldName()` while its file said `NewName.guitkx`, every importer asked for a
+	# name nothing exported, and the whole thing was invisible to undo.
+	var old_name := module.name
+	if old_name == name:
 		return
+	# THE EXPORT IDENTIFIER, WHICH IS NOT ALWAYS THE MODULE NAME. `module.name` is derived from
+	# the file name; the export is what the file declares and what importers bind. They agree for
+	# a module created here and diverge for one whose file was named by hand, so the rewrite has
+	# to follow the declaration rather than the path.
+	var card_now := graph.card_of(module.file_path()) if graph != null else null
+	var old_export := old_name
+	if card_now != null and not card_now.exports.is_empty():
+		old_export = str(card_now.exports[0])
+	var destination := rename_target(module, name)
+	if not workspace.is_path_available(destination):
+		toast("%s already exists there." % destination.get_file())
+		return
+
+	ledger.begin("Rename %s to %s" % [old_name, name])
+	# The module's own declaration first, while its path is still the one the ledger knows.
+	var renamed := Edits.rename_export(module.buffer_text, old_export, name)
+	if renamed != module.buffer_text:
+		apply_edit(module.file_path(), renamed, "Rename the export to %s" % name)
+
+	# Then every importer's binding and uses, addressed by the specifier they use TODAY --
+	# `move_to` below rewrites those specifiers, and doing it in the other order would leave this
+	# pass looking for an import that has already moved.
+	for card in graph.cards:
+		if Paths.same(card.file_path, module.file_path()):
+			continue
+		var importer := workspace.try_get(card.file_path)
+		if importer == null or importer.read_only:
+			continue
+		var spec := Specifiers.relative(card.file_path.get_base_dir(), module.file_path())
+		if spec.is_empty():
+			continue
+		var rebound := Edits.rename_binding(importer.buffer_text, spec, old_export, name)
+		if rebound != importer.buffer_text:
+			apply_edit(card.file_path, rebound, "Follow the rename in %s" % card.title)
+
+	# And the move itself, which carries the folder when the module owns one and rewrites the
+	# specifiers the new path invalidated.
+	var from_path := module.file_path()
+	workspace.move_to(from_path, destination.get_base_dir(), name)
+	ledger.record_move(from_path, destination)
+	ledger.end()
+
 	reproject()
-	select_module(folder.path_join(name + Module.suffix_for(module.kind)))
+	select_module(destination)
+	_source.refresh_from_model()
 	preview.request_refresh()
 
 
@@ -2281,7 +2396,7 @@ func _on_card_menu(id: int) -> void:
 			if current == null:
 				return
 			_search_menu.open_name_prompt("rename %s" % current.name, "name...",
-				func(name: String) -> String: return _validate_name(current.kind, name),
+				func(name: String) -> String: return _validate_rename(current, name),
 				_menu_screen_at(), current.name)
 			return
 		CardMenuId.REVEAL_CARD:

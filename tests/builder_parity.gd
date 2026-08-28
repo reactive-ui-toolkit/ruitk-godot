@@ -39,6 +39,9 @@ const PARITY := [
 	["ValidateNewName", "func _validate_name"],
 	["CreateModule", "func _create_named"],
 	["ShowRenamePrompt", "CardMenuId.RENAME"],
+	["RenameTargetPath (shared by prompt and rename)", "func rename_target"],
+	["RenameModule (export + bindings + uses)", "func rename_export"],
+	["ValidateRenameName", "func _validate_rename"],
 	["ReferrersTo (delete refused while imported)", "func referrers_to"],
 	# The source pane
 	["BeginSourceEdit", "func _set_editing"],

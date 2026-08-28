@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 251
+const ASSERTION_FLOOR := 271
 
 var _fails := 0
 var _passes := 0
@@ -65,6 +65,9 @@ func _run() -> void:
 	await _test_one_funnel()
 	await _test_undo_across_files()
 	await _test_add_chip_opens_the_editor()
+	await _test_rename_is_complete()
+	await _test_rename_validation()
+	await _test_move_guards()
 	await _test_folder_pane_refiles()
 	await _test_folder_pane_drop_rules()
 	await _test_hit_test_agrees_with_the_rendered_tree()
@@ -939,6 +942,105 @@ func _test_add_chip_opens_the_editor() -> void:
 	await process_frame
 	_check(w._buffer_of(ROOT.path_join("app.guitkx")).contains("useState(0)"),
 		"the typed line replaced the seeded one")
+
+	_drop(w)
+
+
+## A RENAME MUST RENAME: the export, the file, the folder when owned, and every importer's
+## specifier, binding and uses. This did only the file and the specifiers.
+func _test_rename_is_complete() -> void:
+	_section("wire an importer up first, so the rename has references to follow")
+	var w := _window()
+	await process_frame
+	var host := ROOT.path_join("app.guitkx")
+	var target := ROOT.path_join("components/row/row.guitkx")
+	w.apply_edit(host, w._with_component_import(w._buffer_of(host), host, "Row"), "import Row")
+	await process_frame
+	# And a USE of it, which is the half a specifier rewrite never touches.
+	var used: String = w._buffer_of(host).replace("<Label", "<Row />
+			<Label")
+	w.apply_edit(host, used, "use Row")
+	await process_frame
+	_check(w._buffer_of(host).contains("<Row"), "the host uses <Row>")
+
+	_section("renaming rewrites the module's own export")
+	w._menu_target = target
+	# Asked of the operation itself: a module that OWNS its folder renames the folder with it, so
+	# the destination is not simply "the old folder with a new file name".
+	var moved: String = w.rename_target(w.workspace.try_get(target), "Line")
+	w._rename_to("Line")
+	await process_frame
+	var renamed = w.workspace.try_get(moved)
+	_check(renamed != null, "the module is at its new path")
+	if renamed != null:
+		_check(renamed.buffer_text.contains("export Line"), "and declares the new name")
+		_check(not renamed.buffer_text.contains("export Row"), "not the old one")
+
+	_section("and every importer follows it")
+	var after: String = w._buffer_of(host)
+	_check(after.contains("Line"), "the importer names it")
+	_check(not after.contains("{ Row }"), "the import no longer asks for a name nothing exports")
+	_check(not after.contains("<Row"), "and the USES moved too")
+
+	_section("the whole rename is one undoable action")
+	_check(w.ledger.can_undo(), "it is on the ledger")
+
+	_drop(w)
+
+
+## THE RENAME PROMPT ASKS ABOUT THE MODULE'S OWN FOLDER, not about where a NEW module would go.
+func _test_rename_validation() -> void:
+	var w := _window()
+	await process_frame
+	var style = w.workspace.try_get(ROOT.path_join("app.style.guitkx"))
+	_check(style != null, "the fixture has a style companion")
+
+	_section("its current name is not a rename")
+	_check(not w._validate_rename(style, style.name).is_empty(), "refused with a reason")
+
+	_section("a name already taken in its own folder is refused")
+	# The create validator asked about `<parent>/components/<Name>/` -- a folder that does not
+	# exist -- so it never saw a collision and Save wrote one module over another.
+	var app = w.workspace.try_get(ROOT.path_join("app.guitkx"))
+	_eq(w.rename_target(style, "restyled"),
+		style.folder.path_join("restyled" + Module.suffix_for(style.kind)),
+		"a companion never owns a folder, so it renames in place")
+	_check(w.rename_target(app, "App2").contains("App2"), "and an owner carries its folder")
+	_check(not w._validate_rename(style, "app").is_empty(),
+		"taking a sibling's file name is refused")
+
+	_section("shape rules still apply, by kind")
+	_check(not w._validate_rename(app, "lowercase").is_empty(), "a component must be PascalCase")
+	_check(w._validate_rename(app, "Renamed").is_empty(), "and a free PascalCase name is allowed")
+
+	_drop(w)
+
+
+## NOTHING MAY CLAIM A PATH TWICE, and a folder-owning component carries its folder.
+func _test_move_guards() -> void:
+	var w := _window()
+	await process_frame
+
+	_section("a module cannot be re-filed on top of another")
+	var style_path := ROOT.path_join("app.style.guitkx")
+	_check(w.place_module(style_path, ROOT.path_join("components/row")), "the first move lands")
+	await process_frame
+	# Put a second module of the same file name in the way, then try to move it there too.
+	var second := ROOT.path_join("components/app.style.guitkx")
+	w.workspace.create_new(second, "export nothing := {}
+")
+	w.reproject()
+	await process_frame
+	_check(not w.place_module(second, ROOT.path_join("components/row")),
+		"the second is refused rather than displacing it")
+	_check(w.workspace.try_get(second) != null, "and stays where it was")
+
+	_section("the model refuses it too, whatever the caller does")
+	var resident = w.workspace.try_get(ROOT.path_join("components/row/app.style.guitkx"))
+	var intruder = w.workspace.try_get(second)
+	_check(resident != null and intruder != null, "both modules exist")
+	_check(not w.workspace.tree().move_to(intruder, resident.folder, resident.name),
+		"Tree.move_to is the last line of defence")
 
 	_drop(w)
 

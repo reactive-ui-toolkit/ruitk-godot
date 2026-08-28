@@ -108,9 +108,22 @@ func remove_by_path(path: String) -> bool:
 ## "Inside" means IN the folder as well as under it. Carrying only the nested case leaves a
 ## component's own companions -- the style and hook modules beside it, which are the whole
 ## reason the folder exists -- at a path their folder has vacated.
-func move_to(module: Module, new_folder: String, new_name: String) -> void:
+## Returns false when the move was REFUSED, which happens when another module already derives the
+## destination path.
+##
+## The guard lives HERE rather than in each caller, because two modules claiming one path is a
+## state the model must not be able to enter: `_reindex` keys `_by_path` by derived path, so the
+## second arrival silently displaces the first in the index while both stay in `_modules` -- and
+## Save then writes one over the other. The canvas drop, the folder-pane drop, the card menu and
+## every future caller get the refusal for free.
+func move_to(module: Module, new_folder: String, new_name: String) -> bool:
 	if module == null:
-		return
+		return false
+	var destination := Paths.canon(new_folder).path_join(
+		new_name + Module.suffix_for(module.kind))
+	var resident := by_path(destination)
+	if resident != null and resident != module:
+		return false
 	var old_folder := module.folder
 	var owns := module.owns_folder()
 	var target := Paths.canon(new_folder)
@@ -137,6 +150,7 @@ func move_to(module: Module, new_folder: String, new_name: String) -> void:
 			var tail := Paths.canon(other.folder).substr(old_canon.length() + 1)
 			other.folder = Paths.canon(target.path_join(tail))
 	_reindex()
+	return true
 
 
 ## Replaces the whole contents -- used by load, and by abort, which is load re-run.

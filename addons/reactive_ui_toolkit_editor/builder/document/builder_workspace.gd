@@ -341,7 +341,10 @@ func move_to_path(from_path: String, to_path: String) -> Array:
 
 func _move(module: Module, new_folder: String, new_name: String) -> Array:
 	var snapshot := capture_imports()
-	_tree.move_to(module, new_folder, new_name)
+	# REFUSED MOVES CHANGE NOTHING. An empty return already means "refused" to every caller, and
+	# the import reconciliation must not run against a tree that did not move.
+	if not _tree.move_to(module, new_folder, new_name):
+		return []
 	var rewrites := reconcile_imports(snapshot)
 	changed.emit()
 	return rewrites

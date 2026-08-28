@@ -679,6 +679,64 @@ static func delete_clause(source: String, row: Graph.Line) -> String:
 ".join(out)
 
 
+## Renames the module's OWN export declaration.
+##
+## `move_to` rewrites folders, file names and every importer's SPECIFIER, and its caller's comment
+## claimed it renamed the export too. It never did -- so a renamed module kept
+## `export OldName()` while its file said `NewName.guitkx`, every importer asked for a name
+## nothing exported, and nothing said so.
+##
+## Capped at one substitution: the declaration is the definition, and a later mention of the same
+## word is a use that the caller rewrites separately or deliberately leaves alone.
+static func rename_export(source: String, old_name: String, new_name: String) -> String:
+	if old_name.is_empty() or new_name.is_empty() or old_name == new_name:
+		return source
+	var re := RegEx.create_from_string("\\bexport\\s+(?:[A-Za-z_][A-Za-z0-9_]*\\s+)*?" \
+		+ old_name + "\\b")
+	var found := re.search(source)
+	if found == null:
+		return source
+	var head := found.get_string()
+	return source.substr(0, found.get_start()) \
+		+ head.substr(0, head.length() - old_name.length()) + new_name \
+		+ source.substr(found.get_end())
+
+
+## Rewrites an importer's reference to a module that was renamed: the imported NAME, and -- when
+## the file binds it under that same name -- every use of it.
+##
+## The uses matter as much as the import. A component importing `Card` writes `<Card />`; leaving
+## those behind turns a rename into a file that imports one name and uses another.
+static func rename_binding(source: String, spec: String, old_name: String,
+		new_name: String) -> String:
+	if old_name.is_empty() or new_name.is_empty() or old_name == new_name:
+		return source
+	var binding := ""
+	for imp in Compiler.scan_imports(source):
+		if str(imp.get("spec", "")) != spec:
+			continue
+		for entry in (imp.get("names", []) as Array):
+			var pair := entry as Dictionary
+			var remote := str(pair.get("remote", ""))
+			var local := str(pair.get("name", ""))
+			if remote == old_name or (remote.is_empty() and local == old_name):
+				binding = local
+				break
+	if binding.is_empty():
+		return source
+
+	var out := _ensure_import_line(remove_import(source, spec, PackedStringArray([old_name])),
+		spec,
+		PackedStringArray([new_name if binding == old_name else "%s as %s" % [new_name, binding]]),
+		PackedStringArray([new_name]))
+	if binding != old_name:
+		# An aliased import already reads under a name the rename does not touch.
+		return out
+	# The binding WAS the old name, so every use of it moves too.
+	var re := RegEx.create_from_string("\\b" + old_name + "\\b")
+	return re.sub(out, new_name, true)
+
+
 ## Whether a source line opens a directive clause -- `@else {`, `} @elif (x) {`, `@case (1) {`.
 ##
 ## Asked of the line rather than of the projection, because `delete_clause` is a pure text edit
