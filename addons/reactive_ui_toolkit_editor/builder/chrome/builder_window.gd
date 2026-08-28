@@ -772,6 +772,23 @@ func open_tree(focus_path: String) -> void:
 ## The layout is applied and then TOPPED UP: what it already knows keeps its slot, and only a
 ## module it has never seen takes a seeded one. Re-seeding everything would move every card the
 ## user has ever dragged the moment one module is added.
+## Puts the tree at Layer 2, centred on its content, once the canvas actually has a size.
+##
+## Deferred for the same reason `_fit_when_sized` is: `reproject` runs before the containers have
+## laid out, and centring against a zero-sized canvas centres on nothing.
+func _centre_when_sized(attempts := 8) -> void:
+	if _canvas == null or attempts <= 0:
+		return
+	if _canvas.size.x > 1.0 and _canvas.size.y > 1.0:
+		var zoom: float = _canvas.zoom
+		var bounds := Metrics.content_bounds(graph, Metrics.lod_of(zoom))
+		var centre := bounds.position + bounds.size * 0.5
+		_canvas.set_camera(_canvas.size * 0.5 - centre * zoom, zoom)
+		return
+	await get_tree().process_frame
+	_centre_when_sized(attempts - 1)
+
+
 ## Frames the tree once the canvas actually has a size.
 ##
 ## Deferred, because `reproject` runs before the containers have laid out and a fit against a
@@ -801,19 +818,22 @@ func reproject() -> void:
 	layout = CanvasLayout.for_graph(graph)
 	layout.apply_to(graph)
 	layout.adopt_unplaced(graph)
-	if layout.zoom > 0.0:
+	if layout.has_saved_view:
 		_canvas.camera = layout.camera
 		_canvas.zoom = layout.zoom
 	_canvas.show_graph(graph)
-	# A TREE WITH NO SAVED CAMERA IS FRAMED, not left wherever the last one happened to sit. A
-	# freshly opened tree came up clipped against the top-left corner -- the fit existed, on a
-	# toolbar button nobody has pressed yet.
-	# A TREE WITH NO SAVED LAYOUT OPENS AT LAYER 2 (capability reference §2), not fitted: the fit
-	# picks whatever zoom happens to frame the graph, so the layer the user lands in depends on
-	# how many modules they have.
-	if layout.zoom <= 0.0 and not graph.cards.is_empty():
+	# A TREE WITH NO SAVED LAYOUT OPENS AT LAYER 2 (capability reference §2), CENTRED -- not
+	# fitted. A fit picks whatever zoom frames the whole graph, so the layer the user lands in
+	# depends on how many modules they have: five cards opened at a third of Layer 2's size, with
+	# the toolbar confidently reading "Layer 2 — Cards" beside cards nobody could read. Setting the
+	# zoom and then fitting, which is what this did, is just the fit.
+	if not layout.has_saved_view and not graph.cards.is_empty():
+		# THE ZOOM IS SET NOW, the centring deferred. Which layer a tree opens at is not a
+		# question about the canvas's pixel size, so it must not wait for one: deferred with the
+		# centring, a canvas that is never laid out -- headless, or a window opened and measured
+		# in the same frame -- opens at 1:1 with the toolbar reading "Layer 2".
 		_canvas.zoom = Metrics.DEFAULT_ZOOM
-		_fit_when_sized()
+		_centre_when_sized()
 	if _preview_pane != null:
 		_preview_pane.graph = graph
 	_sync_empty_state()

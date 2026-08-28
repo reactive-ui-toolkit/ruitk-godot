@@ -69,7 +69,7 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 				for __cf1_once in 1:
 					__cf1 = V.fc(CanvasCardSections, { "card": card, "lod": lod, "index": index, "on_add": on_add, "zoom": zoom, "revision": revision, "sel_section": sel_section, "sel_row": sel_row })
 					continue
-			__cf0 = V.PanelContainer({ "position": at, "scale": Vector2(zoom, zoom), "custom_minimum_size": Vector2(card_w, 0), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_box_selected() if is_selected else P.card_box() }, [V.VBoxContainer({ "style": {"separation": 4} }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod }), __cf1])])
+			__cf0 = V.PanelContainer({ "position": at, "scale": Vector2(zoom, zoom), "custom_minimum_size": Vector2(card_w, 0), "size": Vector2(card_w, 0), "clip_contents": true, "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_box_selected() if is_selected else P.card_box() }, [V.VBoxContainer({ "style": {"separation": 4} }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod }), __cf1])])
 			continue
 	else:
 		for __cf0_once in 1:
@@ -110,7 +110,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 	var __cf0 = null
 	if card.signature != "" and card.kind != 2:
 		for __cf0_once in 1:
-			__cf0 = V.Label({ "text": card.signature, "style": P.signature() })
+			__cf0 = V.Label({ "text": card.signature, "style": P.signature(), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS })
 			continue
 	var __cf1 = null
 	if not card.imports.is_empty():
@@ -128,7 +128,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 			var __cf4: Array = []
 			for i in range(card.body.size()):
 				var row = card.body[i]
-				__cf4.append(V.PanelContainer({ "style": P.row_selected() if (sel_section == 2 and sel_row == i) else P.chip() }, [V.Label({ "text": row.text, "style": P.chip_text() })], str(row.at)))
+				__cf4.append(V.PanelContainer({ "style": P.row_selected() if (sel_section == 2 and sel_row == i) else P.chip() }, [V.Label({ "text": row.text, "style": P.chip_text(), "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS })], str(row.at)))
 				continue
 			__cf3 = V.fc(CanvasCardSection, { "heading": "BODY — HOOKS & STATE" }, [V.HFlowContainer({ "style": {"separation": 4} }, [__cf4, V.fc(CanvasAddChip, { "label": "+ hook", "what": "hook", "index": index, "on_add": on_add }), V.fc(CanvasAddChip, { "label": "+ code", "what": "code", "index": index, "on_add": on_add })])])
 			continue
@@ -148,7 +148,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 			var __cf8: Array = []
 			for i in range(card.export_detail.size()):
 				var row = card.export_detail[i]
-				__cf8.append(V.PanelContainer({ "style": P.row_selected() if (sel_section == 4 and sel_row == i) else P.row_plain() }, [V.Label({ "text": "  ".repeat(row.depth) + row.text, "style": P.export_row() })], str(row.at) + row.text))
+				__cf8.append(V.PanelContainer({ "style": P.row_selected() if (sel_section == 4 and sel_row == i) else P.row_plain() }, [V.Label({ "text": "  ".repeat(row.depth) + row.text, "style": P.export_row(), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS })], str(row.at) + row.text))
 				continue
 			__cf7 = V.fc(CanvasCardSection, { "heading": "EXPORTS" }, [__cf8, V.HFlowContainer({ "style": {"separation": 4} }, [V.fc(CanvasAddChip, { "label": "+ style", "what": "style", "index": index, "on_add": on_add })])])
 			continue
@@ -157,7 +157,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 		for __cf9_once in 1:
 			var __cf10: Array = []
 			for i in range(card.island_lines.size()):
-				__cf10.append(V.PanelContainer({ "style": P.row_selected() if (sel_section == 5 and sel_row == i) else P.row_plain() }, [V.Label({ "text": card.island_lines[i], "style": P.island_row() })], str(i)))
+				__cf10.append(V.PanelContainer({ "style": P.row_selected() if (sel_section == 5 and sel_row == i) else P.row_plain() }, [V.Label({ "text": card.island_lines[i], "style": P.island_row(), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS })], str(i)))
 				continue
 			__cf9 = V.fc(CanvasCardSection, { "heading": "SETUP" }, [__cf10])
 			continue
@@ -185,9 +185,9 @@ static func CanvasMarkupRow(props: Dictionary, children: Array) -> RuitkVNode:
 	var __cf0 = null
 	if row.attrs_text != "" and M.shows_attributes(zoom):
 		for __cf0_once in 1:
-			__cf0 = V.Label({ "text": row.attrs_text, "style": P.attrs() })
+			__cf0 = V.Label({ "text": row.attrs_text, "style": P.attrs(), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS, "size_flags_horizontal": Control.SIZE_SHRINK_END })
 			continue
-	return V.HBoxContainer({ "style": {"separation": 6} }, [V.Label({ "text": "    ".repeat(row.depth) + row.text, "style": style }), __cf0])
+	return V.HBoxContainer({ "style": {"separation": 6} }, [V.Label({ "text": "    ".repeat(row.depth) + row.text, "style": style, "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS, "size_flags_horizontal": Control.SIZE_EXPAND_FILL }), __cf0])
 
 # component CanvasAddChip
 static func CanvasAddChip(props: Dictionary, children: Array) -> RuitkVNode:

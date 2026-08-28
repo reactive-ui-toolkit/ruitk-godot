@@ -54,6 +54,9 @@ var zoom := 1.0
 ## The card whose edges are highlighted, or -1.
 var selected := -1
 
+## What an edge that touches nothing selected fades to.
+const DIMMED_ALPHA := 0.28
+
 
 func _init() -> void:
 	# The overlay is decoration over an interactive surface: every click has to reach the cards
@@ -143,6 +146,12 @@ func _draw_edge(edge: Graph.Edge, _ordinal: int, card_width: float) -> void:
 	# different colour put three colours on a canvas whose legend names two, so the key stopped
 	# mapping onto what was drawn.
 	var color := Palette.edge_style() if to_style else Palette.edge_component()
+	# AND EVERY OTHER EDGE DIMS. Node editors do not route around nodes -- they make crossings
+	# cheap instead, and dimming is the part of that this canvas can do without an auto-layout:
+	# with one card selected, the lines that touch it are the only bright ones, so a crossing is
+	# something the eye passes over rather than something it has to untangle.
+	if selected >= 0 and not highlighted:
+		color.a *= DIMMED_ALPHA
 
 	var points := PackedVector2Array()
 	for step in range(CURVE_STEPS + 1):

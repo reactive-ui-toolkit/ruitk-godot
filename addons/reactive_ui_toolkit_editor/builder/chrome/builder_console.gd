@@ -46,12 +46,48 @@ func _init() -> void:
 	_list.auto_height = true
 	_list.visible = false
 	_list.item_activated.connect(_on_item_activated)
+	# A DIAGNOSTIC EXISTS TO BE ACTED ON ELSEWHERE -- pasted into a search, a message, a report --
+	# and one that can only be read is one the user retypes. Ctrl+A selects the round, Ctrl+C
+	# copies what is selected, which is what every other console on the machine does.
+	_list.select_mode = ItemList.SELECT_MULTI
+	_list.focus_mode = Control.FOCUS_ALL
+	_list.gui_input.connect(_on_list_input)
 	add_child(_list)
 
 	# Synced ONCE at build time too, not only on the mutations: with nothing reported yet the
 	# console had never been asked whether it should be on screen, so a fresh window opened with
 	# an empty console header sitting on the canvas.
 	_sync_visibility()
+
+
+## Ctrl+A selects every row; Ctrl+C copies the selected ones, one per line.
+func _on_list_input(event: InputEvent) -> void:
+	if not (event is InputEventKey):
+		return
+	var key := event as InputEventKey
+	if not key.pressed or not key.ctrl_pressed:
+		return
+	if key.keycode == KEY_A:
+		for i in _list.item_count:
+			_list.select(i, false)
+		accept_event()
+	elif key.keycode == KEY_C:
+		DisplayServer.clipboard_set(copy_text())
+		accept_event()
+
+
+## The selected rows as text, or EVERY row when nothing is selected.
+##
+## Copying with no selection meaning "copy nothing" is technically defensible and useless: the
+## gesture is almost always "give me this console".
+func copy_text() -> String:
+	var out := PackedStringArray()
+	var selected := _list.get_selected_items()
+	for i in _list.item_count:
+		if selected.is_empty() or Array(selected).has(i):
+			out.append(_list.get_item_text(i))
+	return "
+".join(out)
 
 
 ## Reports one preview round. A null summary means the round decided there was nothing to do,

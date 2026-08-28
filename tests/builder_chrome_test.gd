@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 220
+const ASSERTION_FLOOR := 225
 
 var _fails := 0
 var _passes := 0
@@ -64,6 +64,7 @@ func _run() -> void:
 	await _test_inline_editor()
 	await _test_one_funnel()
 	await _test_undo_across_files()
+	await _test_opens_at_layer_two()
 	await _test_selection_and_delete()
 	await _test_save_confirms_deletions()
 	await _test_create_placement()
@@ -885,6 +886,48 @@ func _test_undo_across_files() -> void:
 ## Deletion is the one thing a save does that cannot be taken back from inside the builder --
 ## every other part of it is a write the ledger still remembers.
 ## SELECTION IS ONE THING AT A TIME, and Delete acts on it before it falls through to the module.
+## A TREE WITH NO SAVED LAYOUT OPENS AT LAYER 2, CENTRED.
+##
+## Not fitted: a fit picks whatever zoom frames the whole graph, so the layer the user lands in
+## depends on how many modules they have -- five cards opened at a third of Layer 2's size with
+## the toolbar confidently reading "Layer 2 — Cards" beside cards nobody could read.
+func _test_opens_at_layer_two() -> void:
+	_section("no saved layout")
+	# Cleared FIRST, and by MEMBERSHIP. The layout store lives under `user://` and outlives the
+	# process, so an earlier test in this suite -- or an earlier RUN of it -- leaves a layout for
+	# this same tree and the "no saved layout" path is never the one under test. A layout is found
+	# by which modules it covers, not by the root it was saved under, so removing the root's own
+	# file is not enough.
+	var store := DirAccess.open(Layout.LAYOUT_DIR)
+	if store != null:
+		for stale in store.get_files():
+			if stale.ends_with(".json"):
+				DirAccess.remove_absolute(Layout.LAYOUT_DIR.path_join(stale))
+	var w := _window()
+	w.size = Vector2(1400, 800)
+	await process_frame
+	await process_frame
+	await process_frame
+	_eq(w.canvas().zoom, Metrics.DEFAULT_ZOOM, "the canvas opens at the Layer 2 preset")
+	_eq(int(Metrics.lod_of(w.canvas().zoom)), int(Metrics.Lod.SECTIONS),
+		"which is the band the layer selector names")
+
+	_section("and the centring is what waits for a size, not the zoom")
+	# Which layer a tree opens at is not a question about the canvas's pixel size, so it must not
+	# wait for one -- a canvas that is never laid out would otherwise open at 1:1 with the toolbar
+	# reading "Layer 2".
+	w._centre_when_sized(1)
+	if w.canvas().size.x > 1.0:
+		var bounds: Rect2 = Metrics.content_bounds(w.graph, Metrics.lod_of(w.canvas().zoom))
+		var centre_screen := Metrics.world_to_screen(bounds.position + bounds.size * 0.5,
+			w.canvas().camera, w.canvas().zoom)
+		_check(absf(centre_screen.x - w.canvas().size.x * 0.5) < 2.0, "centred horizontally")
+		_check(absf(centre_screen.y - w.canvas().size.y * 0.5) < 2.0, "and vertically")
+	_eq(w.canvas().zoom, Metrics.DEFAULT_ZOOM, "and the zoom is unchanged either way")
+
+	_drop(w)
+
+
 func _test_selection_and_delete() -> void:
 	_section("clicking a row selects it")
 	var w := _window()

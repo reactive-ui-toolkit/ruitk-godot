@@ -31,6 +31,15 @@ var members := PackedStringArray()
 var positions := {}
 var camera := Vector2.ZERO
 var zoom := 1.0
+
+## Whether this layout came from a SAVED view -- a camera and zoom someone actually left the
+## canvas at -- rather than from the defaults of a layout that has never been written.
+##
+## A flag rather than a sentinel zoom, because the default has to stay a usable 1.0 for every
+## consumer that just reads it. Asking `zoom <= 0.0` instead, which is what the window did, is a
+## question a fresh layout answers "no" to -- so the whole "no saved layout" path, the framing and
+## then the Layer 2 default, was unreachable code and a new tree always opened cornered at 1:1.
+var has_saved_view := false
 var saved_at := ""
 
 ## Layout files this one has outgrown, because the tree root moved and the file is NAMED after
@@ -147,6 +156,7 @@ func adopt_unplaced(graph: Graph) -> bool:
 func capture_from(graph: Graph, camera_at: Vector2, zoom_at: float) -> void:
 	camera = camera_at
 	zoom = zoom_at
+	has_saved_view = true
 	members = PackedStringArray()
 	for card in graph.cards:
 		members.append(card.file_path)
@@ -263,7 +273,10 @@ static func _read(path: String) -> Self:
 	if not (parsed is Dictionary):
 		push_warning("[builder] canvas layout at %s is not readable -- ignoring it" % path)
 		return null
-	return from_dict(parsed)
+	var stored := from_dict(parsed)
+	if stored != null:
+		stored.has_saved_view = true
+	return stored
 
 
 ## Removes every stored layout. For tests, and for a "forget my layouts" action.

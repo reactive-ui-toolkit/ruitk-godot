@@ -89,7 +89,8 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 		@if (near) {
 			return (
 				<PanelContainer position={ at } scale={ Vector2(zoom, zoom) }
-					custom_minimum_size={ Vector2(card_w, 0) }
+					custom_minimum_size={ Vector2(card_w, 0) } size={ Vector2(card_w, 0) }
+					clip_contents={ true }
 					mouse_filter={ Control.MOUSE_FILTER_IGNORE }
 					style={ P.card_box_selected() if is_selected else P.card_box() }>
 					<VBoxContainer style={ {"separation": 4} }>
@@ -165,7 +166,8 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 		<VBoxContainer style={ {"separation": 4} }>
 			@if (card.signature != "" and card.kind != 2) {
 				return (
-					<Label text={ card.signature } style={ P.signature() } />
+					<Label text={ card.signature } style={ P.signature() } clip_text={ true }
+						text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
 				)
 			}
 			@if (not card.imports.is_empty()) {
@@ -193,7 +195,8 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 								return (
 									<PanelContainer key={ str(row.at) }
 											style={ P.row_selected() if (sel_section == 2 and sel_row == i) else P.chip() }>
-										<Label text={ row.text } style={ P.chip_text() } />
+										<Label text={ row.text } style={ P.chip_text() }
+										text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
 									</PanelContainer>
 								)
 							}
@@ -226,7 +229,9 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 							return (
 								<PanelContainer key={ str(row.at) + row.text }
 										style={ P.row_selected() if (sel_section == 4 and sel_row == i) else P.row_plain() }>
-									<Label text={ "  ".repeat(row.depth) + row.text } style={ P.export_row() } />
+									<Label text={ "  ".repeat(row.depth) + row.text } style={ P.export_row() }
+										clip_text={ true }
+										text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
 								</PanelContainer>
 							)
 						}
@@ -243,7 +248,8 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 							return (
 								<PanelContainer key={ str(i) }
 										style={ P.row_selected() if (sel_section == 5 and sel_row == i) else P.row_plain() }>
-									<Label text={ card.island_lines[i] } style={ P.island_row() } />
+									<Label text={ card.island_lines[i] } style={ P.island_row() } clip_text={ true }
+										text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
 								</PanelContainer>
 							)
 						}
@@ -286,10 +292,14 @@ export CanvasMarkupRow(row = null, zoom: float = 1.0) -> RuitkVNode {
 
 	return (
 		<HBoxContainer style={ {"separation": 6} }>
-			<Label text={ "    ".repeat(row.depth) + row.text } style={ style } />
+			<Label text={ "    ".repeat(row.depth) + row.text } style={ style } clip_text={ true }
+				text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS }
+				size_flags_horizontal={ Control.SIZE_EXPAND_FILL } />
 			@if (row.attrs_text != "" and M.shows_attributes(zoom)) {
 				return (
-					<Label text={ row.attrs_text } style={ P.attrs() } />
+					<Label text={ row.attrs_text } style={ P.attrs() } clip_text={ true }
+						text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS }
+						size_flags_horizontal={ Control.SIZE_SHRINK_END } />
 				)
 			}
 		</HBoxContainer>
