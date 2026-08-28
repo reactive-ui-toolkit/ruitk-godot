@@ -18,6 +18,7 @@ const Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 const Drag = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_drag.gd")
 const Attributes = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_attributes.gd")
+const Schema = preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_schema.gd")
 const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
 
 ## The number of assertions a complete run makes. KEPT EXACT, and raised with the suite.
@@ -25,7 +26,7 @@ const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/docum
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 278
+const ASSERTION_FLOOR := 289
 
 var _fails := 0
 var _passes := 0
@@ -49,6 +50,7 @@ func _initialize() -> void:
 	_test_wrap_variants()
 	_test_island()
 	_test_imports()
+	_test_style_vocabulary_is_live()
 	_test_menus_emit_valid_code()
 	_test_import_bindings()
 	_test_setup_lines()
@@ -434,6 +436,35 @@ func _spec_of(source: String) -> String:
 ## THE MENUS MUST OFFER NAMES, NOT STRINGIFIED RECORDS, and every hook stub must be legal
 ## GDScript. Three separate sites each did `str(record)` on a Dictionary or wrote `var _ =`, and
 ## the result in every case was a file that does not parse -- written by a menu pick, silently.
+## THE STYLE VOCABULARY COMES FROM THE ENGINE, not from a hand-kept list.
+##
+## The schema carries 45 curated entries against a surface of roughly 74, so every per-side and
+## per-corner key was unreachable from any menu -- and the list could drift from Godot on any
+## release with nothing to notice.
+func _test_style_vocabulary_is_live() -> void:
+	_section("the curated head is still there")
+	var live := Schema.style_keys_live()
+	var names := {}
+	for entry in live:
+		names[str((entry as Dictionary)["name"])] = true
+	_check(names.has("bg_color"), "bg_color")
+	_check(names.has("font_size"), "font_size")
+
+	_section("and every StyleBoxFlat property is reachable")
+	# These are the keys the hand-written list did not have, and a user cannot type what a menu
+	# will not offer.
+	for key in ["border_width_left", "corner_radius_top_right", "content_margin_bottom",
+			"border_width_bottom", "corner_radius_bottom_left"]:
+		_check(names.has(key), "%s is offered" % key)
+	_check(live.size() > Schema.style_keys().size(),
+		"the live vocabulary is larger than the curated list (%d > %d)"
+			% [live.size(), Schema.style_keys().size()])
+
+	_section("and nothing that is not a style key leaks in")
+	for junk in ["resource_name", "resource_path", "script"]:
+		_check(not names.has(junk), "%s is not offered" % junk)
+
+
 func _test_menus_emit_valid_code() -> void:
 	_section("a host tag's attributes are named, not stringified")
 	var props := Attributes.props_of_host("Button")

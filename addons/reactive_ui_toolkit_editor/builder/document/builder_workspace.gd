@@ -102,7 +102,26 @@ func is_path_available(file_path: String) -> bool:
 	var full := Paths.canon(file_path)
 	if full.is_empty():
 		return false
-	return _tree.by_path(full) == null and not FileAccess.file_exists(full)
+	if _tree.by_path(full) != null:
+		return false
+	if not FileAccess.file_exists(full):
+		return true
+	# A FILE ON DISK IS NOT ALWAYS AN OCCUPANT. Under the save-only contract the disk lags the
+	# tree, so two of its files name paths nothing claims any more, and the comment above has
+	# always said so while the code tested the disk alone -- UB-222.
+	#
+	#   * a module that has MOVED still has its old file sitting there until Save projects it
+	#   * a module DELETED in session leaves its file until Save takes it to the trash
+	#
+	# Refusing either one makes the builder unable to create, rename or move a module back onto a
+	# name it has just released -- which is the ordinary shape of changing your mind.
+	for module in _tree.modules():
+		if module.has_moved() and Paths.same(module.disk_path, full):
+			return true
+	for orphan in _tree.orphaned_paths():
+		if Paths.same(str(orphan), full):
+			return true
+	return false
 
 
 # ── Policy ───────────────────────────────────────────────────────────────────────────

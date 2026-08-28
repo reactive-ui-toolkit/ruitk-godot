@@ -123,6 +123,45 @@ static func property_info(godot_class: String, prop: String) -> Dictionary:
 
 ## The RuitkStyle vocabulary (the `style={ {...} }` dict keys), from the bundled schema:
 ## [{name, type, detail}]. Godot's own tooling has no vocabulary for these.
+## The style vocabulary the runtime ACTUALLY accepts: the curated head from the schema, plus every
+## `StyleBoxFlat` property, read live from ClassDB the same way `RuitkStyle` reads them.
+##
+## The schema's list is 45 hand-maintained entries against a surface of roughly 74, so the
+## per-side and per-corner keys -- `border_width_left`, `corner_radius_top_right`,
+## `content_margin_bottom` and the rest -- could not be reached from any menu, and the list could
+## drift from the engine on any Godot release without anything noticing.
+static func style_keys_live() -> Array:
+	var out: Array = []
+	var seen := {}
+	for entry in style_keys():
+		var spec := entry as Dictionary
+		var name := str(spec.get("name", ""))
+		if name.is_empty() or seen.has(name):
+			continue
+		seen[name] = true
+		out.append(spec)
+	for prop in ClassDB.class_get_property_list("StyleBoxFlat"):
+		var info := prop as Dictionary
+		var name := str(info.get("name", ""))
+		# The same filter `RuitkStyle` applies: groups and category rows are not properties, and
+		# the `resource_*` four belong to Resource rather than to the box.
+		if name.is_empty() or seen.has(name) or name.begins_with("resource_"):
+			continue
+		var usage := int(info.get("usage", 0))
+		if usage & PROPERTY_USAGE_GROUP or usage & PROPERTY_USAGE_SUBGROUP \
+				or usage & PROPERTY_USAGE_CATEGORY:
+			continue
+		if not (usage & PROPERTY_USAGE_EDITOR):
+			continue
+		seen[name] = true
+		out.append({
+			"name": name,
+			"type": type_string(int(info.get("type", TYPE_NIL))),
+			"detail": "StyleBoxFlat.%s" % name,
+		})
+	return out
+
+
 static func style_keys() -> Array:
 	_ensure_loaded()
 	return _schema.get("styleKeys", [])

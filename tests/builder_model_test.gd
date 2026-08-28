@@ -28,10 +28,47 @@ const SANDBOX := "res://tests/__builder_tmp"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 347
+const ASSERTION_FLOOR := 352
 
 var _fails := 0
 var _passes := 0
+
+
+## A PATH A MODULE HAS RELEASED IS AVAILABLE AGAIN, even while its old file is still on disk.
+##
+## Under the save-only contract the disk lags the tree, so two of its files name paths nothing
+## claims any more: the old file of a module that MOVED, and the file of one DELETED in session.
+## `is_path_available` tested the disk alone -- while its own doc comment said it did not -- so the
+## builder could not create, rename or move a module back onto a name it had just released, which
+## is the ordinary shape of changing your mind. UB-222.
+func _test_path_availability_ignores_stale_disk() -> void:
+	_section("a fresh path is available")
+	var ws := Workspace.new()
+	var dir := "res://tests/__builder_tmp"
+	DirAccess.make_dir_recursive_absolute(dir)
+	var occupied := dir.path_join("occupied.guitkx")
+	var f := FileAccess.open(occupied, FileAccess.WRITE)
+	f.store_string("export Occupied() -> RuitkVNode {
+	return (
+		<Label />
+	)
+}
+")
+	f.close()
+	_check(not ws.is_path_available(occupied), "a file on disk that nothing in the tree released")
+
+	_section("a module that MOVED releases the path it came from")
+	ws.open(occupied)
+	var module := ws.try_get(occupied)
+	_check(module != null, "the module opened")
+	if module != null:
+		ws.move_to(occupied, dir.path_join("moved"), module.name)
+		_check(module.has_moved(), "it knows it moved")
+		_check(ws.is_path_available(occupied),
+			"so its old path is free again, even though the file is still there")
+
+	_check(FileAccess.file_exists(occupied), "and nothing was written -- Save is the only writer")
+	DirAccess.remove_absolute(occupied)
 
 
 func _initialize() -> void:
@@ -62,6 +99,7 @@ func _initialize() -> void:
 	_test_journal()
 	_test_ledger()
 	_test_no_residue()
+	_test_path_availability_ignores_stale_disk()
 
 	print("")
 	# A FLOOR ON THE COUNT. A suite that stops at a broken dependency prints ALL PASS on however

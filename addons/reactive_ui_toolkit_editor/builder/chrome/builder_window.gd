@@ -1510,7 +1510,7 @@ func _style_key_items(row) -> Array:
 	# KEYS THE EXPORT ALREADY HAS ARE NOT OFFERED. A dictionary literal with a duplicate key does
 	# not load, and offering one is offering to break the file.
 	var source := _buffer_of(_menu_target)
-	for key in Schema.style_keys():
+	for key in Schema.style_keys_live():
 		var spec := key as Dictionary
 		var key_name := str(spec.get("name", ""))
 		if key_name.is_empty():

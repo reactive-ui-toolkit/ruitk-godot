@@ -43,18 +43,25 @@ static func props_of_component(card: Graph.Card) -> Array:
 		var part := str(raw).strip_edges()
 		if part.is_empty():
 			continue
-		# `name: Type = default` -> name, Type. The default is not offered: it is what the prop
-		# already does when the attribute is absent.
+		# `name: Type = default` -> name, Type, default.
+		#
+		# The default used to be thrown away here with a comment saying it is what the prop does
+		# when the attribute is absent -- true for the ATTRIBUTE menu, and exactly wrong for the
+		# preview, which needs a value to render with when nothing in the tree uses the component
+		# yet.
+		var declared := ""
 		var equals := part.find("=")
 		if equals >= 0:
+			declared = part.substr(equals + 1).strip_edges()
 			part = part.substr(0, equals).strip_edges()
 		var colon := part.find(":")
 		if colon < 0:
-			out.append({ "name": part, "type": "Variant" })
+			out.append({ "name": part, "type": "Variant", "default": declared })
 			continue
 		out.append({
 			"name": part.substr(0, colon).strip_edges(),
 			"type": part.substr(colon + 1).strip_edges(),
+			"default": declared,
 		})
 	return out
 

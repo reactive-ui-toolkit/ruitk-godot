@@ -313,7 +313,15 @@ func _build_knobs() -> void:
 		var name := str(spec["name"])
 		var seeded := _seeded_literal(usage, name)
 		if seeded.is_empty():
-			continue
+			# NO USAGE IS NOT NO KNOB. The seed came from a literal in some other module's usage
+			# row, so a component nothing imports YET -- which is every component in the first
+			# minutes of a session -- got an empty knobs block and nothing to drive the preview
+			# with. Fall back to the prop's own declared default, and then to a typed blank.
+			seeded = str(spec.get("default", ""))
+			if seeded.is_empty():
+				seeded = str(Attributes.default_value(str(spec.get("type", "")))["value"])
+			if seeded.is_empty():
+				continue
 		# A VALUE THE USER TYPED WINS over the literal in the usage row. Rebuilding the knobs is
 		# sometimes unavoidable -- a prop was added or renamed -- and when it happens the values
 		# that still have a home should survive it.

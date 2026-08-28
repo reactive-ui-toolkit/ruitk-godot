@@ -120,6 +120,7 @@ const PARITY := [
 	["CancelActiveEdit", "func _cancel_active_edit"],
 	# Save
 	["ResolveUnsavedLocation", "func _ask_where_the_tree_lives"],
+	["style vocabulary read from the engine", "Schema.style_keys_live()"],
 	["ResolveEmptyModules", "func blank_modules"],
 	["a tree with no saved layout opens at Layer 2", "func _centre_when_sized"],
 	["FormatDirtyBuffers", "format_on_save"],
