@@ -28,7 +28,11 @@ const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document
 const ROOT := "res://tests/__builder_canvas_tmp/app"
 const VIEWPORT := Vector2(1280, 720)
 
-## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
+## The number of assertions a complete run makes. KEPT EXACT, and raised with the suite.
+##
+## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
+## still printed ALL PASS, because the count it reached was comfortably above a floor set several
+## additions ago. The floor only catches a truncated run while it sits AT the real count.
 const ASSERTION_FLOOR := 141
 
 var _fails := 0

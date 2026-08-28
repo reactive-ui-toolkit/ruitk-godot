@@ -30,7 +30,14 @@ const JsxScan = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_jsx_scan
 ## Where a dropped element lands relative to the row it was dropped on. The three bands a drop
 ## gesture resolves to: the top third of a row is "before", the bottom third "after", and the
 ## middle is "inside".
-enum Placement { BEFORE, INSIDE, AFTER }
+## Where a drop lands relative to the row under the cursor.
+##
+## FIRST_CHILD exists because the canvas lists markup FLATTENED with indentation, so the row for
+## `<VBoxContainer>` is only its OPEN TAG line and the gap drawn under it is visually the gap
+## BEFORE ITS FIRST CHILD. AFTER inserts at the row's whole-block end -- past every descendant,
+## which on a deep tree is hundreds of lines below where the caret was drawn. The caret and the
+## edit were reading one gesture in two coordinate systems.
+enum Placement { BEFORE, INSIDE, AFTER, FIRST_CHILD }
 
 
 # ── Markup structure ─────────────────────────────────────────────────────────────────
@@ -48,7 +55,7 @@ enum Placement { BEFORE, INSIDE, AFTER }
 static func can_place(card: Graph.Card, row: Graph.Line, placement: Placement) -> Dictionary:
 	if row == null:
 		return { "ok": false, "reason": "nothing to place it against" }
-	if placement == Placement.INSIDE:
+	if placement == Placement.INSIDE or placement == Placement.FIRST_CHILD:
 		return { "ok": true, "reason": "" }
 	if card == null:
 		return { "ok": true, "reason": "" }
@@ -99,8 +106,41 @@ static func insert(source: String, card: Graph.Card, row: Graph.Line, markup: St
 			return _insert_line_before(source, row.at, markup, _indent_of(source, row.at))
 		Placement.AFTER:
 			return _insert_line_after(source, row.end_at, markup, _indent_of(source, row.at))
+		Placement.FIRST_CHILD:
+			# Under the OPEN TAG, which is where the caret was drawn. A self-closing target has no
+			# inside to be first in, so it falls back to the append path that rewrites `/>` into
+			# an open/close pair.
+			if row.self_closing:
+				return _insert_inside(source, row, markup)
+			var indent := _indent_of(source, row.at)
+			return _insert_line_after(source, _open_tag_end(source, row), markup,
+				indent + _indent_unit(source))
 		_:
 			return _insert_inside(source, row, markup)
+
+
+## The offset just past a row's OPEN TAG -- the `>` that ends it, not the end of its block.
+##
+## Found by scanning rather than assumed to be the end of `row.at`'s line, because an element
+## with a long attribute run is written across several lines and its open tag ends on the last of
+## them.
+static func _open_tag_end(source: String, row: Graph.Line) -> int:
+	var i := row.at
+	var limit: int = mini(row.end_at, source.length())
+	var in_string := false
+	var quote := ""
+	while i < limit:
+		var ch := source[i]
+		if in_string:
+			if ch == quote:
+				in_string = false
+		elif ch == "\"" or ch == "'":
+			in_string = true
+			quote = ch
+		elif ch == ">":
+			return i + 1
+		i += 1
+	return row.at
 
 
 static func _insert_inside(source: String, row: Graph.Line, markup: String) -> String:
@@ -307,24 +347,100 @@ static func ensure_import(source: String, from_path: String, target_path: String
 	if spec.is_empty():
 		return source
 
+	return _ensure_import_line(source, spec, names, names)
+
+
+## Puts `entries` on the import line for `spec`, adding the line when there is none.
+##
+## `remotes` names what the TARGET exports, one per entry, so an entry already imported under any
+## local binding is recognised rather than added twice. `entries` is how each should be written --
+## `"accent"` or `"accent as brandAccent"`.
+##
+## The existing line is REWRITTEN FROM THE SCAN'S OWN SPELLING, alias included: each scanned entry
+## carries `remote` (the name the target exports) and `name` (what this file binds it to), and
+## rebuilding from `name` alone turned `primary as brand` into `brand` -- an import of a name the
+## target does not export -- the moment a second name was added to it.
+static func _ensure_import_line(source: String, spec: String, entries: PackedStringArray,
+		remotes: PackedStringArray) -> String:
+	if entries.is_empty():
+		return source
 	for imp in Compiler.scan_imports(source):
 		if str(imp.get("spec", "")) != spec:
 			continue
 		var have := PackedStringArray()
-		for entry in (imp.get("names", []) as Array):
-			have.append(str((entry as Dictionary).get("name", "")))
+		var bound := {}
+		for scanned in (imp.get("names", []) as Array):
+			var pair := scanned as Dictionary
+			var local := str(pair.get("name", ""))
+			var remote := str(pair.get("remote", ""))
+			bound[remote if not remote.is_empty() else local] = true
+			have.append(local if remote.is_empty() or remote == local 				else "%s as %s" % [remote, local])
 		var missing := PackedStringArray()
-		for wanted in names:
-			if not have.has(wanted):
-				missing.append(wanted)
+		for i in entries.size():
+			var remote_name := str(remotes[i]) if i < remotes.size() else str(entries[i])
+			if not bound.has(remote_name):
+				missing.append(str(entries[i]))
 		if missing.is_empty():
 			return source
 		have.append_array(missing)
 		var replacement := "import { %s } from \"%s\"" % [", ".join(have), spec]
 		return source.substr(0, int(imp["at"])) + replacement + source.substr(int(imp["end"]))
 
-	var line := "import { %s } from \"%s\"\n" % [", ".join(names), spec]
+	var line := "import { %s } from \"%s\"
+" % [", ".join(entries), spec]
 	return _insert_into_preamble(source, line)
+
+
+## Imports `export_name` from `target_path` and reports the NAME THIS FILE CAN REFERENCE IT BY.
+##
+## Returns `{ "text": String, "binding": String }`.
+##
+## THE BINDING IS NOT ALWAYS THE EXPORT NAME. A style module and the component it belongs to are
+## named by two conventions that collapse onto one identifier by construction -- `Card.guitkx`
+## exporting `Card`, `card.style.guitkx` exporting `Card` -- so importing the style export into
+## the component redeclares the component's own name. An alias is chosen against everything the
+## file already means: its own exports and every binding its existing imports introduce.
+##
+## A module ALREADY imported keeps whatever binding it was given. Styling a second element from
+## the same module must reference the name the file actually binds, not a fresh one.
+static func bind_export(source: String, from_path: String, target_path: String,
+		export_name: String) -> Dictionary:
+	var spec := Specifiers.relative(from_path.get_base_dir(), target_path)
+	if spec.is_empty():
+		return { "text": source, "binding": export_name }
+
+	var taken := {}
+	for imp in Compiler.scan_imports(source):
+		var same := str(imp.get("spec", "")) == spec
+		for entry in (imp.get("names", []) as Array):
+			var pair := entry as Dictionary
+			var local := str(pair.get("name", ""))
+			var remote := str(pair.get("remote", ""))
+			if same and (remote == export_name or (remote.is_empty() and local == export_name)):
+				return { "text": source, "binding": local }
+			taken[local] = true
+		var ns := str(imp.get("ns", ""))
+		if not ns.is_empty():
+			taken[ns] = true
+	# The file's OWN declarations are names it already means. `analyzed_decls` hands back a
+	# Dictionary whose `decls` is the list -- iterating it directly walks its KEYS.
+	for decl in (Compiler.analyzed_decls(source).get("decls", []) as Array):
+		taken[str((decl as Dictionary).get("name", ""))] = true
+
+	var binding := export_name
+	if taken.has(binding):
+		binding = export_name + "Style"
+	var counter := 2
+	while taken.has(binding):
+		binding = "%s%d" % [export_name, counter]
+		counter += 1
+
+	var written := PackedStringArray([
+		export_name if binding == export_name else "%s as %s" % [export_name, binding]])
+	return {
+		"text": _ensure_import_line(source, spec, written, PackedStringArray([export_name])),
+		"binding": binding,
+	}
 
 
 ## Whether `source` imports `spec` at all.

@@ -19,8 +19,12 @@ const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/
 const Drag = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_drag.gd")
 const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
 
-## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
-const ASSERTION_FLOOR := 167
+## The number of assertions a complete run makes. KEPT EXACT, and raised with the suite.
+##
+## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
+## still printed ALL PASS, because the count it reached was comfortably above a floor set several
+## additions ago. The floor only catches a truncated run while it sits AT the real count.
+const ASSERTION_FLOOR := 185
 
 var _fails := 0
 var _passes := 0
@@ -39,6 +43,7 @@ func _initialize() -> void:
 	_test_wrap_variants()
 	_test_island()
 	_test_imports()
+	_test_import_bindings()
 	_test_setup_lines()
 	_test_style_entries()
 	_test_templates()
@@ -166,6 +171,26 @@ func _test_insert_placements() -> void:
 	_check(into_if.contains("<Label text=\"tail\" />\n    </VBoxContainer>"),
 		"the root element's last child lands above its close tag")
 	_compiles(into_if, "an insert into the root")
+
+	_section("FIRST_CHILD lands under the OPEN TAG, not past the block")
+	# The canvas lists markup FLATTENED, so the row for `<HBoxContainer>` is only its open tag and
+	# the gap drawn under it is visually the gap before its first child. AFTER inserts past every
+	# descendant -- the same gesture read in two different coordinate systems.
+	var first := Edits.insert(SRC, _card(SRC), _row(SRC, "HBoxContainer"), "<ColorRect />",
+		Edits.Placement.FIRST_CHILD)
+	_check(first.contains("<HBoxContainer>
+        <ColorRect />"),
+		"it becomes the first child, one indent in")
+	_check(not first.contains("</HBoxContainer>
+      <ColorRect />"),
+		"and NOT below the whole subtree, which is where AFTER puts it")
+	_compiles(first, "an insert as first child")
+
+	_section("a self-closing target has no inside to be first in")
+	var reopened := Edits.insert(SRC, _card(SRC), _row(SRC, "Label"), "<ColorRect />",
+		Edits.Placement.FIRST_CHILD)
+	_check(reopened.contains("<ColorRect />"), "so it falls back to re-opening the tag")
+	_compiles(reopened, "a first-child insert into a self-closing element")
 
 	_section("refusals")
 	_eq(Edits.insert(SRC, _card(SRC), null, "<X />", Edits.Placement.INSIDE), SRC, "no row, no edit")
@@ -397,6 +422,59 @@ func _spec_of(source: String) -> String:
 
 # ── Setup ────────────────────────────────────────────────────────────────────────────
 
+## The import writer has to survive the file it is editing already having an ALIAS in it, and has
+## to choose a binding that does not collide with what the file already means.
+func _test_import_bindings() -> void:
+	_section("adding a name to an aliased import keeps the alias")
+	# `primary as brand` rebuilt from the local name alone became `brand` -- an import of a name
+	# the target does not export -- so adding one style entry silently broke the file.
+	var aliased := "import { primary as brand } from \"./app.style\"
+
+" 		+ "export App() -> RuitkVNode {
+	return (
+		<Label />
+	)
+}
+"
+	var grown := Edits.ensure_import(aliased, "res://a/app.guitkx", "res://a/app.style.guitkx",
+		PackedStringArray(["accent"]))
+	_check(grown.contains("primary as brand"), "the alias survives")
+	_check(grown.contains("accent"), "and the new name is there")
+
+	_section("a name already imported is not imported twice")
+	_eq(Edits.ensure_import(aliased, "res://a/app.guitkx", "res://a/app.style.guitkx",
+		PackedStringArray(["primary"])), aliased,
+		"asked for under its REMOTE name, which is what the target exports")
+
+	_section("a binding that would collide with the file's own name is aliased")
+	# A style module and the component it belongs to are named by two conventions that collapse
+	# onto one identifier: `Card.guitkx` exporting `Card`, `card.style.guitkx` exporting `Card`.
+	var component := "export Card() -> RuitkVNode {
+	return (
+		<Label />
+	)
+}
+"
+	var bound := Edits.bind_export(component, "res://a/Card.guitkx", "res://a/card.style.guitkx",
+		"Card")
+	_eq(str(bound["binding"]), "CardStyle", "so the import binds a name that cannot collide")
+	_check(str(bound["text"]).contains("Card as CardStyle"), "written as an alias")
+
+	_section("a module already imported keeps the binding it was given")
+	# Styling a second element from the same module must reference the name the file actually
+	# binds, not invent a fresh one.
+	var again := Edits.bind_export(str(bound["text"]), "res://a/Card.guitkx",
+		"res://a/card.style.guitkx", "Card")
+	_eq(str(again["binding"]), "CardStyle", "the same binding")
+	_eq(str(again["text"]), str(bound["text"]), "and no second import")
+
+	_section("no collision, no alias")
+	var plain := Edits.bind_export(component, "res://a/Card.guitkx",
+		"res://a/card.style.guitkx", "panel")
+	_eq(str(plain["binding"]), "panel", "the export name is used as it is")
+	_check(not str(plain["text"]).contains(" as "), "with no alias in the line")
+
+
 func _test_setup_lines() -> void:
 	_section("a hook is inserted at the TOP of setup")
 	# Hooks must run unconditionally and in a stable order. The end of setup is still legal, but
@@ -502,6 +580,21 @@ func _test_row_bands() -> void:
 		"the middle is INSIDE")
 	_eq(int(Metrics.row_hit(card, Vector2(10, top + row_h * 0.9))["band"]), 2,
 		"the bottom third is AFTER")
+
+	_section("the bottom band's MEANING depends on what is listed next")
+	# Same band, same pixel, two different edits -- and both land in the same place on screen,
+	# which is the point: the caret is a position in the LISTED tree.
+	var deep := Drag._placement_of(2, card, int(Metrics.Section.MARKUP), 0)
+	_eq(int(deep), int(Edits.Placement.FIRST_CHILD),
+		"under a row whose next listed row is DEEPER, it means become that row's first child")
+	var last_index := card.markup.size() - 1
+	_eq(int(Drag._placement_of(2, card, int(Metrics.Section.MARKUP), last_index)),
+		int(Edits.Placement.AFTER),
+		"under the last row there is nothing deeper, so it means after its block")
+	_eq(int(Drag._placement_of(0, card, int(Metrics.Section.MARKUP), 0)),
+		int(Edits.Placement.BEFORE), "the top band is unaffected")
+	_eq(int(Drag._placement_of(1, card, int(Metrics.Section.MARKUP), 0)),
+		int(Edits.Placement.INSIDE), "and so is the middle")
 
 	_section("which row")
 	_eq(int(Metrics.row_hit(card, Vector2(10, top + row_h * 0.5))["index"]), 0, "the first row")

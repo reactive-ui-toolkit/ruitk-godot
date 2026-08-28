@@ -121,19 +121,40 @@ static func resolve(graph: Graph, screen: Vector2, camera: Vector2,
 			"row": row,
 			"section": hit["section"],
 			"band": hit["band"],
-			"placement": _placement_of(int(hit["band"])),
+			"placement": _placement_of(int(hit["band"]), card, int(hit["section"]),
+				int(hit["index"])),
 		}
 	return miss
 
 
-static func _placement_of(band: int) -> Edits.Placement:
+## THE CARET IS A POSITION IN THE LISTED TREE, and the edit lands there.
+##
+##   top band     -> before this row, as a sibling
+##   middle band  -> inside it, as its last child
+##   bottom band  -> if the NEXT LISTED ROW IS DEEPER, become that row's first child; the gap
+##                   under a row is visually the gap before its first child, and the listing is
+##                   flattened, so those are the same place on screen. Otherwise it means after
+##                   this row's whole block, which is also the same place on screen.
+static func _placement_of(band: int, card: Graph.Card = null, section := -1,
+		index := -1) -> Edits.Placement:
 	match band:
 		0:
 			return Edits.Placement.BEFORE
 		2:
+			if _next_listed_is_deeper(card, section, index):
+				return Edits.Placement.FIRST_CHILD
 			return Edits.Placement.AFTER
 		_:
 			return Edits.Placement.INSIDE
+
+
+## Whether the row listed after `index` is nested inside it.
+static func _next_listed_is_deeper(card: Graph.Card, section: int, index: int) -> bool:
+	if card == null or section != int(Metrics.Section.MARKUP):
+		return false
+	if index < 0 or index + 1 >= card.markup.size():
+		return false
+	return card.markup[index + 1].depth > card.markup[index].depth
 
 
 static func _row_of(card: Graph.Card, section: int, index: int) -> Graph.Line:

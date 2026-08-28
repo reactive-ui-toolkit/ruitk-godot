@@ -18,7 +18,11 @@ const Codegen = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_codegen.
 
 const ROOT := "res://tests/__builder_preview_tmp/ui"
 
-## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
+## The number of assertions a complete run makes. KEPT EXACT, and raised with the suite.
+##
+## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
+## still printed ALL PASS, because the count it reached was comfortably above a floor set several
+## additions ago. The floor only catches a truncated run while it sits AT the real count.
 const ASSERTION_FLOOR := 82
 
 var _fails := 0

@@ -1377,12 +1377,13 @@ func _on_search_picked(payload: Variant) -> void:
 			# `Palette` is a file that does not compile, and a style applied in two commits is a
 			# style that is briefly an error.
 			var pick := payload as Dictionary
-			var alias := str(pick["alias"])
-			after = Edits.set_attribute(before, _menu_row, "style",
-				"%s.%s" % [alias, str(pick["export"])], false)
-			after = Edits.ensure_import(after, _menu_target, str(pick["path"]),
-				PackedStringArray([str(pick["export"])]))
-			what = "Style %s with %s" % [_menu_row.text.strip_edges(), str(pick["export"])]
+			var export_name := str(pick["export"])
+			# THE BINDING the file will actually have, decided before either edit, so the
+			# attribute and the import cannot disagree about what the style is called here.
+			var bind := Edits.bind_export(before, _menu_target, str(pick["path"]), export_name)
+			after = Edits.set_attribute(before, _menu_row, "style", str(bind["binding"]), false)
+			after = str(Edits.bind_export(after, _menu_target, str(pick["path"]), export_name)["text"])
+			what = "Style %s with %s" % [_menu_row.text.strip_edges(), export_name]
 		"remove_attribute":
 			after = Edits.remove_attribute(before, _menu_row, str(payload))
 			what = "Remove %s from %s" % [str(payload), _menu_row.text.strip_edges()]
@@ -2070,6 +2071,11 @@ func drop_library_entry(kind: String, name: String, at: Vector2) -> bool:
 			Edits.insert_setup_line(_buffer_of(card.file_path), card, "var _ = %s()" % name),
 			"add %s" % name)
 
+	# A MODULE from the library: a style module dropped ON AN ELEMENT styles it; anything else,
+	# and a style dropped on the card rather than a row, adds the import alone.
+	if kind == LibraryPane.ENTRY_STYLE or kind == LibraryPane.ENTRY_UTIL 			or kind == LibraryPane.ENTRY_HOOK_MODULE:
+		return drop_module_export(card, hit["row"], kind, name)
+
 	var row: Graph.Line = hit["row"]
 	if row == null or row.kind == Graph.LineKind.IMPORT:
 		return false
@@ -2088,6 +2094,57 @@ func drop_library_entry(kind: String, name: String, at: Vector2) -> bool:
 			Edits.insert(_buffer_of(card.file_path), card, row, Drag.markup_for(name), placement),
 			card.file_path, name),
 		"add <%s>" % name)
+
+
+## The card that exports `name` and is of `kind`, or null.
+func _module_exporting(name: String, kind: int) -> Graph.Card:
+	if graph == null:
+		return null
+	for card in graph.cards:
+		if card.kind == kind and card.exports.has(name):
+			return card
+	return null
+
+
+## A MODULE EXPORT dropped on the canvas.
+##
+## A STYLE DROPPED ON AN ELEMENT IS APPLIED TO IT -- the style attribute is set and the import
+## added, as ONE undoable action. Adding only the import was the version this had: the card gained
+## a line, the preview looked identical, and the styling still had to be typed by hand.
+##
+## THE WRITE ORDER IS LOAD-BEARING. The attribute goes in FIRST, against the row's current source
+## line, because inserting an import at the top of the file shifts every line below it down by one
+## and the row's recorded position would then be off by exactly that.
+##
+## Dropped on the CARD rather than a row it adds the import alone, which is the right answer
+## there -- and the only answer for a util or hook module, which style nothing.
+func drop_module_export(card: Graph.Card, row: Graph.Line, kind: String, name: String) -> bool:
+	if card == null or workspace == null:
+		return false
+	var module_kind := Module.Kind.STYLE
+	if kind == LibraryPane.ENTRY_UTIL:
+		module_kind = Module.Kind.UTIL
+	elif kind == LibraryPane.ENTRY_HOOK_MODULE:
+		module_kind = Module.Kind.HOOK
+	var source_card := _module_exporting(name, module_kind)
+	if source_card == null or Paths.same(source_card.file_path, card.file_path):
+		return false
+
+	var text := _buffer_of(card.file_path)
+	var styleable := kind == LibraryPane.ENTRY_STYLE and row != null 		and (row.kind == Graph.LineKind.ELEMENT or row.kind == Graph.LineKind.COMPONENT)
+
+	# The BINDING, not the export name: a style module and the component it belongs to are named
+	# by two conventions that collapse onto one identifier, so importing `Card` into `Card`
+	# redeclares the file's own name.
+	var bound := Edits.bind_export(text, card.file_path, source_card.file_path, name)
+	var binding := str(bound["binding"])
+
+	if styleable:
+		text = Edits.set_attribute(text, row, "style", binding, false)
+		text = str(Edits.bind_export(text, card.file_path, source_card.file_path, name)["text"])
+		return apply_edit(card.file_path, text,
+			"style %s with %s" % [row.text.strip_edges(), name])
+	return apply_edit(card.file_path, str(bound["text"]), "import %s" % name)
 
 
 ## Re-parents a markup row. The gesture the Unity leg lists as unreliable, and the one this whole
