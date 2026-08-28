@@ -138,6 +138,35 @@ static func shows_detail(lod: Lod) -> bool:
 ##   Layer 1 — Architecture: a pill. Name and kind, nothing else.
 ##   Layer 2 — Cards:        signature, imports, hook chips, MARKUP ROWS.
 ##   Layer 3 — Edit:         adds attributes, code islands and style entry lines.
+## Whether a card HAS a BODY section at all.
+##
+## The model said "not card.body.is_empty() or kind is COMPONENT/HOOK"; the view said
+## `card.kind != 2`, which is every kind except STYLE. For a util, a value or a plain module the
+## two disagreed about whether the section EXISTS -- and this file's whole reason for being is
+## that the height estimate and the hit-test read ONE description. Written twice, they drifted,
+## which is the failure its own class comment warns about.
+static func has_body_section(card: Graph.Card) -> bool:
+	if card == null:
+		return false
+	# A component or a hook has one even when it is empty -- the card offers to add the first hook
+	# there, and an affordance the card declines to show cannot be clicked.
+	return not card.body.is_empty() 		or card.kind == Module.Kind.COMPONENT or card.kind == Module.Kind.HOOK
+
+
+## Whether a card shows a SIGNATURE row.
+static func has_signature_section(card: Graph.Card) -> bool:
+	return card != null and not card.signature.is_empty() and card.kind != Module.Kind.STYLE
+
+
+## Whether a card has an EXPORTS block -- the entry list a style, util or value module carries.
+##
+## The view gated this on `card.kind == 2` (STYLE alone) while the stack builds it from
+## `export_detail`, so a util or value module's exports were never drawn AT ANY ZOOM while the
+## metrics reserved height for them and the hit-test addressed rows inside that height.
+static func has_exports_section(card: Graph.Card) -> bool:
+	return card != null and not card.export_detail.is_empty()
+
+
 static func draws_section(section: int, lod: Lod) -> bool:
 	if lod == Lod.PILL:
 		return false
@@ -227,12 +256,9 @@ static func section_stack(card: Graph.Card) -> Array:
 	if card == null:
 		return out
 	var inner := CARD_WIDTH_SECTIONS - CARD_PADDING
-	# A component or a hook has a body section even when it is empty -- the card offers to add
-	# the first hook there, and an affordance the card declines to show cannot be clicked.
-	var has_body := card.kind == Module.Kind.COMPONENT or card.kind == Module.Kind.HOOK
 	var top := HEADER_H
 
-	if not card.signature.is_empty():
+	if has_signature_section(card):
 		var lines := wrap_lines(card.signature.length(), inner, MONO_ADVANCE)
 		out.append(_section_row(Section.SIGNATURE, top, SIGNATURE_LEAD_H, lines, SIGNATURE_LINE_H))
 		top += SIGNATURE_LEAD_H + lines * SIGNATURE_LINE_H
@@ -240,15 +266,15 @@ static func section_stack(card: Graph.Card) -> Array:
 		out.append(_section_row(Section.IMPORTS, top, SECTION_OVERHEAD_H,
 			card.imports.size(), IMPORT_ROW_H))
 		top += SECTION_OVERHEAD_H + card.imports.size() * IMPORT_ROW_H
-	if not card.body.is_empty() or has_body:
-		var chips := _chip_rows(card, inner, has_body)
+	if has_body_section(card):
+		var chips := _chip_rows(card, inner, has_body_section(card))
 		out.append(_section_row(Section.BODY, top, SECTION_OVERHEAD_H, chips, CHIP_ROW_H))
 		top += SECTION_OVERHEAD_H + chips * CHIP_ROW_H
 	if not card.markup.is_empty():
 		out.append(_section_row(Section.MARKUP, top, SECTION_OVERHEAD_H,
 			card.markup.size(), MARKUP_ROW_H))
 		top += SECTION_OVERHEAD_H + card.markup.size() * MARKUP_ROW_H
-	if not card.export_detail.is_empty():
+	if has_exports_section(card):
 		out.append(_section_row(Section.EXPORTS, top, SECTION_OVERHEAD_H,
 			card.export_detail.size(), MARKUP_ROW_H))
 		top += SECTION_OVERHEAD_H + card.export_detail.size() * MARKUP_ROW_H

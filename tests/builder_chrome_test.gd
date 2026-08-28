@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 341
+const ASSERTION_FLOOR := 345
 
 var _fails := 0
 var _passes := 0
@@ -88,6 +88,7 @@ func _run() -> void:
 	await _test_selection_and_delete()
 	await _test_save_confirms_deletions()
 	await _test_create_placement()
+	await _test_focus_rebinds_when_its_module_goes()
 	await _test_delete_strips_references()
 	await _test_delete_and_undo()
 	await _test_read_only()
@@ -1815,6 +1816,29 @@ func _test_create_placement() -> void:
 ## deletes, and says why: "One entry covers the module AND every reference to it, so a single undo
 ## puts the tree back exactly as it was." The defect register records the refusal as a design
 ## Unity RETIRED. The source is the reference, so the spec line is the stale one.
+## THE FOCUS DOES NOT OUTLIVE THE MODULE IT NAMES.
+##
+## `_focus_path` is a path and `select_module` early-returns on an empty one, so after deleting
+## the focused module the window went on naming a file that no longer exists -- the status bar
+## showed it, the source pane kept its buffer, and the preview compiled against it.
+func _test_focus_rebinds_when_its_module_goes() -> void:
+	_section("deleting the focused module moves the focus to a real one")
+	var w := _window()
+	await process_frame
+	var doomed := ROOT.path_join("app.style.guitkx")
+	w.select_module(doomed)
+	await process_frame
+	_eq(w.focus_path(), doomed, "the companion is focused")
+
+	_check(w.delete_module(doomed), "it deletes")
+	await process_frame
+	_check(w.focus_path() != doomed, "the focus is no longer on it")
+	_check(w.workspace.try_get(w.focus_path()) != null,
+		"and names a module that exists (%s)" % w.focus_path())
+
+	_drop(w)
+
+
 func _test_delete_strips_references() -> void:
 	_section("a module another one imports still deletes")
 	var w := _window()

@@ -792,14 +792,16 @@ func _wire() -> void:
 		if graph == null or index < 0 or index >= graph.cards.size():
 			return
 		_menu_world = world
-		_open_card_menu(graph.cards[index].file_path, get_global_mouse_position()))
+		_open_card_menu(graph.cards[index].file_path,
+			_screen_at(_canvas.position + _canvas.get_local_mouse_position())))
 	_canvas.canvas_context_requested.connect(func(world: Vector2):
 		_menu_world = world
 		# CLEARED: this menu was opened over empty canvas, so "new" means "at the tree root". Left
 		# set, it still names whichever card was right-clicked last, and the module is born inside
 		# a component the user is not even pointing at.
 		_menu_target = ""
-		_canvas_menu.position = Vector2i(get_global_mouse_position())
+		_canvas_menu.position = Vector2i(
+			_screen_at(_canvas.position + _canvas.get_local_mouse_position()))
 		_canvas_menu.popup())
 
 	# CLICKING an entry inserts it into the selected card, which is the keyboard-and-trackpad
@@ -1368,6 +1370,20 @@ func _on_canvas_drop(data: Dictionary, at: Vector2) -> void:
 ## One place, because the menu is now built five different ways and every one of them ended with
 ## the same three lines -- which is exactly how two of them come to disagree about which
 ## coordinate space `at` is in.
+## A LOCAL point in screen coordinates, whichever mode the viewport is in.
+##
+## The row menu used `get_screen_position() + at` and the card and canvas menus used
+## `get_global_mouse_position()`, which is a CanvasItem coordinate -- so two of the four menus
+## were positioned in a different space from the other two, and which one was right depended on
+## whether the host viewport embeds subwindows. It is a real OS window here and an embedded one in
+## a test or a shot, so neither assumption holds everywhere.
+func _screen_at(local: Vector2) -> Vector2:
+	var viewport := get_viewport()
+	if viewport != null and viewport.gui_embed_subwindows:
+		return local
+	return get_screen_position() + local
+
+
 func _show_row_menu(at: Vector2) -> void:
 	_show_row_menu(at)
 
@@ -1500,7 +1516,7 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 			_row_menu.add_separator()
 			_row_menu.add_item("Delete element", RowMenuId.DELETE_ROW)
 
-	_row_menu.position = Vector2i(_canvas.get_screen_position() + at)
+	_row_menu.position = Vector2i(_screen_at(_canvas.position + at))
 	_row_menu.reset_size()
 	_row_menu.popup()
 
@@ -3178,6 +3194,7 @@ func delete_module(file_path: String) -> bool:
 	ledger.record_deletion(file_path, module)
 	ledger.end()
 	reproject()
+	_rebind_focus_if_missing()
 	_source.refresh_from_model()
 	preview.request_refresh()
 	if referrers.is_empty():
@@ -3254,6 +3271,31 @@ func adopt_external_changes() -> void:
 	for path in touched:
 		names.append(str(path).get_file())
 	toast("Reloaded %s from disk." % ", ".join(names))
+
+
+## Re-points the focus when the module it names has gone.
+##
+## `_focus_path` is a PATH, and `select_module` early-returns on an empty one -- so after deleting
+## or aborting the focused module the window went on naming a file that no longer exists: the
+## status bar showed it, the source pane kept its buffer, and the preview compiled against it.
+## Two move routes maintained the focus across a path CHANGE; nothing handled its DISAPPEARANCE.
+func _rebind_focus_if_missing() -> void:
+	if workspace == null or _focus_path.is_empty():
+		return
+	if workspace.try_get(_focus_path) != null:
+		return
+	var paths := PackedStringArray()
+	for module in workspace.modules():
+		paths.append(module.file_path())
+	paths.sort()
+	if paths.is_empty():
+		# Nothing left to focus. The empty state is the honest answer, not a stale name.
+		_focus_path = ""
+		_source.clear()
+		_sync_empty_state()
+		_refresh_status()
+		return
+	select_module(paths[0])
 
 
 func _refresh_status() -> void:

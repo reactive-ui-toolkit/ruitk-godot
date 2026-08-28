@@ -94,7 +94,7 @@ static func CanvasCardHeader(props: Dictionary, children: Array) -> RuitkVNode:
 		for __cf0_once in 1:
 			__cf0 = V.Label({ "text": "read-only", "style": P.read_only() })
 			continue
-	return V.PanelContainer({ "style": P.card_header_band(tint), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.HBoxContainer({ "style": {"separation": 6}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.PanelContainer({ "style": P.kind_badge(tint), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.Label({ "text": Model.kind_word(int(card.kind)), "style": P.pill_badge_text(tint) if lod == M.Lod.PILL else P.kind_badge_text(tint) })]), V.Label({ "text": card.title, "style": P.pill_title() if lod == M.Lod.PILL else P.title() }), __cf0])])
+	return V.PanelContainer({ "style": P.card_header_band(tint), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.HBoxContainer({ "style": {"separation": 6}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.PanelContainer({ "style": P.kind_badge(tint), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.Label({ "text": Model.kind_word(int(card.kind)), "style": P.pill_badge_text(tint) if lod == M.Lod.PILL else P.kind_badge_text(tint) })]), V.Label({ "text": card.title, "style": P.pill_title() if lod == M.Lod.PILL else P.title(), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS, "size_flags_horizontal": Control.SIZE_EXPAND_FILL }), __cf0])])
 
 # component CanvasCardSections
 static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode:
@@ -115,7 +115,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 	var draws_exports = M.draws_section(M.Section.EXPORTS, lod)
 	var draws_island = M.draws_section(M.Section.ISLAND, lod)
 	var __cf0 = null
-	if card.signature != "" and card.kind != 2:
+	if M.has_signature_section(card):
 		for __cf0_once in 1:
 			__cf0 = V.Label({ "text": card.signature, "style": P.signature(), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS })
 			continue
@@ -130,7 +130,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 			__cf1 = V.fc(CanvasCardSection, { "heading": "IMPORTS" }, [__cf2])
 			continue
 	var __cf3 = null
-	if card.kind != 2:
+	if M.has_body_section(card):
 		for __cf3_once in 1:
 			var __cf4: Array = []
 			for i in range(card.body.size()):
@@ -150,7 +150,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 			__cf5 = V.fc(CanvasCardSection, { "heading": "RETURN — MARKUP" }, [__cf6])
 			continue
 	var __cf7 = null
-	if draws_exports and card.kind == 2:
+	if draws_exports and M.has_exports_section(card):
 		for __cf7_once in 1:
 			var __cf8: Array = []
 			for i in range(card.export_detail.size()):

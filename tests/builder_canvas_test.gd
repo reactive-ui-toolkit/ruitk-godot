@@ -33,7 +33,7 @@ const VIEWPORT := Vector2(1280, 720)
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 171
+const ASSERTION_FLOOR := 179
 
 var _fails := 0
 var _passes := 0
@@ -48,6 +48,7 @@ func _run() -> void:
 	Layout.clear_all()
 	_graph = _build_graph()
 
+	_test_section_predicates_are_shared()
 	_test_hit_test_matches_what_is_drawn()
 	_test_hook_usage_highlighting()
 	_test_lod_bands()
@@ -144,6 +145,47 @@ func _card(name: String) -> Graph.Card:
 ## its title bar kept working, because the title bar is inside the short rect.
 ##
 ## Layer 2 is the layer a tree opens at, so this was the first thing anyone met.
+## THE VIEW AND THE METRICS MUST AGREE ABOUT WHICH SECTIONS A CARD HAS.
+##
+## They did not: the model asked "body is non-empty, or the kind is COMPONENT/HOOK"; the view
+## asked `card.kind != 2` -- every kind except STYLE. So for a util, a value or a plain module the
+## two disagreed about whether the section exists, and the EXPORTS block of those kinds was never
+## drawn at any zoom while the metrics reserved height for it and the hit-test addressed rows
+## inside that height.
+func _test_section_predicates_are_shared() -> void:
+	_section("a component and a hook always have a body")
+	for kind in [Module.Kind.COMPONENT, Module.Kind.HOOK]:
+		var card := Graph.Card.new()
+		card.kind = kind
+		_check(Metrics.has_body_section(card),
+			"kind %d has one even when empty -- the card offers to add the first hook" % int(kind))
+
+	_section("a style module does not, and does not show a signature")
+	var style := Graph.Card.new()
+	style.kind = Module.Kind.STYLE
+	style.signature = "Palette"
+	_check(not Metrics.has_body_section(style), "no body")
+	_check(not Metrics.has_signature_section(style), "and no signature row")
+
+	_section("a util has a body only when it has one, and exports when it declares them")
+	var util := Graph.Card.new()
+	util.kind = Module.Kind.UTIL
+	_check(not Metrics.has_body_section(util), "an empty util has no body section")
+	_check(not Metrics.has_exports_section(util), "and no exports block")
+	util.export_detail = [_line(Graph.LineKind.EXPORT, "clamp01")]
+	_check(Metrics.has_exports_section(util),
+		"but it DOES once it declares one -- gated on STYLE alone, this was never drawn")
+
+	_section("and the stack agrees with the predicates")
+	# The stack is what the height estimate and the hit-test both read, so a section the
+	# predicates claim must actually be in it.
+	var sections := {}
+	for entry in Metrics.section_stack(util):
+		sections[int((entry as Dictionary)["section"])] = true
+	_check(sections.has(int(Metrics.Section.EXPORTS)),
+		"the util's exports section is in the stack")
+
+
 func _test_hit_test_matches_what_is_drawn() -> void:
 	_section("every reportable row is inside the card the mouse can hit")
 	var card := _card_with_everything()

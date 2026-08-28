@@ -140,7 +140,9 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 				<Label text={ Model.kind_word(int(card.kind)) }
 					style={ P.pill_badge_text(tint) if lod == M.Lod.PILL else P.kind_badge_text(tint) } />
 			</PanelContainer>
-			<Label text={ card.title } style={ P.pill_title() if lod == M.Lod.PILL else P.title() } />
+			<Label text={ card.title } style={ P.pill_title() if lod == M.Lod.PILL else P.title() }
+				clip_text={ true } text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS }
+				size_flags_horizontal={ Control.SIZE_EXPAND_FILL } />
 			@if (card.read_only) {
 				return (
 					<Label text="read-only" style={ P.read_only() } />
@@ -171,7 +173,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 
 	return (
 		<VBoxContainer style={ {"separation": 4} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
-			@if (card.signature != "" and card.kind != 2) {
+			@if (M.has_signature_section(card)) {
 				return (
 					<Label text={ card.signature } style={ P.signature() } clip_text={ true }
 						text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
@@ -193,7 +195,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 					</CanvasCardSection>
 				)
 			}
-			@if (card.kind != 2) {
+			@if (M.has_body_section(card)) {
 				return (
 					<CanvasCardSection heading="BODY — HOOKS & STATE">
 						<HFlowContainer style={ {"separation": 4} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
@@ -228,7 +230,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 					</CanvasCardSection>
 				)
 			}
-			@if (draws_exports and card.kind == 2) {
+			@if (draws_exports and M.has_exports_section(card)) {
 				return (
 					<CanvasCardSection heading="EXPORTS">
 						@for (i in range(card.export_detail.size())) {
