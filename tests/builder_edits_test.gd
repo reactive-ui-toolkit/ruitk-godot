@@ -25,7 +25,7 @@ const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/docum
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 239
+const ASSERTION_FLOOR := 256
 
 var _fails := 0
 var _passes := 0
@@ -40,6 +40,8 @@ func _initialize() -> void:
 	_test_directive_headers()
 	_test_wrap_in_directive()
 	_test_clauses()
+	_test_delete_clause_positions()
+	_test_unwrap_is_refused_where_it_would_corrupt()
 	_test_unwrap()
 	_test_wrap_variants()
 	_test_island()
@@ -802,6 +804,83 @@ const IF_SRC := "export App(flag: bool = true) -> RuitkVNode {
 	)
 }
 "
+
+## A THREE-CLAUSE CONSTRUCT, so a MIDDLE clause exists to delete. The suite only ever deleted the
+## last one, where "remove head..close inclusive" happens to be right.
+const THREE_SRC := """export App(count: int = 0) -> RuitkVNode {
+	return (
+		<VBoxContainer>
+			@if (count > 5) {
+				return (
+					<Label text="a" />
+				)
+			} @elif (count > 2) {
+				return (
+					<Label text="b" />
+				)
+			} @else {
+				return (
+					<Label text="c" />
+				)
+			}
+		</VBoxContainer>
+	)
+}
+"""
+
+
+## DELETING A CLAUSE MUST LEAVE A FILE THAT COMPILES -- first, middle or last.
+func _test_delete_clause_positions() -> void:
+	_section("deleting the MIDDLE clause keeps the next clause's head")
+	# A continuation's close IS the next clause's head line in the shared form, so removing
+	# head..close inclusive deleted `} @else {` too and orphaned its body.
+	var elif_row := _directive(THREE_SRC, "@elif")
+	_check(elif_row != null, "the @elif is a row")
+	var without_elif := Edits.delete_clause(THREE_SRC, elif_row)
+	_check(not without_elif.contains("count > 2"), "the clause is gone")
+	_check(without_elif.contains("@else"), "and the @else survives it")
+	_check(without_elif.contains("text=\"c\""), "with its body still attached")
+	var mid: Dictionary = Compiler.compile(without_elif, "App")
+	_check(bool(mid["ok"]), "and the file compiles (got %s)" % str(mid.get("diagnostics", [])))
+
+	_section("deleting the LAST clause still works")
+	var else_row := _directive(THREE_SRC, "@else")
+	var without_else := Edits.delete_clause(THREE_SRC, else_row)
+	_check(not without_else.contains("text=\"c\""), "the else body is gone")
+	var last: Dictionary = Compiler.compile(without_else, "App")
+	_check(bool(last["ok"]), "and the file compiles (got %s)" % str(last.get("diagnostics", [])))
+
+	_section("a head is not a clause you can delete this way")
+	var head_row := _directive(THREE_SRC, "@if")
+	_eq(head_row.clause_index, 0, "the @if is the construct head")
+
+
+## UNWRAP IS OFFERED ONLY WHERE IT IS SOUND. It splices a construct's body up a level, which is
+## true only for a single-clause, non-match HEAD.
+func _test_unwrap_is_refused_where_it_would_corrupt() -> void:
+	_section("a multi-clause construct refuses it")
+	var three := _card(THREE_SRC)
+	var head := _directive(THREE_SRC, "@if")
+	_check(not Edits.is_single_clause(three, head), "the @if has continuations")
+	_check(not Edits.can_unwrap(three, head), "so unwrap is refused on the head")
+	_check(not Edits.can_unwrap(three, _directive(THREE_SRC, "@elif")),
+		"and on a continuation")
+	_check(not Edits.can_unwrap(three, _directive(THREE_SRC, "@else")), "and on the @else")
+
+	_section("a lone @if allows it")
+	var lone := _card(IF_SRC)
+	var lone_head := _directive(IF_SRC, "@if")
+	_check(Edits.is_single_clause(lone, lone_head), "one clause")
+	_check(Edits.can_unwrap(lone, lone_head), "so unwrap is offered")
+	var unwrapped := Edits.unwrap_directive(IF_SRC, lone_head)
+	_check(unwrapped != IF_SRC, "and it does something")
+	var ok: Dictionary = Compiler.compile(unwrapped, "App")
+	_check(bool(ok["ok"]), "producing a file that compiles (got %s)" % str(ok.get("diagnostics", [])))
+
+	_section("and the operation refuses a continuation even if a caller offers it")
+	_eq(Edits.unwrap_directive(THREE_SRC, _directive(THREE_SRC, "@else")), THREE_SRC,
+		"unwrap_directive is its own last line of defence")
+
 
 func _test_clauses() -> void:
 	_section("an @if grows an @else, and the file still balances")

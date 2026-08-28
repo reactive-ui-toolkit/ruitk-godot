@@ -1118,7 +1118,12 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 			_row_menu.add_item("Add @elif", RowMenuId.ADD_ELSE_IF)
 			_row_menu.add_item("Add @else", RowMenuId.ADD_ELSE)
 		_row_menu.add_separator()
-		_row_menu.add_item("Remove %s, keep its contents" % row.badge_text, RowMenuId.UNWRAP)
+		# OFFERED ONLY WHERE IT IS SAFE. Unwrap splices a construct's body up a level, which is
+		# only sound for a single-clause, non-match HEAD -- from anywhere else it corrupts the
+		# brace balance and produces a file that does not compile. This was offered on every
+		# directive row, and four of the six kinds broke.
+		if Edits.can_unwrap(card, row):
+			_row_menu.add_item("Remove %s, keep its contents" % row.badge_text, RowMenuId.UNWRAP)
 		if row.clause_index > 0:
 			_row_menu.add_item("Delete this %s clause" % row.badge_text, RowMenuId.DELETE_CLAUSE)
 		_row_menu.add_item("Delete " + row.badge_text, RowMenuId.DELETE_ROW)

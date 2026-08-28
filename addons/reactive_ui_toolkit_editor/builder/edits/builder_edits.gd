@@ -643,17 +643,104 @@ static func delete_clause(source: String, row: Graph.Line) -> String:
 		return source
 
 	var shared_head := str(lines[head]).strip_edges().begins_with("}")
+	# IS THE CLOSING LINE ACTUALLY THE NEXT CLAUSE'S HEAD?
+	#
+	# For a MIDDLE clause it is: a continuation's close is its body's close, and in the shared form
+	# the brace that closes an @elif's body is the `} @else {` line itself. Removing head..close
+	# INCLUSIVE therefore deleted the next clause's head along with the clause the user asked to
+	# delete, leaving its body orphaned in the middle of the markup. Only a LONE closer may be
+	# removed with the range.
+	var next_is_head := _line_opens_clause(str(lines[close]))
+	var last := close - 1 if next_is_head else close
+
 	var out := PackedStringArray()
 	for i in range(lines.size()):
-		if i >= head and i <= close:
+		if i >= head and i <= last:
 			continue
 		out.append(str(lines[i]))
-	# A SHARED head carried the previous clause's closing brace away with it, so one has to go
-	# back; a SEPARATE head carried nothing, and adding one would unbalance the file the other way.
-	if shared_head:
+
+	if next_is_head:
+		# The surviving head keeps the brace balance of the clause it now follows. A SEPARATE
+		# clause deleted from in front of a SHARED next head leaves that head's leading `}`
+		# closing a body that no longer exists.
+		if not shared_head:
+			var at := head
+			if at < out.size():
+				var survivor := str(out[at])
+				var trimmed := survivor.strip_edges()
+				if trimmed.begins_with("}"):
+					out[at] = _indent_of_line(survivor) + trimmed.substr(1).strip_edges()
+	elif shared_head:
+		# A SHARED head carried the previous clause's closing brace away with it, so one has to go
+		# back; a SEPARATE head carried nothing, and adding one would unbalance the file the other
+		# way.
 		out.insert(head, _indent_of_line(str(lines[head])) + "}")
 	return "
 ".join(out)
+
+
+## Whether a source line opens a directive clause -- `@else {`, `} @elif (x) {`, `@case (1) {`.
+##
+## Asked of the line rather than of the projection, because `delete_clause` is a pure text edit
+## and must not need a card to be correct.
+static func _line_opens_clause(line: String) -> bool:
+	var text := line.strip_edges()
+	if text.begins_with("}"):
+		text = text.substr(1).strip_edges()
+	return text.begins_with("@")
+
+
+## Whether `row`'s construct has exactly one clause.
+##
+## Unwrapping REMOVES A CONSTRUCT HEAD and splices its body up a level, which assumes the head is
+## the only thing holding the braces. On a multi-clause construct the brace walk stops at the
+## `} @else {` line, so the head is deleted and a dangling clause is left behind. Unity refuses
+## the operation for exactly this reason and says so; this port offered it on every directive row.
+##
+## The clauses of a construct are the DIRECTIVE rows that follow the head at its own depth with a
+## rising `clause_index`; the body sits deeper and is skipped.
+static func is_single_clause(card: Graph.Card, row: Graph.Line) -> bool:
+	if card == null or row == null:
+		return true
+	# FOUND BY SOURCE POSITION, not by object identity. A `Line` handed in from an earlier
+	# projection is a different object from the one in this card even when it names the same
+	# construct, and identity matching would quietly answer "single clause" for every caller
+	# holding a row that is one edit old.
+	var at := -1
+	for i in card.markup.size():
+		var candidate: Graph.Line = card.markup[i]
+		if candidate == row or (row.directive_line > 0 				and candidate.directive_line == row.directive_line):
+			at = i
+			break
+	if at < 0:
+		return true
+	for i in range(at + 1, card.markup.size()):
+		var other: Graph.Line = card.markup[i]
+		if other.depth > row.depth:
+			continue          # the clause body
+		if other.depth < row.depth:
+			return true       # left the construct entirely
+		if other.kind == Graph.LineKind.DIRECTIVE and other.clause_index > row.clause_index:
+			return false      # a continuation: @elif / @else / another @case
+		return true
+	return true
+
+
+## Whether a row may be unwrapped at all.
+##
+## Three refusals, all Unity's: never from a CONTINUATION (the unwrap assumes it starts at a
+## construct head and corrupts the brace balance from a clause line), never a `@match` (its body
+## is clauses, not markup, so splicing it up a level leaves bare `@case`es), and never a
+## multi-clause construct.
+static func can_unwrap(card: Graph.Card, row: Graph.Line) -> bool:
+	if row == null or row.kind != Graph.LineKind.DIRECTIVE:
+		return false
+	if row.clause_index > 0:
+		return false
+	if row.badge == Graph.Badge.MATCH or row.badge == Graph.Badge.CASE \
+			or row.badge == Graph.Badge.DEFAULT:
+		return false
+	return is_single_clause(card, row)
 
 
 ## Every directive a row can be wrapped in, and the header each one is seeded with.
@@ -773,6 +860,11 @@ static func set_island(source: String, row_start: int, row_end: int, text: Strin
 ## clause the user has been editing may not agree with the projection yet, and unwrapping to the
 ## wrong line takes a chunk of unrelated markup with it.
 static func unwrap_directive(source: String, row: Graph.Line) -> String:
+	# REFUSED FROM A CONTINUATION even when a caller offers it: this walks braces from a construct
+	# head, and from an `@else` line the head's own `}` and `{` cancel, so the walk stops on the
+	# very next line and takes the body's `return (` with it.
+	if row != null and row.clause_index > 0:
+		return source
 	if row == null or row.directive_line <= 0:
 		return source
 	var lines := source.split("
