@@ -2388,6 +2388,45 @@ func tree_root() -> String:
 	return best if not best.is_empty() else Workspace.UNSAVED_ROOT
 
 
+## Where a module is born when the gesture named no parent -- an empty canvas, or the library.
+##
+## `tree_root()` BARE was the answer, and it drops the folder convention the rest of the builder
+## is built around: a component belongs in `components/<name>/` so it can own a folder and take
+## children, and a companion belongs beside the component it companions. Unity's `BirthPathFor`
+## makes the same three distinctions and calls the convention "a DEFAULT, not a rule -- nothing
+## re-places a module afterwards, so the folder view can put anything anywhere and the convention
+## will not argue with it".
+func _birth_folder(kind: int, name: String) -> String:
+	var root := tree_root()
+	# THE FIRST MODULE OF A NEW TREE OWNS ITS FOLDER rather than nesting under a `components`
+	# directory that has nothing above it.
+	if workspace == null or workspace.modules().is_empty():
+		return Workspace.UNSAVED_ROOT.path_join(name) if not name.is_empty() 			else Workspace.UNSAVED_ROOT
+	if kind == Module.Kind.COMPONENT:
+		return root.path_join("components").path_join(name) if not name.is_empty() 			else root.path_join("components")
+	# A COMPANION NAMED AFTER A COMPONENT JOINS IT, wherever that component lives -- the family
+	# rule, kept as the fallback now that creating FROM a card states the parent outright.
+	var family := _family_owner(name)
+	return family if not family.is_empty() else root
+
+
+## The folder of the COMPONENT a companion of this name belongs to, or "".
+##
+## Nearest to the focus wins when more than one carries the family name, and an exact tie falls to
+## the ordinally-smallest path so the answer does not depend on the order the tree was loaded in.
+func _family_owner(name: String) -> String:
+	if workspace == null or name.is_empty():
+		return ""
+	var best := ""
+	for module in workspace.modules():
+		if module.kind != Module.Kind.COMPONENT or module.name.to_lower() != name.to_lower():
+			continue
+		var folder: String = module.folder
+		if best.is_empty() or folder < best:
+			best = folder
+	return best
+
+
 ## Whether a create menu may be offered over `card_path` at all.
 ##
 ## A COMPANION card offers none (capability reference §5). A style or util module has no children:
@@ -2423,7 +2462,7 @@ func can_create_at(card_path: String) -> bool:
 func _create_folder(kind: int = Module.Kind.COMPONENT, name := "") -> String:
 	var over := _menu_target
 	if over.is_empty() or workspace == null:
-		return tree_root()
+		return _birth_folder(kind, name)
 	var parent := workspace.try_get(over)
 	if parent == null or parent.kind != Module.Kind.COMPONENT:
 		return tree_root()

@@ -54,6 +54,8 @@ const PARITY := [
 	["NewFile / ShowCreatePrompt", "func prompt_create"],
 	["ValidateNewName", "func _validate_name"],
 	["CreateModule", "func _create_named"],
+	["BirthPathFor (the folder convention)", "func _birth_folder"],
+	["FamilyOwnerFor", "func _family_owner"],
 	["ShowRenamePrompt", "CardMenuId.RENAME"],
 	["RenameTargetPath (shared by prompt and rename)", "func rename_target"],
 	["RenameModule (export + bindings + uses)", "func rename_export"],

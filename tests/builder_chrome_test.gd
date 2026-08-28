@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 345
+const ASSERTION_FLOOR := 346
 
 var _fails := 0
 var _passes := 0
@@ -175,6 +175,33 @@ func _window() -> BuilderWindow:
 	w.reproject()
 	w.select_module(ROOT.path_join("app.guitkx"))
 	return w
+
+
+## Every file under a folder, one level deep -- for a message that says what IS there when an
+## assertion about what should be there fails.
+## Removes a directory and everything under it.
+func _purge(dir: String) -> void:
+	var handle := DirAccess.open(dir)
+	if handle == null:
+		return
+	for file in handle.get_files():
+		DirAccess.remove_absolute(dir.path_join(file))
+	for sub in handle.get_directories():
+		_purge(dir.path_join(sub))
+	DirAccess.remove_absolute(dir)
+
+
+func _files_under(dir: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	var handle := DirAccess.open(dir)
+	if handle == null:
+		return out
+	for file in handle.get_files():
+		out.append(file)
+	for sub in handle.get_directories():
+		for file in _files_under(dir.path_join(sub)):
+			out.append(sub + "/" + file)
+	return out
 
 
 func _drop(w: BuilderWindow) -> void:
@@ -480,7 +507,7 @@ func _test_unplaced_tree_is_placed_before_written() -> void:
 		"a name is accepted with no tree open")
 	_check(not w._validate_name(Module.Kind.COMPONENT, "Fresh").is_empty(),
 		"and PascalCase is refused -- that is the export's convention, not the file's")
-	var made: String = w._create_named(Module.Kind.COMPONENT, "Fresh")
+	var made: String = w._create_named(Module.Kind.COMPONENT, "fresh")
 	_check(made.begins_with(Workspace.UNSAVED_ROOT),
 		"a first module is born at the provisional root (%s)" % made)
 	_eq(w.workspace.unlocated_modules().size(), 1, "and the workspace knows it is unplaced")
@@ -493,15 +520,19 @@ func _test_unplaced_tree_is_placed_before_written() -> void:
 	_check(w._place_tree_in(PLACED_ROOT), "placing it succeeds")
 	_eq(w.workspace.unlocated_modules().size(), 0, "nothing is unplaced any more")
 	_check(w.save() > 0, "and now Save writes")
-	_check(FileAccess.file_exists(PLACED_ROOT.path_join("Fresh.guitkx")),
-		"where the user asked, not under the provisional root")
+	# THE FIRST MODULE OF A NEW TREE OWNS ITS FOLDER -- Unity's `asRoot` case -- so the relative
+	# shape carried into the chosen folder is `fresh/fresh.guitkx`, not a bare file. `_place_tree_in`
+	# preserves that shape on purpose: a component and the folder it owns were arranged that way.
+	_check(FileAccess.file_exists(PLACED_ROOT.path_join("fresh/fresh.guitkx")),
+		"where the user asked, keeping the shape it had (%s)"
+			% ", ".join(_files_under(PLACED_ROOT)))
 
 	_drop(w)
-	# Cleaned up by hand: this suite has no rm helper, and a tree left behind makes the next run
-	# of this section fail on "already there" rather than on anything it is testing.
-	for name in ["Fresh.guitkx", "Fresh.guitkx.uid", "Fresh.gd", "Fresh.gd.uid"]:
-		DirAccess.remove_absolute(PLACED_ROOT.path_join(name))
-	DirAccess.remove_absolute(PLACED_ROOT)
+	# Cleaned up by hand, and RECURSIVELY: this suite has no rm helper, and a tree left behind
+	# makes the next run fail on "already there" rather than on anything it is testing. The old
+	# version named four files at the root and the module now owns a FOLDER, so it left one --
+	# and on a case-insensitive filesystem `Fresh/` then collided with `fresh/`.
+	_purge(PLACED_ROOT)
 
 
 ## Where the placement test puts its tree.
@@ -1776,10 +1807,23 @@ func _test_create_placement() -> void:
 	await process_frame
 	_eq(w.tree_root(), ROOT, "the shallowest folder any module lives in")
 
-	_section("over empty canvas, a module is born at the tree root")
+	_section("over empty canvas, the FOLDER CONVENTION still applies")
+	# Checked against Unity's `BirthPathFor`, not the capability document: the spec's table says
+	# "empty canvas -> tree root", and `BuilderWindow.cs:6440` says
+	# `PathFor(root, "Component", name)` -- which nests under `components/<name>/` so the module
+	# can own a folder and take children. A bare root drops the convention the rest of the builder
+	# is built around. Unity calls it "a DEFAULT, not a rule": nothing re-places a module
+	# afterwards, so the folder view can still put it anywhere.
 	w._menu_target = ""
-	_eq(w._create_folder(Module.Kind.COMPONENT, "Panel"), ROOT, "a component goes to the root")
-	_eq(w._create_folder(Module.Kind.STYLE, "panel"), ROOT, "and so does a companion")
+	_eq(w._create_folder(Module.Kind.COMPONENT, "panel"), ROOT.path_join("components/panel"),
+		"a component owns a folder under components/")
+	_eq(w._create_folder(Module.Kind.STYLE, "nothing_matches_this"), ROOT,
+		"a companion with no family owner lands at the root")
+
+	_section("and a companion joins the component it is named after")
+	_eq(w._create_folder(Module.Kind.STYLE, "row"),
+		ROOT.path_join("components/row"),
+		"row.style.guitkx belongs beside row.guitkx, wherever that lives")
 
 	_section("over a component card, a component becomes its CHILD")
 	w._menu_target = ROOT.path_join("app.guitkx")
