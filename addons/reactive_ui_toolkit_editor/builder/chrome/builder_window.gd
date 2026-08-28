@@ -665,6 +665,13 @@ func _tool_button(label: String, id: int) -> Button:
 
 func _wire() -> void:
 	_folders.module_selected.connect(select_module)
+	# Re-filing from the pane goes through the SAME two operations the canvas and the card menu
+	# use, so a move made by dragging in the tree and one made any other way produce the same
+	# ledger entry and the same importer rewrites.
+	_folders.refile_requested.connect(func(what: String, path: String, into: String):
+		var moved := move_folder(path, into) if what == "folder" else place_module(path, into)
+		if not moved:
+			toast("Couldn't move %s into %s." % [path.get_file(), into.get_file()]))
 	_folders.module_activated.connect(func(path: String):
 		select_module(path)
 		_canvas.select_card(graph.index_of(path) if graph != null else -1))
@@ -1645,6 +1652,36 @@ func move_folder(source_folder: String, target_folder: String) -> bool:
 
 
 ## One module carrying its own folder.
+## Re-files ONE module into `target_folder`, as one ledger entry.
+##
+## The folder pane's drop lands here; the card menu's move and the canvas drop land in the same
+## place by other routes. A module that owns its folder carries it, which `place_at` handles.
+func place_module(module_path: String, target_folder: String) -> bool:
+	if workspace == null:
+		return false
+	var module := workspace.try_get(module_path)
+	if module == null or module.read_only:
+		return false
+	if Paths.same(module.folder, target_folder):
+		return false
+	var destination := Paths.canon(target_folder.path_join(module_path.get_file()))
+	ledger.begin("Move %s" % module_path.get_file())
+	var snapshot := workspace.capture_imports()
+	var ok := _move_one(module, target_folder, module_path.get_file())
+	if ok:
+		# RECORDED, so the move is undoable like every other structural edit. `_move_one` is the
+		# shared mechanics of moving; the ledger entry belongs to the ACTION, which is what the
+		# user would press Ctrl+Z about.
+		ledger.record_move(module_path, destination)
+		workspace.reconcile_imports(snapshot)
+	ledger.end()
+	if ok:
+		reproject()
+		_source.refresh_from_model()
+		preview.request_refresh()
+	return ok
+
+
 func _move_one(module, target_folder: String, leaf: String) -> bool:
 	var moved := workspace.place_at(module, target_folder)
 	if moved.is_empty():

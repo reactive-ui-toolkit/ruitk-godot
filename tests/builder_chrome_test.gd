@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 225
+const ASSERTION_FLOOR := 239
 
 var _fails := 0
 var _passes := 0
@@ -64,6 +64,8 @@ func _run() -> void:
 	await _test_inline_editor()
 	await _test_one_funnel()
 	await _test_undo_across_files()
+	await _test_folder_pane_refiles()
+	await _test_folder_pane_drop_rules()
 	await _test_opens_at_layer_two()
 	await _test_selection_and_delete()
 	await _test_save_confirms_deletions()
@@ -891,6 +893,60 @@ func _test_undo_across_files() -> void:
 ## Not fitted: a fit picks whatever zoom frames the whole graph, so the layer the user lands in
 ## depends on how many modules they have -- five cards opened at a third of Layer 2's size with
 ## the toolbar confidently reading "Layer 2 — Cards" beside cards nobody could read.
+## DRAGGING A FILE OR A FOLDER ONTO ANOTHER FOLDER RE-FILES IT -- the only gesture that moves
+## anything. The pane could start such a drag and had no way to receive one, so its own doc
+## comment described a gesture that ended nowhere.
+func _test_folder_pane_refiles() -> void:
+	_section("a module dropped on a folder is re-filed into it")
+	var w := _window()
+	await process_frame
+	var moved := w.place_module(ROOT.path_join("app.style.guitkx"),
+		ROOT.path_join("components/row"))
+	_check(moved, "the move is accepted")
+	_check(w.workspace.try_get(ROOT.path_join("components/row/app.style.guitkx")) != null,
+		"and the module is at its new path")
+	_check(w.workspace.try_get(ROOT.path_join("app.style.guitkx")) == null,
+		"and no longer at the old one")
+
+	_section("a move that changes nothing is refused")
+	_check(not w.place_module(ROOT.path_join("components/row/app.style.guitkx"),
+		ROOT.path_join("components/row")), "dropping a module in the folder it already lives in")
+
+	_section("and the move is one undoable action")
+	_check(w.ledger.can_undo(), "so it can be taken back")
+	_check(w.undo(), "undo runs")
+	await process_frame
+	_check(w.workspace.try_get(ROOT.path_join("app.style.guitkx")) != null,
+		"and the module is home again")
+
+	_drop(w)
+
+
+## The pane's own drop rules, asked directly: which drags a folder row accepts.
+func _test_folder_pane_drop_rules() -> void:
+	_section("a folder cannot land in itself or its own subtree")
+	var w := _window()
+	await process_frame
+	var pane := w.folder_pane()
+
+	var parent := ROOT.path_join("components")
+	var child := ROOT.path_join("components/row")
+	_eq(pane._drop_target_for(
+		{ "source": "folder", "path": parent }, parent), "", "not into itself")
+	_eq(pane._drop_target_for(
+		{ "source": "folder", "path": parent }, child), "", "and not into its own subtree")
+	_eq(pane._drop_target_for({ "source": "folder", "path": child }, parent), "",
+		"and not into the folder it already sits in")
+	_eq(pane._drop_target_for({ "source": "folder", "path": child }, ROOT), ROOT,
+		"but moving it up a level is a real move")
+	_eq(pane._drop_target_for({ "source": "module", "path": ROOT.path_join("app.guitkx") }, child),
+		child, "a module into a different folder is fine")
+	_eq(pane._drop_target_for({ "source": "nonsense", "path": "x" }, child), "",
+		"and an unknown payload is refused")
+
+	_drop(w)
+
+
 func _test_opens_at_layer_two() -> void:
 	_section("no saved layout")
 	# Cleared FIRST, and by MEMBERSHIP. The layout store lives under `user://` and outlives the
@@ -1124,12 +1180,18 @@ func _tree_rows(pane: FolderPane) -> Array:
 	return out
 
 
+## The MODULE rows of the pane, in tree order.
+##
+## A module carries its path as a plain String and a folder carries `{ "folder": path }`, so the
+## two are told apart by TYPE. Collecting "everything with metadata" gathered folder rows too the
+## moment folders became drop targets.
 func _collect_rows(item: TreeItem, out: Array) -> void:
 	if item == null:
 		return
 	var child := item.get_first_child()
 	while child != null:
-		if child.get_metadata(0) != null and not str(child.get_metadata(0)).is_empty():
+		var meta: Variant = child.get_metadata(0)
+		if meta != null and not (meta is Dictionary) and not str(meta).is_empty():
 			out.append(child)
 		_collect_rows(child, out)
 		child = child.get_next()

@@ -22,6 +22,15 @@ signal module_selected(file_path: String)
 signal module_activated(file_path: String)
 signal module_context_requested(file_path: String, at: Vector2)
 
+## Something was dropped onto a FOLDER row. `what` is "module" or "folder" and `path` is what was
+## dragged; `into` is the folder it landed on.
+##
+## DRAGGING A FILE OR A FOLDER ONTO ANOTHER FOLDER RE-FILES IT, and the capability reference calls
+## this "the only gesture that moves anything". The pane could START such a drag -- its own doc
+## comment said "onto another folder row to move it" -- and had no way to RECEIVE one, so the
+## sentence described a gesture that ended nowhere.
+signal refile_requested(what: String, path: String, into: String)
+
 ## What each kind's row is marked with. Text, not editor icons: the pane is built headlessly in
 ## the suites, where `EditorInterface` has no theme to ask.
 const KIND_GLYPH := {
@@ -81,13 +90,70 @@ func _get_drag_data(at_position: Vector2) -> Variant:
 	var item := get_item_at_position(at_position)
 	if item == null:
 		return null
-	var path := str(item.get_metadata(0))
-	if path.is_empty():
-		return null
+	var meta: Variant = item.get_metadata(0)
+	var payload := {}
+	var label := ""
+	if meta is Dictionary and (meta as Dictionary).has("folder"):
+		var folder := str((meta as Dictionary)["folder"])
+		payload = { "source": "folder", "path": folder }
+		label = folder.get_file()
+	else:
+		var path := str(meta)
+		if path.is_empty():
+			return null
+		payload = { "source": "module", "path": path }
+		label = path.get_file()
 	var ghost := Label.new()
-	ghost.text = path.get_file()
+	ghost.text = label
 	set_drag_preview(ghost)
-	return { "source": "module", "path": path }
+	return payload
+
+
+## Only a FOLDER row takes a drop, and never one onto itself or into its own subtree.
+func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
+	return not _drop_target(at_position, data).is_empty()
+
+
+func _drop_data(at_position: Vector2, data: Variant) -> void:
+	var into := _drop_target(at_position, data)
+	if into.is_empty():
+		return
+	var spec := data as Dictionary
+	refile_requested.emit(str(spec["source"]), str(spec["path"]), into)
+
+
+## The folder `data` would land in, or "" when this is not a legal drop.
+func _drop_target(at_position: Vector2, data: Variant) -> String:
+	var item := get_item_at_position(at_position)
+	if item == null:
+		return ""
+	var meta: Variant = item.get_metadata(0)
+	if not (meta is Dictionary) or not (meta as Dictionary).has("folder"):
+		return ""
+	return _drop_target_for(data, str((meta as Dictionary)["folder"]))
+
+
+## THE RULE ALONE, with the row lookup taken out of it: whether `data` may land in `into`.
+##
+## Separated so the rule can be asked a question without a laid-out Tree to hit-test against --
+## these are the cases that produce a move with no destination, and they are worth pinning
+## somewhere cheaper than a mouse position.
+func _drop_target_for(data: Variant, into: String) -> String:
+	if not (data is Dictionary) or into.is_empty():
+		return ""
+	var spec := data as Dictionary
+	var source := str(spec.get("source", ""))
+	var dragged := str(spec.get("path", ""))
+	if dragged.is_empty() or (source != "module" and source != "folder"):
+		return ""
+	if source == "module":
+		# Already there is not a move.
+		return "" if Paths.same(dragged.get_base_dir(), into) else into
+	# A FOLDER CANNOT LAND IN ITSELF OR IN ITS OWN SUBTREE -- that is a move with no destination,
+	# and the projection it produces has no root.
+	if Paths.same(dragged, into) or Paths.is_under(into, dragged):
+		return ""
+	return "" if Paths.same(into, dragged.get_base_dir()) else into
 
 
 ## Rebuilds from the workspace. Cheap enough to run on every model change: a tree of a few dozen
@@ -179,6 +245,9 @@ func _ensure_folder(parent: TreeItem, folders: Dictionary, path: String, label: 
 	item.set_selectable(0, false)
 	item.set_selectable(1, false)
 	item.set_custom_color(0, Color(0.55, 0.58, 0.64))
+	# A FOLDER carries its path as a Dictionary, a module as a plain String. The two are told
+	# apart by TYPE rather than by a second lookup, so no caller can read one as the other.
+	item.set_metadata(0, { "folder": path })
 	folders[path] = item
 	return item
 
