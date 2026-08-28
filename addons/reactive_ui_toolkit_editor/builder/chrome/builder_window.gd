@@ -128,6 +128,9 @@ var _seed_header_edit := ""
 ## not ask again.
 var _deletions_agreed := false
 
+## Set only while a save is resuming from its own empty-module question.
+var _blanks_agreed := false
+
 ## Whether the preview pipeline's own narration is being echoed into the console.
 var _tracing := false
 
@@ -2659,6 +2662,15 @@ func save() -> int:
 	# check.
 	if not _confirmed_deletions():
 		return 0
+	# AN EMPTY MODULE IS ASKED ABOUT BEFORE THE WRITE, not reported after it.
+	#
+	# `save_all` skips a blank module and moves on. For one that has NEVER been written that is
+	# right -- an empty .guitkx is not an empty file, it is a BROKEN one, and writing it takes the
+	# project's compile down with it. For one ALREADY ON DISK it is the destructive case: the old
+	# content stays, the emptying is silently not written, and the user is told about it in a
+	# console line under a Save that reported success.
+	if not _confirmed_blank_modules():
+		return 0
 	for blank in workspace.blank_modules():
 		_console.add_diagnostics(blank.file_path(), [{
 			"code": "", "severity": Console.SEVERITY_WARNING, "line": -1,
@@ -2699,6 +2711,47 @@ func _format_dirty_buffers() -> void:
 		var spec := entry as Dictionary
 		apply_edit(str(spec["path"]), str(spec["text"]), "Format %s" % str(spec["path"]).get_file())
 	ledger.end()
+
+
+## Whether the user has settled what an empty module means before the write.
+##
+## Only asked about modules ALREADY ON DISK: a never-written blank is a module someone created and
+## thought better of, and holding the whole save hostage to it would be worse than leaving it
+## pending. One that exists on disk and has been emptied is a different thing -- its old content
+## is about to survive an edit the user believes they made.
+func _confirmed_blank_modules() -> bool:
+	if workspace == null or _blanks_agreed:
+		return true
+	var stale: Array = []
+	for blank in workspace.blank_modules():
+		if blank.is_on_disk():
+			stale.append(blank)
+	if stale.is_empty():
+		return true
+
+	var names := PackedStringArray()
+	for blank in stale:
+		names.append("    " + blank.file_path().trim_prefix("res://"))
+	var dialog := ConfirmationDialog.new()
+	dialog.title = "%d module(s) are empty" % stale.size()
+	dialog.dialog_text = ("These are on disk and now hold nothing:\n\n%s\n\n"
+		+ "An empty .guitkx is not an empty file -- the language requires a top-level "
+		+ "declaration, so writing one takes the project's compile with it.\n\n"
+		+ "Delete them, or cancel and give them something to hold.") % "\n".join(names)
+	dialog.ok_button_text = "Delete and save"
+	dialog.cancel_button_text = "Cancel the save"
+	dialog.confirmed.connect(func():
+		# THROUGH `delete_module`, so the imports go with them and the whole thing is one
+		# undoable action rather than a write nobody recorded.
+		for blank in stale:
+			delete_module(blank.file_path())
+		_blanks_agreed = true
+		save()
+		_blanks_agreed = false)
+	dialog.close_requested.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered()
+	return false
 
 
 ## Whether the user has agreed to the deletions this save would perform.
@@ -2777,12 +2830,20 @@ func _place_tree_in(folder: String) -> bool:
 		plan.append({ "module": module, "to": target })
 
 	ledger.begin("Place the tree")
-	var snapshot := workspace.capture_imports()
 	for entry in plan:
 		var spec := entry as Dictionary
 		var module = spec["module"]
 		var from: String = module.file_path()
-		workspace.move_to(from, str(spec["to"]), module.name)
+		# THE INNER REWRITES ARE THE ONES THAT HAPPENED. `move_to` runs its own
+		# capture/reconcile pass and returns the importer rewrites it made; this discarded them
+		# and then took an OUTER snapshot around the whole batch, which by the end could no longer
+		# see the intermediate states. So undoing "place the tree" reverted the moves and left
+		# every importer rewritten -- pointing at paths nothing occupies.
+		for rewrite in workspace.move_to(from, str(spec["to"]), module.name):
+			var r := rewrite as Dictionary
+			ledger.record(str(r["file_path"]), str(r["before"]), str(r["after"]))
+		# And the move itself, so undo has something to walk back.
+		ledger.record_move(from, module.file_path())
 		# THE FIRST SAVE OF A NEW TREE KEEPS THE ARRANGEMENT. Every module moves out of the
 		# provisional root here, so without this every card the user had positioned looked like a
 		# module the layout had never seen and was seeded a fresh slot -- UB-220 at full strength.
@@ -2790,9 +2851,9 @@ func _place_tree_in(folder: String) -> bool:
 			layout.repath(from, module.file_path(), false)
 		if Paths.same(_focus_path, from):
 			_focus_path = module.file_path()
-	for rewrite in workspace.reconcile_imports(snapshot):
-		var r := rewrite as Dictionary
-		ledger.record(str(r["file_path"]), str(r["before"]), str(r["after"]))
+	# No outer reconcile: `move_to` already ran one per module and its rewrites are on the ledger
+	# above. A second pass around the whole batch could no longer see the intermediate states, so
+	# it recorded a diff that undo could not walk back.
 	ledger.end()
 	if layout != null:
 		layout.save(Time.get_datetime_string_from_system(true))
