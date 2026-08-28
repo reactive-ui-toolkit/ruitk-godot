@@ -33,7 +33,7 @@ const VIEWPORT := Vector2(1280, 720)
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 151
+const ASSERTION_FLOOR := 166
 
 var _fails := 0
 var _passes := 0
@@ -48,6 +48,7 @@ func _run() -> void:
 	Layout.clear_all()
 	_graph = _build_graph()
 
+	_test_hit_test_matches_what_is_drawn()
 	_test_hook_usage_highlighting()
 	_test_lod_bands()
 	await _test_card_can_be_moved()
@@ -133,6 +134,95 @@ func _card(name: String) -> Graph.Card:
 # ── Metrics ──────────────────────────────────────────────────────────────────────────
 
 ## HOVERING A HOOK CHIP HIGHLIGHTS EVERY USAGE of what it returns.
+## THE HIT-TEST AND THE DRAWN CARD MUST AGREE, AT EVERY LAYER.
+##
+## This is the defect that made the builder unusable: `drawn_height` stopped the card above its
+## markup at the Cards layer, while `row_hit` went on reporting markup rows below that -- so the
+## lower half of every card was DEAD TO THE MOUSE. `card_at` answered "no card here", and with it
+## went the row click, the row menu and every drop that resolves through a card. Adding an element,
+## dragging one onto a card and re-parenting a row all failed together, while dragging the card by
+## its title bar kept working, because the title bar is inside the short rect.
+##
+## Layer 2 is the layer a tree opens at, so this was the first thing anyone met.
+func _test_hit_test_matches_what_is_drawn() -> void:
+	_section("every reportable row is inside the card the mouse can hit")
+	var card := _card_with_everything()
+	for lod in [Metrics.Lod.PILL, Metrics.Lod.SECTIONS, Metrics.Lod.FULL]:
+		var height: float = Metrics.drawn_height(card, lod)
+		var reported := 0
+		var outside := 0
+		var undrawn := 0
+		# Walk the whole card in one-pixel steps: anything the hit-test claims must lie within
+		# the rectangle `card_at` tests against, and must belong to a section this layer draws.
+		var y := 0.0
+		while y < height + 400.0:
+			var hit: Dictionary = Metrics.row_hit(card, Vector2(10.0, y), lod)
+			if bool(hit["found"]):
+				reported += 1
+				if y >= height:
+					outside += 1
+				if not Metrics.draws_section(int(hit["section"]), lod):
+					undrawn += 1
+			y += 1.0
+		_eq(outside, 0, "at %s no row is reported below the drawn card"
+			% ["Architecture", "Cards", "Edit"][int(lod)])
+		_eq(undrawn, 0, "at %s no row is reported for a section the layer does not draw"
+			% ["Architecture", "Cards", "Edit"][int(lod)])
+		if lod != Metrics.Lod.PILL:
+			_check(reported > 0, "and at %s there are rows to aim at"
+				% ["Architecture", "Cards", "Edit"][int(lod)])
+
+	_section("the Cards layer draws markup rows -- that is what makes it the Cards layer")
+	# Capability reference §2: Layer 2 shows "signature, imports, hook chips, markup rows"; Layer 3
+	# ADDS attributes, code islands and style entry lines.
+	_check(Metrics.draws_section(int(Metrics.Section.MARKUP), Metrics.Lod.SECTIONS),
+		"markup at Layer 2")
+	_check(not Metrics.draws_section(int(Metrics.Section.ISLAND), Metrics.Lod.SECTIONS),
+		"but the code island waits for Layer 3")
+	_check(not Metrics.draws_section(int(Metrics.Section.EXPORTS), Metrics.Lod.SECTIONS),
+		"and so do style entry lines")
+	_check(Metrics.draws_section(int(Metrics.Section.ISLAND), Metrics.Lod.FULL),
+		"which draws both")
+	_check(not Metrics.draws_section(int(Metrics.Section.MARKUP), Metrics.Lod.PILL),
+		"a pill draws no rows at all")
+
+	_section("a taller layer is a taller card")
+	_check(Metrics.drawn_height(card, Metrics.Lod.FULL)
+		> Metrics.drawn_height(card, Metrics.Lod.SECTIONS),
+		"Edit shows more than Cards")
+	_check(Metrics.drawn_height(card, Metrics.Lod.SECTIONS)
+		> Metrics.drawn_height(card, Metrics.Lod.PILL),
+		"and Cards shows more than Architecture")
+
+
+## A card carrying one of everything, so every section is present to be hit-tested.
+func _card_with_everything() -> Graph.Card:
+	var card := Graph.Card.new()
+	card.kind = Module.Kind.COMPONENT
+	card.title = "Everything"
+	card.signature = "Everything(a: int = 1) -> RuitkVNode"
+	card.imports = [_line(Graph.LineKind.IMPORT, "import { X } from \"./x\"")]
+	card.body = [_line(Graph.LineKind.HOOK, "useState  →  count")]
+	card.markup = [
+		_line(Graph.LineKind.ELEMENT, "<VBoxContainer>"),
+		_line(Graph.LineKind.ELEMENT, "<Label>"),
+		_line(Graph.LineKind.COMPONENT, "<X>"),
+	]
+	card.export_detail = [_line(Graph.LineKind.EXPORT, "container")]
+	card.island_lines = PackedStringArray(["var t = 1"])
+	card.island_start_line = 1
+	card.island_end_line = 1
+	return card
+
+
+func _line(kind: int, text: String) -> Graph.Line:
+	var row := Graph.Line.new()
+	row.kind = kind
+	row.text = text
+	row.name = text
+	return row
+
+
 func _test_hook_usage_highlighting() -> void:
 	_section("a chip's bindings are read off its own text")
 	var chip := Graph.Line.new()

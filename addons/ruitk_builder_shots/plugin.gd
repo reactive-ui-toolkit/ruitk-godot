@@ -72,6 +72,7 @@ func _run() -> void:
 	# Let the editor finish coming up before anything is asked of it.
 	await get_tree().create_timer(2.0).timeout
 	print("SHOTS: starting")
+	await _verify_gestures()
 
 	DirAccess.make_dir_recursive_absolute(SHOT_DIR)
 	var written: Array = []
@@ -98,6 +99,134 @@ func _run() -> void:
 ## state reached by a path is a state that carries whatever the path left behind -- a selection
 ## that never cleared, a menu still open -- and the whole point of a reference shot is that it
 ## shows one thing.
+## Drives the three gestures the owner reports as broken, THROUGH THE REAL WINDOW.
+##
+## Every headless check of these passes, because a headless check calls `_gui_input` directly and
+## so proves only that the handler is correct -- never that Godot routes an event to it. This
+## pushes input at the Window, which is the path a person's mouse takes.
+func _verify_gestures() -> void:
+	# START FROM NO SAVED LAYOUT. Each run drags a card and the store remembers it, so run after
+	# run the fixture creeps across the canvas and eventually off the bottom of it.
+	var Layout = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_layout.gd")
+	Layout.clear_all()
+	var builder = _open_builder(FIXTURE)
+	if builder == null:
+		print("SHOTS: GESTURES: could not open the builder")
+		return
+	await get_tree().create_timer(SETTLE_SECONDS).timeout
+	var canvas = builder.canvas()
+	var graph = builder.graph
+	if graph == null or graph.cards.is_empty():
+		print("SHOTS: GESTURES: no cards")
+		_close_builder()
+		return
+
+	# EVERY LAYER, because the gestures are hit-tested per LOD and the layer the user lands in by
+	# default is not the one a framed card happens to sit at.
+	for preset in Metrics.LAYER_PRESETS:
+		await _gestures_at(builder, canvas, float(preset))
+	_close_builder()
+
+
+## Drives click / menu / drag on card 0 at one zoom, with the card centred so nothing lands off
+## the canvas.
+func _gestures_at(builder, canvas, want_zoom: float) -> void:
+	var graph = builder.graph
+	var card = graph.cards[0]
+	var lod = Metrics.lod_of(want_zoom)
+	var size := Vector2(Metrics.card_width_for(lod), Metrics.drawn_height(card, lod))
+	var centre := Vector2(card.x, card.y) + size * 0.5
+	canvas.set_camera(canvas.size * 0.5 - centre * want_zoom, want_zoom)
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	var rect: Rect2 = canvas.get_global_rect()
+	var title_local := Metrics.world_to_screen(
+		Vector2(card.x + 40.0, card.y + 8.0), canvas.camera, canvas.zoom)
+
+	var saw := {"row": 0, "card": 0, "click": 0}
+	var c1 := func(_c, _s, _i, _p): saw["row"] += 1
+	var c2 := func(_c, _s, _i): saw["click"] += 1
+	canvas.row_context_requested.connect(c1)
+	canvas.row_clicked.connect(c2)
+
+	var markup := {}
+	var top_at := Metrics.HEADER_H
+	for entry in Metrics.section_stack(card):
+		var e := entry as Dictionary
+		if not Metrics.draws_section(int(e["section"]), lod):
+			continue
+		if int(e["section"]) == int(Metrics.Section.MARKUP):
+			markup = { "top": top_at, "lead": e["lead"], "row_height": e["row_height"] }
+		top_at += float(e["height"])
+
+	var click_result := "n/a (this layer draws no markup)"
+	var menu_result := "n/a"
+	if not markup.is_empty():
+		var row_local := Metrics.world_to_screen(Vector2(card.x, card.y) + Vector2(20,
+			float(markup["top"]) + float(markup["lead"])
+				+ float(markup["row_height"]) * 0.5), canvas.camera, canvas.zoom)
+		var row_pt: Vector2 = rect.position + row_local
+		if not rect.has_point(row_pt):
+			click_result = "SKIPPED (row off canvas)"
+		else:
+			_push(_mb(row_pt, true)); await get_tree().process_frame
+			_push(_mb(row_pt, false)); await get_tree().process_frame
+			click_result = "OK" if saw["click"] > 0 else "BROKEN"
+			_push(_mb(row_pt, true, MOUSE_BUTTON_RIGHT)); await get_tree().process_frame
+			_push(_mb(row_pt, false, MOUSE_BUTTON_RIGHT)); await get_tree().process_frame
+			menu_result = "OK" if saw["row"] > 0 else "BROKEN"
+			_dismiss_popups(builder)
+			await get_tree().process_frame
+
+	var before := Vector2(card.x, card.y)
+	var at: Vector2 = rect.position + title_local
+	_push(_mb(at, true)); await get_tree().process_frame
+	for step in [Vector2(25, 15), Vector2(60, 35), Vector2(100, 60)]:
+		_push(_mm(at + step)); await get_tree().process_frame
+	_push(_mb(at + Vector2(100, 60), false)); await get_tree().process_frame
+	var drag_result := "OK" if Vector2(card.x, card.y) != before else "BROKEN"
+	card.x = before.x
+	card.y = before.y
+
+	canvas.row_context_requested.disconnect(c1)
+	canvas.row_clicked.disconnect(c2)
+	print("SHOTS: GESTURES: zoom %.2f (%s)  row click=%s  row menu=%s  card drag=%s"
+		% [want_zoom, ["Architecture", "Cards", "Edit"][int(lod)],
+		   click_result, menu_result, drag_result])
+
+
+## Hides any popup the previous step opened. An embedded popup grabs input, so the next gesture
+## would land on the menu instead of the canvas.
+func _dismiss_popups(node: Node) -> void:
+	for child in node.get_children():
+		if child is PopupMenu and (child as PopupMenu).visible:
+			(child as PopupMenu).hide()
+		_dismiss_popups(child)
+
+
+func _push(event: InputEvent) -> void:
+	if _window != null:
+		_window.push_input(event, true)
+
+
+func _mb(at: Vector2, down: bool, button := MOUSE_BUTTON_LEFT) -> InputEventMouseButton:
+	var e := InputEventMouseButton.new()
+	e.button_index = button
+	e.pressed = down
+	e.position = at
+	e.global_position = at
+	return e
+
+
+func _mm(at: Vector2) -> InputEventMouseMotion:
+	var e := InputEventMouseMotion.new()
+	e.position = at
+	e.global_position = at
+	e.button_mask = MOUSE_BUTTON_MASK_LEFT
+	return e
+
+
 func _shoot(shot: Dictionary) -> bool:
 	_close_builder()
 	await get_tree().process_frame

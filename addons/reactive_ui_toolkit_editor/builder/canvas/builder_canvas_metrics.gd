@@ -124,6 +124,28 @@ static func shows_detail(lod: Lod) -> bool:
 	return lod == Lod.FULL
 
 
+## WHETHER A LAYER DRAWS THIS SECTION. The single definition, read by the height estimate, the
+## hit-test AND the view.
+##
+## Written in three places it drifted, and the symptom was the worst kind: `drawn_height` stopped
+## the card above its markup while `row_hit` went on reporting markup rows below that, so on every
+## card the lower half was DEAD TO THE MOUSE. `card_at` said "no card here", and with it went the
+## row click, the row menu, and every drop that resolves through a card -- which is to say adding
+## an element, dragging one onto a card, and re-parenting a row all failed together while dragging
+## the card by its title bar kept working, because the title bar is inside the short rect.
+##
+## The bands are the capability reference's §2:
+##   Layer 1 — Architecture: a pill. Name and kind, nothing else.
+##   Layer 2 — Cards:        signature, imports, hook chips, MARKUP ROWS.
+##   Layer 3 — Edit:         adds attributes, code islands and style entry lines.
+static func draws_section(section: int, lod: Lod) -> bool:
+	if lod == Lod.PILL:
+		return false
+	if section == int(Section.EXPORTS) or section == int(Section.ISLAND):
+		return shows_detail(lod)
+	return true
+
+
 # ── Camera ───────────────────────────────────────────────────────────────────────────
 
 ## World point -> screen point, under a camera offset and zoom.
@@ -176,10 +198,7 @@ static func drawn_height(card: Graph.Card, lod: Lod) -> float:
 	var height := HEADER_H
 	for entry in section_stack(card):
 		var section := entry as Dictionary
-		# MARKUP, EXPORTS and the setup island only appear in the detail band.
-		var kind := int(section["section"])
-		if not shows_detail(lod) and kind in [int(Section.MARKUP), int(Section.EXPORTS),
-				int(Section.ISLAND)]:
+		if not draws_section(int(section["section"]), lod):
 			continue
 		height += float(section["height"])
 	return height
@@ -482,13 +501,21 @@ const BAND_EDGE := 1.0 / 3.0
 ##
 ## Read from `section_stack`, so the hit-test and the height model cannot disagree about where a
 ## row is -- a disagreement there reads as an imprecise drag rather than as a defect.
-static func row_hit(card: Graph.Card, card_local: Vector2) -> Dictionary:
+static func row_hit(card: Graph.Card, card_local: Vector2, lod := Lod.FULL) -> Dictionary:
 	var miss := { "found": false, "section": Section.MARKUP, "index": -1, "band": 1 }
 	if card == null or card_local.y < 0.0:
 		return miss
+	# TOPS ARE RE-ACCUMULATED FOR THIS LOD. `section_stack` describes the full card, so a section
+	# the layer does not draw is not merely skipped -- everything below it also sits that much
+	# higher on screen, and hit-testing against the full-card tops would report the row above or
+	# below the one under the cursor.
+	var top_at := HEADER_H
 	for entry in section_stack(card):
 		var e := entry as Dictionary
-		var top := float(e["top"])
+		if not draws_section(int(e["section"]), lod):
+			continue
+		var top := top_at
+		top_at += float(e["height"])
 		var height := float(e["height"])
 		if card_local.y < top or card_local.y >= top + height:
 			continue

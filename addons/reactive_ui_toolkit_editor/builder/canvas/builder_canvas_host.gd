@@ -282,13 +282,28 @@ func _render() -> void:
 ## pass, which runs on its own schedule after the reconciler has committed -- so the first attempt
 ## reads the size the card had an edit ago and fits it to that. Running until the fit is a no-op
 ## costs two idle frames after a change and nothing at all when nothing is changing.
-const SETTLE_FRAMES := 3
+## Enough frames to outlast a SLICED commit, not just Godot's layout pass. A render that spends
+## its quantum continues on the scheduler's Normal lane under the frame budget, so on a large tree
+## the commit can be several frames behind the `set_root` that asked for it.
+const SETTLE_FRAMES := 8
 
 var _settle_frames := 0
 
 
 func _process(_delta: float) -> void:
 	_fit_cards()
+	# AND THE MOUSE PASS, EVERY SETTLE FRAME. An UPDATE render is time-sliced: `set_root` returns
+	# as soon as the slice quantum is spent, and the commit lands one or more frames later -- so
+	# the walk that ran straight after `set_root` saw the tree as it was BEFORE the change, and
+	# every node that commit created kept Godot's default `STOP`. On a small tree the whole render
+	# finishes inside the first quantum and commits synchronously, which is why this never showed
+	# up in a test and always showed up on a real one.
+	#
+	# The view declares `mouse_filter` on everything it builds, so this is now a safety net rather
+	# than the mechanism. It stays because "a Control nobody remembered to annotate" is exactly the
+	# failure it catches, and the symptom -- no dragging, no dropping, no row menus -- gives no
+	# hint of the cause.
+	_pass_mouse_through(_cards)
 	_settle_frames -= 1
 	if _settle_frames <= 0:
 		set_process(false)
@@ -526,7 +541,8 @@ func row_at(index: int, screen_position: Vector2) -> Dictionary:
 	if not Metrics.shows_sections(Metrics.lod_of(zoom)):
 		return { "found": false }   # a pill has no rows to aim at
 	var card := graph.cards[index]
-	return Metrics.row_hit(card, Metrics.card_local_of(card, screen_position, camera, zoom))
+	return Metrics.row_hit(card, Metrics.card_local_of(card, screen_position, camera, zoom),
+		Metrics.lod_of(zoom))
 
 
 ## The card under a SCREEN point, or -1.

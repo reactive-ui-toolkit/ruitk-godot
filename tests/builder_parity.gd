@@ -79,6 +79,7 @@ const PARITY := [
 	["drag sources", "func _get_drag_data"],
 	["drop target", "func _can_drop_data"],
 	["card dragging, by the TITLE BAR", "func on_title_bar"],
+	["one definition of what a layer draws", "func draws_section"],
 	["card dragging", "signal card_moved"],
 	["the bottom band's first-child rule", "Placement.FIRST_CHILD"],
 	# The preview

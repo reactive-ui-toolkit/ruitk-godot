@@ -104,13 +104,18 @@ static func resolve(graph: Graph, screen: Vector2, camera: Vector2,
 	if graph == null:
 		return miss
 	var world := Metrics.screen_to_world(screen, camera, zoom)
-	var width := Metrics.card_width_for(Metrics.lod_of(zoom))
+	var lod := Metrics.lod_of(zoom)
+	var width := Metrics.card_width_for(lod)
 	for i in range(graph.cards.size() - 1, -1, -1):
 		var card := graph.cards[i]
-		var rect := Rect2(card.x, card.y, width, Metrics.card_height(card))
+		# THE DRAWN height, which is what the user is aiming at. `card_height` is the full-card
+		# estimate the layout is keyed on, and at any layer that draws less than everything it
+		# describes a rectangle taller than the card on screen -- so a drop into the empty space
+		# below a card resolved onto it.
+		var rect := Rect2(card.x, card.y, width, Metrics.drawn_height(card, lod))
 		if not rect.has_point(world):
 			continue
-		var hit := Metrics.row_hit(card, world - rect.position)
+		var hit := Metrics.row_hit(card, world - rect.position, lod)
 		var row: Graph.Line = null
 		if bool(hit["found"]):
 			row = _row_of(card, int(hit["section"]), int(hit["index"]))
