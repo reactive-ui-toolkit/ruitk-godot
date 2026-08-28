@@ -17,6 +17,7 @@ const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document
 const Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
 const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 const Drag = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_drag.gd")
+const Attributes = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_attributes.gd")
 const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
 
 ## The number of assertions a complete run makes. KEPT EXACT, and raised with the suite.
@@ -24,7 +25,7 @@ const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/docum
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 185
+const ASSERTION_FLOOR := 239
 
 var _fails := 0
 var _passes := 0
@@ -43,6 +44,7 @@ func _initialize() -> void:
 	_test_wrap_variants()
 	_test_island()
 	_test_imports()
+	_test_menus_emit_valid_code()
 	_test_import_bindings()
 	_test_setup_lines()
 	_test_style_entries()
@@ -424,6 +426,70 @@ func _spec_of(source: String) -> String:
 
 ## The import writer has to survive the file it is editing already having an ALIAS in it, and has
 ## to choose a binding that does not collide with what the file already means.
+## THE MENUS MUST OFFER NAMES, NOT STRINGIFIED RECORDS, and every hook stub must be legal
+## GDScript. Three separate sites each did `str(record)` on a Dictionary or wrote `var _ =`, and
+## the result in every case was a file that does not parse -- written by a menu pick, silently.
+func _test_menus_emit_valid_code() -> void:
+	_section("a host tag's attributes are named, not stringified")
+	var props := Attributes.props_of_host("Button")
+	_check(props.size() > 20, "Button offers a real property list (%d)" % props.size())
+	var by_name := {}
+	for entry in props:
+		by_name[str((entry as Dictionary)["name"])] = str((entry as Dictionary)["type"])
+	_check(by_name.has("text"), "including \"text\"")
+	_eq(by_name.get("text", ""), "String", "carrying its real type")
+	var stringified := 0
+	for name in by_name:
+		if str(name).contains("{") or str(name).contains("\"name\""):
+			stringified += 1
+	_eq(stringified, 0, "and NOT ONE name is a stringified Dictionary")
+
+	_section("every offered type is one default_value understands")
+	var unknown := 0
+	for name in by_name:
+		var seed := Attributes.default_value(str(by_name[name]))
+		if str(seed["value"]) == "null" and str(by_name[name]) != "Variant":
+			unknown += 1
+	_check(unknown < props.size(), "types resolve to real seeds, not all null")
+
+	_section("every hook stub is legal GDScript")
+	# The gate that matters: `var _ = useState()` PARSES AS AN ERROR, so a stub that looks fine
+	# in a diff still breaks the file. Each one is compiled.
+	# The probe DECLARES every hook, because a hook is not a global -- the codegen resolves it.
+	# What is under test is SYNTAX: `var _ = x()` is a parse error ("Expected variable name
+	# after \"var\""), and a stub can look perfectly reasonable in a diff and still break the file.
+	var preamble := "extends RefCounted
+"
+	for hook in Compiler.hook_names():
+		preamble += "func %s(_a = null, _b = null, _c = null, _d = null): return null
+" % hook
+	var checked := 0
+	for hook in Compiler.hook_names():
+		var stub := Attributes.hook_stub(str(hook))
+		_check(not stub.begins_with("var _ ") and not stub.begins_with("var _="),
+			"%s does not bind to \"_\"" % hook)
+		var probe := GDScript.new()
+		probe.source_code = preamble + "func _p():
+	%s
+" % stub
+		_eq(probe.reload(), OK, "%s compiles: %s" % [hook, stub])
+		checked += 1
+	_check(checked >= 20, "and every runtime hook was covered (%d)" % checked)
+
+	_section("and the shape the bug had is still rejected")
+	# A guard on the guard: if `var _ = ...` ever became legal GDScript this test would pass
+	# vacuously, so prove the probe can still see the original defect.
+	var bad := GDScript.new()
+	bad.source_code = preamble + "func _p():
+	var _ = useState()
+"
+	_check(bad.reload() != OK, "\"var _ = useState()\" is still a parse error")
+
+	_section("an unknown hook still gets a binding, never \"_\"")
+	_eq(Attributes.hook_stub("useCartTotal"), "var cart_total = useCartTotal()",
+		"a user hook binds a snake_case name derived from its own")
+
+
 func _test_import_bindings() -> void:
 	_section("adding a name to an aliased import keeps the alias")
 	# `primary as brand` rebuilt from the local name alone became `brand` -- an import of a name

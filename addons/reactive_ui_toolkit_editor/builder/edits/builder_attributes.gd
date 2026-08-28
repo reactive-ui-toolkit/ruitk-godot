@@ -66,13 +66,89 @@ static func props_of_host(tag: String) -> Array:
 	var godot_class := Schema.godot_class_for(tag)
 	if godot_class.is_empty():
 		godot_class = tag
+	# READ THE RECORD, do not stringify it. `godot_properties` hands back `[{ name, type }, ...]`,
+	# and `str(prop)` on that yields the literal text `{ "name": "text", "type": "String" }` --
+	# which became the menu label, then the attribute name, then the text written into the tag.
+	# Every one of a Button's 139 properties was offered under that name, and `property_info`
+	# looking the garbage up returned {} so every type collapsed to "Variant" and every seeded
+	# value to `null`.
+	#
+	# The round-trip through `property_info` goes with it: `godot_properties` already reports
+	# `type` as a `type_string()` -- "String", "bool", "int", "float", "Vector2", "Color" -- which
+	# is exactly the vocabulary `default_value` below matches on.
 	for prop in Schema.godot_properties(godot_class):
-		var name := str(prop)
-		var info: Dictionary = Schema.property_info(godot_class, name)
-		out.append({ "name": name, "type": str(info.get("type", "Variant")) })
+		var info := prop as Dictionary
+		out.append({ "name": str(info.get("name", "")), "type": str(info.get("type", "Variant")) })
 	for event in Schema.events_for_class(godot_class):
-		out.append({ "name": str(event), "type": "Callable" })
+		var spec: Variant = event
+		var event_name := str((spec as Dictionary).get("name", "")) if spec is Dictionary else str(spec)
+		out.append({ "name": event_name, "type": "Callable" })
 	return out
+
+
+## The setup line a hook insertion writes.
+##
+## `var _ = useState()` was written for every one of the 23 hooks, and it is wrong twice over.
+## `var _` is not legal GDScript -- the parser rejects it with "Expected variable name after
+## \"var\"" -- so the generated .gd failed at load. And roughly ten of the hooks take
+## required arguments, so the call was wrong even where the binding was not.
+##
+## Hooks that return nothing are written as bare calls; the rest bind a name derived from the
+## hook, so the line reads like code someone would have typed.
+const HOOK_STUBS := {
+	"useState": "var state = useState(null)",
+	"useReducer": "var store = useReducer(func(s, action): return s, null)",
+	"useRef": "var ref = useRef(null)",
+	"useMemo": "var memo = useMemo(func(): return null, [])",
+	"useCallback": "var callback = useCallback(func(): pass, [])",
+	"useEffect": "useEffect(func(): pass, [])",
+	"useLayoutEffect": "useLayoutEffect(func(): pass, [])",
+	"useImperativeHandle": "useImperativeHandle(null, func(): return null, [])",
+	"createContext": "var context = createContext(null)",
+	"useContext": "var value = useContext(null)",
+	"provideContext": "provideContext(null, null)",
+	"useDeferredValue": "var deferred = useDeferredValue(null)",
+	"useTransition": "var transition = useTransition()",
+	"useStableCallback": "var stable = useStableCallback(func(): pass)",
+	"useStableFunc": "var stable = useStableFunc(func(): pass)",
+	"useStableAction": "var action = useStableAction(func(): pass)",
+	"useSafeArea": "var safe_area = useSafeArea()",
+	"useSignal": "var signal_value = useSignal(null)",
+	"useSignalKey": "var signal_key = useSignalKey(null)",
+	"useTween": "var tween = useTween()",
+	"useTweenValue": "var tween_value = useTweenValue(0.0, 1.0, 0.3)",
+	"useAnimate": "var animate = useAnimate()",
+	"useSfx": "var sfx = useSfx()",
+}
+
+
+## The line to insert for `hook_name`, always legal GDScript.
+##
+## A hook this table does not know still gets a binding rather than `var _`: an unknown hook is a
+## user hook from a `.hooks.guitkx` module, and binding its result is the common case.
+static func hook_stub(hook_name: String) -> String:
+	if HOOK_STUBS.has(hook_name):
+		return str(HOOK_STUBS[hook_name])
+	return "var %s = %s()" % [_binding_for(hook_name), hook_name]
+
+
+## A snake_case binding derived from a hook's name: `useCartTotal` -> `cart_total`.
+static func _binding_for(hook_name: String) -> String:
+	var stem := hook_name
+	if stem.begins_with("use_"):
+		stem = stem.substr(4)
+	elif stem.begins_with("use") and stem.length() > 3:
+		stem = stem.substr(3)
+	var out := ""
+	for i in stem.length():
+		var ch := stem[i]
+		if ch >= "A" and ch <= "Z":
+			if not out.is_empty():
+				out += "_"
+			out += ch.to_lower()
+		else:
+			out += ch
+	return out if not out.is_empty() else "value"
 
 
 ## What a newly-added attribute should say.

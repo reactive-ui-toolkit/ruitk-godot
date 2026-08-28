@@ -17,6 +17,7 @@ const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/
 const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_module.gd")
 const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
 const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
+const Edits = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_edits.gd")
 const Service = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph_service.gd")
 
 const ROOT := "res://tests/__builder_graph_tmp/app"
@@ -26,7 +27,7 @@ const ROOT := "res://tests/__builder_graph_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 162
+const ASSERTION_FLOOR := 171
 
 var _fails := 0
 var _passes := 0
@@ -45,6 +46,7 @@ func _initialize() -> void:
 	_test_hook_chips()
 	_test_island()
 	_test_markup_golden()
+	_test_directive_round_trip()
 	_test_directive_families()
 	_test_spans_address_the_source()
 	_test_export_detail()
@@ -397,20 +399,20 @@ func _test_markup_golden() -> void:
 	_section("the markup tree, flattened")
 	_eq(_render_markup(_card("app.guitkx")), """VBoxContainer  el  style={brand}
   Label  el/  text={title}
-  @if  dir(1)  @if (count > 5)
+  @if  dir(1)  count > 5
     Label  el/  text="high"
-  @elif  dir(2)  @elif (count > 2)
+  @elif  dir(2)  count > 2
     Label  el/  text="mid"
-  @else  dir(3)  @else
+  @else  dir(3)
     Label  el/  text="low"
-  @for  dir(4)  @for (f in facts)
+  @for  dir(4)  f in facts
     Row  comp/  key={f} text={label}
-  @while  dir(5)  @while (count < 0)
+  @while  dir(5)  count < 0
     Label  el/  text="never"
-  @match  dir(6)  @match (level)
-    @case  dir(7)  @case (1)
+  @match  dir(6)  level
+    @case  dir(7)  1
       Label  el/  text="one"
-    @default  dir(8)  @default
+    @default  dir(8)
       Label  el/  text="rest"
   HBoxContainer  el
     Button  el/  text="go" onPressed={func(): s[1].call(0)}
@@ -668,6 +670,27 @@ func _test_degenerate_buffers() -> void:
 # ── Rendering helpers ────────────────────────────────────────────────────────────────
 
 ## One compact line per markup row, so a whole tree can be asserted as a literal.
+## SEEDING THE EDITOR AND COMMITTING UNCHANGED MUST BE THE IDENTITY.
+##
+## `directive_text` is what the inline editor opens on and `set_directive_header` is what the
+## commit calls, so those two have to be inverse. They were not: the seed carried the rendered
+## header `@if (true)` and the commit replaced only what sits INSIDE the parentheses, so one
+## round trip wrote `@if (@if (true))`. The compiler accepted that file and the generated .gd
+## then failed at load, which is why nothing caught it.
+func _test_directive_round_trip() -> void:
+	_section("opening a directive header and committing it unchanged changes nothing")
+	var card := _card("app.guitkx")
+	var source: String = _ws.try_get(ROOT.path_join("app.guitkx")).buffer_text
+	var checked := 0
+	for row in card.markup:
+		if row.kind != Graph.LineKind.DIRECTIVE:
+			continue
+		checked += 1
+		_eq(Edits.set_directive_header(source, row, row.directive_text), source,
+			"%s round-trips" % row.badge_text)
+	_check(checked >= 6, "and every directive kind in the fixture was covered (%d)" % checked)
+
+
 func _render_markup(card: Graph.Card) -> String:
 	var out := PackedStringArray()
 	for row in card.markup:
@@ -689,7 +712,8 @@ func _render_markup(card: Graph.Card) -> String:
 		var head := row.name if not row.name.is_empty() else row.text
 		if row.kind == Graph.LineKind.DIRECTIVE:
 			head = row.badge_text
-			tail += "  " + row.directive_text
+			if not row.directive_text.is_empty():
+				tail += "  " + row.directive_text
 		elif row.kind == Graph.LineKind.EXPRESSION:
 			head = row.text
 		elif row.kind == Graph.LineKind.PLAIN:

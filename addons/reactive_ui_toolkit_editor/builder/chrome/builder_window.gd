@@ -581,7 +581,7 @@ func _on_library_activated(kind: String, name: String) -> void:
 	var before := module.buffer_text
 	var after := before
 	if kind == LibraryPane.ENTRY_HOOK:
-		after = Edits.insert_setup_line(before, card, "var _ = %s()" % name)
+		after = Edits.insert_setup_line(before, card, Attributes.hook_stub(name))
 	else:
 		# Into the LAST markup row, which is where "add one more" means on a card you are
 		# looking at. A drag says where precisely; a click says "somewhere sensible".
@@ -1261,18 +1261,46 @@ func _with_component_import(source: String, importer_path: String, tag: String) 
 func _style_key_items(row) -> Array:
 	var items: Array = []
 	var owner := str(row.name)
+	# READ THE RECORD. `style_keys()` returns `[{ name, type, detail }, ...]`, so `str(key)` made
+	# the menu label -- and then the DICTIONARY KEY written into the style module -- the literal
+	# text `{ "name": "bg_color", "type": "Color", "detail": "..." }`. Every "Add entry..."
+	# produced a style module that does not parse.
 	for key in Schema.style_keys():
-		items.append(SearchMenu.item(str(key), {
-			"export": owner, "key": str(key), "value": _style_seed(str(key)),
-		}))
+		var spec := key as Dictionary
+		var key_name := str(spec.get("name", ""))
+		if key_name.is_empty():
+			continue
+		var key_type := str(spec.get("type", ""))
+		items.append(SearchMenu.item(key_name, {
+			"export": owner, "key": key_name, "value": _style_seed(key_name, key_type),
+		}, key_type))
 	return items
 
 
 ## What a fresh style entry is worth. Seeded, like every other header this builder writes.
-func _style_seed(key: String) -> String:
+## TYPE-DRIVEN, not name-driven. The schema reports each key's real type, so a seed can be
+## right by construction; guessing from the name -- a `_color` suffix, a "width" substring -- was
+## wrong for every key those heuristics did not happen to describe, and silently.
+func _style_seed(key: String, type_name: String = "") -> String:
+	match type_name:
+		"Color":
+			return "Color(0.2, 0.2, 0.24)"
+		"int":
+			return "8"
+		"float":
+			return "0.0"
+		"bool":
+			return "true"
+		"String", "StringName":
+			return "\"\""
+		"Vector2":
+			return "Vector2.ZERO"
+	# No type from the schema: fall back to the name heuristics rather than to `null`, which is a
+	# legal value for almost no style key.
 	if key.ends_with("_color"):
 		return "Color(0.2, 0.2, 0.24)"
-	if key.begins_with("font_size") or key.contains("width") or key.contains("radius") 			or key.contains("margin") or key.contains("separation"):
+	if key.begins_with("font_size") or key.contains("width") or key.contains("radius") \
+			or key.contains("margin") or key.contains("separation"):
 		return "8"
 	return "null"
 
@@ -2271,7 +2299,7 @@ func drop_library_entry(kind: String, name: String, at: Vector2) -> bool:
 	var card: Graph.Card = hit["card"]
 	if kind == LibraryPane.ENTRY_HOOK:
 		return apply_edit(card.file_path,
-			Edits.insert_setup_line(_buffer_of(card.file_path), card, "var _ = %s()" % name),
+			Edits.insert_setup_line(_buffer_of(card.file_path), card, Attributes.hook_stub(name)),
 			"add %s" % name)
 
 	# A MODULE from the library: a style module dropped ON AN ELEMENT styles it; anything else,

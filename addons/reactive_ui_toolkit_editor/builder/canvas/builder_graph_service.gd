@@ -820,7 +820,11 @@ static func _directive_head(label: String, badge: Graph.Badge, header: String,
 	row.depth = depth
 	row.badge = badge
 	row.badge_text = label
-	row.directive_text = text
+	# THE EXPRESSION ALONE, not the rendered header. This feeds the inline editor, and
+	# `set_directive_header` replaces only what is INSIDE the parentheses -- so seeding the editor
+	# with the full `@if (true)` and committing it unchanged wrote `@if (@if (true))`. The
+	# compiler accepted that file, and the generated .gd then failed at load, so nothing warned.
+	row.directive_text = head
 	row.directive_line = row.source_line
 	row.close_line = close_line
 	row.clause_index = clause_index
