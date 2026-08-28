@@ -979,6 +979,42 @@ func apply_edit(file_path: String, after: String, description: String) -> bool:
 ## The card is re-populated in place rather than the whole graph being rebuilt: rebuilding would
 ## discard every card's measured height and re-seed the layout, so a keystroke would visibly
 ## reshuffle the canvas.
+## The diagnostics for one module, compiled with the tree's own component vocabulary.
+##
+## LI-05: `GUITKX0105` -- unknown element, with a did-you-mean -- is only raised when the compiler
+## is TOLD which names are components; handed an empty list it suppresses the check entirely. The
+## builder never told it, so `<Labell />` compiled clean and lowered to a call on a class that
+## does not exist.
+##
+## Style and util exports are deliberately NOT in the union: they are not elements, and offering
+## them would make a typo'd tag resolve to a dictionary.
+func known_component_tags() -> PackedStringArray:
+	var out := PackedStringArray()
+	if graph == null:
+		return out
+	for card in graph.cards:
+		if card.kind != Module.Kind.COMPONENT:
+			continue
+		for export_name in card.exports:
+			if not out.has(str(export_name)):
+				out.append(str(export_name))
+	return out
+
+
+## Compiles one module and paints what it says onto the source pane and the console.
+func _publish_diagnostics(file_path: String) -> void:
+	if workspace == null or _source == null or not Paths.same(file_path, _source.path()):
+		return
+	var module := workspace.try_get(file_path)
+	if module == null:
+		return
+	var result: Dictionary = Compiler.compile(module.buffer_text, module.name,
+		known_component_tags(), {})
+	var diagnostics: Array = result.get("diagnostics", [])
+	_source.show_diagnostics(diagnostics)
+	_console.add_diagnostics(file_path, diagnostics)
+
+
 func _after_model_change(file_path: String) -> void:
 	if graph != null:
 		var index := graph.index_of(file_path)
@@ -992,6 +1028,7 @@ func _after_model_change(file_path: String) -> void:
 	_source.refresh_from_model()
 	preview.request_refresh()
 	_refresh_status()
+	_publish_diagnostics(file_path)
 
 
 ## A keystroke in the source pane.

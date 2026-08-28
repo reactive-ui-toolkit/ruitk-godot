@@ -13,6 +13,7 @@ extends VBoxContainer
 ## the same kind of event and land in the same ledger.
 
 const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
+const Diagnostics = preload("res://addons/reactive_ui_toolkit_editor/editor/guitkx_diagnostics_renderer.gd")
 const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_module.gd")
 const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_paths.gd")
 const GuitkxEditor = preload("res://addons/reactive_ui_toolkit_editor/editor/guitkx_code_edit.gd")
@@ -220,6 +221,43 @@ func _leave_edit() -> void:
 ##
 ## `_unhandled_key_input` rather than `_gui_input`, because the focus is on the CodeEdit inside
 ## this pane, not on the pane.
+## Paints the compiler's diagnostics onto the editing surface.
+##
+## `GuitkxCodeEdit` OWNS a diagnostics gutter, a per-line store and a hover composer that
+## prepends a line's diagnostics -- and the builder called none of it, so the gutter it embeds was
+## permanently blank and an error in the file being edited was invisible on the surface it was
+## being edited on. Everything here is the editor addon's own pipeline; what was missing was the
+## call.
+func show_diagnostics(diagnostics: Array) -> void:
+	if _editor == null or _editor.diag_gutter < 0:
+		return
+	var err := _icon("StatusError")
+	var warn := _icon("StatusWarning")
+	Diagnostics.render(_editor, _editor.diag_gutter, diagnostics, err, warn)
+	# And the same list per line, so the hover card carries the message rather than a bare icon.
+	var by_line := {}
+	for entry in diagnostics:
+		if not (entry is Dictionary):
+			continue
+		var line := int((entry as Dictionary).get("line", -1))
+		if line < 0:
+			continue
+		if not by_line.has(line):
+			by_line[line] = []
+		(by_line[line] as Array).append(entry)
+	_editor.set_line_diagnostics(by_line)
+
+
+## An editor theme icon, or null outside the editor -- the renderer handles a null icon.
+func _icon(name: String) -> Texture2D:
+	if not Engine.is_editor_hint():
+		return null
+	var theme := EditorInterface.get_editor_theme()
+	if theme == null or not theme.has_icon(name, "EditorIcons"):
+		return null
+	return theme.get_icon(name, "EditorIcons")
+
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not _editing or not (event is InputEventKey):
 		return

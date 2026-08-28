@@ -56,6 +56,10 @@ signal trace(message: String)
 class Summary extends RefCounted:
 	## Every module the round considered, after the focus closure trimmed the batch.
 	var considered := PackedStringArray()
+	## Set when the COMPILER ITSELF could not run this round -- a tool state, not a source fault.
+	## Reported once for the round rather than once per module, because it is one condition.
+	var env_error := ""
+
 	## Why each rebuilt module was rebuilt: "text changed" or "dependency rebuilt".
 	var reasons := {}
 	var rebuilt := PackedStringArray()
@@ -227,15 +231,21 @@ func compile_dirty(focus_path: String) -> Summary:
 		summary.rebuilt.append(path)
 		if bool(result["ok"]):
 			_compiled_from[key] = module.buffer_text
+		elif bool(result.get("env_error", false)):
+			# THE LAST GOOD BUILD KEEPS SERVING. `_compiled_from` is left alone so the next round
+			# tries this module again, `_built` is left alone so the mount still has a script, and
+			# the module is NOT a failed root -- nothing downstream of it is skipped for a
+			# condition that has nothing to do with any of them.
+			summary.env_error = str(result["error"])
 		else:
 			_compiled_from.erase(key)
 			_built.erase(key)
 			failed_roots[key] = path
 			summary.failures.append({ "path": path, "error": str(result["error"]) })
-		compile_finished.emit(path, bool(result["ok"]), str(result["error"]))
+		compile_finished.emit(path, bool(result["ok"]), str(result.get("error", "")))
 		if Paths.key(path) == Paths.key(focus):
 			summary.focus_ok = bool(result["ok"])
-			summary.focus_error = str(result["error"])
+			summary.focus_error = str(result.get("error", ""))
 
 	if summary.rebuilt.is_empty() and summary.is_clean():
 		# Nothing the focus can reach has moved. A module outside the closure may well still be
@@ -260,6 +270,14 @@ func _build(module: Module) -> Dictionary:
 	var result := Compiler.compile(
 		module.buffer_text, mirrored.get_file().get_basename(), [], {},
 		mirrored, scratch_root_for(path))
+	# A TRANSIENT ENVIRONMENT FAILURE IS NOT A SOURCE FAILURE. The compiler reports `env_error`
+	# when it cannot read the vocabulary -- a fact about the TOOL, not about this file -- and its
+	# own comment states the caller contract: keep the existing sibling .gd and the previous
+	# sidecar. Treated as an ordinary failure it blamed every module in the tree for a condition
+	# none of them caused, and discarded the last good build for all of them.
+	if bool(result.get("env_error", false)):
+		return { "ok": false, "env_error": true,
+			"error": "the .guitkx compiler is not ready — the last good render is still showing" }
 	if not bool(result.get("ok", false)):
 		return { "ok": false, "error": _first_error(result) }
 

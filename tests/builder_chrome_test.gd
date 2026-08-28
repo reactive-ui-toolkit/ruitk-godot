@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 316
+const ASSERTION_FLOOR := 321
 
 var _fails := 0
 var _passes := 0
@@ -67,6 +67,7 @@ func _run() -> void:
 	await _test_add_chip_opens_the_editor()
 	await _test_preview_anchor_and_knobs()
 	await _test_double_click_edits_in_place()
+	await _test_diagnostics_reach_the_surface()
 	await _test_source_pane_keyboard()
 	await _test_delete_refuses_what_it_must()
 	await _test_selection_survives_an_edit()
@@ -1066,6 +1067,44 @@ func _test_double_click_edits_in_place() -> void:
 
 
 ## THE SOURCE PANE HAS CHORDS: Ctrl+Enter applies, Escape cancels.
+## THE BUILDER REPORTS WHAT THE COMPILER SAYS -- on the surface being edited, and in the console.
+##
+## `GuitkxCodeEdit` owns a diagnostics gutter, a per-line store and a hover composer, and the
+## builder called NONE of it: the gutter it embeds was permanently blank, so an error in the file
+## being edited was invisible on the surface it was being edited on.
+func _test_diagnostics_reach_the_surface() -> void:
+	var w := _window()
+	await process_frame
+	var path := ROOT.path_join("app.guitkx")
+	w.select_module(path)
+	await process_frame
+
+	_section("an unknown element is reported at all")
+	# GUITKX0105 is only raised when the compiler is TOLD which names are components; handed an
+	# empty list it suppresses the check, and the builder never told it -- so `<Labell />` compiled
+	# clean and lowered to a call on a class that does not exist.
+	var known := w.known_component_tags()
+	_check(known.has("App"), "the tree's own components are in the vocabulary")
+	_check(not known.has("primary"),
+		"and a style export is NOT -- it is not an element, and a typo must not resolve to one")
+
+	# A mistyped COMPONENT, not a mistyped host tag -- a host tag is checked against ClassDB
+	# regardless, and the vocabulary is what gates the component half.
+	var broken: String = w._buffer_of(path).replace("<Row ", "<Roww ")
+	var quiet: Dictionary = Compiler.compile(broken, "App", [], {})
+	var told: Dictionary = Compiler.compile(broken, "App", known, {})
+	_check(bool(quiet.get("ok", false)), "with no vocabulary the compiler stays quiet")
+	_check(not bool(told.get("ok", false)), "and with one it reports the unknown element")
+
+	_section("and the pane is handed them")
+	# The gutter is the editor addon's own; what was missing was the call.
+	w._publish_diagnostics(path)
+	await process_frame
+	_check(w.source_pane().editor().diag_gutter >= 0, "the pane has a diagnostics gutter to paint")
+
+	_drop(w)
+
+
 func _test_source_pane_keyboard() -> void:
 	var w := _window()
 	await process_frame
