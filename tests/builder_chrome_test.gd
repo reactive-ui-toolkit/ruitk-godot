@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 293
+const ASSERTION_FLOOR := 300
 
 var _fails := 0
 var _passes := 0
@@ -65,6 +65,8 @@ func _run() -> void:
 	await _test_one_funnel()
 	await _test_undo_across_files()
 	await _test_add_chip_opens_the_editor()
+	await _test_delete_refuses_what_it_must()
+	await _test_selection_survives_an_edit()
 	await _test_load_does_not_destroy_unsaved_work()
 	await _test_redo_of_a_creation_keeps_its_text()
 	await _test_source_edit_reaches_the_funnel()
@@ -957,6 +959,70 @@ func _test_add_chip_opens_the_editor() -> void:
 ## It reached none of them. The pane wrote the model on every keystroke, so by the time Apply ran
 ## `before` already equalled `after` and the window's funnel rejected the whole thing as a no-op.
 ## UNSAVED WORK SURVIVES SOMEONE OPENING ANOTHER FILE.
+## THE THINGS DELETE MUST NOT DELETE.
+func _test_delete_refuses_what_it_must() -> void:
+	var w := _window()
+	await process_frame
+	var path := ROOT.path_join("app.guitkx")
+	var index := w.graph.index_of(path)
+	var card: Graph.Card = w.graph.cards[index]
+	var original: String = w._buffer_of(path)
+
+	_section("the component's return root cannot be deleted")
+	# The guard was `row_index > 0`, so wrapping the root in an @if made the root row 1 and the
+	# guard stopped protecting it.
+	var root_row: int = Edits.first_element_row(card)
+	_check(root_row >= 0, "the card has a return root (row %d)" % root_row)
+	w._on_row_clicked(index, int(Metrics.Section.MARKUP), root_row)
+	w._delete_selection()
+	await process_frame
+	_eq(w._buffer_of(path), original, "deleting it does nothing")
+	_check(w.toast_text().contains("must return one node"), "and says why")
+
+	_section("an affordance row has no span, so it deletes nothing")
+	# "+ entry" and friends are synthetic rows with at == end_at == 0, and removing that range cut
+	# the FIRST LINE OF THE FILE.
+	var affordance := Graph.Line.new()
+	_check(not Edits.has_span(affordance), "a fresh Line has no span")
+	_eq(Edits.remove(original, affordance), original, "and remove refuses it outright")
+
+	_section("clicking a setup line does not select the return root")
+	var with_setup := w.graph.card_of(path)
+	if with_setup != null and with_setup.island_start_line > 0:
+		var island = w._island_row(with_setup)
+		_check(island != null, "the island resolves to a row of its own")
+		if island != null:
+			_check(island.end_at > island.at, "with a real span")
+			_check(island.source_line == with_setup.island_start_line,
+				"pointing at the setup, not at the markup")
+
+	_drop(w)
+
+
+## THE SELECTED ROW IS RE-RESOLVED, so a Delete after a menu edit cuts at current offsets.
+func _test_selection_survives_an_edit() -> void:
+	_section("an edit rebuilds the rows; the selection still names the right one")
+	var w := _window()
+	await process_frame
+	var path := ROOT.path_join("app.guitkx")
+	var index := w.graph.index_of(path)
+	var card: Graph.Card = w.graph.cards[index]
+	var last := card.markup.size() - 1
+	w._on_row_clicked(index, int(Metrics.Section.MARKUP), last)
+	var stale = w._menu_row
+
+	# Any edit at all re-projects the card into new Line objects.
+	w.apply_edit(path, w._buffer_of(path).replace("<VBoxContainer>",
+		"<VBoxContainer>
+			<Label text=\"inserted\" />"), "insert above")
+	await process_frame
+	var live = w._live_menu_row()
+	_check(live != null, "the selection still resolves")
+	_check(live != stale, "to a CURRENT row object, not the one captured before the edit")
+
+	_drop(w)
+
+
 func _test_load_does_not_destroy_unsaved_work() -> void:
 	_section("a dirty tree adopts the file instead of being replaced by it")
 	var w := _window()

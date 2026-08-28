@@ -99,7 +99,20 @@ var _search_menu: SearchMenu = null
 var _search_purpose := ""
 ## The module kind a create prompt is naming.
 var _pending_kind := -1
+## A newline, built rather than written: an escape in a source literal has to survive every layer
+## between here and the file.
+const _LF := "
+"
+
 var _menu_row = null
+
+## WHERE the menu row lives, so it can be resolved again against the CURRENT projection.
+##
+## `_menu_row` holds a `Line` object, and every edit rebuilds a card's rows as new instances --
+## so after any menu edit it described the buffer as it was BEFORE that edit, and a Delete then cut
+## at offsets that had moved. The coordinates survive a re-projection; the object does not.
+var _menu_section := -1
+var _menu_row_index := -1
 
 ## The header text a wrap just seeded, waiting for the editor to open on it once the edit has been
 ## applied and the card re-projected. Empty when the pending action is not a wrap.
@@ -282,14 +295,36 @@ func _typing_focused() -> bool:
 ## The row first, because it is the more specific selection and the one the user most recently
 ## made. Deleting a whole module on a keypress meant for one element is not a mistake a builder
 ## should let happen quietly.
+## The selected row, RE-RESOLVED against the current projection.
+##
+## Never the stored object: an edit rebuilds a card's rows, so the stored one describes the buffer
+## as it was before. The coordinates still name the right row, and `_row_of` reads the live
+## projection.
+func _live_menu_row():
+	if _menu_card < 0 or _menu_section < 0 or _menu_row_index < 0:
+		return _menu_row
+	var fresh = _row_of(_menu_card, _menu_section, _menu_row_index)
+	return fresh if fresh != null else _menu_row
+
+
 func _delete_selection() -> void:
-	if _menu_row != null and not _menu_target.is_empty() and workspace != null:
+	var row = _live_menu_row()
+	if row != null and not _menu_target.is_empty() and workspace != null:
 		var module := workspace.try_get(_menu_target)
-		if module != null and not module.read_only:
-			var after := Edits.remove(module.buffer_text, _menu_row)
+		if module != null and not module.read_only and Edits.has_span(row):
+			# A COMPONENT MUST RETURN ONE NODE, so its return root cannot be deleted. The menu
+			# guards this; the Delete KEY did not guard it at all.
+			var card_now := graph.card_of(_menu_target) if graph != null else null
+			if card_now != null and _menu_section == int(Metrics.Section.MARKUP) \
+					and _menu_row_index == Edits.first_element_row(card_now):
+				toast("%s must return one node." % _menu_target.get_file())
+				return
+			var after := Edits.remove(module.buffer_text, row)
 			if after != module.buffer_text:
-				apply_edit(_menu_target, after, "Delete %s" % _menu_row.text.strip_edges())
+				apply_edit(_menu_target, after, "Delete %s" % row.text.strip_edges())
 				_menu_row = null
+				_menu_section = -1
+				_menu_row_index = -1
 				return
 	if not _focus_path.is_empty():
 		delete_module(_focus_path)
@@ -1115,6 +1150,8 @@ func _on_row_clicked(card_index: int, _section: int, row_index: int) -> void:
 	_menu_target = graph.cards[card_index].file_path
 	_menu_row = row
 	_menu_card = card_index
+	_menu_section = _section
+	_menu_row_index = row_index
 	_canvas.select_row(card_index, _section, row_index)
 	select_module(graph.cards[card_index].file_path)
 	_source.goto_line(row.source_line)
@@ -1175,6 +1212,8 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 	_menu_target = card.file_path
 	_menu_row = row
 	_menu_card = card_index
+	_menu_section = section
+	_menu_row_index = row_index
 	_menu_at = at
 	_row_menu.clear()
 	_row_menu.add_separator(row.text.strip_edges())
@@ -1196,7 +1235,10 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 		if row.badge_text == "@if" and row.clause_index == 0:
 			_row_menu.add_separator()
 			_row_menu.add_item("Add @elif", RowMenuId.ADD_ELSE_IF)
-			_row_menu.add_item("Add @else", RowMenuId.ADD_ELSE)
+			# ONE ELSE. Offered unconditionally, this produced a second `} @else {` and a file
+			# that does not compile.
+			if not Edits.construct_has_clause(card, row, "@else"):
+				_row_menu.add_item("Add @else", RowMenuId.ADD_ELSE)
 		_row_menu.add_separator()
 		# OFFERED ONLY WHERE IT IS SAFE. Unwrap splices a construct's body up a level, which is
 		# only sound for a single-clause, non-match HEAD -- from anywhere else it corrupts the
@@ -1205,8 +1247,11 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 		if Edits.can_unwrap(card, row):
 			_row_menu.add_item("Remove %s, keep its contents" % row.badge_text, RowMenuId.UNWRAP)
 		if row.clause_index > 0:
+			# A CONTINUATION HAS NO BLOCK DELETE. "Delete @else" routed to the line-range remove,
+			# which took the head line and left the clause body and a surplus brace behind.
 			_row_menu.add_item("Delete this %s clause" % row.badge_text, RowMenuId.DELETE_CLAUSE)
-		_row_menu.add_item("Delete " + row.badge_text, RowMenuId.DELETE_ROW)
+		else:
+			_row_menu.add_item("Delete " + row.badge_text, RowMenuId.DELETE_ROW)
 	else:
 		_row_menu.add_item("Add attribute...", RowMenuId.ADD_ATTRIBUTE)
 		_row_menu.add_item("Add child element...", RowMenuId.ADD_CHILD)
@@ -1219,7 +1264,10 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 		_row_menu.add_item("Wrap in...", RowMenuId.WRAP_IF)
 		# The FIRST element row is the component's return root: deleting it leaves a component
 		# with nothing to return, which is a compile error rather than an edit.
-		if row_index > 0 or section != Metrics.Section.MARKUP:
+		# NOT `row_index > 0`. After wrapping the root in an @if the directive is row 0 and the
+		# return root is row 1, so the old test offered "Delete element" on the one row that has
+		# to stay.
+		if section != Metrics.Section.MARKUP or row_index != Edits.first_element_row(card):
 			_row_menu.add_separator()
 			_row_menu.add_item("Delete element", RowMenuId.DELETE_ROW)
 
@@ -1659,6 +1707,35 @@ func _on_inline_committed(token: Variant, text: String) -> void:
 
 
 ## The row under the pointer, from the section the hit-test named.
+## A row standing for the whole SETUP island, with its real span.
+##
+## Synthesised rather than stored, because the island is a line RANGE on the card and every other
+## consumer speaks in offsets. Built from the card's own `island_start_line`/`island_end_line`
+## against the live buffer, so `Edits.remove` and the source-pane jump are both span-exact.
+func _island_row(card):
+	if card == null or card.island_start_line <= 0 or workspace == null:
+		return null
+	var module := workspace.try_get(card.file_path)
+	if module == null:
+		return null
+	var lines := module.buffer_text.split(_LF)
+	if card.island_end_line > lines.size():
+		return null
+	var at := 0
+	for i in range(card.island_start_line - 1):
+		at += str(lines[i]).length() + 1
+	var end_at := at
+	for i in range(card.island_start_line - 1, card.island_end_line):
+		end_at += str(lines[i]).length() + 1
+	var row := Graph.Line.new()
+	row.kind = Graph.LineKind.PLAIN
+	row.text = "setup"
+	row.at = at
+	row.end_at = end_at
+	row.source_line = card.island_start_line
+	return row
+
+
 func _row_of(card_index: int, section: int, row_index: int):
 	if graph == null or card_index < 0 or card_index >= graph.cards.size():
 		return null
@@ -1675,8 +1752,11 @@ func _row_of(card_index: int, section: int, row_index: int):
 			rows = card.export_detail
 		Metrics.Section.ISLAND:
 			# The SETUP block is edited whole, not row by row: it is GDScript, and half a
-			# statement is not a thing to write back.
-			return card.markup[0] if not card.markup.is_empty() else null
+			# statement is not a thing to write back. But it is NOT the first markup row, which is
+			# what this returned -- so clicking any setup line selected the component's return
+			# root, jumped the source pane to it, and Delete removed the element the component
+			# exists to return.
+			return _island_row(card)
 		_:
 			return null
 	return rows[row_index] if row_index >= 0 and row_index < rows.size() else null

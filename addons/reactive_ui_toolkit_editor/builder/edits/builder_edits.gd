@@ -173,6 +173,10 @@ static func _reopen_self_closing(source: String, row: Graph.Line, markup: String
 ## Removes the row and everything under it -- an element with its subtree, a directive with its
 ## whole construct. The blank line the removal would leave goes with it.
 static func remove(source: String, row: Graph.Line) -> String:
+	# A ROW WITH NO SPAN IS AN AFFORDANCE, NOT TEXT. "+ entry" and friends are synthetic rows with
+	# `at` and `end_at` at 0, so removing one cut the first line of the file.
+	if not has_span(row):
+		return source
 	if row == null:
 		return source
 	var from := _line_start(source, row.at)
@@ -782,6 +786,68 @@ static func is_single_clause(card: Graph.Card, row: Graph.Line) -> bool:
 			return false      # a continuation: @elif / @else / another @case
 		return true
 	return true
+
+
+## The continuation clauses of a construct, in order. Empty for a row that is not a head.
+static func clauses_of(card: Graph.Card, head: Graph.Line) -> Array:
+	var out: Array = []
+	if card == null or head == null:
+		return out
+	var at := -1
+	for i in card.markup.size():
+		var candidate: Graph.Line = card.markup[i]
+		if candidate == head or (head.directive_line > 0 \
+				and candidate.directive_line == head.directive_line):
+			at = i
+			break
+	if at < 0:
+		return out
+	for i in range(at + 1, card.markup.size()):
+		var other: Graph.Line = card.markup[i]
+		if other.depth > head.depth:
+			continue
+		if other.depth < head.depth:
+			break
+		if other.kind == Graph.LineKind.DIRECTIVE and other.clause_index > head.clause_index:
+			out.append(other)
+			continue
+		break
+	return out
+
+
+## Whether a construct already carries a clause with this badge text -- `"@else"`, `"@default"`.
+##
+## "Add @else" was offered on an @if that already had one, and produced a second `} @else {` that
+## does not compile. The language has one else; the menu has to know that.
+static func construct_has_clause(card: Graph.Card, head: Graph.Line, badge_text: String) -> bool:
+	for clause in clauses_of(card, head):
+		if (clause as Graph.Line).badge_text == badge_text:
+			return true
+	return false
+
+
+## The index of the row that IS the component's return root, or -1.
+##
+## A component must return exactly one node, so that row cannot be deleted. The guard was
+## `row_index > 0` -- literally index zero -- which is the predicate Unity's own comment names as
+## the mistake: after wrapping the root in an `@if`, the root element is row 1 and the directive is
+## row 0, so "Delete element" was offered on the one row that must stay.
+static func first_element_row(card: Graph.Card) -> int:
+	if card == null:
+		return -1
+	for i in card.markup.size():
+		if (card.markup[i] as Graph.Line).kind != Graph.LineKind.DIRECTIVE:
+			return i
+	return -1
+
+
+## Whether a row is TEXT rather than an affordance.
+##
+## The card lists "+ entry", "+ hook" and "+ code" as rows, and they are synthetic `Line`s with no
+## span -- `at` and `end_at` both 0. Deleting one ran `remove` over the range 0..0, which cuts the
+## FIRST LINE OF THE FILE.
+static func has_span(row: Graph.Line) -> bool:
+	return row != null and row.end_at > row.at
 
 
 ## Whether a row may be unwrapped at all.
