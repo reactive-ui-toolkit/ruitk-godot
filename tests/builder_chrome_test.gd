@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 309
+const ASSERTION_FLOOR := 313
 
 var _fails := 0
 var _passes := 0
@@ -73,6 +73,7 @@ func _run() -> void:
 	await _test_redo_of_a_creation_keeps_its_text()
 	await _test_source_edit_reaches_the_funnel()
 	await _test_abandoned_edit_is_not_kept()
+	await _test_layout_follows_the_file()
 	await _test_rename_is_complete()
 	await _test_rename_validation()
 	await _test_move_guards()
@@ -1216,6 +1217,44 @@ func _test_abandoned_edit_is_not_kept() -> void:
 	await process_frame
 	_eq(w._buffer_of(path), original, "the abandoned edit did not survive the switch")
 	_check(not pane.is_editing(), "and the pane is not still in edit mode")
+
+	_drop(w)
+
+
+## A CARD KEEPS ITS POSITION THROUGH A RENAME AND A RE-FILE.
+##
+## `layout.repath` existed, was correct, and had one caller whose call was then DISCARDED --
+## `reproject()` rebuilds the layout from disk, so re-keying it in memory achieved nothing. Every
+## rename, re-file and folder move lost the arrangement the user had made.
+func _test_layout_follows_the_file() -> void:
+	var w := _window()
+	w.size = Vector2(1400, 800)
+	await process_frame
+	await process_frame
+	var path := ROOT.path_join("app.style.guitkx")
+	var index := w.graph.index_of(path)
+	_check(index >= 0, "the companion has a card")
+
+	_section("put it somewhere deliberate, and save the arrangement")
+	var placed := Vector2(640.0, 480.0)
+	w._on_card_moved(index, placed)
+	await process_frame
+	var card: Graph.Card = w.graph.cards[index]
+	card.x = placed.x
+	card.y = placed.y
+	w._capture_layout()
+
+	_section("re-filing it keeps the position")
+	_check(w.place_module(path, ROOT.path_join("components/row")), "the move lands")
+	await process_frame
+	var moved := ROOT.path_join("components/row/app.style.guitkx")
+	var now := w.graph.index_of(moved)
+	_check(now >= 0, "the module has a card at its new path")
+	if now >= 0:
+		var after: Graph.Card = w.graph.cards[now]
+		_check(absf(after.x - placed.x) < 1.0 and absf(after.y - placed.y) < 1.0,
+			"and it is where the user put it, not at a freshly seeded slot (%.0f,%.0f)"
+				% [after.x, after.y])
 
 	_drop(w)
 

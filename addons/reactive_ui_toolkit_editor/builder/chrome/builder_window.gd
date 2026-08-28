@@ -2054,9 +2054,12 @@ func move_folder(source_folder: String, target_folder: String) -> bool:
 		var from: String = module.file_path()
 		workspace.move_to(from, str(spec["to"]), module.name)
 		if layout != null:
+			# In memory only would be discarded: `reproject()` rebuilds `layout` from disk.
 			layout.repath(from, module.file_path(), false)
 		if Paths.same(_focus_path, from):
 			_focus_path = module.file_path()
+	if layout != null:
+		layout.save(Time.get_datetime_string_from_system(true))
 	for rewrite in workspace.reconcile_imports(snapshot):
 		var r := rewrite as Dictionary
 		ledger.record(str(r["file_path"]), str(r["before"]), str(r["after"]))
@@ -2120,9 +2123,24 @@ func place_module(module_path: String, target_folder: String) -> bool:
 
 
 func _move_one(module, target_folder: String, leaf: String) -> bool:
-	var moved := workspace.place_at(module, target_folder)
-	if moved.is_empty():
+	# SUCCESS IS "THE MODULE MOVED", not "some importer needed rewriting".
+	#
+	# `place_at` returns the specifier REWRITES a move made necessary, and this treated an empty
+	# array as failure -- so moving a module nothing imports, which is the ordinary case, reported
+	# false while having moved it. Everything the caller does on success was skipped: the ledger
+	# entry, the focus re-point, the layout repath, the toast. The move happened and the builder
+	# behaved as though it had not.
+	var before: String = module.file_path()
+	var owned: String = module.folder if module.owns_folder() else ""
+	workspace.place_at(module, target_folder)
+	if Paths.same(module.file_path(), before):
 		return false
+	# THE CARD'S POSITION MOVES WITH THE FILE, and it has to happen BEFORE the re-projection --
+	# `reproject()` rebuilds the layout from disk, so a re-keying done afterwards is read back over
+	# by the next projection and the card is seeded a fresh slot.
+	if not owned.is_empty():
+		_repath_layout(owned, module.folder, true)
+	_repath_layout(before, module.file_path())
 	reproject()
 	toast("Moved %s — applies on Save" % leaf)
 	return true
@@ -2360,10 +2378,15 @@ func _rename_to(name: String) -> void:
 	# And the move itself, which carries the folder when the module owns one and rewrites the
 	# specifiers the new path invalidated.
 	var from_path := module.file_path()
+	var owned_folder := module.folder if module.owns_folder() else ""
 	workspace.move_to(from_path, destination.get_base_dir(), name)
 	ledger.record_move(from_path, destination)
 	ledger.end()
 
+	# BEFORE the re-projection, which reloads the layout from disk.
+	if not owned_folder.is_empty():
+		_repath_layout(owned_folder, destination.get_base_dir(), true)
+	_repath_layout(from_path, destination)
 	reproject()
 	select_module(destination)
 	_source.refresh_from_model()
@@ -2547,12 +2570,19 @@ func _place_tree_in(folder: String) -> bool:
 		var module = spec["module"]
 		var from: String = module.file_path()
 		workspace.move_to(from, str(spec["to"]), module.name)
+		# THE FIRST SAVE OF A NEW TREE KEEPS THE ARRANGEMENT. Every module moves out of the
+		# provisional root here, so without this every card the user had positioned looked like a
+		# module the layout had never seen and was seeded a fresh slot -- UB-220 at full strength.
+		if layout != null:
+			layout.repath(from, module.file_path(), false)
 		if Paths.same(_focus_path, from):
 			_focus_path = module.file_path()
 	for rewrite in workspace.reconcile_imports(snapshot):
 		var r := rewrite as Dictionary
 		ledger.record(str(r["file_path"]), str(r["before"]), str(r["after"]))
 	ledger.end()
+	if layout != null:
+		layout.save(Time.get_datetime_string_from_system(true))
 	reproject()
 	return true
 
@@ -2623,6 +2653,25 @@ func _replay_change(change, reverse: bool) -> void:
 		Ledger.ChangeKind.MOVE:
 			workspace.move_to_path(change.after if reverse else change.before,
 				change.before if reverse else change.after)
+
+
+## Moves a card's saved position with the file, and SAVES IT, before anything re-projects.
+##
+## `layout.repath` existed and was correct and had exactly one caller -- whose call was then
+## discarded, because `reproject()` rebuilds `layout` from disk and the re-keying only ever
+## happened in memory. So a rename, a re-file, a folder move and the first Save of a new tree all
+## lost every card position the user had arranged: the paths changed, the layout still knew the
+## old ones, and `adopt_unplaced` seeded fresh positions for what looked like new modules.
+##
+## UB-220 in the Unity register, at full strength.
+func _repath_layout(old_path: String, new_path: String, is_folder := false) -> void:
+	if layout == null or Paths.same(old_path, new_path):
+		return
+	layout.repath(old_path, new_path, is_folder)
+	# SAVED WITHOUT RE-CAPTURING. `capture_from` reads the positions off the CURRENT graph, which
+	# still carries the old paths at this point -- so capturing here would key them back to where
+	# they came from and undo the re-keying on the line above.
+	layout.save(Time.get_datetime_string_from_system(true))
 
 
 func _capture_layout() -> void:

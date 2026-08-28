@@ -32,6 +32,7 @@ const PARITY := [
 	# Folders and modules
 	["MoveModuleToFolder", "func drop_module"],
 	["MoveFolderToFolder", "func move_folder"],
+	["the layout follows the file", "func _repath_layout"],
 	["re-file by dragging onto a folder row", "signal refile_requested"],
 	["PlaceModule", "func place_module"],
 	["ShowEmptyState", "func _build_empty_state"],
