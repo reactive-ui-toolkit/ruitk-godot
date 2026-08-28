@@ -299,6 +299,13 @@ func _entry_row(kind: String, name: String) -> Button:
 	# heading above them.
 	row.flat = false
 	row.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# PASS, NOT THE BUTTON DEFAULT. Godot's `Viewport::_gui_get_drag_data` walks UP from the
+	# control the press landed on and stops at the first `MOUSE_FILTER_STOP` -- which is a
+	# Button's default -- so the pane's `_get_drag_data` was never reached and the library could
+	# not be dragged at all. PASS keeps the Button's own press and hover behaviour, so
+	# click-to-insert and the double-click framing still work, while letting the press continue
+	# up to the pane that knows how to package it.
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
 	# Elements and components read as the TAG they insert; a hook reads as the call it is. The
 	# library's job is to show what will land in the file, and `Label` and `<Label>` are not the
 	# same thing to someone scanning markup.

@@ -89,6 +89,14 @@ var _revision := 0
 func _init() -> void:
 	clip_contents = true
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	# THE CANVAS TAKES THE KEYBOARD WHEN CLICKED, and that single line answers two defects.
+	# Godot only moves focus to the control a press directly hits, and only when that control's
+	# `focus_mode` is not FOCUS_NONE -- the Control default, which this was. So a click on the
+	# canvas focused nothing, and the inline editor's commit-on-blur, which hangs off the
+	# LineEdit's `focus_exited`, could never fire: the editor kept the keyboard while the user
+	# clicked away, so "clicking away commits" was dead. It also left the keyboard model with no
+	# owner it could see.
+	focus_mode = Control.FOCUS_CLICK
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	_cards = Control.new()

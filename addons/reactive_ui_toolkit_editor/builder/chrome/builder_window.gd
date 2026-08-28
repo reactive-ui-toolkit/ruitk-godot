@@ -223,13 +223,23 @@ func _tick_toast() -> void:
 ## ALL OF IT IS OFF WHILE A TEXT SURFACE HAS FOCUS. Delete inside the source pane means "delete a
 ## character" and Escape there is the field's own cancel; a canvas keyboard model that fired
 ## under one would eat both.
-func _gui_input(event: InputEvent) -> void:
+## THE CHORDS ARE DELIVERED TREE-WIDE, not to whoever holds focus.
+##
+## This was `_gui_input`, which Godot delivers only to `gui.key_focus` -- and nothing in the
+## builder ever focused the window except one of the three entry routes, so the entire keyboard
+## model was unreachable from the menu item and stopped working the moment a click landed on the
+## folder tree, the library, the source pane or the layer selector. `_shortcut_input` runs for the
+## whole viewport after the focused Control has declined the event, which is the Godot shape of
+## what Unity gets from TrickleDown-plus-consume.
+func _shortcut_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not (event as InputEventKey).pressed:
 		return
 	var key := event as InputEventKey
-	if _typing_focused():
-		return
 
+	# THE CTRL BRANCH RUNS FIRST, before the typing guard, which is the order Unity uses. The
+	# guard exists so bare Delete and Escape belong to whatever field is being typed in; it must
+	# not also hand Ctrl+Z to that field, because once a source-pane edit is a ledger entry the
+	# ledger is where undo has to happen.
 	if key.ctrl_pressed or key.meta_pressed:
 		match key.keycode:
 			KEY_S:
@@ -240,9 +250,11 @@ func _gui_input(event: InputEvent) -> void:
 				redo()
 			_:
 				return
-		accept_event()
+		get_viewport().set_input_as_handled()
 		return
 
+	if _typing_focused():
+		return
 	match key.keycode:
 		KEY_DELETE:
 			_delete_selection()
@@ -250,7 +262,7 @@ func _gui_input(event: InputEvent) -> void:
 			_cancel_active_edit()
 		_:
 			return
-	accept_event()
+	get_viewport().set_input_as_handled()
 
 
 ## True while something that takes typing owns the keyboard.
@@ -609,6 +621,13 @@ func _build_toolbar() -> HBoxContainer:
 	_layers.item_selected.connect(_on_layer_chosen)
 	_toolbar.add_child(_layers)
 
+	_toolbar.add_child(VSeparator.new())
+	# UNDO AND REDO HAVE A VISIBLE DOOR. The chords are the fast path, but they were the ONLY
+	# path -- and the enable/disable sweep that greys commands by `can_undo`/`can_redo` had no
+	# button to act on, so it swept nothing. A destructive canvas is one where the way back is
+	# discoverable.
+	_toolbar.add_child(_tool_button("Undo", MenuId.UNDO))
+	_toolbar.add_child(_tool_button("Redo", MenuId.REDO))
 	_toolbar.add_child(VSeparator.new())
 	_toolbar.add_child(_tool_button("History", MenuId.HISTORY))
 	_toolbar.add_child(_tool_button("Trace", MenuId.TRACE))
@@ -1743,6 +1762,12 @@ func place_module(module_path: String, target_folder: String) -> bool:
 	ledger.end()
 	if ok:
 		reproject()
+		# THE FOCUS FOLLOWS THE MODULE IT IS ON. `_focus_path` is a PATH, and a re-file changes it
+		# -- so re-filing the module you are looking at left the focus naming a file that no longer
+		# exists: the source pane blanked, the folder pane deselected, and `Service.project`
+		# re-rooted the graph off a dead focus. `move_folder` already re-points; this route did not.
+		if Paths.same(module_path, _focus_path):
+			select_module(destination)
 		_source.refresh_from_model()
 		preview.request_refresh()
 	return ok
