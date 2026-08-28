@@ -59,9 +59,9 @@ enum MenuId { SAVE, ABORT, UNDO, REDO, FIT_VIEW, REVEAL, HISTORY, TRACE, HELP, _
 ## on a dropdown, and a named layer is the difference between a level of detail and an accident
 ## of how far you happened to scroll.
 const LAYERS := [
-	{ "title": "Layer 1 — Pills", "zoom": 0.34 },
-	{ "title": "Layer 2 — Cards", "zoom": 0.80 },
-	{ "title": "Layer 3 — Edit", "zoom": 1.20 },
+	{ "title": "Layer 1 — Architecture", "zoom": Metrics.LAYER_PRESETS[0] },
+	{ "title": "Layer 2 — Cards", "zoom": Metrics.LAYER_PRESETS[1] },
+	{ "title": "Layer 3 — Edit", "zoom": Metrics.LAYER_PRESETS[2] },
 ]
 ## Card-menu ids, started past zero. `add_submenu_item` takes no id and Godot assigns it one from
 ## the low end, so ids counted from 0 collided with it -- `get_item_index(RENAME)` answered with the
@@ -100,12 +100,19 @@ var _search_purpose := ""
 ## The module kind a create prompt is naming.
 var _pending_kind := -1
 var _menu_row = null
+
+## The header text a wrap just seeded, waiting for the editor to open on it once the edit has been
+## applied and the card re-projected. Empty when the pending action is not a wrap.
+var _seed_header_edit := ""
 var _menu_card := -1
 var _menu_at := Vector2.ZERO
 var _pending_attribute := {}
 
 ## The card menu's header row: the only item addressed positionally.
 const _HEADER_ITEM := 0
+## The "New" submenu row, immediately under the header. Like the header it is addressed by INDEX,
+## because `add_submenu_item` takes no id.
+const _NEW_SUBMENU_ITEM := 1
 var _canvas_menu: PopupMenu = null
 var _preview_pane: PreviewPane = null
 var _layers: OptionButton = null
@@ -516,6 +523,32 @@ func _canvas_new_menu() -> PopupMenu:
 
 
 ## A library entry was clicked. Inserts it where the selection is.
+## Double-clicking a workspace entry BRINGS ITS CARD UP: the canvas zooms so the card fills the
+## surface and centres on it.
+##
+## The library is how you find a module by name on a tree too big to scan visually, so the entry
+## has to be able to take you to it -- otherwise finding it in the list and then finding it on the
+## canvas are two separate searches.
+func _on_library_framed(name: String) -> void:
+	if graph == null:
+		return
+	for index in graph.cards.size():
+		if graph.cards[index].exports.has(name):
+			_canvas.frame_card(index)
+			select_module(graph.cards[index].file_path)
+			return
+
+
+## "+ new" in the library creates AT THE TREE ROOT (capability reference §10).
+##
+## The library is not pointing at anywhere in particular -- it is a list of everything -- so there
+## is no right-click target to inherit a location from, and the root is the one answer that does
+## not depend on what happens to be selected.
+func _on_library_create(kind: int) -> void:
+	_menu_target = ""
+	prompt_create(kind)
+
+
 func _on_library_activated(kind: String, name: String) -> void:
 	if graph == null or _focus_path.is_empty():
 		toast("Select a card first — a click in the library inserts into the selected module.")
@@ -568,7 +601,7 @@ func _build_toolbar() -> HBoxContainer:
 	_layers = OptionButton.new()
 	for layer in LAYERS:
 		_layers.add_item(str((layer as Dictionary)["title"]))
-	_layers.selected = 2
+	_layers.selected = 1
 	_layers.item_selected.connect(_on_layer_chosen)
 	_toolbar.add_child(_layers)
 
@@ -644,7 +677,14 @@ func _wire() -> void:
 	# An ABANDONED inline edit still has to clear what it was about: leaving `_menu_row` pointing
 	# at a row after the user pressed Escape means the next Delete acts on a row they walked away
 	# from.
-	_inline.cancelled.connect(func(_token: Variant): _menu_row = null)
+	_inline.cancelled.connect(func(_token: Variant, undo_seeding: bool):
+		_menu_row = null
+		# ESCAPE ON A SEEDED EDITOR TAKES THE SEEDING BACK. The builder wrote that `@if (true)`
+		# itself, a moment ago, as one ledger entry -- so undoing it is the same undo the user
+		# would reach for, and doing it here means "cancel" means the same thing whether they
+		# changed their mind during the edit or after it.
+		if undo_seeding:
+			undo())
 	_canvas.camera_changed.connect(_on_camera_changed)
 	_canvas.camera_changed.connect(func(_c: Vector2, _z: float): _sync_layer_selector())
 	_canvas.card_context_requested.connect(func(index: int, world: Vector2):
@@ -654,14 +694,19 @@ func _wire() -> void:
 		_open_card_menu(graph.cards[index].file_path, get_global_mouse_position()))
 	_canvas.canvas_context_requested.connect(func(world: Vector2):
 		_menu_world = world
+		# CLEARED: this menu was opened over empty canvas, so "new" means "at the tree root". Left
+		# set, it still names whichever card was right-clicked last, and the module is born inside
+		# a component the user is not even pointing at.
+		_menu_target = ""
 		_canvas_menu.position = Vector2i(get_global_mouse_position())
 		_canvas_menu.popup())
 
-	_library.create_requested.connect(prompt_create)
 	# CLICKING an entry inserts it into the selected card, which is the keyboard-and-trackpad
 	# route to the same place the drag goes. The signal existed and nothing listened, so a click
 	# in the library did nothing at all and the only way in was a drag.
 	_library.entry_activated.connect(_on_library_activated)
+	_library.entry_framed.connect(_on_library_framed)
+	_library.create_requested.connect(_on_library_create)
 	_source.buffer_edited.connect(_on_buffer_edited)
 	_source.edit_applied.connect(func(path: String, text: String):
 		apply_edit(path, text, "Edit %s" % path.get_file()))
@@ -759,7 +804,11 @@ func reproject() -> void:
 	# A TREE WITH NO SAVED CAMERA IS FRAMED, not left wherever the last one happened to sit. A
 	# freshly opened tree came up clipped against the top-left corner -- the fit existed, on a
 	# toolbar button nobody has pressed yet.
+	# A TREE WITH NO SAVED LAYOUT OPENS AT LAYER 2 (capability reference §2), not fitted: the fit
+	# picks whatever zoom happens to frame the graph, so the layer the user lands in depends on
+	# how many modules they have.
 	if layout.zoom <= 0.0 and not graph.cards.is_empty():
+		_canvas.zoom = Metrics.DEFAULT_ZOOM
 		_fit_when_sized()
 	if _preview_pane != null:
 		_preview_pane.graph = graph
@@ -1317,6 +1366,7 @@ func _on_search_picked(payload: Variant) -> void:
 			else:
 				after = Edits.wrap_in_directive(before, _menu_row, header)
 				what = "Wrap %s in %s" % [_menu_row.text.strip_edges(), header.split(" ")[0]]
+			_seed_header_edit = header
 		"style_entry":
 			var pick := payload as Dictionary
 			after = Edits.insert_style_entry(before, str(pick["export"]),
@@ -1342,10 +1392,46 @@ func _on_search_picked(payload: Variant) -> void:
 	if after == before:
 		toast("Nothing changed — %s could not be applied here." % what.to_lower())
 		return
-	apply_edit(_menu_target, after, what)
+	var target := _menu_target
+	var seeded_row: Graph.Line = _menu_row
+	apply_edit(target, after, what)
+
+	# A SEEDED WRAP OPENS FOR EDITING IMMEDIATELY. `@if (true)` is a placeholder, not an answer:
+	# the point of wrapping a row is the condition, so the builder writes a header that compiles
+	# and then puts the caret in it. Escape here undoes the wrap as well as the edit, which is
+	# what `seeded` on the editor is for.
+	if not _seed_header_edit.is_empty() and seeded_row != null:
+		var header := _seed_header_edit
+		_seed_header_edit = ""
+		var fresh := _row_after_reproject(target, seeded_row)
+		if fresh != null:
+			_inline.open_at(Rect2(_menu_at, Vector2(260, 24)), header,
+				{ "kind": "directive", "path": target, "row": fresh }, true)
+	_seed_header_edit = ""
 
 
 ## A name prompt was submitted.
+## The DIRECTIVE row that now wraps `original`, found again after the re-projection an edit
+## triggers. The `Line` the menu was opened on belongs to the old projection and is stale the
+## moment the buffer changes -- editing through it writes at the offsets the row used to have.
+func _row_after_reproject(path: String, original: Graph.Line) -> Graph.Line:
+	if graph == null or original == null:
+		return null
+	var card := graph.card_of(path)
+	if card == null:
+		return null
+	for row in card.markup:
+		if row.kind == Graph.LineKind.DIRECTIVE and row.source_line <= original.source_line:
+			# The nearest directive at or above where the wrapped row was: wrapping puts the
+			# header immediately before the row it wrapped.
+			var candidate := row
+			for later in card.markup:
+				if later.kind == Graph.LineKind.DIRECTIVE 						and later.source_line > candidate.source_line 						and later.source_line <= original.source_line:
+					candidate = later
+			return candidate
+	return null
+
+
 func _on_search_submitted(text: String) -> void:
 	match _search_purpose:
 		"create":
@@ -1573,7 +1659,7 @@ func _validate_name(kind: int, name: String) -> String:
 	elif not RegEx.create_from_string("^[a-z][A-Za-z0-9]*$").search(name):
 		return "camelCase identifier required"
 
-	var folder := _create_folder()
+	var folder := _create_folder(kind, name)
 	if folder.is_empty():
 		return "no folder to create in"
 	
@@ -1586,26 +1672,77 @@ func _validate_name(kind: int, name: String) -> String:
 	return ""
 
 
-## Where a new module is born: beside the focused one, or at the PROVISIONAL ROOT when there is
-## no focus yet.
+## THE ROOT OF THE OPEN TREE: the shallowest folder any module in it lives in.
 ##
-## NOTHING IS ON DISK UNTIL SAVE, including the first module of a brand new tree, and the
-## workspace already had the whole mechanism for that -- `UNSAVED_ROOT`, `is_unlocated`,
-## `unlocated_modules` and a save that asks where an unlocated module should go. The create flow
-## never used it: with no focus it asked for the base directory of an empty string, got an empty
-## string, and refused with "no folder to create in" -- so the ONE path a first-time user takes,
-## the four buttons on the start screen, was the one path that could not work.
-func _create_folder() -> String:
-	if not _focus_path.is_empty():
-		return _focus_path.get_base_dir()
-	return Workspace.UNSAVED_ROOT
+## Derived rather than stored. A tree is recognised by MEMBERSHIP -- which modules are in it -- so
+## it has no recorded root to go stale when the shallowest module is moved or deleted.
+func tree_root() -> String:
+	if workspace == null:
+		return Workspace.UNSAVED_ROOT
+	var best := ""
+	for module in workspace.modules():
+		var folder: String = module.folder
+		if folder.is_empty():
+			continue
+		if best.is_empty() or folder.length() < best.length():
+			best = folder
+	return best if not best.is_empty() else Workspace.UNSAVED_ROOT
+
+
+## Whether a create menu may be offered over `card_path` at all.
+##
+## A COMPANION card offers none (capability reference §5). A style or util module has no children:
+## it is a leaf that belongs to the component beside it, and "create inside this" has no meaning
+## there -- so the menu is absent rather than present and quietly creating somewhere else.
+func can_create_at(card_path: String) -> bool:
+	if workspace == null:
+		return false
+	if card_path.is_empty():
+		return true
+	var module := workspace.try_get(card_path)
+	if module == null:
+		return true
+	return module.kind == Module.Kind.COMPONENT
+
+
+## Where a new module of `kind` is born, given the card the menu was opened over.
+##
+## BIRTH LOCATION FOLLOWS WHERE YOU RIGHT-CLICKED, NEVER WHAT IS FOCUSED (capability reference §5).
+## Those are different things constantly: the focus follows selection, and selection follows the
+## last thing you clicked anywhere -- a library entry, a source pane, a preview element. Creating
+## from a card's own menu and having the module appear beside some other card, because that other
+## card happened to be selected, is the version this had before, and it is unexplainable from the
+## screen.
+##
+##   empty canvas   -> the tree root
+##   component card -> a COMPONENT becomes its child, in `<parent>/components/<Name>/`
+##                     a COMPANION becomes its sibling, in `<parent>` itself
+##
+## "Create states placement; wiring states usage" -- so none of this adds an import. Where a module
+## LIVES and whether anything USES it are separate decisions, and conflating them is how you get a
+## tree of files that import each other because of where they were born.
+func _create_folder(kind: int = Module.Kind.COMPONENT, name := "") -> String:
+	var over := _menu_target
+	if over.is_empty() or workspace == null:
+		return tree_root()
+	var parent := workspace.try_get(over)
+	if parent == null or parent.kind != Module.Kind.COMPONENT:
+		return tree_root()
+	if kind != Module.Kind.COMPONENT:
+		# A companion belongs BESIDE the component it companions -- that is the whole folder
+		# convention: `Card.guitkx` and `card.style.guitkx` in one folder.
+		return parent.folder
+	var child := name.strip_edges()
+	if child.is_empty():
+		return parent.folder.path_join("components")
+	return parent.folder.path_join("components").path_join(child)
 
 
 ## Creates `name` once the prompt accepted it.
 func _create_named(kind: int, name: String) -> String:
 	if workspace == null or name.strip_edges().is_empty():
 		return ""
-	var folder := _create_folder()
+	var folder := _create_folder(kind, name)
 	if folder.is_empty():
 		return ""
 	var path := folder.path_join(name + Module.suffix_for(kind))
@@ -1888,6 +2025,9 @@ func _open_card_menu(file_path: String, at: Vector2) -> void:
 	_card_menu.set_item_text(_HEADER_ITEM, shown.to_upper())
 	_card_menu.set_item_text(_card_menu.get_item_index(CardMenuId.RENAME), "Rename %s..." % shown)
 	_card_menu.set_item_text(_card_menu.get_item_index(CardMenuId.DELETE), "Delete %s" % shown)
+	# A COMPANION CARD OFFERS NO CREATE MENU (capability reference §5): a style or util module has
+	# no inside to create in, so the submenu would only ever mean "somewhere else".
+	_card_menu.set_item_disabled(_NEW_SUBMENU_ITEM, not can_create_at(file_path))
 	_card_menu.position = Vector2i(at)
 	_card_menu.popup()
 
@@ -2005,19 +2145,53 @@ func _buffer_of(file_path: String) -> String:
 	return module.buffer_text if module != null else ""
 
 
+## Every module that imports `target`, by file path.
+##
+## The question deletion asks before it does anything. Answered from the MODEL's import scan rather
+## than by matching text, so an import written across two lines or with an alias still counts.
+func referrers_to(target: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	if workspace == null or graph == null:
+		return out
+	for card in graph.cards:
+		if Paths.same(card.file_path, target):
+			continue
+		var spec := Specifiers.relative(card.file_path.get_base_dir(), target)
+		if spec.is_empty():
+			continue
+		var module := workspace.try_get(card.file_path)
+		if module == null:
+			continue
+		if Edits.imports_specifier(module.buffer_text, spec):
+			out.append(card.file_path)
+	return out
+
+
 ## Deletes a module: it leaves the tree, and the ledger holds the module itself so undo puts the
 ## SAME one back -- its identity, its buffer and its disk path.
+##
+## REFUSED WHILE ANOTHER MODULE IMPORTS IT, and the refusal NAMES THE REFERRERS (capability
+## reference §2). This used to strip the importers' imports instead and delete anyway, which is a
+## worse answer than it looks: the user asked to delete ONE file and silently got an edit to
+## several others, none of them on screen, none of them the thing they were looking at. Unwiring is
+## a decision about those files, so it belongs to whoever owns them -- and the refusal tells them
+## exactly which ones to go and look at.
 func delete_module(file_path: String) -> bool:
 	if workspace == null:
 		return false
 	var module := workspace.try_get(file_path)
 	if module == null or module.read_only:
 		return false
-	# EVERY REFERENCE GOES WITH IT, as one ledger entry. Deleting a module and leaving its
-	# importers importing it turns a delete into a build that does not compile -- and the user
-	# discovers it later, in a file they did not touch, about a module that no longer exists.
+
+	var referrers := referrers_to(file_path)
+	if not referrers.is_empty():
+		var names := PackedStringArray()
+		for path in referrers:
+			names.append(str(path).get_file())
+		toast("Can't delete %s — still imported by %s" % [file_path.get_file(), ", ".join(names)])
+		return false
+
 	ledger.begin("Delete %s" % file_path.get_file())
-	_strip_references_to(file_path)
 	if not workspace.delete(file_path):
 		ledger.end()
 		return false
@@ -2029,29 +2203,9 @@ func delete_module(file_path: String) -> bool:
 	return true
 
 
-## Removes every import of `target` from every other module in the tree.
-##
-## Ported from the Unity leg's `StripReferencesTo`. Only the IMPORT is removed, not the usages
-## it bound: a `<Card />` left in the markup is a visible, locatable error the user can decide
-## about, while silently deleting rows of their layout because a module went away is a much
-## worse surprise. The reference strips attribute values too; that is a judgement I would rather
-## the user made, and the compiler names the rows either way.
-func _strip_references_to(target: String) -> void:
-	if workspace == null or graph == null:
-		return
-	for card in graph.cards:
-		if Paths.same(card.file_path, target):
-			continue
-		var module := workspace.try_get(card.file_path)
-		if module == null or module.read_only:
-			continue
-		var spec := Specifiers.relative(card.file_path.get_base_dir(), target)
-		if spec.is_empty():
-			continue
-		var after := Edits.remove_import(module.buffer_text, spec)
-		if after != module.buffer_text:
-			apply_edit(card.file_path, after,
-				"Remove the import of %s" % target.get_file())
+## The last toast the builder raised -- where a refusal says why it refused.
+func toast_text() -> String:
+	return _toast.text if _toast != null else ""
 
 
 func _refresh_status() -> void:

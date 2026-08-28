@@ -24,11 +24,13 @@ const Layout = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/b
 const Ledger = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_ledger.gd")
 const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_module.gd")
 const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
+const Edits = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_edits.gd")
+const Specifiers = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_specifiers.gd")
 
 const ROOT := "res://tests/__builder_chrome_tmp/app"
 
 ## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
-const ASSERTION_FLOOR := 168
+const ASSERTION_FLOOR := 207
 
 var _fails := 0
 var _passes := 0
@@ -58,6 +60,8 @@ func _run() -> void:
 	await _test_inline_editor()
 	await _test_one_funnel()
 	await _test_undo_across_files()
+	await _test_create_placement()
+	await _test_delete_refused_while_imported()
 	await _test_delete_and_undo()
 	await _test_read_only()
 	_test_cleanup()
@@ -722,7 +726,7 @@ func _test_inline_editor() -> void:
 	var committed: Array = []
 	var cancelled: Array = []
 	editor.committed.connect(func(t: Variant, text: String): committed.append([t, text]))
-	editor.cancelled.connect(func(t: Variant): cancelled.append(t))
+	editor.cancelled.connect(func(t: Variant, undo_seeding: bool): cancelled.append([t, undo_seeding]))
 
 	editor.open_at(Rect2(10, 10, 120, 22), "before", "attr:text")
 	_check(editor.is_open() and editor.visible, "it opens")
@@ -749,6 +753,8 @@ func _test_inline_editor() -> void:
 	editor._gui_input(escape)
 	_eq(cancelled.size(), 1, "escape cancels")
 	_eq(committed.size(), 1, "and commits nothing")
+	_check(not bool((cancelled[0] as Array)[1]),
+		"and an editor the USER opened cancels only the edit")
 
 	_section("opening it somewhere else commits what was there")
 	# A user who clicks straight from one attribute to the next has not asked to throw the first
@@ -760,6 +766,31 @@ func _test_inline_editor() -> void:
 	_eq(str((committed[1] as Array)[0]), "attr:a", "under its own token")
 	_eq(editor.token(), "attr:b", "and the editor is now on the second")
 	_eq(editor.text, "second", "seeded with that one's text")
+
+	_section("focus does not select what is in the field")
+	# A selection means the first keystroke wipes the value the editor was opened to ADJUST, and
+	# every inline edit here starts from an existing value.
+	editor.open_at(Rect2(10, 10, 120, 22), "existing", "attr:z")
+	_eq(editor.get_selected_text(), "", "nothing is selected")
+	_eq(editor.caret_column, len("existing"), "the caret waits at the end")
+	editor.cancel()
+	_check(not bool((cancelled[cancelled.size() - 1] as Array)[1]),
+		"an editor the USER opened cancels only the edit")
+
+	_section("escaping a SEEDED editor asks for the seeding back too")
+	# The builder wrote `@if (true)` itself as part of opening this editor, so cancelling the edit
+	# and cancelling the wrap are one gesture.
+	editor.open_at(Rect2(10, 10, 120, 22), "@if (true)", "directive:1", true)
+	editor._gui_input(escape)
+	_check(bool((cancelled[cancelled.size() - 1] as Array)[1]),
+		"it asks the window to undo the seeding")
+
+	_section("committing a seeded editor keeps the seeding")
+	var cancels_before := cancelled.size()
+	editor.open_at(Rect2(10, 10, 120, 22), "@if (true)", "directive:2", true)
+	editor.text = "@if (count > 2)"
+	editor.commit()
+	_eq(cancelled.size(), cancels_before, "nothing is undone -- the wrap was wanted after all")
 
 	editor.cancel()
 	editor.queue_free()
@@ -829,6 +860,88 @@ func _test_undo_across_files() -> void:
 
 	_section("replay does not record itself")
 	_eq(w.ledger.entries().size(), 1, "an undo rewriting buffers is not a new action")
+
+	_drop(w)
+
+
+## DELETION IS REFUSED WHILE THE MODULE IS STILL IMPORTED, and the refusal names who imports it.
+##
+## The alternative -- delete anyway and quietly strip the importers' imports -- is what this
+## builder did until now, and it means a one-file delete silently edits files the user cannot see.
+## WHERE A MODULE IS BORN FOLLOWS THE RIGHT-CLICK, NOT THE FOCUS.
+##
+## Pinned as a table because the rule has four cases and they are easy to collapse into one: this
+## used to read `_focus_path.get_base_dir()`, which is neither the card you right-clicked nor the
+## tree root, and on a fresh tree was the empty string -- the "no folder to create in" refusal that
+## made the start screen's own buttons dead.
+func _test_create_placement() -> void:
+	_section("the tree root is derived from membership")
+	var w := _window()
+	await process_frame
+	_eq(w.tree_root(), ROOT, "the shallowest folder any module lives in")
+
+	_section("over empty canvas, a module is born at the tree root")
+	w._menu_target = ""
+	_eq(w._create_folder(Module.Kind.COMPONENT, "Panel"), ROOT, "a component goes to the root")
+	_eq(w._create_folder(Module.Kind.STYLE, "panel"), ROOT, "and so does a companion")
+
+	_section("over a component card, a component becomes its CHILD")
+	w._menu_target = ROOT.path_join("app.guitkx")
+	_eq(w._create_folder(Module.Kind.COMPONENT, "Panel"), ROOT.path_join("components/Panel"),
+		"in components/<Name>/ under the parent")
+
+	_section("and a companion becomes its SIBLING")
+	_eq(w._create_folder(Module.Kind.STYLE, "panel"), ROOT,
+		"in the parent's own folder -- which is what the folder convention pairs")
+	_eq(w._create_folder(Module.Kind.HOOK, "usePanel"), ROOT, "hooks companion the same way")
+
+	_section("a companion card offers no create menu at all")
+	_check(w.can_create_at(ROOT.path_join("app.guitkx")), "a component card offers one")
+	_check(not w.can_create_at(ROOT.path_join("app.style.guitkx")),
+		"a style companion does not -- it has no inside to create in")
+	_check(w.can_create_at(""), "and empty canvas always does")
+
+	_section("focus does not move it")
+	# The defect this pins: selecting something else between right-click and create silently
+	# relocated the new module.
+	w._menu_target = ROOT.path_join("app.guitkx")
+	w.select_module(ROOT.path_join("components/row/row.guitkx"))
+	await process_frame
+	_eq(w._create_folder(Module.Kind.COMPONENT, "Panel"), ROOT.path_join("components/Panel"),
+		"still born under the card the menu was opened on")
+
+	_drop(w)
+
+
+func _test_delete_refused_while_imported() -> void:
+	_section("a module another one imports cannot just be deleted")
+	var w := _window()
+	await process_frame
+	var host := ROOT.path_join("app.guitkx")
+	var target := ROOT.path_join("components/row/row.guitkx")
+
+	# Wire it up first: with nothing importing Row, deleting it is legal and says nothing.
+	var wired: String = w._with_component_import(w._buffer_of(host), host, "Row")
+	w.apply_edit(host, wired, "import Row")
+	await process_frame
+
+	var referrers := w.referrers_to(target)
+	_eq(referrers.size(), 1, "the importer is found")
+	_eq(str(referrers[0]), host, "and it is named by path")
+
+	_check(not w.delete_module(target), "so the delete is refused")
+	_check(w.workspace.try_get(target) != null, "and the module is still in the tree")
+	_check(w.toast_text().contains("row.guitkx"), "the refusal names what was refused")
+	_check(w.toast_text().contains("app.guitkx"), "and names the module that still imports it")
+
+	_section("unwire it and the same delete goes through")
+	# The unwiring is the USER's edit, in their own undo history, on a file they chose -- which is
+	# the whole difference between this and stripping it for them.
+	var spec := Specifiers.relative(host.get_base_dir(), target)
+	w.apply_edit(host, Edits.remove_import(w._buffer_of(host), spec), "drop the import")
+	await process_frame
+	_eq(w.referrers_to(target).size(), 0, "nothing imports it now")
+	_check(w.delete_module(target), "and now it deletes")
 
 	_drop(w)
 

@@ -97,26 +97,30 @@ func _draw_anchors(card: Graph.Card, index: int, card_width: float) -> void:
 	# One dot per import row, down the card's left column -- so a card with four imports shows
 	# four distinct arrival points rather than four lines converging on one.
 	var incoming := graph.edges_to(index).size()
-	var rows: int = maxi(1, incoming)
-	for k in range(rows):
-		var world := Metrics.edge_target_anchor(card) + Vector2(0.0, k * Metrics.ANCHOR_PITCH)
-		var at := Metrics.world_to_screen(world, camera, zoom)
-		draw_circle(at, ANCHOR_RADIUS, ANCHOR_COLOR)
+	# ONE dot where the edges arrive, at the card's top-left corner. A COLUMN of arrival dots was
+	# drawn here before, one per incoming edge, spaced down the left border -- but every edge now
+	# arrives at the same corner, so all but the first marked a point no line touched.
+	if incoming > 0:
+		var arrival := Metrics.world_to_screen(Metrics.edge_target_anchor(card), camera, zoom)
+		draw_circle(arrival, ANCHOR_RADIUS, ANCHOR_COLOR)
 
-	# AND ONE PER OUTGOING EDGE, on the row that owns it. Only the arrival side had dots, so a
-	# parent card showed four edges leaving its right edge with nothing marking where -- and the
-	# IMPORTS list each one comes from had no visible connection to any of them. Placed by
-	# `edge_source_anchor`, which is what the edge itself leaves from, so a dot cannot end up
-	# somewhere the line does not start.
-	var outgoing := graph.edges_from(index)
-	for k in range(outgoing.size()):
-		var source := Metrics.edge_source_anchor(card, k, card_width, Metrics.lod_of(zoom))
+	# AND ONE PER OUTGOING EDGE, ON THE ROW THAT OWNS IT -- a column down the card's right border.
+	# Only the arrival side had dots, so a parent card showed four edges leaving its right edge with
+	# nothing marking where. Placed by `edge_source_anchor` from the edge's OWN row, which is what
+	# the edge itself leaves from, so a dot cannot end up somewhere the line does not start.
+	for edge in graph.edges_from(index):
+		var source := Metrics.edge_source_anchor(card, edge.from_row, card_width,
+			Metrics.lod_of(zoom), edge.from_section)
 		draw_circle(Metrics.world_to_screen(source, camera, zoom), ANCHOR_RADIUS, ANCHOR_COLOR)
 
 
-func _draw_edge(edge: Graph.Edge, ordinal: int, card_width: float) -> void:
+func _draw_edge(edge: Graph.Edge, _ordinal: int, card_width: float) -> void:
 	var from_card := graph.cards[edge.from_index]
-	var from_world := Metrics.edge_source_anchor(from_card, ordinal, card_width, Metrics.lod_of(zoom))
+	# FROM THE EDGE'S OWN ROW, not from its position in the outgoing list. Those agreed only while
+	# every edge came from an import; with usage edges in the list too, the Nth outgoing edge is
+	# no longer the Nth import row, and the line left from a row belonging to a different edge.
+	var from_world := Metrics.edge_source_anchor(from_card, edge.from_row, card_width,
+		Metrics.lod_of(zoom), edge.from_section)
 	var from := Metrics.world_to_screen(from_world, camera, zoom)
 
 	if edge.is_broken():

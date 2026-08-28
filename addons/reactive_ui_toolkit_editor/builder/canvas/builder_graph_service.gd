@@ -20,6 +20,11 @@ extends RefCounted
 
 const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_module.gd")
 const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_paths.gd")
+## `Metrics.Section` values an edge can leave from. Held as plain ints: the metrics preload the
+## canvas view, which projects from this service, and naming the enum here closes that ring.
+const SECTION_IMPORTS := 1
+const SECTION_MARKUP := 3
+
 const Specifiers = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_specifiers.gd")
 const BuilderTree = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_tree.gd")
 const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
@@ -96,6 +101,11 @@ static func refresh_edges_for(graph: Graph, card_index: int) -> void:
 
 static func _append_edges_for(graph: Graph, card_index: int, index_by_key: Dictionary) -> void:
 	var card := graph.cards[card_index]
+	# What each imported NAME resolves to, so a usage row can be matched to a card without
+	# re-resolving the specifier once per row.
+	var target_of_name := {}
+
+	var import_index := 0
 	for row in card.imports:
 		# A theme or asset directive names a resource, not a module: no node, so no edge.
 		if row.badge == Graph.Badge.IMPORT_ASSET:
@@ -104,6 +114,8 @@ static func _append_edges_for(graph: Graph, card_index: int, index_by_key: Dicti
 		edge.from_index = card_index
 		edge.specifier = row.name
 		edge.names = row.attr_pairs
+		edge.from_row = import_index
+		edge.from_section = SECTION_IMPORTS
 		# An unresolved specifier still produces an edge with no target: the import row is real
 		# even when what it points at is not there yet, and a broken edge is what tells the
 		# canvas to draw the dot as unsatisfied rather than to draw nothing at all.
@@ -111,6 +123,30 @@ static func _append_edges_for(graph: Graph, card_index: int, index_by_key: Dicti
 		edge.to_index = int(index_by_key.get(Paths.key(mapped), -1)) if not mapped.is_empty() else -1
 		edge.target_kind = graph.cards[edge.to_index].kind if edge.to_index >= 0 else Module.Kind.UNKNOWN
 		graph.edges.append(edge)
+		if edge.to_index >= 0:
+			for imported in row.attr_pairs:
+				target_of_name[str(imported)] = edge.to_index
+		import_index += 1
+
+	# AND ONE PER MARKUP ROW THAT INSTANTIATES ANOTHER MODULE. Only rows whose tag is a name this
+	# card actually imported: a `<Button />` is a Godot class, not a module, and an edge to nothing
+	# is worse than no edge.
+	for row_index in card.markup.size():
+		var row: Graph.Line = card.markup[row_index]
+		if row.kind != Graph.LineKind.COMPONENT:
+			continue
+		if not target_of_name.has(row.name):
+			continue
+		var usage := Graph.Edge.new()
+		usage.from_index = card_index
+		usage.to_index = int(target_of_name[row.name])
+		usage.specifier = row.name
+		usage.names = PackedStringArray([row.name])
+		usage.from_row = row_index
+		usage.from_section = SECTION_MARKUP
+		usage.is_usage = true
+		usage.target_kind = graph.cards[usage.to_index].kind
+		graph.edges.append(usage)
 
 
 ## The card the layout is seeded from: the module the focus belongs to, preferring the component

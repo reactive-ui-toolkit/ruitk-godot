@@ -327,6 +327,19 @@ static func ensure_import(source: String, from_path: String, target_path: String
 	return _insert_into_preamble(source, line)
 
 
+## Whether `source` imports `spec` at all.
+##
+## The question that decides whether a module can be deleted. Asked of the COMPILER's import scan,
+## not of the text: an import spelled across two lines, or aliased, or with the module among five
+## other names, is still an import, and a `contains()` on the specifier would also match one
+## inside a comment or a string.
+static func imports_specifier(source: String, spec: String) -> bool:
+	for imp in Compiler.scan_imports(source):
+		if str(imp.get("spec", "")) == spec:
+			return true
+	return false
+
+
 ## Removes the import naming `spec` entirely, or just some of its names.
 static func remove_import(source: String, spec: String, names := PackedStringArray()) -> String:
 	for imp in Compiler.scan_imports(source):
@@ -545,7 +558,10 @@ static func _crlf() -> String:
 
 const WRAPS := [
 	{ "label": "@if", "header": "@if (true)" },
-	{ "label": "@for", "header": "@for (item in [])" },
+	# `range(1)`, not `[]`: a seeded wrap has to keep the row it wrapped ON SCREEN. An empty
+	# collection iterates zero times, so wrapping an element in @for made it vanish from the
+	# preview, and the user's next move was to work out what they had broken.
+	{ "label": "@for", "header": "@for (item in range(1))" },
 	{ "label": "@while", "header": "@while (false)" },
 ]
 

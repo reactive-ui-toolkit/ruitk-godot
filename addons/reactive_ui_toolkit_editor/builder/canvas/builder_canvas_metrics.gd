@@ -26,15 +26,23 @@ const ZOOM_MAX := 2.2
 ## and hook chips; L2 adds the markup tree with its attributes and the code island.
 enum Lod { PILL, SECTIONS, FULL }
 
-## The band edges. Below the first, a card is a pill; below the second, it shows its sections;
-## above, everything.
+## The band edges, from the capability reference §2:
 ##
-## The FULL band starts below 1:1 on purpose. It used to start above it, which made 100% zoom --
-## where a user actually works, and where the layer selector says "Edit" -- the band that shows
-## everything EXCEPT the markup. The card was at its largest and carrying the least, and reaching
-## the markup meant zooming past the point where a second card fits on screen.
-const LOD_PILL_BELOW := 0.45
-const LOD_SECTIONS_BELOW := 0.75
+##   Layer 1 — Architecture   preset 0.30   applies below 0.32
+##   Layer 2 — Cards          preset 0.75   applies below 0.80
+##   Layer 3 — Edit           preset 1.25   applies at 0.80 and above
+##
+## These are the reference's numbers, not ones invented here. The values I had (0.45 / 0.75) put
+## the working zoom in the wrong band and made the layer selector disagree with what was drawn.
+const LOD_PILL_BELOW := 0.32
+const LOD_SECTIONS_BELOW := 0.80
+
+## The zoom each layer jumps to when chosen by name.
+const LAYER_PRESETS := [0.30, 0.75, 1.25]
+
+## What a tree with no saved layout opens at: Layer 2, where a card shows its shape without
+## showing every attribute in it.
+const DEFAULT_ZOOM := 0.75
 
 ## Card width per LOD. A pill is narrower because it holds a title; the full card is wider
 ## because it is the only one that rides the attribute run on a markup row.
@@ -322,19 +330,38 @@ static func fit_to_view(graph: Graph, viewport: Vector2, margin := 40.0) -> Dict
 	return { "camera": camera, "zoom": zoom }
 
 
+## The camera and zoom that FRAME one card: solve the zoom so the card fills the viewport, then
+## centre on it (capability reference §10).
+##
+## What double-clicking a library entry does. Distinct from `fit_to_view`, which frames the whole
+## graph -- on a tree of twenty modules that leaves every card too small to read, which is exactly
+## the situation someone hunting for one module by name is in.
+##
+## Measured at the SECTIONS layout, then clamped: a card is drawn at whatever band the solved zoom
+## lands in, and solving against the band's own height would be circular.
+static func frame_card(card: Graph.Card, viewport: Vector2, margin := 60.0) -> Dictionary:
+	if card == null or viewport.x <= 0.0 or viewport.y <= 0.0:
+		return { "camera": Vector2.ZERO, "zoom": 1.0 }
+	var size := Vector2(card_width_for(Lod.SECTIONS), maxf(drawn_height(card, Lod.SECTIONS), 1.0))
+	var usable := viewport - Vector2(margin, margin) * 2.0
+	var zoom := clamp_zoom(minf(usable.x / size.x, usable.y / size.y))
+	var centre := Vector2(card.x, card.y) + size * 0.5
+	return { "camera": viewport * 0.5 - centre * zoom, "zoom": zoom }
+
+
 # ── Anchors ──────────────────────────────────────────────────────────────────────────
 
 ## Where an edge leaves a card: the right edge of the import ROW it comes from, so a card with
 ## four imports has four distinct departure points rather than four lines out of one.
 static func edge_source_anchor(card: Graph.Card, import_index: int,
-		card_width: float, lod := Lod.FULL) -> Vector2:
-	# ON THE IMPORT ROW, when the card is showing its import rows.
+		card_width: float, lod := Lod.FULL, section := Section.IMPORTS) -> Vector2:
+	# ON THE ROW IT LEAVES FROM, when the card is showing that row.
 	#
 	# A fixed offset from the card top put every anchor in the header, so at the section and full
-	# bands all of a card's edges left from the same point and the card's own IMPORTS list -- the
-	# thing each edge actually comes from -- had nothing beside it. The section stack already
-	# knows where that list starts and how tall a row is; asking it is the difference between an
-	# edge attached to a line and an edge attached to a box.
+	# bands all of a card's edges left from the same point and the card's own rows -- the things
+	# each edge actually comes from -- had nothing beside them. The section stack already knows
+	# where each list starts and how tall a row is; asking it is the difference between an edge
+	# attached to a line and an edge attached to a box.
 	var y := card.y + EDGE_ANCHOR_Y + maxi(0, import_index) * ANCHOR_PITCH
 	# A PILL HAS NO ROWS to anchor on, so every edge leaves from its single header line. Walking
 	# the section stack there put the anchor where the imports WOULD be if the card were open --
@@ -342,17 +369,44 @@ static func edge_source_anchor(card: Graph.Card, import_index: int,
 	if lod == Lod.PILL:
 		return Vector2(card.x + card_width, card.y + HEADER_H * 0.5)
 	for entry in section_stack(card):
-		var section := entry as Dictionary
-		if int(section["section"]) != int(Section.IMPORTS):
+		var spec := entry as Dictionary
+		if int(spec["section"]) != int(section):
 			continue
-		y = card.y + float(section["top"]) + SECTION_OVERHEAD_H 			+ (float(maxi(0, import_index)) + 0.5) * IMPORT_ROW_H
+		var pitch := float(spec.get("row_height", IMPORT_ROW_H))
+		y = card.y + float(spec["top"]) + SECTION_OVERHEAD_H 			+ (float(maxi(0, import_index)) + 0.5) * pitch
 		break
 	return Vector2(card.x + card_width, y)
 
 
-## Where an edge arrives: the left edge of the target card, at its own anchor line.
+## Whether a world point is on a card's TITLE BAR -- the band a card is dragged by.
+##
+## CARDS ARE DRAGGED BY THE TITLE BAR (capability reference §2), not from anywhere on their face.
+## A card is mostly rows, and every row is a click target of its own -- selecting it, opening its
+## menu, starting a re-parent drag. Making the whole card a drag handle means any of those
+## gestures, off by four pixels, silently moves the card instead.
+##
+## A PILL IS ALL TITLE: at that band the card has no rows to compete with, and requiring the top
+## 38 world-units of a card drawn at a third of its size would leave a handle a few pixels tall.
+static func on_title_bar(card: Graph.Card, world: Vector2, card_width: float,
+		lod := Lod.FULL) -> bool:
+	if card == null:
+		return false
+	if world.x < card.x or world.x > card.x + card_width:
+		return false
+	if lod == Lod.PILL:
+		return world.y >= card.y and world.y <= card.y + drawn_height(card, lod)
+	return world.y >= card.y and world.y <= card.y + HEADER_H
+
+
+## Where an edge arrives: the TOP-LEFT CORNER of the target card.
+##
+## The reference's own choice (capability reference §2), and it is the one that stays readable as
+## a card grows: a fixed offset down the left border lands mid-card once the card is tall, so the
+## curve crosses the card's own rows on its way in and the arrival point moves every time the
+## module gains a hook. The corner is the one point on a card that does not move when its content
+## changes.
 static func edge_target_anchor(card: Graph.Card) -> Vector2:
-	return Vector2(card.x, card.y + EDGE_ANCHOR_Y)
+	return Vector2(card.x, card.y)
 
 
 ## The two control points of the edge curve. Pulled horizontally by a fraction of the span, with

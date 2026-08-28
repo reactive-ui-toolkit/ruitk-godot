@@ -70,6 +70,10 @@ var _grab_offset := Vector2.ZERO
 var _pressed_at := Vector2.ZERO
 var _press_index := -1
 
+## Whether the press that may become a drag landed on a card's TITLE BAR. Recorded at press rather
+## than asked at motion, because by then the pointer has left the bar it started on.
+var _press_on_title := false
+
 ## Bumped on every `show_graph`, so an in-place model change cannot be bailed out of.
 var _revision := 0
 
@@ -130,6 +134,15 @@ func select_card(index: int) -> void:
 
 ## Frames the whole graph. What "reset view" does, and what a freshly opened tree with no saved
 ## layout comes up as.
+## Brings ONE card up to fill the surface, and selects it.
+func frame_card(index: int) -> void:
+	if graph == null or index < 0 or index >= graph.cards.size() or size.x <= 0.0:
+		return
+	var solved := Metrics.frame_card(graph.cards[index], size)
+	set_camera(solved["camera"], solved["zoom"])
+	select_card(index)
+
+
 func fit_to_view() -> void:
 	if graph == null:
 		return
@@ -313,6 +326,13 @@ func _handle_button(event: InputEventMouseButton) -> void:
 			if event.pressed:
 				_pressed_at = event.position
 				_press_index = card_at(event.position)
+				# WHETHER THE PRESS LANDED ON THE TITLE BAR decides whether a later drag moves the
+				# card or pans the canvas. Recorded at press rather than asked at motion, because
+				# by then the pointer has left the bar it started on.
+				_press_on_title = _press_index >= 0 and Metrics.on_title_bar(
+					graph.cards[_press_index],
+					Metrics.screen_to_world(event.position, camera, zoom),
+					Metrics.card_width_for(Metrics.lod_of(zoom)), Metrics.lod_of(zoom))
 				select_card(_press_index)
 				var hit := row_at(_press_index, event.position)
 				if bool(hit.get("found", false)):
@@ -414,7 +434,7 @@ func _handle_motion(motion: InputEventMouseMotion) -> void:
 		return
 	if _pressed_at.distance_to(motion.position) < DRAG_THRESHOLD:
 		return
-	if _press_index >= 0 and graph != null and _press_index < graph.cards.size():
+	if _press_on_title and _press_index >= 0 and graph != null and _press_index < graph.cards.size():
 		var card := graph.cards[_press_index]
 		var world := Metrics.screen_to_world(_pressed_at, camera, zoom)
 		_grab_offset = world - Vector2(card.x, card.y)

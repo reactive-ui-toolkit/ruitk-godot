@@ -29,7 +29,7 @@ const ROOT := "res://tests/__builder_canvas_tmp/app"
 const VIEWPORT := Vector2(1280, 720)
 
 ## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
-const ASSERTION_FLOOR := 137
+const ASSERTION_FLOOR := 141
 
 var _fails := 0
 var _passes := 0
@@ -129,19 +129,24 @@ func _card(name: String) -> Graph.Card:
 
 func _test_lod_bands() -> void:
 	_section("one LOD definition, and every consumer asks it")
-	# The Unity leg has two -- the view banding at 0.45/1.05 and the host at 0.32/0.80 -- so
-	# between those thresholds the card the view drew and the card the camera measured were
-	# different widths.
+	# The band edges are the capability reference's, not ones chosen here: Architecture below 0.32,
+	# Cards below 0.80, Edit at 0.80 and up. This asserted 0.45/0.75 before -- the Unity VIEW's
+	# banding rather than its HOST's -- and that is the pair which disagrees with the layer selector,
+	# so the layer named in the toolbar was not the layer being drawn.
 	_eq(Metrics.lod_of(0.10), Metrics.Lod.PILL, "the smallest zoom is a pill")
-	_eq(Metrics.lod_of(0.44), Metrics.Lod.PILL, "just under the first band edge")
-	_eq(Metrics.lod_of(0.45), Metrics.Lod.SECTIONS, "at the edge it is sections")
-	# The FULL band starts BELOW 1:1: 100% zoom is where a user works and where the layer selector
-	# says "Edit", and with the edge above it that was the band showing everything except the
-	# markup -- the card at its largest, carrying the least.
-	_eq(Metrics.lod_of(0.74), Metrics.Lod.SECTIONS, "just under the second")
-	_eq(Metrics.lod_of(0.75), Metrics.Lod.FULL, "at the edge it is full")
+	_eq(Metrics.lod_of(0.31), Metrics.Lod.PILL, "just under the first band edge")
+	_eq(Metrics.lod_of(0.32), Metrics.Lod.SECTIONS, "at the edge it is sections")
+	_eq(Metrics.lod_of(0.79), Metrics.Lod.SECTIONS, "just under the second")
+	_eq(Metrics.lod_of(0.80), Metrics.Lod.FULL, "at the edge it is full")
 	_eq(Metrics.lod_of(1.0), Metrics.Lod.FULL, "and 1:1 -- where the work happens -- is full")
 	_eq(Metrics.lod_of(2.2), Metrics.Lod.FULL, "and stays full")
+
+	# Each layer's preset zoom must land INSIDE the band that layer names. Choosing "Cards" and
+	# being shown pills is the defect this pins.
+	_eq(Metrics.lod_of(Metrics.LAYER_PRESETS[0]), Metrics.Lod.PILL, "the Architecture preset is Architecture")
+	_eq(Metrics.lod_of(Metrics.LAYER_PRESETS[1]), Metrics.Lod.SECTIONS, "the Cards preset is Cards")
+	_eq(Metrics.lod_of(Metrics.LAYER_PRESETS[2]), Metrics.Lod.FULL, "the Edit preset is Edit")
+	_eq(Metrics.DEFAULT_ZOOM, Metrics.LAYER_PRESETS[1], "a tree with no saved layout opens at Layer 2")
 
 	_eq(Metrics.card_width_for(Metrics.Lod.PILL), 300.0, "a pill is the narrowest")
 	_eq(Metrics.card_width_for(Metrics.Lod.SECTIONS), 340.0, "sections are wider")

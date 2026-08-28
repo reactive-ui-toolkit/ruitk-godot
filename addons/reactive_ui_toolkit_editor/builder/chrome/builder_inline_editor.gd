@@ -18,16 +18,24 @@ extends LineEdit
 ## The edit was accepted. `token` is whatever the opener passed in, so the caller can tell which
 ## row it opened this for without keeping the state itself.
 signal committed(token: Variant, text: String)
-signal cancelled(token: Variant)
+## `undo_seeding` is true when the builder had written the text being edited as part of opening
+## the editor, so cancelling should take that back as well.
+signal cancelled(token: Variant, undo_seeding: bool)
 
 var _token: Variant = null
 var _initial := ""
 var _open := false
 
+## Whether the text in the editor was written by the BUILDER when it opened.
+var _seeded := false
+
 
 func _init() -> void:
 	visible = false
-	select_all_on_focus = true
+	# FOCUS NEVER SELECTS THE WHOLE TEXT (capability reference §5). Selecting it means the first
+	# keystroke wipes the value the user opened the editor to ADJUST -- and every inline edit here
+	# starts from an existing value, because that is what "edit in place" means.
+	select_all_on_focus = false
 	# Above the canvas and its overlay, so a click lands here rather than starting a pan.
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	text_submitted.connect(func(_t: String): commit())
@@ -47,9 +55,14 @@ func token() -> Variant:
 ## Opening while already open COMMITS the previous edit first. The alternative is to discard it,
 ## and a user who clicks straight from one attribute to the next has not asked to throw the first
 ## one away.
-func open_at(rect: Rect2, initial: String, for_token: Variant) -> void:
+## `seeded` marks an editor the BUILDER opened on text it had just written itself -- a fresh wrap
+## header, a new clause. Escaping one of those undoes the seeding too (capability reference §5):
+## the user asked to wrap a row and then changed their mind, and leaving `@if (true)` behind makes
+## cancelling the edit and cancelling the action two separate steps.
+func open_at(rect: Rect2, initial: String, for_token: Variant, seeded := false) -> void:
 	if _open:
 		commit()
+	_seeded = seeded
 	_token = for_token
 	_initial = initial
 	text = initial
@@ -58,7 +71,9 @@ func open_at(rect: Rect2, initial: String, for_token: Variant) -> void:
 	visible = true
 	_open = true
 	grab_focus()
-	select_all()
+	# THE CARET GOES TO THE END, and nothing is selected: every inline edit here starts from a
+	# value the user opened the editor to adjust, so a selection means the first keystroke wipes it.
+	caret_column = text.length()
 
 
 func commit() -> void:
@@ -80,12 +95,14 @@ func cancel() -> void:
 	if not _open:
 		return
 	var for_token := _token
+	var undo_seeding := _seeded
 	_close()
-	cancelled.emit(for_token)
+	cancelled.emit(for_token, undo_seeding)
 
 
 func _close() -> void:
 	_open = false
+	_seeded = false
 	visible = false
 	_token = null
 	_initial = ""

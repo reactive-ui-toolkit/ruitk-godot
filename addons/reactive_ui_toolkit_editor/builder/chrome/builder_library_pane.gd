@@ -20,6 +20,12 @@ const Parts = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/bu
 ## component name.
 signal entry_activated(kind: String, name: String)
 
+## A WORKSPACE entry was double-clicked: bring its card up on the canvas (capability reference
+## §10). Only the tree's own modules answer this -- a native element and a built-in hook have no
+## card to go to.
+signal entry_framed(name: String)
+
+
 ## A new module of `kind` was asked for from the pane's own `+ new` button. The library is where
 ## a user looks for "something to put in", and a module they have not written yet is exactly that
 ## -- so the create affordance belongs here rather than only behind a right-click on the canvas,
@@ -29,6 +35,13 @@ signal create_requested(kind: int)
 const ENTRY_ELEMENT := "element"
 const ENTRY_HOOK := "hook"
 const ENTRY_COMPONENT := "component"
+## The tree's own COMPANION modules, listed by kind (capability reference §10). A style module and
+## a util module are things you reach for while building, exactly as a component is -- and until
+## they were listed the library could show you a tree's components while silently omitting half
+## of what that tree contained.
+const ENTRY_STYLE := "style"
+const ENTRY_UTIL := "util"
+const ENTRY_HOOK_MODULE := "hook_module"
 
 ## The elements that lead the list. Everything a UI actually starts with -- a box, a label, a
 ## button -- ahead of the hundred and thirty that follow.
@@ -49,7 +62,10 @@ var graph: Graph = null
 var _sections := {}
 ## Which sections are open. A VIEW state -- it survives a rebuild, because a pane that re-folded
 ## itself every time the model changed would be unusable while anyone was working.
-var _expanded := { ENTRY_ELEMENT: true, ENTRY_HOOK: true, ENTRY_COMPONENT: true }
+var _expanded := {
+	ENTRY_ELEMENT: true, ENTRY_HOOK: true, ENTRY_COMPONENT: true,
+	ENTRY_STYLE: true, ENTRY_UTIL: true, ENTRY_HOOK_MODULE: true,
+}
 var _search := ""
 
 ## The component whose card is selected on the canvas, so the palette row for it can say so.
@@ -119,6 +135,13 @@ func rebuild() -> void:
 	_add_section(ENTRY_ELEMENT, "NATIVE ELEMENTS", _element_entries())
 	_add_section(ENTRY_COMPONENT, "CUSTOM COMPONENTS", _component_entries())
 	_add_section(ENTRY_HOOK, "HOOKS", _hook_entries())
+	# The tree's OWN companion modules, each kind its own section. Grouped rather than merged into
+	# one "modules" list: what you do with an entry depends on its kind -- a style module is
+	# dragged onto a row, a util is imported and called -- so a list mixing them is a list you
+	# have to read the suffix of.
+	_add_section(ENTRY_STYLE, "STYLE MODULES", _module_entries(Module.Kind.STYLE))
+	_add_section(ENTRY_UTIL, "UTIL MODULES", _module_entries(Module.Kind.UTIL))
+	_add_section(ENTRY_HOOK_MODULE, "HOOK MODULES", _module_entries(Module.Kind.HOOK))
 
 
 ## The open tree's own components -- what the user is building, offered alongside what the engine
@@ -134,6 +157,20 @@ func _component_entries() -> PackedStringArray:
 			out.append(export_name)
 	# ALPHABETICAL. Projection order is graph order, which is the order the tree was walked in --
 	# stable, but meaningless to someone scanning a list for a name.
+	out.sort()
+	return out
+
+
+## The open tree's modules of one companion KIND, by exported name.
+func _module_entries(kind: int) -> PackedStringArray:
+	var out := PackedStringArray()
+	if graph == null:
+		return out
+	for card in graph.cards:
+		if card.kind != kind:
+			continue
+		for export_name in card.exports:
+			out.append(export_name)
 	out.sort()
 	return out
 
@@ -221,6 +258,12 @@ func _show_all(kind: String, entries: PackedStringArray) -> void:
 ## `drop_library_entry` existed, `builder_drag.gd` existed to resolve where a drop landed, and no
 ## gesture in the builder could start a drag -- so the primary interaction of a
 ## direct-manipulation surface was a function nobody could reach.
+## Whether entries of this kind name a module IN THE OPEN TREE, rather than something the engine
+## or the runtime provides.
+static func _is_workspace_kind(kind: String) -> bool:
+	return kind == ENTRY_COMPONENT or kind == ENTRY_STYLE 		or kind == ENTRY_UTIL or kind == ENTRY_HOOK_MODULE
+
+
 func _get_drag_data(at_position: Vector2) -> Variant:
 	var row: Control = _row_under(at_position)
 	if row == null:
@@ -259,7 +302,10 @@ func _entry_row(kind: String, name: String) -> Button:
 	# Elements and components read as the TAG they insert; a hook reads as the call it is. The
 	# library's job is to show what will land in the file, and `Label` and `<Label>` are not the
 	# same thing to someone scanning markup.
-	row.text = "    " + (name if kind == ENTRY_HOOK else "<%s>" % name)
+	# Only ELEMENTS and COMPONENTS read as tags: those are the two you write in angle brackets.
+	# A hook, a style export and a util are identifiers you call or reference.
+	var tagged := kind == ENTRY_ELEMENT or kind == ENTRY_COMPONENT
+	row.text = "    " + ("<%s>" % name if tagged else name)
 	row.tooltip_text = "%s -- drag onto a card, or click to insert" % name
 	row.set_meta("entry_kind", kind)
 	row.set_meta("entry_name", name)
@@ -268,6 +314,10 @@ func _entry_row(kind: String, name: String) -> Button:
 		row.toggle_mode = true
 	row.set_meta("entry_name", name)
 	row.pressed.connect(func(): entry_activated.emit(kind, name))
+	if _is_workspace_kind(kind):
+		row.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton 					and (event as InputEventMouseButton).double_click 					and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+				entry_framed.emit(name))
 	return row
 
 

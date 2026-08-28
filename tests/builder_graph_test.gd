@@ -22,7 +22,7 @@ const Service = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/
 const ROOT := "res://tests/__builder_graph_tmp/app"
 
 ## The fewest assertions a complete run makes. Raise it when the suite genuinely grows.
-const ASSERTION_FLOOR := 158
+const ASSERTION_FLOOR := 162
 
 var _fails := 0
 var _passes := 0
@@ -305,13 +305,30 @@ func _test_import_rows() -> void:
 # ── Edges ────────────────────────────────────────────────────────────────────────────
 
 func _test_edges() -> void:
-	_section("one edge per resolvable import row")
+	_section("one edge per resolvable import row, and one per USAGE row")
 	var app_index := _graph.index_of(ROOT.path_join("app.guitkx"))
 	var out := _graph.edges_from(app_index)
-	_eq(out.size(), 4, "four module imports, four edges -- the theme directive is not one")
+	var imports_only: Array = []
+	var usages: Array = []
+	for e in out:
+		if e.is_usage:
+			usages.append(e)
+		else:
+			imports_only.append(e)
+	_eq(imports_only.size(), 4, "four module imports, four edges -- the theme directive is not one")
+
+	# THE USAGE EDGE is the second half of the contract: the import says Row is available here, the
+	# usage says where in this component it is actually put. `<Label>` and the rest are Godot
+	# classes, not modules, so they are not edges -- only a tag naming an imported name is.
+	_eq(usages.size(), 1, "and one usage edge, for the single <Row /> in the markup")
+	_eq(usages[0].specifier, "Row", "named by the tag it was written as")
+	_eq(usages[0].to_index, _graph.index_of(ROOT.path_join("components/row/row.guitkx")),
+		"pointing at the module that tag instantiates")
+	_eq(_graph.cards[app_index].markup[usages[0].from_row].name, "Row",
+		"and anchored on the markup row that produced it")
 
 	var rendered := PackedStringArray()
-	for e in out:
+	for e in imports_only:
 		var target := "<broken>" if e.is_broken() else _graph.cards[e.to_index].file_path.trim_prefix(ROOT + "/")
 		rendered.append("%s -> %s (%d)" % [e.specifier, target, e.target_kind])
 	_eq("\n".join(rendered), """./app.hooks -> app.hooks.guitkx (1)
@@ -329,7 +346,8 @@ func _test_edges() -> void:
 
 	_section("edges_to answers who depends on a card")
 	var row_index := _graph.index_of(ROOT.path_join("components/row/row.guitkx"))
-	_eq(_graph.edges_to(row_index).size(), 1, "one importer of the row component")
+	_eq(_graph.edges_to(row_index).size(), 2,
+		"the app reaches Row twice -- once by importing it, once by placing it")
 	_eq(_graph.edges_to(_graph.index_of(ROOT.path_join("util.guitkx"))).size(), 0,
 		"and none for a module nothing imports yet")
 
@@ -591,11 +609,12 @@ func _test_refresh_edges() -> void:
 
 	_section("refreshing one card leaves every other edge alone")
 	var app_index := graph.index_of(ROOT.path_join("app.guitkx"))
-	_eq(graph.edges_from(app_index).size(), 4, "the app's edges are untouched")
+	_eq(graph.edges_from(app_index).size(), 5,
+		"the app's four import edges and its one usage edge are untouched")
 	Service.refresh_edges_for(graph, -1)
 	Service.refresh_edges_for(graph, 999)
 	Service.refresh_edges_for(null, 0)
-	_eq(graph.edges.size(), 5, "an out-of-range refresh is a no-op, not a wipe")
+	_eq(graph.edges.size(), 6, "an out-of-range refresh is a no-op, not a wipe")
 
 
 # ── Degenerate input ─────────────────────────────────────────────────────────────────

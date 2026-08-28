@@ -202,6 +202,19 @@ class Edge extends RefCounted:
 	var names: PackedStringArray = PackedStringArray()
 	var target_kind: Module.Kind = Module.Kind.UNKNOWN
 
+	## Which ROW on the source card this edge leaves from: the index within `from_section`.
+	##
+	## An edge per import row AND an edge per markup row that instantiates another module
+	## (capability reference §2). The import says the module is AVAILABLE here; the usage says
+	## where it is actually PUT. Drawing only the first answers "what does this file depend on"
+	## and leaves the more useful question -- "where in this component does that one appear" --
+	## needing the source pane to answer.
+	var from_row: int = 0
+	var from_section: int = 1   ## Metrics.Section.IMPORTS / .MARKUP, kept as an int to avoid a cycle
+
+	## Whether this edge came from a usage row rather than from the import row.
+	var is_usage: bool = false
+
 	func is_broken() -> bool:
 		return to_index < 0
 
