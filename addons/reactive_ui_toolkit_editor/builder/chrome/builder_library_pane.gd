@@ -72,6 +72,9 @@ var _search := ""
 ## Without it the library is the one region that never reflects the selection every other region
 ## is showing.
 var _selected_component := ""
+
+## The file the selection belongs to, when it has one. A name alone cannot tell two modules apart.
+var _selected_path := ""
 var _search_field: LineEdit = null
 var _create_menu: PopupMenu = null
 var _body: VBoxContainer = null
@@ -292,6 +295,26 @@ func _row_under(at_position: Vector2):
 	return null
 
 
+## The module a workspace entry comes from, or "" for a native element or a built-in hook.
+func _path_exporting(kind: String, name: String) -> String:
+	if graph == null or not _is_workspace_kind(kind):
+		return ""
+	for card in graph.cards:
+		if card.exports.has(name):
+			return card.file_path
+	return ""
+
+
+## Whether this entry is the one the workspace has selected.
+##
+## BY PATH when both sides have one, which is what makes two modules exporting the same name
+## distinguishable; by name otherwise, which is the only identity a native element has.
+func _is_selected(kind: String, name: String) -> bool:
+	if not _selected_path.is_empty():
+		return _path_exporting(kind, name) == _selected_path
+	return kind == ENTRY_COMPONENT and name == _selected_component
+
+
 func _entry_row(kind: String, name: String) -> Button:
 	var row := Button.new()
 	# NOT flat. A palette entry is a drag handle and a click target, and flat text on a panel
@@ -316,7 +339,8 @@ func _entry_row(kind: String, name: String) -> Button:
 	row.tooltip_text = "%s -- drag onto a card, or click to insert" % name
 	row.set_meta("entry_kind", kind)
 	row.set_meta("entry_name", name)
-	if kind == ENTRY_COMPONENT and name == _selected_component:
+	row.set_meta("entry_path", _path_exporting(kind, name))
+	if _is_selected(kind, name):
 		# TOGGLE MODE FIRST. Godot's `BaseButton::set_pressed` early-returns while `toggle_mode`
 		# is false, so setting them the other way round was a no-op and the selection mirror never
 		# painted at all.
@@ -371,7 +395,21 @@ func open_create_menu() -> void:
 
 ## Points the palette at the component the canvas has selected.
 func select_component(name: String) -> void:
-	if _selected_component == name:
+	select_entry("", name)
+
+
+## Mirrors the workspace selection, identified by FILE PATH.
+##
+## A bare name cannot identify a module. `select_component` was fed `card.exports[0]` of the
+## focused module, so a module with NO exports mirrored nothing, a module whose second export was
+## the interesting one mirrored the wrong row, and two modules exporting the same name in
+## different folders were indistinguishable. The path is what the workspace rows are keyed on.
+##
+## The name is kept as the fallback, because a native element and a built-in hook have no file --
+## for those, the name IS the identity.
+func select_entry(file_path: String, name: String) -> void:
+	if _selected_path == file_path and _selected_component == name:
 		return
+	_selected_path = file_path
 	_selected_component = name
 	rebuild()

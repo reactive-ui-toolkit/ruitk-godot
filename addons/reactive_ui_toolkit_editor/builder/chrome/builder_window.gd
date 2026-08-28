@@ -128,6 +128,9 @@ var _seed_header_edit := ""
 ## not ask again.
 var _deletions_agreed := false
 
+## Whether the preview pipeline's own narration is being echoed into the console.
+var _tracing := false
+
 ## Whether the crash-journal offer has been made for this window. Asked once: a second prompt for
 ## the same journal reads as the builder not believing the first answer.
 var _offered_recovery := false
@@ -818,6 +821,12 @@ func _wire() -> void:
 	ledger.changed.connect(_refresh_status)
 	# A FAILED round brings the console forward; a clean one leaves it away. That is the whole
 	# rule, and it is why the console does not need to be on screen the rest of the time.
+	preview.trace.connect(func(message: String):
+		if _tracing and _console != null:
+			_console.add_diagnostics("", [{
+				"code": "", "severity": Console.SEVERITY_WARNING, "line": -1,
+				"message": message,
+			}]))
 	preview.compile_finished.connect(func(_p: String, ok: bool, _e: String):
 		if not ok and _console != null:
 			_console.visible = true)
@@ -1179,8 +1188,17 @@ func run_command(id: int) -> void:
 			_history_menu.popup()
 			return
 		MenuId.TRACE:
+			# A TOGGLE, not a one-shot dump. `Preview` declares `signal trace(message)` and emits
+			# it twice a round -- and nothing in the addon had ever connected it, so the pipeline
+			# narrated itself to no one. Trace now turns that stream on, which is what makes a
+			# round debuggable from its own output rather than from its symptoms.
 			_console.visible = true
+			_tracing = not _tracing
 			_console.trace(workspace, ledger, preview)
+			_console.add_diagnostics("", [{
+				"code": "", "severity": Console.SEVERITY_WARNING, "line": -1,
+				"message": "preview trace %s" % ("ON" if _tracing else "off"),
+			}])
 			return
 		MenuId.HELP:
 			_console.visible = true
@@ -2838,7 +2856,9 @@ func select_module(file_path: String) -> void:
 	if _library != null and graph != null:
 		var at := graph.index_of(_focus_path)
 		var card = graph.cards[at] if at >= 0 else null
-		_library.select_component(
+		# BY PATH. Handing it `exports[0]` meant a module with no exports mirrored nothing and a
+		# module whose second export was the interesting one mirrored the wrong row.
+		_library.select_entry(_focus_path,
 			str(card.exports[0]) if card != null and not card.exports.is_empty() else "")
 	if _preview_pane != null:
 		# BUILD IT IF IT IS NOT BUILT. A round compiles the focus's closure, and the module a user

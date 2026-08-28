@@ -17,6 +17,21 @@ extends SceneTree
 ## An entry is a Unity method name and a token that must appear somewhere under `builder/` or in
 ## the editor plugin. The token is deliberately a distinctive IDENTIFIER, not prose: prose gets
 ## reworded and the gate rots into a test of its own comments.
+##
+## WHAT THIS GATE CANNOT DO, said plainly because it was believed to do it. A token that exists is
+## not a feature that works: this sweep is green over any identifier, however inert. Three ways it
+## was found lying, all fixed here, all worth knowing about when adding an entry:
+##
+##   * MIS-MAPPED -- `MoveModuleToFolder` pointed at `drop_module`, which is the style-application
+##     gesture and has nothing to do with re-filing. The token existed, so the gate was green.
+##   * AMBIGUOUS -- `func apply_edit` is defined in FOUR files with four different jobs, so the
+##     entry stayed green with the one it named deleted. Prefer a token that exists once.
+##   * INERT -- an entry can name a function that is correct and unreachable. `undo` was green
+##     while no key or button could trigger it, and `trace` while nothing listened to the signal.
+##
+## So this is a CHECKLIST OF COVERAGE, not a test of behaviour. The behaviour lives in the seven
+## builder suites and in `scripts/builder-shots.mjs`, which drives real input at a real editor
+## window. Adding an entry here is not adding a test.
 
 const ROOTS := [
 	"res://addons/reactive_ui_toolkit_editor/builder",
@@ -30,11 +45,11 @@ const PARITY := [
 	["OpenFor", "func open_builder_on"],
 	["Assets/Open in RUITK UI Builder", "CONTEXT_SLOT_FILESYSTEM"],
 	# Folders and modules
-	["MoveModuleToFolder", "func drop_module"],
+	["MoveModuleToFolder", "func place_module"],
 	["MoveFolderToFolder", "func move_folder"],
 	["the layout follows the file", "func _repath_layout"],
 	["re-file by dragging onto a folder row", "signal refile_requested"],
-	["PlaceModule", "func place_module"],
+
 	["ShowEmptyState", "func _build_empty_state"],
 	["NewFile / ShowCreatePrompt", "func prompt_create"],
 	["ValidateNewName", "func _validate_name"],
@@ -47,7 +62,7 @@ const PARITY := [
 	["an import matched by RESOLVED PATH, not by spelling", "func _spec_importing"],
 	# The source pane
 	["BeginSourceEdit", "func _set_editing"],
-	["ApplySourceEdit", "func apply_edit"],
+	["ApplySourceEdit", "edit_applied.emit"],
 	["CancelSourceEdit", "func cancel_edit"],
 	# History
 	["UndoAction / RedoAction", "func undo"],
@@ -56,7 +71,7 @@ const PARITY := [
 	# The row spine
 	["OnCanvasRowClicked", "func _on_row_clicked"],
 	["OnCanvasRowContext", "func _on_row_context"],
-	["SyncLibrarySelection", "func select_component"],
+	["SyncLibrarySelection", "func select_entry"],
 	["double-click a workspace entry to FRAME its card", "signal entry_framed"],
 	["style / util / hook MODULE sections", "const ENTRY_HOOK_MODULE"],
 	["ShowAttributeMenu", "func menu_for"],
@@ -113,7 +128,7 @@ const PARITY := [
 	# Chrome
 	["Toast", "func toast"],
 	["ToggleHelp", "func show_help"],
-	["TogglePreviewTrace", "func trace"],
+	["TogglePreviewTrace", "preview.trace.connect"],
 	["diagnostics on the editing surface", "func show_diagnostics"],
 	["GUITKX0105 vocabulary (unknown element)", "func known_component_tags"],
 	["a tool failure is not a source failure", "env_error"],
@@ -160,6 +175,22 @@ func _initialize() -> void:
 	print("")
 	for entry in DELIBERATE:
 		print("  skipped  %-24s %s" % [str((entry as Array)[0]), str((entry as Array)[1])])
+	# AMBIGUOUS ENTRIES ARE REPORTED, not silently tolerated. Not a failure: a few tokens
+	# legitimately appear in more than one file (a signal and its connection, a const and its use).
+	# Naming them keeps the next person from adding a fifth `func apply_edit`.
+	var ambiguous: Array = []
+	for entry in PARITY:
+		var pair := entry as Array
+		var hits := _files_matching(sources, str(pair[1]))
+		if hits > 1:
+			ambiguous.append("%s  (`%s` matches %d files)" % [str(pair[0]), str(pair[1]), hits])
+	if not ambiguous.is_empty():
+		print("  %d entr(ies) match more than one file -- prefer a token that exists once:"
+			% ambiguous.size())
+		for line in ambiguous:
+			print("    %s" % line)
+		print("")
+
 	print("")
 	if not missing.is_empty():
 		for line in missing:
@@ -174,10 +205,20 @@ func _initialize() -> void:
 
 
 func _found(sources: PackedStringArray, token: String) -> bool:
+	return _files_matching(sources, token) > 0
+
+
+## How many FILES carry this token.
+##
+## More than one means the entry is ambiguous: `func apply_edit` is defined in four files with
+## four different jobs, so the entry stayed green with the one it named deleted. An ambiguous
+## token is a gate that cannot fail for the reason it exists.
+func _files_matching(sources: PackedStringArray, token: String) -> int:
+	var n := 0
 	for text in sources:
 		if text.contains(token):
-			return true
-	return false
+			n += 1
+	return n
 
 
 ## Every `.gd` and `.guitkx` under the builder, read once.
