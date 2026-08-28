@@ -89,7 +89,7 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 	return (
 		@if (near) {
 			return (
-				<PanelContainer position={ at } scale={ Vector2(zoom, zoom) }
+				<PanelContainer name={ "card-%d" % index } position={ at } scale={ Vector2(zoom, zoom) }
 					custom_minimum_size={ Vector2(card_w, 0) } size={ Vector2(card_w, 0) }
 					clip_contents={ true }
 					mouse_filter={ Control.MOUSE_FILTER_IGNORE }
@@ -183,7 +183,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 						@for (i in range(card.imports.size())) {
 							var row = card.imports[i]
 							return (
-								<PanelContainer key={ str(row.at) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
+								<PanelContainer key={ str(row.at) } name={ "row-1-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
 										style={ P.row_selected() if (sel_section == 1 and sel_row == i) else P.row_plain() }>
 									<Label text={ row.text } style={ P.import_row() }
 										text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
@@ -200,7 +200,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 							@for (i in range(card.body.size())) {
 								var row = card.body[i]
 								return (
-									<PanelContainer key={ str(row.at) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
+									<PanelContainer key={ str(row.at) } name={ "row-2-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
 											style={ P.row_selected() if (sel_section == 2 and sel_row == i) else P.chip() }>
 										<Label text={ row.text } style={ P.chip_text() }
 										text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
@@ -219,7 +219,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 						@for (i in range(card.markup.size())) {
 							var row = card.markup[i]
 							return (
-								<PanelContainer key={ str(row.at) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
+								<PanelContainer key={ str(row.at) } name={ "row-3-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
 										style={ P.row_selected() if (sel_section == 3 and sel_row == i) else (P.row_highlighted() if M.row_mentions(row, highlight_names) else P.row_plain()) }>
 									<CanvasMarkupRow row={ row } zoom={ zoom } />
 								</PanelContainer>
@@ -234,7 +234,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 						@for (i in range(card.export_detail.size())) {
 							var row = card.export_detail[i]
 							return (
-								<PanelContainer key={ str(row.at) + row.text } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
+								<PanelContainer key={ str(row.at) + row.text } name={ "row-4-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
 										style={ P.row_selected() if (sel_section == 4 and sel_row == i) else P.row_plain() }>
 									<Label text={ "  ".repeat(row.depth) + row.text } style={ P.export_row() }
 										clip_text={ true }
@@ -253,7 +253,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 					<CanvasCardSection heading="SETUP">
 						@for (i in range(card.island_lines.size())) {
 							return (
-								<PanelContainer key={ str(i) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
+								<PanelContainer key={ str(i) } name={ "row-5-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
 										style={ P.row_selected() if (sel_section == 5 and sel_row == i) else P.row_plain() }>
 									<Label text={ card.island_lines[i] } style={ P.island_row() } clip_text={ true }
 										text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />

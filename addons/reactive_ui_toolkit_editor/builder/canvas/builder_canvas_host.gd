@@ -64,6 +64,17 @@ var selected_row_index := -1
 ## The identifiers the hovered hook chip binds. Empty when nothing is hovered.
 var highlight_names := PackedStringArray()
 
+## WHAT WAS ACTUALLY DRAWN, per card: `{ card_index: { "height": float, "rows": { key: Rect2 } } }`
+## in CARD-LOCAL units, where `key` is "section:index".
+##
+## The section stack is a PREDICTION. It is computed from constants -- a heading block, a row
+## pitch, a section origin -- and nothing ever compared it to the Control tree the view lays out.
+## It was wrong by 35-60px by the bottom of a card, so `card_at` reported no card over the lower
+## half of every card, clicking one row selected its neighbour, and a right-click below a card
+## opened that card's row menu. Measurement makes the answer observable; the estimate stays as the
+## pre-layout fallback, which is what Unity does and says it does.
+var _measured := {}
+
 var _cards: Control = null
 var _edges: Edges = null
 var _root: RuitkRoot = null
@@ -312,9 +323,71 @@ func _process(_delta: float) -> void:
 	# failure it catches, and the symptom -- no dragging, no dropping, no row menus -- gives no
 	# hint of the cause.
 	_pass_mouse_through(_cards)
+	_measure_cards()
 	_settle_frames -= 1
 	if _settle_frames <= 0:
 		set_process(false)
+
+
+## Records every drawn row's rect, in card-local units.
+##
+## Run from the settle loop, so it re-reads after Godot's layout pass has settled and after a
+## sliced commit has landed. Positions are divided by `zoom` because a card node carries the zoom
+## as its `scale`, while the section stack -- and therefore every consumer -- speaks card-local
+## units.
+func _measure_cards() -> void:
+	if _cards == null or graph == null:
+		return
+	var fresh := {}
+	# SEARCHED, not iterated. The view's own root `Control` sits between this node and the cards,
+	# so the card nodes are grandchildren -- and a component boundary could add another level at
+	# any time. Finding them by name is what makes this robust to the tree's shape.
+	_collect_cards(_cards, fresh)
+	if not fresh.is_empty():
+		_measured = fresh
+
+
+func _collect_cards(node: Node, out: Dictionary) -> void:
+	for child in node.get_children():
+		if child is Control and str(child.name).begins_with("card-"):
+			var index := int(str(child.name).substr(5))
+			if index >= 0 and index < graph.cards.size():
+				var card_control := child as Control
+				var entry := { "height": card_control.size.y, "rows": {} }
+				_collect_rows(card_control, card_control.get_global_rect().position,
+					maxf(zoom, 0.0001), entry["rows"])
+				out[index] = entry
+			continue
+		_collect_cards(child, out)
+
+
+func _collect_rows(node: Node, origin: Vector2, scale: float, out: Dictionary) -> void:
+	for child in node.get_children():
+		if child is Control:
+			var control := child as Control
+			var name := str(control.name)
+			if name.begins_with("row-"):
+				var parts := name.substr(4).split("-")
+				if parts.size() == 2:
+					var local := (control.get_global_rect().position - origin) / scale
+					out["%s:%s" % [parts[0], parts[1]]] = Rect2(local, control.size)
+		_collect_rows(child, origin, scale, out)
+
+
+## The measured rect of one row, or an empty Rect2 when nothing was measured.
+func measured_row(card_index: int, section: int, row_index: int) -> Rect2:
+	var entry: Variant = _measured.get(card_index)
+	if not (entry is Dictionary):
+		return Rect2()
+	var rows: Dictionary = (entry as Dictionary)["rows"]
+	var key := "%d:%d" % [section, row_index]
+	return rows[key] if rows.has(key) else Rect2()
+
+
+## The measured height of a card, or 0.0 when nothing was measured.
+func measured_height(card_index: int) -> float:
+	var entry: Variant = _measured.get(card_index)
+	return float((entry as Dictionary)["height"]) if entry is Dictionary else 0.0
 
 
 ## Shrinks every card back to its content. Returns true when something actually moved.
@@ -549,8 +622,34 @@ func row_at(index: int, screen_position: Vector2) -> Dictionary:
 	if not Metrics.shows_sections(Metrics.lod_of(zoom)):
 		return { "found": false }   # a pill has no rows to aim at
 	var card := graph.cards[index]
-	return Metrics.row_hit(card, Metrics.card_local_of(card, screen_position, camera, zoom),
-		Metrics.lod_of(zoom))
+	var local := Metrics.card_local_of(card, screen_position, camera, zoom)
+	# THE MEASURED ROWS FIRST. The estimate is only the answer before anything has been laid out.
+	var hit := _measured_hit(index, local)
+	if bool(hit["found"]):
+		return hit
+	return Metrics.row_hit(card, local, Metrics.lod_of(zoom))
+
+
+## Which drawn row a card-local point is in, from the measured rects.
+##
+## Returns the same shape as `Metrics.row_hit`, bands included, so every consumer is unchanged.
+func _measured_hit(card_index: int, local: Vector2) -> Dictionary:
+	var entry: Variant = _measured.get(card_index)
+	if not (entry is Dictionary):
+		return { "found": false }
+	for key in ((entry as Dictionary)["rows"] as Dictionary):
+		var rect: Rect2 = (entry as Dictionary)["rows"][key]
+		if not rect.has_point(local):
+			continue
+		var parts := str(key).split(":")
+		var fraction: float = (local.y - rect.position.y) / maxf(rect.size.y, 0.001)
+		var band := 1
+		if fraction < Metrics.BAND_EDGE:
+			band = 0
+		elif fraction > 1.0 - Metrics.BAND_EDGE:
+			band = 2
+		return { "found": true, "section": int(parts[0]), "index": int(parts[1]), "band": band }
+	return { "found": false }
 
 
 ## The card under a SCREEN point, or -1.
@@ -567,6 +666,11 @@ func card_at(screen_position: Vector2) -> int:
 	var width := Metrics.card_width_for(lod)
 	for i in range(graph.cards.size() - 1, -1, -1):
 		var card := graph.cards[i]
-		if Rect2(card.x, card.y, width, Metrics.drawn_height(card, lod)).has_point(world):
+		# THE MEASURED HEIGHT when there is one. The estimate over-reported by tens of pixels, so
+		# empty canvas below a card answered as that card and opened its row menu.
+		var height: float = measured_height(i)
+		if height <= 0.0:
+			height = Metrics.drawn_height(card, lod)
+		if Rect2(card.x, card.y, width, height).has_point(world):
 			return i
 	return -1

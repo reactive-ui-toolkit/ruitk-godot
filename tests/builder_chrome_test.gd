@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 247
+const ASSERTION_FLOOR := 251
 
 var _fails := 0
 var _passes := 0
@@ -67,6 +67,7 @@ func _run() -> void:
 	await _test_add_chip_opens_the_editor()
 	await _test_folder_pane_refiles()
 	await _test_folder_pane_drop_rules()
+	await _test_hit_test_agrees_with_the_rendered_tree()
 	await _test_opens_at_layer_two()
 	await _test_selection_and_delete()
 	await _test_save_confirms_deletions()
@@ -989,6 +990,62 @@ func _test_folder_pane_drop_rules() -> void:
 		child, "a module into a different folder is fine")
 	_eq(pane._drop_target_for({ "source": "nonsense", "path": "x" }, child), "",
 		"and an unknown payload is refused")
+
+	_drop(w)
+
+
+## THE HIT-TEST MUST AGREE WITH WHAT WAS RENDERED, not with a prediction of it.
+##
+## The section stack is computed from constants and nothing ever compared it to the Control tree
+## the view lays out. It was wrong by tens of pixels by the bottom of a card, so `card_at`
+## reported NO CARD over the lower half of every card, clicking one row selected its neighbour,
+## and a right-click on empty canvas below a card opened that card's row menu.
+##
+## The gate that was missing: walk the tree that was actually drawn and ask the hit-test about
+## every row in it. The old canvas test asserted the model against the model and passed.
+func _test_hit_test_agrees_with_the_rendered_tree() -> void:
+	_section("every drawn row answers to its own centre")
+	var w := _window()
+	w.size = Vector2(1400, 800)
+	for i in 12:
+		await process_frame
+	var canvas := w.canvas()
+	var checked := 0
+	var wrong := 0
+	for index in w.graph.cards.size():
+		var card: Graph.Card = w.graph.cards[index]
+		for section in [int(Metrics.Section.IMPORTS), int(Metrics.Section.BODY),
+				int(Metrics.Section.MARKUP), int(Metrics.Section.EXPORTS)]:
+			for row_index in 12:
+				var rect: Rect2 = canvas.measured_row(index, section, row_index)
+				if rect.size.y <= 0.0:
+					continue
+				checked += 1
+				var centre := Vector2(card.x, card.y) + rect.position + rect.size * 0.5
+				var at := Metrics.world_to_screen(centre, canvas.camera, canvas.zoom)
+				var hit: Dictionary = canvas.row_at(index, at)
+				if not bool(hit["found"]) or int(hit["section"]) != section 						or int(hit["index"]) != row_index:
+					wrong += 1
+					if wrong <= 3:
+						print("        card %d row %d:%d -> %s" % [index, section, row_index, hit])
+	_check(checked > 0, "the canvas laid out rows to measure (%d)" % checked)
+	_eq(wrong, 0, "and every one of them is found at its own centre")
+
+	_section("and empty canvas below a card is not the card")
+	for index in w.graph.cards.size():
+		var height: float = canvas.measured_height(index)
+		if height <= 0.0:
+			continue
+		var card: Graph.Card = w.graph.cards[index]
+		var below := Vector2(card.x + 10.0, card.y + height + 24.0)
+		var occupied := false
+		for other in w.graph.cards:
+			if other != card and Rect2(other.x, other.y, 400.0, 400.0).has_point(below):
+				occupied = true
+		if occupied:
+			continue
+		_eq(canvas.card_at(Metrics.world_to_screen(below, canvas.camera, canvas.zoom)), -1,
+			"below card %d is empty canvas" % index)
 
 	_drop(w)
 

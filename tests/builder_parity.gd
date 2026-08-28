@@ -80,6 +80,9 @@ const PARITY := [
 	["drop target", "func _can_drop_data"],
 	["card dragging, by the TITLE BAR", "func on_title_bar"],
 	["one definition of what a layer draws", "func draws_section"],
+	["AnchorOf/CardRect (measure the drawn card)", "func measured_row"],
+	["IsSingleClauseConstruct (unwrap guard)", "func can_unwrap"],
+	["hook stubs that are legal GDScript", "func hook_stub"],
 	["card dragging", "signal card_moved"],
 	["the bottom band's first-child rule", "Placement.FIRST_CHILD"],
 	# The preview
