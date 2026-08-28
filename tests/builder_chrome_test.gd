@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 239
+const ASSERTION_FLOOR := 247
 
 var _fails := 0
 var _passes := 0
@@ -64,6 +64,7 @@ func _run() -> void:
 	await _test_inline_editor()
 	await _test_one_funnel()
 	await _test_undo_across_files()
+	await _test_add_chip_opens_the_editor()
 	await _test_folder_pane_refiles()
 	await _test_folder_pane_drop_rules()
 	await _test_opens_at_layer_two()
@@ -896,6 +897,51 @@ func _test_undo_across_files() -> void:
 ## DRAGGING A FILE OR A FOLDER ONTO ANOTHER FOLDER RE-FILES IT -- the only gesture that moves
 ## anything. The pane could start such a drag and had no way to receive one, so its own doc
 ## comment described a gesture that ended nowhere.
+## "+ hook" SEEDS A LINE AND OPENS THE EDITOR ON IT.
+##
+## Capability reference §5: the chips exist "so custom body logic never requires the source pane".
+## Seeding and stopping left the user with `var state = useState(null)` on the card and the source
+## pane as the only way to make it say anything else -- which is the thing the chip was for.
+func _test_add_chip_opens_the_editor() -> void:
+	_section("+ hook writes a useState and puts the caret in it")
+	var w := _window()
+	await process_frame
+	var index := w.graph.index_of(ROOT.path_join("app.guitkx"))
+	var before: String = w._buffer_of(ROOT.path_join("app.guitkx"))
+
+	w._on_card_add(index, "hook")
+	await process_frame
+	var after: String = w._buffer_of(ROOT.path_join("app.guitkx"))
+	_check(after != before, "the line is seeded")
+	_check(after.contains("useState"), "as a useState")
+	_check(w.inline_editor().is_open(), "and the editor opens on it")
+	_eq(w.inline_editor().text, "var state = useState(null)", "holding the seeded line")
+
+	_section("and it is a SEEDED editor, so Escape takes the seeding back")
+	var cancelled: Array = []
+	w.inline_editor().cancelled.connect(func(_t, undo: bool): cancelled.append(undo))
+	var escape := InputEventKey.new()
+	escape.keycode = KEY_ESCAPE
+	escape.pressed = true
+	w.inline_editor()._gui_input(escape)
+	await process_frame
+	_eq(cancelled.size(), 1, "escape cancels")
+	_check(bool(cancelled[0]), "asking for the seeding back")
+	_eq(w._buffer_of(ROOT.path_join("app.guitkx")), before,
+		"and the hook is gone -- one gesture, taken back in one")
+
+	_section("committing an edit keeps it")
+	w._on_card_add(index, "hook")
+	await process_frame
+	w.inline_editor().text = "var count = useState(0)"
+	w.inline_editor().commit()
+	await process_frame
+	_check(w._buffer_of(ROOT.path_join("app.guitkx")).contains("useState(0)"),
+		"the typed line replaced the seeded one")
+
+	_drop(w)
+
+
 func _test_folder_pane_refiles() -> void:
 	_section("a module dropped on a folder is re-filed into it")
 	var w := _window()

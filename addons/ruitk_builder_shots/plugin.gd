@@ -125,7 +125,131 @@ func _verify_gestures() -> void:
 	# default is not the one a framed card happens to sit at.
 	for preset in Metrics.LAYER_PRESETS:
 		await _gestures_at(builder, canvas, float(preset))
+	await _surface_gestures(builder, canvas)
 	_close_builder()
+
+
+## The gestures that are not about a row: panning, wheel zoom, the card menu, the card's own "+"
+## chips, and the library.
+func _surface_gestures(builder, canvas) -> void:
+	var graph = builder.graph
+	var card = graph.cards[0]
+	canvas.set_camera(Vector2(600, 400), 0.75)
+	await get_tree().process_frame
+	var rect: Rect2 = canvas.get_global_rect()
+
+	# PAN: left-drag on empty canvas.
+	var empty := rect.position + Vector2(60, rect.size.y - 60)
+	var cam_before: Vector2 = canvas.camera
+	_push(_mb(empty, true)); await get_tree().process_frame
+	for step in [Vector2(20, 10), Vector2(60, 30), Vector2(110, 55)]:
+		_push(_mm(empty + step)); await get_tree().process_frame
+	_push(_mb(empty + Vector2(110, 55), false)); await get_tree().process_frame
+	print("SHOTS: GESTURES: PAN %s" % ("OK" if canvas.camera != cam_before else "BROKEN"))
+
+	# ZOOM: the wheel.
+	var zoom_before: float = canvas.zoom
+	var wheel := _mb(rect.position + rect.size * 0.5, true, MOUSE_BUTTON_WHEEL_UP)
+	_push(wheel); await get_tree().process_frame
+	print("SHOTS: GESTURES: WHEEL ZOOM %s (%.2f -> %.2f)"
+		% ["OK" if canvas.zoom != zoom_before else "BROKEN", zoom_before, canvas.zoom])
+
+	# CARD MENU: right-click the title bar.
+	var lod = Metrics.lod_of(canvas.zoom)
+	var size := Vector2(Metrics.card_width_for(lod), Metrics.drawn_height(card, lod))
+	canvas.set_camera(canvas.size * 0.5 - (Vector2(card.x, card.y) + size * 0.5) * canvas.zoom,
+		canvas.zoom)
+	await get_tree().process_frame
+	var title := rect.position + Metrics.world_to_screen(
+		Vector2(card.x + 40.0, card.y + 8.0), canvas.camera, canvas.zoom)
+	var seen := {"n": 0}
+	var cb := func(_i, _w): seen["n"] += 1
+	canvas.card_context_requested.connect(cb)
+	_push(_mb(title, true, MOUSE_BUTTON_RIGHT)); await get_tree().process_frame
+	_push(_mb(title, false, MOUSE_BUTTON_RIGHT)); await get_tree().process_frame
+	canvas.card_context_requested.disconnect(cb)
+	print("SHOTS: GESTURES: CARD MENU %s" % ("OK" if seen["n"] > 0 else "BROKEN"))
+	_dismiss_popups(builder)
+	await get_tree().process_frame
+
+	# THE "+ hook" CHIP: a real Button inside the card.
+	var chip = _find_button(builder.canvas(), "+ hook")
+	if chip == null:
+		print("SHOTS: GESTURES: + HOOK CHIP BROKEN (no button found on any card)")
+	else:
+		var before: String = builder._buffer_of(card.file_path)
+		chip.pressed.emit()
+		await get_tree().process_frame
+		await get_tree().create_timer(0.4).timeout
+		# The chip must SEED a line and then OPEN THE EDITOR ON IT -- the inline editor is a plain
+		# Control, not a Popup, so this asks the editor itself rather than hunting for a window.
+		print("SHOTS: GESTURES: + HOOK CHIP %s (buffer %s, editor %s)"
+			% ["OK" if builder._inline.is_open()
+					and builder._buffer_of(card.file_path) != before else "BROKEN",
+			   "changed" if builder._buffer_of(card.file_path) != before else "unchanged",
+			   "open" if builder._inline.is_open() else "closed"])
+		builder._inline.cancel()
+		await get_tree().process_frame
+		_dismiss_popups(builder)
+
+	# DROP a library element onto a markup row, through the same resolver a real drag uses.
+	# RE-FETCHED: every edit above re-projects the graph, so the `card` this function started with
+	# is a stale object whose section offsets no longer describe what is on screen.
+	card = builder.graph.cards[0]
+	var markup_top := Metrics.HEADER_H
+	var found_markup := false
+	for entry in Metrics.section_stack(card):
+		var e := entry as Dictionary
+		if not Metrics.draws_section(int(e["section"]), Metrics.lod_of(canvas.zoom)):
+			continue
+		if int(e["section"]) == int(Metrics.Section.MARKUP):
+			markup_top += float(e["lead"]) + float(e["row_height"]) * 0.5
+			found_markup = true
+			break
+		markup_top += float(e["height"])
+	if found_markup:
+		var row_local := Metrics.world_to_screen(
+			Vector2(card.x + 20.0, card.y + markup_top), canvas.camera, canvas.zoom)
+		var src: String = builder._buffer_of(card.file_path)
+		var placed: bool = builder.drop_library_entry("element", "Button", row_local)
+		var now: String = builder._buffer_of(card.file_path)
+		print("SHOTS: GESTURES: DROP ELEMENT %s (returned %s)"
+			% ["OK" if now != src else "BROKEN", placed])
+
+	# LIBRARY: does the pane offer anything, and does clicking an entry insert?
+	var lib = builder.library_pane() if builder.has_method("library_pane") else null
+	var entry_button = _find_button(lib, "<Button>") if lib != null else null
+	print("SHOTS: GESTURES: LIBRARY ENTRY %s"
+		% ["found" if entry_button != null else "BROKEN (no <Button> row)"])
+	if entry_button != null:
+		var src2: String = builder._buffer_of(card.file_path)
+		entry_button.pressed.emit()
+		await get_tree().process_frame
+		print("SHOTS: GESTURES: LIBRARY CLICK INSERTS %s"
+			% ["OK" if builder._buffer_of(card.file_path) != src2 else "BROKEN"])
+
+
+## Any popup surface, not just a PopupMenu: the searchable menu is a PopupPanel, and checking only
+## for PopupMenu reported "no menu opened" for a menu that had opened.
+func _any_popup(node: Node) -> bool:
+	for child in node.get_children():
+		if child is Popup and (child as Popup).visible:
+			return true
+		if _any_popup(child):
+			return true
+	return false
+
+
+func _find_button(node: Node, label: String):
+	if node == null:
+		return null
+	for child in node.get_children():
+		if child is Button and (child as Button).text.strip_edges() == label:
+			return child
+		var deeper = _find_button(child, label)
+		if deeper != null:
+			return deeper
+	return null
 
 
 ## Drives click / menu / drag on card 0 at one zoom, with the card centred so nothing lands off

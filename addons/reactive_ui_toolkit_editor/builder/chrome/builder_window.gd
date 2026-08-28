@@ -1502,6 +1502,12 @@ func _on_inline_committed(token: Variant, text: String) -> void:
 		"island":
 			after = Edits.set_island(before, int(spec.get("from", 0)), int(spec.get("to", 0)), text)
 			what = "Edit the setup of %s" % path.get_file()
+		"body":
+			# ONE setup line, edited in place. `set_island` already replaces an inclusive line
+			# range, and a hook chip or a code line is a range of exactly one -- so this is the
+			# same edit, not a second implementation of it.
+			after = Edits.set_island(before, row.source_line, row.source_line, text)
+			what = "Edit %s" % row.text.strip_edges()
 		"attribute":
 			var attr_name := str(spec.get("name", ""))
 			# AN EMPTIED VALUE TAKES THE ATTRIBUTE WITH IT. Writing `text=""` back would leave a
@@ -1559,12 +1565,20 @@ func _on_card_add(index: int, what: String) -> void:
 	var before := module.buffer_text
 	var after := before
 	var description := ""
+	# `+ hook` seeds a useState and `+ code` a plain statement, and BOTH THEN OPEN THE INLINE
+	# EDITOR ON THE NEW LINE (capability reference §5) -- that is the whole point of the chips:
+	# "custom body logic never requires the source pane". Seeding and stopping left the user with
+	# `var state = useState(null)` on the card and the source pane as the only way to make it say
+	# anything else.
+	var seeded_body := ""
 	match what:
 		"hook":
-			after = Edits.insert_setup_line(before, card, "var state = useState(null)")
+			seeded_body = "var state = useState(null)"
+			after = Edits.insert_setup_line(before, card, seeded_body)
 			description = "Add a hook to %s" % card.title
 		"code":
-			after = Edits.insert_setup_line(before, card, "# ...")
+			seeded_body = "# ..."
+			after = Edits.insert_setup_line(before, card, seeded_body)
 			description = "Add a setup line to %s" % card.title
 		"style", "entry":
 			var export_name := str(card.exports[0]) if not card.exports.is_empty() else ""
@@ -1574,8 +1588,60 @@ func _on_card_add(index: int, what: String) -> void:
 			description = "Add a style entry to %s" % card.title
 		_:
 			return
-	if after != before:
-		apply_edit(card.file_path, after, description)
+	if after == before:
+		return
+	var path: String = card.file_path
+	apply_edit(path, after, description)
+	if seeded_body.is_empty():
+		return
+
+	# On the line the seed just produced, found again AFTER the re-projection: the `Line` objects
+	# this function started with belong to the old projection and carry offsets the buffer no
+	# longer has.
+	#
+	# A HOOK CALL AND A PLAIN STATEMENT LAND IN DIFFERENT SECTIONS. A hook becomes a chip in BODY;
+	# anything else is setup code and joins the card's ISLAND. Editing them is the same gesture to
+	# the user and two different line ranges underneath.
+	_menu_target = path
+	var fresh := graph.card_of(path) if graph != null else null
+	if fresh == null:
+		return
+	if what == "hook":
+		for row_index in fresh.body.size():
+			var row: Graph.Line = fresh.body[row_index]
+			if row.source_text != seeded_body:
+				continue
+			_menu_row = row
+			_inline.open_at(_body_row_rect(fresh, row_index), seeded_body,
+				{ "kind": "body", "path": path, "row": row }, true)
+			return
+		return
+	for i in fresh.island_lines.size():
+		if str(fresh.island_lines[i]).strip_edges() != seeded_body:
+			continue
+		var line := fresh.island_start_line + i
+		_inline.open_at(_body_row_rect(fresh, 0), seeded_body,
+			{ "kind": "island", "path": path, "row": null, "from": line, "to": line }, true)
+		return
+
+
+## Where a BODY row sits on screen, so the editor can open over the line it edits rather than
+## wherever the last menu was.
+func _body_row_rect(card: Graph.Card, row_index: int) -> Rect2:
+	var lod := Metrics.lod_of(_canvas.zoom)
+	var top := Metrics.HEADER_H
+	for entry in Metrics.section_stack(card):
+		var section := entry as Dictionary
+		if not Metrics.draws_section(int(section["section"]), lod):
+			continue
+		if int(section["section"]) == int(Metrics.Section.BODY):
+			top += float(section["lead"]) + row_index * float(section["row_height"])
+			var at := _canvas.get_global_rect().position + Metrics.world_to_screen(
+				Vector2(card.x, card.y) + Vector2(8.0, top), _canvas.camera, _canvas.zoom)
+			return Rect2(at, Vector2(Metrics.card_width_for(lod) * _canvas.zoom - 16.0,
+				float(section["row_height"]) * _canvas.zoom))
+		top += float(section["height"])
+	return Rect2(_menu_screen_at(), Vector2(260, 24))
 
 
 ## Create, from a card's own menu: the clicked module is the anchor, so the new one lands in its
