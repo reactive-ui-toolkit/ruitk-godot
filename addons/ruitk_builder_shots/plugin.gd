@@ -216,6 +216,41 @@ func _surface_gestures(builder, canvas) -> void:
 		print("SHOTS: GESTURES: DROP ELEMENT %s (returned %s)"
 			% ["OK" if now != src else "BROKEN", placed])
 
+	# THE REAL DRAG-AND-DROP HANDSHAKE, which the drop helper above does not exercise: the library
+	# has to PRODUCE a payload from a point on one of its rows, and the canvas has to ACCEPT that
+	# payload at a point on a row of its own.
+	var lib0 = builder.library_pane() if builder.has_method("library_pane") else null
+	if lib0 != null:
+		var entry = _find_button(lib0, "<Button>")
+		if entry == null:
+			print("SHOTS: GESTURES: DND HANDSHAKE BROKEN (no library row to pick up)")
+		else:
+			var grab: Vector2 = entry.get_global_rect().position 				- lib0.get_global_rect().position + entry.size * 0.5
+			var payload = lib0._get_drag_data(grab)
+			var card2 = builder.graph.cards[0]
+			var top2 := Metrics.HEADER_H
+			var lod2 = Metrics.lod_of(canvas.zoom)
+			var row_pt2 := Vector2.ZERO
+			for entry2 in Metrics.section_stack(card2):
+				var e2 := entry2 as Dictionary
+				if not Metrics.draws_section(int(e2["section"]), lod2):
+					continue
+				if int(e2["section"]) == int(Metrics.Section.MARKUP):
+					row_pt2 = Metrics.world_to_screen(Vector2(card2.x + 20.0,
+						card2.y + top2 + float(e2["lead"]) + float(e2["row_height"]) * 0.5),
+						canvas.camera, canvas.zoom)
+					break
+				top2 += float(e2["height"])
+			var accepted: bool = payload != null and canvas._can_drop_data(row_pt2, payload)
+			print("SHOTS: GESTURES: DND HANDSHAKE %s (payload=%s accepted=%s)"
+				% ["OK" if accepted else "BROKEN", payload, accepted])
+			if accepted:
+				var src3: String = builder._buffer_of(card2.file_path)
+				canvas._drop_data(row_pt2, payload)
+				await get_tree().process_frame
+				print("SHOTS: GESTURES: DND DROP %s"
+					% ["OK" if builder._buffer_of(card2.file_path) != src3 else "BROKEN"])
+
 	# LIBRARY: does the pane offer anything, and does clicking an entry insert?
 	var lib = builder.library_pane() if builder.has_method("library_pane") else null
 	var entry_button = _find_button(lib, "<Button>") if lib != null else null
