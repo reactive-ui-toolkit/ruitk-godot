@@ -108,6 +108,10 @@ var _seed_header_edit := ""
 ## Set only while a save is resuming from its own deletion confirmation, so the second pass does
 ## not ask again.
 var _deletions_agreed := false
+
+## Whether the crash-journal offer has been made for this window. Asked once: a second prompt for
+## the same journal reads as the builder not believing the first answer.
+var _offered_recovery := false
 var _menu_card := -1
 var _menu_at := Vector2.ZERO
 var _pending_attribute := {}
@@ -765,6 +769,38 @@ func _wire() -> void:
 # ── Opening ──────────────────────────────────────────────────────────────────────────
 
 ## Opens the tree the given module belongs to.
+## Opens a tree for `focus_path`, keeping whatever is already open when it holds unsaved work.
+##
+## THE ENTRY POINT EVERY EXTERNAL CALLER SHOULD USE. `open_tree` replaces the tree outright --
+## `load_tree` ends in `_tree.reset`, which clears every module -- so right-clicking a `.guitkx`
+## in the FileSystem dock while the builder held a half-built component destroyed the whole
+## session, silently and with the ledger cleared behind it.
+##
+## Three cases, which is what Unity's LoadTreeFor distinguishes:
+##   * the tree already holds that module -> just focus it
+##   * there is unsaved work            -> ADOPT the file into the open tree, keeping the work
+##   * otherwise                        -> load its tree, and adopt the file if it is not in it
+func load_tree_for(focus_path: String) -> void:
+	if workspace == null or focus_path.is_empty():
+		return
+	if workspace.try_get(focus_path) != null:
+		select_module(focus_path)
+		return
+	if workspace.has_unsaved_changes():
+		if workspace.open(focus_path) == null:
+			toast("Couldn't open %s." % focus_path.get_file())
+			return
+		reproject()
+		select_module(focus_path)
+		toast("Opened %s beside your unsaved work." % focus_path.get_file())
+		return
+	open_tree(focus_path)
+	if workspace.try_get(focus_path) == null:
+		workspace.open(focus_path)
+		reproject()
+		select_module(focus_path)
+
+
 func open_tree(focus_path: String) -> void:
 	if focus_path.strip_edges().is_empty():
 		# The START SCREEN. Opening with nothing is what the menu does on a project that has no
@@ -773,6 +809,7 @@ func open_tree(focus_path: String) -> void:
 			workspace = Workspace.new()
 		reproject()
 		_refresh_status()
+		_offer_recovery()
 		return
 	if workspace == null:
 		workspace = Workspace.new()
@@ -971,6 +1008,46 @@ func _journal_tick() -> void:
 ## thing and the offer needs no other evidence to be sure it is not noise.
 func pending_recovery() -> Dictionary:
 	return Journal.peek()
+
+
+## Offers the crashed session's work back, once per window.
+##
+## `pending_recovery`, `restore_recovery` and `discard_recovery` all existed and NOTHING had ever
+## called them -- the only reference in the whole repository was the parity gate, which greps for
+## the identifier. So the journal was written faithfully every five seconds and never read, and
+## the first Save of any later session cleared it: the crashed session's only copy, destroyed by
+## the act of doing ordinary work.
+##
+## Offered only onto an EMPTY tree. Restoring over open modules would replace them, which is a
+## second way to lose work while trying to prevent the first.
+func _offer_recovery() -> void:
+	if _offered_recovery or workspace == null or not workspace.modules().is_empty():
+		return
+	_offered_recovery = true
+	var pending := pending_recovery()
+	if pending.is_empty():
+		return
+	var names := PackedStringArray()
+	for entry in (pending.get("modules", []) as Array):
+		names.append("    " + str(entry).get_file())
+	var dialog := ConfirmationDialog.new()
+	dialog.title = "Restore unsaved work?"
+	dialog.dialog_text = ("A previous session left unsaved work, last seen %s:
+
+%s
+
+"
+		+ "Restoring opens it here. Discarding throws it away for good.") 		% [str(pending.get("saved_at", "recently")), "
+".join(names)]
+	dialog.ok_button_text = "Restore"
+	dialog.cancel_button_text = "Discard"
+	dialog.confirmed.connect(func():
+		if restore_recovery():
+			toast("Restored %d unsaved module(s)." % names.size()))
+	dialog.canceled.connect(discard_recovery)
+	dialog.close_requested.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered()
 
 
 ## Takes the recovered tree. The caller asks first: restoring over an open tree replaces it.
@@ -2147,14 +2224,41 @@ func save() -> int:
 			"code": "", "severity": Console.SEVERITY_WARNING, "line": -1,
 			"message": "empty, so it was not written -- delete it, or give it something to hold",
 		}])
+	# FORMATTING GOES THROUGH THE FUNNEL, ahead of the write. `save_all` used to assign
+	# `module.buffer_text` directly -- past `Module.apply_edit`, past the workspace, past this
+	# window -- so a reformat was invisible to the ledger and the canvas kept row spans measured
+	# against the UNFORMATTED text. The next canvas edit then wrote at offsets that had moved.
+	_format_dirty_buffers()
 	var written := workspace.save_all()
 	# Cleared HERE, not on a clean tree: the journal being there has to mean exactly one thing --
 	# work existed that never reached disk -- or the recovery offer becomes noise.
 	Journal.clear()
 	_capture_layout()
+	reproject()
+	_source.refresh_from_model()
 	_folders.rebuild()
 	_refresh_status()
 	return written
+
+
+## Reformats every dirty buffer as ONE undoable action, before the write.
+func _format_dirty_buffers() -> void:
+	if workspace == null or not workspace.format_on_save:
+		return
+	var pending: Array = []
+	for module in workspace.modules():
+		if module.read_only or not module.is_dirty():
+			continue
+		var formatted := workspace.formatted(module.buffer_text)
+		if formatted != module.buffer_text:
+			pending.append({ "path": module.file_path(), "text": formatted })
+	if pending.is_empty():
+		return
+	ledger.begin("Format on save")
+	for entry in pending:
+		var spec := entry as Dictionary
+		apply_edit(str(spec["path"]), str(spec["text"]), "Format %s" % str(spec["path"]).get_file())
+	ledger.end()
 
 
 ## Whether the user has agreed to the deletions this save would perform.
@@ -2299,9 +2403,14 @@ func _replay_change(change, reverse: bool) -> void:
 			workspace.apply_edit(path, change.before if reverse else change.after)
 		Ledger.ChangeKind.CREATION:
 			if reverse:
+				# THE MODULE'S TEXT IS CAPTURED ON THE WAY OUT. Redo minted the module with a
+				# hard-coded empty string, so undoing past a creation and redoing it destroyed the
+				# template and everything typed into it since.
+				if module != null:
+					change.after = module.buffer_text
 				workspace.delete(path)
 			elif module == null:
-				workspace.create_new(change.file_path, "")
+				workspace.create_new(change.file_path, change.after)
 		Ledger.ChangeKind.DELETION:
 			if reverse:
 				workspace.restore(change.removed)

@@ -114,7 +114,9 @@ const PARITY := [
 	["SaveAll", "func save_all"],
 	["Save names every file it would delete", "func _confirmed_deletions"],
 	["AbortAll", "func abort_all"],
-	["OfferJournalRestore", "func pending_recovery"],
+	["OfferJournalRestore", "func _offer_recovery"],
+	["LoadTreeFor (keeps unsaved work)", "func load_tree_for"],
+	["FormatDirtyBuffers through the funnel", "func _format_dirty_buffers"],
 ]
 
 ## Features the Unity leg has that this one deliberately does not, and why. Listed so the sweep

@@ -444,6 +444,10 @@ func _open_builder() -> void:
 	if _builder.focus_path().is_empty():
 		_builder.open_tree(_builder_focus_path())
 	_builder_window.popup_centered()
+	# THE KEYBOARD GOES TO THE BUILDER on every route, not only the dock's. Undo, Redo, Save,
+	# Delete and Escape are delivered tree-wide now, but they still need this window to be the one
+	# the editor is talking to.
+	_builder.grab_focus()
 
 
 ## Opens the builder on a specific file. What the FileSystem dock's context item calls, and the
@@ -451,7 +455,11 @@ func _open_builder() -> void:
 func open_builder_on(file_path: String) -> void:
 	_open_builder()
 	if _builder != null and not file_path.is_empty():
-		_builder.open_tree(file_path)
+		# THROUGH `load_tree_for`, which keeps unsaved work. `open_tree` replaces the tree
+		# outright, so right-clicking a `.guitkx` while the builder held a half-built component
+		# destroyed the whole session -- every dirty buffer, every unwritten module, every pending
+		# deletion, and the ledger cleared behind it.
+		_builder.load_tree_for(file_path)
 		_builder.grab_focus()
 
 

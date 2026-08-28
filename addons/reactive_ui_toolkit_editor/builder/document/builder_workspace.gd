@@ -739,6 +739,22 @@ static func _is_blank(module: Module) -> bool:
 ## A file the formatter cannot parse is LEFT ALONE. Mid-edit a buffer is unparseable most of the
 ## time, and a save is not the moment to refuse the user's work over it -- the compiler will say
 ## so on its own, with a position.
+## The formatted form of a buffer, or the buffer unchanged when the formatter declines it.
+##
+## PURE. `_format` used to assign `module.buffer_text` directly from inside `save_all`, which put
+## a whole-file rewrite past every layer that tracks change -- no ledger entry, no re-projection,
+## and a canvas still addressing rows by offsets the rewrite had moved. The window now routes this
+## through its own edit funnel before the write; the model layer only answers the question.
+func formatted(text: String) -> String:
+	var result: Dictionary = Formatter.format(text, formatter_options)
+	# A FALL-BACK OR A FAILURE IS A DATA-LOSS GUARD, NOT A RESULT -- the same rule `_format` has
+	# always applied, kept here so the two cannot answer differently.
+	if bool(result.get("fell_back", false)) or not bool(result.get("ok", false)):
+		return text
+	var out := str(result.get("text", ""))
+	return text if out.is_empty() else out
+
+
 func _format(module: Module) -> void:
 	if not format_on_save:
 		return

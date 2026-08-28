@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 281
+const ASSERTION_FLOOR := 293
 
 var _fails := 0
 var _passes := 0
@@ -65,6 +65,8 @@ func _run() -> void:
 	await _test_one_funnel()
 	await _test_undo_across_files()
 	await _test_add_chip_opens_the_editor()
+	await _test_load_does_not_destroy_unsaved_work()
+	await _test_redo_of_a_creation_keeps_its_text()
 	await _test_source_edit_reaches_the_funnel()
 	await _test_abandoned_edit_is_not_kept()
 	await _test_rename_is_complete()
@@ -954,6 +956,58 @@ func _test_add_chip_opens_the_editor() -> void:
 ##
 ## It reached none of them. The pane wrote the model on every keystroke, so by the time Apply ran
 ## `before` already equalled `after` and the window's funnel rejected the whole thing as a no-op.
+## UNSAVED WORK SURVIVES SOMEONE OPENING ANOTHER FILE.
+func _test_load_does_not_destroy_unsaved_work() -> void:
+	_section("a dirty tree adopts the file instead of being replaced by it")
+	var w := _window()
+	await process_frame
+	var path := ROOT.path_join("app.guitkx")
+	w.apply_edit(path, w._buffer_of(path) + "
+", "make it dirty")
+	await process_frame
+	_check(w.workspace.has_unsaved_changes(), "the tree is dirty")
+	var before := w.workspace.modules().size()
+
+	w.load_tree_for(ROOT.path_join("components/row/row.guitkx"))
+	await process_frame
+	_check(w.workspace.has_unsaved_changes(), "the unsaved work is still here")
+	_check(w.workspace.try_get(path) != null, "and so is the module that held it")
+	_check(w.workspace.modules().size() >= before, "nothing was dropped")
+
+	_section("a file already in the tree just gets focused")
+	w.load_tree_for(path)
+	await process_frame
+	_eq(w.focus_path(), path, "focused, not reloaded")
+
+	_drop(w)
+
+
+## REDOING A CREATION RESTORES THE MODULE'S TEXT, not an empty buffer.
+func _test_redo_of_a_creation_keeps_its_text() -> void:
+	_section("create, undo, redo")
+	var w := _window()
+	await process_frame
+	w._menu_target = ""
+	var created := w._create_named(Module.Kind.COMPONENT, "Panel")
+	await process_frame
+	_check(not created.is_empty(), "the module was created")
+	var text: String = w._buffer_of(created)
+	_check(text.length() > 0, "with a template in it (%d chars)" % text.length())
+
+	_check(w.undo(), "undo runs")
+	await process_frame
+	_check(w.workspace.try_get(created) == null, "and the module is gone")
+
+	_check(w.redo(), "redo runs")
+	await process_frame
+	var back = w.workspace.try_get(created)
+	_check(back != null, "the module is back")
+	if back != null:
+		_eq(back.buffer_text, text, "with the text it had, not an empty buffer")
+
+	_drop(w)
+
+
 func _test_source_edit_reaches_the_funnel() -> void:
 	_section("typing does not touch the model while an edit is open")
 	var w := _window()
