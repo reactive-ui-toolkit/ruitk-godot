@@ -606,6 +606,28 @@ static func on_title_bar(card: Graph.Card, world: Vector2, card_width: float,
 	return world.y >= card.y and world.y <= card.y + HEADER_H
 
 
+## Whether a world point is over the card's KIND BADGE -- the chip at the head of its title bar.
+##
+## A band predicate rather than a hit on the drawn Label, for the reason every other gesture here
+## is model-based: the badge is a `Label` inside a `PanelContainer` with `MOUSE_FILTER_IGNORE`,
+## so it is not something Godot will ever report a press on. The width is the drawn chip's: its
+## text is a kind word at font size 10 or 11, and 74 units covers the longest of them
+## ("component") with the chip's own padding.
+static func on_kind_badge(card: Graph.Card, world: Vector2, card_width: float,
+		lod := Lod.FULL) -> bool:
+	if card == null or not on_title_bar(card, world, card_width, lod):
+		return false
+	# FROM THE CARD EDGE, not from where the chip is inked. The strip between the two is the
+	# card box content margin -- ten units of nothing, which nobody aims at deliberately and
+	# everybody lands in. Refusing it there would mean the handle sometimes works.
+	var width := CARD_PADDING * 0.5 + BADGE_W * (2.0 if lod == Lod.PILL else 1.0)
+	return world.x >= card.x and world.x <= card.x + width
+
+
+## The kind badge's width in card-local units, at the section/full layout.
+const BADGE_W := 74.0
+
+
 ## Where an edge arrives: the TOP-LEFT CORNER of the target card.
 ##
 ## The reference's own choice (capability reference §2), and it is the one that stays readable as

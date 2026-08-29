@@ -211,7 +211,7 @@ func _surface_gestures(builder, canvas) -> void:
 		var row_local := Metrics.world_to_screen(
 			Vector2(card.x + 20.0, card.y + markup_top), canvas.camera, canvas.zoom)
 		var src: String = builder._buffer_of(card.file_path)
-		var placed: bool = builder.drop_library_entry("element", "Button", row_local)
+		var placed: bool = bool(builder.drop_library_entry("element", "Button", row_local)["ok"])
 		var now: String = builder._buffer_of(card.file_path)
 		print("SHOTS: GESTURES: DROP ELEMENT %s (returned %s)"
 			% ["OK" if now != src else "BROKEN", placed])

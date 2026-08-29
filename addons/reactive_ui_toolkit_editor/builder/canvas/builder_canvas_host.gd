@@ -59,6 +59,13 @@ signal dropped(data: Dictionary, at: Vector2)
 ## A card was dragged to a new place on the canvas. The window persists it to the layout.
 signal card_moved(index: int, to: Vector2)
 
+## A card was double-clicked somewhere that is NOT one of its rows.
+##
+## The reference opens the module's file on this gesture; here the module is already open, so
+## what a reader wants from it is to be taken TO the card -- which a single click, which only
+## selects, does not do.
+signal card_activated(card_index: int)
+
 var graph: Graph = null
 var camera := Vector2.ZERO
 var zoom := 1.0
@@ -580,6 +587,12 @@ func _handle_button(event: InputEventMouseButton) -> void:
 					if event.double_click:
 						row_activated.emit(_press_index, int(hit["section"]),
 							int(hit["index"]), event.position)
+				elif event.double_click and _press_index >= 0:
+					# A DOUBLE-CLICK ON THE CARD ITSELF, not on one of its rows. The reference
+					# opens the module's file; here the module is already open -- what a reader
+					# wants from the gesture is to be taken TO it, which a single click, which only
+					# selects, does not do.
+					card_activated.emit(_press_index)
 			else:
 				# A card that was dragged tells the window where it ended up; one that was only
 				# clicked has already been handled by the press.
@@ -636,6 +649,22 @@ func _get_drag_data(at_position: Vector2) -> Variant:
 	var index := card_at(at_position)
 	if index < 0:
 		return null
+	var card_here := graph.cards[index]
+	var lod := Metrics.lod_of(zoom)
+	# THE KIND CHIP IS THE MODULE'S OWN HANDLE. Dragging a card by its title bar MOVES it on the
+	# canvas; dragging it by its kind chip carries the MODULE -- to a folder row, onto another
+	# card, wherever a module payload is accepted. Without it a module could only be re-filed from
+	# the folder pane, and the card, which is the thing the user is looking at, was inert.
+	if Metrics.on_kind_badge(card_here, Metrics.screen_to_world(at_position, camera, zoom),
+			Metrics.card_width_for(lod), lod):
+		var chip := Label.new()
+		chip.text = card_here.title
+		set_drag_preview(chip)
+		return {
+			"source": "module",
+			"path": card_here.file_path,
+			"card_id": card_here.module_id,
+		}
 	var hit := row_at(index, at_position)
 	if not bool(hit.get("found", false)):
 		return null

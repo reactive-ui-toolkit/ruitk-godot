@@ -766,13 +766,21 @@ func _wire() -> void:
 	_folders.module_activated.connect(func(path: String):
 		select_module(path)
 		_canvas.select_card(graph.index_of(path) if graph != null else -1))
+	# THROUGH `_screen_at`, like every other menu. This was the fifth one, and the only one still
+	# reading a CanvasItem coordinate directly -- which is right only when the host viewport
+	# embeds its subwindows.
 	_folders.module_context_requested.connect(func(path: String, _at: Vector2):
-		_open_card_menu(path, get_global_mouse_position()))
+		_open_card_menu(path, _screen_at(get_local_mouse_position())))
 
 	_canvas.card_selected.connect(_on_card_selected)
 	_canvas.card_add_requested.connect(_on_card_add)
 	_canvas.row_clicked.connect(_on_row_clicked)
 	_canvas.row_activated.connect(_on_row_activated)
+	_canvas.card_activated.connect(func(index: int):
+		if graph == null or index < 0 or index >= graph.cards.size():
+			return
+		_canvas.frame_card(index)
+		select_module(graph.cards[index].file_path))
 	_canvas.row_context_requested.connect(_on_row_context)
 	_canvas.dropped.connect(_on_canvas_drop)
 	_canvas.card_moved.connect(_on_card_moved)
@@ -962,12 +970,23 @@ func reproject() -> void:
 	if workspace == null:
 		return
 	graph = Service.project(workspace.modules(), _focus_path)
-	layout = CanvasLayout.for_graph(graph)
+	# THE LAYOUT OBJECT SURVIVES THE REPROJECTION. `for_graph` re-reads it from `user://`, and
+	# reprojection happens after every edit -- so an adoption made in memory a moment ago was
+	# thrown away by the next keystroke, and a card created this session went back to a
+	# projection slot each time. It is re-read when the TREE changes, which is `open_tree`.
+	if layout == null or not Paths.same(layout.root_path, graph.root_path):
+		layout = CanvasLayout.for_graph(graph)
 	layout.apply_to(graph)
-	layout.adopt_unplaced(graph)
+	# AND AN ADOPTED SLOT IS SAVED. It was computed, applied, and the bool discarded -- so the
+	# position a new card was given lived exactly as long as the window did.
+	if layout.adopt_unplaced(graph):
+		layout.save(Time.get_datetime_string_from_system(true))
 	if layout.has_saved_view:
-		_canvas.camera = layout.camera
-		_canvas.zoom = layout.zoom
+		# THROUGH `set_camera`, not by writing the fields. The direct write skipped the clamp, the
+		# redraw and the `camera_changed` emit that syncs the layer dropdown -- so a restored
+		# session could open with the toolbar naming a layer the cards were not drawn at, which is
+		# the same lie CANVAS-01 was about, arriving by a different road.
+		_canvas.set_camera(layout.camera, layout.zoom)
 	_canvas.show_graph(graph)
 	# A TREE WITH NO SAVED LAYOUT OPENS AT LAYER 2 (capability reference §2), CENTRED -- not
 	# fitted. A fit picks whatever zoom frames the whole graph, so the layer the user lands in
@@ -1319,6 +1338,11 @@ func _on_row_activated(card_index: int, section: int, row_index: int, at: Vector
 			if row.kind == Graph.LineKind.DIRECTIVE:
 				_inline.open_at(rect, row.directive_text,
 					{ "kind": "directive", "path": card.file_path, "row": row })
+			elif row.kind == Graph.LineKind.COMPONENT and _navigate_to_component(row.name):
+				# A COMPONENT ROW IS A LINK. Double-clicking `<Card />` inside a component is the
+				# reference's own route to the module that declares it, and the question "where
+				# does this one come from" is the most common reason to be reading a markup tree.
+				return
 			else:
 				_search_purpose = "attribute"
 				_search_menu.open_menu("add an attribute to <%s>" % row.name,
@@ -1326,6 +1350,22 @@ func _on_row_activated(card_index: int, section: int, row_index: int, at: Vector
 					_menu_screen_at(), "add \"%s\"")
 		_:
 			return
+
+
+## Frames and focuses the module that exports `name`. False when nothing here declares it.
+##
+## The same route `_on_library_framed` takes, because "take me to that component" is one
+## behaviour whether it was asked for from the library list or from a usage on a card.
+func _navigate_to_component(name: String) -> bool:
+	if graph == null or name.is_empty():
+		return false
+	for index in graph.cards.size():
+		var card := graph.cards[index]
+		if card.kind == Module.Kind.COMPONENT and card.exports.has(name):
+			_canvas.frame_card(index)
+			select_module(card.file_path)
+			return true
+	return false
 
 
 ## Where a row sits on screen, so an editor can open OVER the thing it edits rather than at
@@ -1371,21 +1411,43 @@ func _on_card_moved(index: int, to: Vector2) -> void:
 ## The three payloads are the three the reference has: a LIBRARY entry becomes an element or a
 ## hook, a ROW is re-parented, and a MODULE card moves into a folder. Each was implemented and
 ## unreachable, because nothing could start a drag.
+## THE DROP SAYS WHAT HAPPENED, in the words of the thing that decided.
+##
+## Three messages covered every outcome before -- "Couldn't place <X> there.", "Couldn't move that
+## row there.", "Couldn't move that module there." -- so a drop refused because the target was an
+## import row, because the row was being moved out of its own module, because the card had no
+## markup to add to, and because there was no card under the cursor at all read identically. The
+## refusals each carry their own reason now, and a drop that LANDS says what it did, which is what
+## makes a correct-but-surprising outcome legible instead of looking like nothing happened.
 func _on_canvas_drop(data: Dictionary, at: Vector2) -> void:
+	var outcome := {}
 	match str(data.get("source", "")):
 		"library":
-			if not drop_library_entry(str(data.get("kind", "")), str(data.get("name", "")), at):
-				toast("Couldn't place <%s> there." % str(data.get("name", "")))
+			outcome = drop_library_entry(str(data.get("kind", "")), str(data.get("name", "")), at)
 		"row":
 			var drag := Drag.new()
 			drag.begin(Drag.Source.ROW, "", str(data.get("card_id", "")),
 				int(data.get("row_at", -1)), int(data.get("row_index", -1)), at)
 			drag.started = true
-			if not drop_row(drag, at):
-				toast("Couldn't move that row there.")
+			outcome = drop_row(drag, at)
 		"module":
-			if not drop_module(str(data.get("path", "")), at):
-				toast("Couldn't move that module there.")
+			outcome = drop_module(str(data.get("path", "")), at)
+		_:
+			return
+	var told := str(outcome.get("did", ""))
+	if not told.is_empty():
+		toast(told)
+
+
+## A drop that landed. `did` is what to tell the user, in the past tense.
+func _drop_did(did: String) -> Dictionary:
+	return { "ok": true, "did": did }
+
+
+## A drop that was refused, and why. The reason IS the toast: a refusal the user cannot act on is
+## the same as no answer at all.
+func _drop_refused(reason: String) -> Dictionary:
+	return { "ok": false, "did": reason }
 
 
 ## Right-click on a row: the operations that apply to THAT row.
@@ -1414,7 +1476,13 @@ func _screen_at(local: Vector2) -> Vector2:
 
 
 func _show_row_menu(at: Vector2) -> void:
-	_show_row_menu(at)
+	# THE THREE LINES THEMSELVES. Consolidating the five call sites left this calling ITSELF, so
+	# every row menu in the builder recursed until the stack gave out and no menu ever opened --
+	# the suites went green because they read the PopupMenu items directly rather than through the
+	# gesture that shows it.
+	_row_menu.position = Vector2i(_screen_at(_canvas.position + at))
+	_row_menu.reset_size()
+	_row_menu.popup()
 
 
 ## The module an import row names, or "" when the specifier resolves to nothing in this tree.
@@ -3083,19 +3151,22 @@ func _on_card_menu(id: int) -> void:
 ## The target is resolved from the POINTER at the moment of the drop, against the graph as it is
 ## then -- never from rows captured when the drag began. The canvas re-renders while a drag is in
 ## flight, because the preview recompiles as the user works.
-func drop_library_entry(kind: String, name: String, at: Vector2) -> bool:
+func drop_library_entry(kind: String, name: String, at: Vector2) -> Dictionary:
 	var hit := Drag.resolve(graph, at, _canvas.camera, _canvas.zoom)
 	if not bool(hit["found"]):
-		return false
+		return _drop_refused("Drop it on a card -- there is nothing here to add <%s> to." % name)
 	var card: Graph.Card = hit["card"]
 	if kind == LibraryPane.ENTRY_HOOK:
-		return apply_edit(card.file_path,
-			Edits.insert_setup_line(_buffer_of(card.file_path), card, Attributes.hook_stub(name)),
-			"add %s" % name)
+		if not apply_edit(card.file_path,
+				Edits.insert_setup_line(_buffer_of(card.file_path), card,
+					Attributes.hook_stub(name)), "add %s" % name):
+			return _drop_refused("%s could not be added to %s." % [name, card.title])
+		return _drop_did("Added %s to %s." % [name, card.title])
 
 	# A MODULE from the library: a style module dropped ON AN ELEMENT styles it; anything else,
 	# and a style dropped on the card rather than a row, adds the import alone.
-	if kind == LibraryPane.ENTRY_STYLE or kind == LibraryPane.ENTRY_UTIL 			or kind == LibraryPane.ENTRY_HOOK_MODULE:
+	if kind == LibraryPane.ENTRY_STYLE or kind == LibraryPane.ENTRY_UTIL \
+			or kind == LibraryPane.ENTRY_HOOK_MODULE:
 		return drop_module_export(card, hit["row"], kind, name)
 
 	var row: Graph.Line = hit["row"]
@@ -3107,11 +3178,11 @@ func drop_library_entry(kind: String, name: String, at: Vector2) -> bool:
 	if row == null:
 		var root_at := Edits.first_element_row(card)
 		if root_at < 0:
-			return false
+			return _drop_refused("%s has no markup to add <%s> to." % [card.title, name])
 		row = card.markup[root_at]
 		placement = Edits.Placement.INSIDE
 	if row.kind == Graph.LineKind.IMPORT:
-		return false
+		return _drop_refused("An import row is not a place to put <%s>." % name)
 	var verdict := Edits.can_place(card, row, placement)
 	if not bool(verdict["ok"]):
 		# A TOAST as well as the console line. A refused drop is answered while the user is still
@@ -3120,12 +3191,15 @@ func drop_library_entry(kind: String, name: String, at: Vector2) -> bool:
 		toast(str(verdict["reason"]))
 		_console.add_diagnostics(card.file_path,
 			[{ "code": "", "severity": Console.SEVERITY_WARNING, "message": str(verdict["reason"]), "line": -1 }])
-		return false
-	return apply_edit(card.file_path,
-		_with_component_import(
-			Edits.insert(_buffer_of(card.file_path), card, row, Drag.markup_for(name), placement),
-			card.file_path, name),
-		"add <%s>" % name)
+		return { "ok": false, "did": "" }   # already toasted, in the words of the rule that refused
+	if not apply_edit(card.file_path,
+			_with_component_import(
+				Edits.insert(_buffer_of(card.file_path), card, row, Drag.markup_for(name),
+					placement),
+				card.file_path, name),
+			"add <%s>" % name):
+		return _drop_refused("<%s> could not be placed there." % name)
+	return _drop_did("Added <%s> to %s." % [name, card.title])
 
 
 ## The card that exports `name` and is of `kind`, or null.
@@ -3150,17 +3224,20 @@ func _module_exporting(name: String, kind: int) -> Graph.Card:
 ##
 ## Dropped on the CARD rather than a row it adds the import alone, which is the right answer
 ## there -- and the only answer for a util or hook module, which style nothing.
-func drop_module_export(card: Graph.Card, row: Graph.Line, kind: String, name: String) -> bool:
+func drop_module_export(card: Graph.Card, row: Graph.Line, kind: String,
+		name: String) -> Dictionary:
 	if card == null or workspace == null:
-		return false
+		return _drop_refused("Drop it on a card.")
 	var module_kind := Module.Kind.STYLE
 	if kind == LibraryPane.ENTRY_UTIL:
 		module_kind = Module.Kind.UTIL
 	elif kind == LibraryPane.ENTRY_HOOK_MODULE:
 		module_kind = Module.Kind.HOOK
 	var source_card := _module_exporting(name, module_kind)
-	if source_card == null or Paths.same(source_card.file_path, card.file_path):
-		return false
+	if source_card == null:
+		return _drop_refused("Nothing in this tree exports %s." % name)
+	if Paths.same(source_card.file_path, card.file_path):
+		return _drop_refused("%s already declares %s -- it cannot import itself." % [card.title, name])
 
 	var text := _buffer_of(card.file_path)
 	var styleable := kind == LibraryPane.ENTRY_STYLE and row != null 		and (row.kind == Graph.LineKind.ELEMENT or row.kind == Graph.LineKind.COMPONENT)
@@ -3174,29 +3251,38 @@ func drop_module_export(card: Graph.Card, row: Graph.Line, kind: String, name: S
 	if styleable:
 		text = Edits.set_attribute(text, row, "style", binding, false)
 		text = str(Edits.bind_export(text, card.file_path, source_card.file_path, name)["text"])
-		return apply_edit(card.file_path, text,
-			"style %s with %s" % [row.text.strip_edges(), name])
-	return apply_edit(card.file_path, str(bound["text"]), "import %s" % name)
+		if not apply_edit(card.file_path, text,
+				"style %s with %s" % [row.text.strip_edges(), name]):
+			return _drop_refused("%s could not be applied to <%s>." % [name, row.name])
+		return _drop_did("Styled <%s> with %s." % [row.name, name])
+	if not apply_edit(card.file_path, str(bound["text"]), "import %s" % name):
+		return _drop_refused("%s is already imported into %s." % [name, card.title])
+	return _drop_did("Imported %s into %s." % [name, card.title])
 
 
 ## Re-parents a markup row. The gesture the Unity leg lists as unreliable, and the one this whole
 ## drag design exists for: both ends are re-resolved against the current graph.
-func drop_row(drag: Drag, at: Vector2) -> bool:
+func drop_row(drag: Drag, at: Vector2) -> Dictionary:
 	var card := drag.source_card(graph)
 	var row := drag.source_row(graph)
 	if card == null or row == null:
-		return false
+		return _drop_refused("That row is no longer where the drag started.")
 	var hit := Drag.resolve(graph, at, _canvas.camera, _canvas.zoom)
 	if not bool(hit["found"]) or hit["card"] != card:
 		# A row can only move within its own module: moving it to another would mean deciding
 		# what to do about every name its subtree references, which is a different operation.
-		return false
+		return _drop_refused("<%s> can only move inside %s." % [row.name, card.title])
 	var target: Graph.Line = hit["row"]
-	if target == null or target == row:
-		return false
-	return apply_edit(card.file_path,
-		Edits.move(_buffer_of(card.file_path), card, row, target, hit["placement"]),
-		"move <%s>" % row.name)
+	if target == null:
+		return _drop_refused("Drop <%s> on a row -- that is the padding under the tree." % row.name)
+	if target == row:
+		return _drop_refused("That is the row you are dragging.")
+	if not apply_edit(card.file_path,
+			Edits.move(_buffer_of(card.file_path), card, row, target, hit["placement"]),
+			"move <%s>" % row.name):
+		return _drop_refused("<%s> cannot go there -- it is inside its own subtree." % row.name)
+	return _drop_did("Moved <%s> %s <%s>." % [row.name,
+		"into" if int(hit["placement"]) == int(Edits.Placement.INSIDE) else "beside", target.name])
 
 
 ## Drops a MODULE onto an element: a style module applies itself, anything else adds an import.
@@ -3204,16 +3290,18 @@ func drop_row(drag: Drag, at: Vector2) -> bool:
 ## This is the whole style-application gesture. `style={ Name }` plus the import it needs -- two
 ## edits, one action, so one undo takes both back. A style applied without its import is a file
 ## that does not compile, and an import added without the use is GUITKX2304.
-func drop_module(module_path: String, at: Vector2) -> bool:
+func drop_module(module_path: String, at: Vector2) -> Dictionary:
 	var hit := Drag.resolve(graph, at, _canvas.camera, _canvas.zoom)
 	if not bool(hit["found"]):
-		return false
+		return _drop_refused("Drop it on a card -- there is nothing here to import into.")
 	var card: Graph.Card = hit["card"]
 	if Paths.same(card.file_path, module_path):
-		return false
+		return _drop_refused("A module cannot import itself.")
 	var source_card := graph.card_of(module_path)
-	if source_card == null or source_card.exports.is_empty():
-		return false
+	if source_card == null:
+		return _drop_refused("That module is not part of this tree.")
+	if source_card.exports.is_empty():
+		return _drop_refused("%s exports nothing to import." % source_card.title)
 	var export_name := str(source_card.exports[0])
 
 	var row: Graph.Line = hit["row"]
@@ -3226,7 +3314,10 @@ func drop_module(module_path: String, at: Vector2) -> bool:
 	else:
 		described = "import %s" % export_name
 	text = Edits.ensure_import(text, card.file_path, module_path, PackedStringArray([export_name]))
-	return apply_edit(card.file_path, text, described)
+	if not apply_edit(card.file_path, text, described):
+		return _drop_refused("%s is already imported into %s." % [export_name, card.title])
+	return _drop_did("%s %s." % [described.capitalize(), card.title] \
+		if described.begins_with("import") else "%s with %s." % [described.capitalize(), export_name])
 
 
 func _buffer_of(file_path: String) -> String:

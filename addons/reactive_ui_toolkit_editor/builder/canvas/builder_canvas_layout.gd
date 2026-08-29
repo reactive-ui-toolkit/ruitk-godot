@@ -20,6 +20,7 @@ extends RefCounted
 ## like one nobody has ever laid out, and the mount mints a fresh default column over the top of
 ## the real one.
 
+const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_paths.gd")
 const Self = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_layout.gd")
 const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
@@ -276,6 +277,11 @@ static func _read(path: String) -> Self:
 	var stored := from_dict(parsed)
 	if stored != null:
 		stored.has_saved_view = true
+		# CLAMPED ON THE WAY IN. A layout file is on disk, which means an older build wrote it, a
+		# hand edit touched it, or it is simply from before the band table moved -- and a zoom
+		# outside [ZOOM_MIN, ZOOM_MAX] restored verbatim puts the canvas at a scale no gesture can
+		# produce, with the toolbar naming a layer the cards are not drawn at.
+		stored.zoom = Metrics.DEFAULT_ZOOM if stored.zoom <= 0.0 else Metrics.clamp_zoom(stored.zoom)
 	return stored
 
 

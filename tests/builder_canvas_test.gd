@@ -20,6 +20,7 @@ const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/docum
 const Service = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph_service.gd")
 const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
 const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
+const CanvasLayout = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_layout.gd")
 const Layout = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_layout.gd")
 const Host = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_host.gd")
 const Edges = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_edges.gd")
@@ -33,7 +34,7 @@ const VIEWPORT := Vector2(1280, 720)
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 205
+const ASSERTION_FLOOR := 212
 
 var _fails := 0
 var _passes := 0
@@ -52,6 +53,8 @@ func _run() -> void:
 	_test_hit_test_matches_what_is_drawn()
 	_test_hook_usage_highlighting()
 	_test_section_caps()
+	_test_kind_badge_band()
+	_test_restored_zoom_is_clamped()
 	_test_lod_bands()
 	await _test_card_can_be_moved()
 	await _test_canvas_can_be_panned()
@@ -391,6 +394,48 @@ func _test_section_caps() -> void:
 	var near_top := Metrics.edge_source_anchor(tall, 0, Metrics.card_width_for(Metrics.Lod.FULL),
 		Metrics.Lod.FULL, Metrics.Section.MARKUP)
 	_check(deep.y > near_top.y, "and rows above the cap still anchor in order")
+
+
+## THE KIND CHIP IS A BAND, like the title bar is.
+##
+## Model-based because the drawn badge is a `Label` inside an IGNORE-filtered `PanelContainer`:
+## Godot will never report a press on it, so a hit-test that waited for one would wait forever.
+func _test_kind_badge_band() -> void:
+	_section("the kind chip is the module's own drag handle")
+	var card := Graph.Card.new()
+	card.title = "Panelled"
+	card.kind = Module.Kind.COMPONENT
+	card.x = 100.0
+	card.y = 200.0
+	var width := Metrics.card_width_for(Metrics.Lod.FULL)
+	_check(Metrics.on_kind_badge(card, Vector2(card.x + 10.0, card.y + 8.0), width),
+		"a point at the head of the title bar is on the chip")
+	_check(not Metrics.on_kind_badge(card, Vector2(card.x + width - 10.0, card.y + 8.0), width),
+		"a point at the far end of the same bar is not")
+	_check(not Metrics.on_kind_badge(card, Vector2(card.x + 10.0, card.y + 300.0), width),
+		"and neither is a point below the title bar -- the chip is not the whole left column")
+	_check(Metrics.on_title_bar(card, Vector2(card.x + 10.0, card.y + 8.0), width),
+		"the chip is INSIDE the title bar, so dragging the card still works around it")
+
+
+## A RESTORED ZOOM IS A ZOOM. A layout file is on disk, so an older build, a hand edit or a moved
+## band table can put a value in it that no gesture can produce.
+func _test_restored_zoom_is_clamped() -> void:
+	_section("a layout restores a zoom the canvas can actually be at")
+	CanvasLayout.clear_all()
+	var layout := CanvasLayout.new()
+	layout.root_path = ROOT
+	layout.zoom = 99.0
+	layout.camera = Vector2(10, 10)
+	layout.save("test")
+	var back := CanvasLayout.load_for_root(ROOT)
+	_check(back != null, "the layout comes back")
+	_eq(back.zoom, Metrics.ZOOM_MAX, "and its wild zoom is clamped to the ceiling")
+	layout.zoom = 0.0
+	layout.save("test")
+	back = CanvasLayout.load_for_root(ROOT)
+	_eq(back.zoom, Metrics.DEFAULT_ZOOM, "a zero zoom is the sentinel for 'no view saved'")
+	CanvasLayout.clear_all()
 
 
 func _line(kind: int, text: String) -> Graph.Line:

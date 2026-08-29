@@ -129,6 +129,12 @@ const PARITY := [
 	["DotColor(kind) -- an anchor dot is its import's kind", "func edge_tint"],
 	["the lattice coarsens instead of vanishing", "doublings"],
 	["UB-23: every card section is capped and scrolls", "func section_cap"],
+	["the kind chip is a drag handle for the MODULE", "func on_kind_badge"],
+	["double-click a component row to go to its module", "func _navigate_to_component"],
+	["double-click a card to frame it", "signal card_activated"],
+	["a drop reports its own outcome", "func _drop_refused"],
+	["a restored zoom is clamped on the way in", "stored.zoom = Metrics.DEFAULT_ZOOM"],
+	["an adopted slot is written down", "if layout.adopt_unplaced(graph):"],
 	["a scrollable section eats the plain wheel; Ctrl+wheel is still the zoom", "func _input"],
 	["UB-78: the signature is two runs, cut at the paren", "func signature_head"],
 	# The preview

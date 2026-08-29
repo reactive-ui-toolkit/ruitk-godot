@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 351
+const ASSERTION_FLOOR := 358
 
 var _fails := 0
 var _passes := 0
@@ -68,6 +68,8 @@ func _run() -> void:
 	await _test_preview_anchor_and_knobs()
 	await _test_double_click_edits_in_place()
 	await _test_row_menu_fits_its_section()
+	await _test_row_menu_actually_opens()
+	await _test_a_drop_says_what_happened()
 	await _test_island_editor_is_multiline()
 	await _test_language_index_follows_the_buffers()
 	await _test_diagnostics_reach_the_surface()
@@ -2055,3 +2057,54 @@ func _row_named(rows: Array, file_name: String) -> TreeItem:
 		if str((row as TreeItem).get_metadata(0)).get_file() == file_name:
 			return row
 	return null
+
+
+## THE MENU OPENS. Every suite here reads `_row_menu`'s ITEMS, which are built before it is shown
+## -- so when consolidating the five call sites left `_show_row_menu` calling itself, every row
+## menu in the builder recursed until the stack gave out, no menu ever appeared, and 350 assertions
+## stayed green. A gesture that is only ever tested up to the last line is a gesture with no test.
+func _test_row_menu_actually_opens() -> void:
+	var w := _window()
+	await process_frame
+	var path := ROOT.path_join("app.guitkx")
+	w.select_module(path)
+	var card_index: int = w.graph.index_of(path)
+	_check(card_index >= 0, "the app card is on the canvas")
+	w._on_row_context(card_index, Metrics.Section.MARKUP, 0, Vector2(40, 40))
+	await process_frame
+	_check(w._row_menu.visible, "right-clicking a row SHOWS the menu")
+	_check(w._row_menu.item_count > 0, "with items on it")
+	w._row_menu.hide()
+	w.queue_free()
+	await process_frame
+
+
+## A DROP REPORTS ITS OUTCOME, in the words of whatever decided it.
+##
+## Three messages covered every refusal before, so "there is no card there", "that is an import
+## row" and "the row cannot leave its module" all read identically -- and a drop that LANDED said
+## nothing at all, which is indistinguishable from one that did nothing.
+func _test_a_drop_says_what_happened() -> void:
+	var w := _window()
+	await process_frame
+	var path := ROOT.path_join("app.guitkx")
+	w.select_module(path)
+
+	var nowhere: Dictionary = w.drop_library_entry("element", "Button", Vector2(-4000, -4000))
+	_check(not bool(nowhere["ok"]), "a drop on empty canvas is refused")
+	_check(str(nowhere["did"]).contains("Button"),
+		"and the refusal names what was being dropped, not 'there'")
+
+	var card := w.graph.cards[w.graph.index_of(path)]
+	var rect: Rect2 = Rect2(Vector2(card.x, card.y), Vector2(1, 1))
+	var landed: Dictionary = w.drop_library_entry("element", "Button",
+		w._canvas.camera + rect.position * w._canvas.zoom + Vector2(30, 90))
+	if bool(landed["ok"]):
+		_check(str(landed["did"]).begins_with("Added"),
+			"a drop that lands says what it added, in the past tense")
+	else:
+		_check(not str(landed["did"]).is_empty(),
+			"and one that does not says why, rather than the same sentence every time")
+
+	w.queue_free()
+	await process_frame
