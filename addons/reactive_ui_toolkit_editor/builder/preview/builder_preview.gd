@@ -596,7 +596,12 @@ func mount(container: Node, focus_path: String, props := {}) -> bool:
 	# PROPS, not an empty dictionary. A component previewed with its declared defaults is
 	# previewed with the least interesting values it ever takes -- an empty label, a list with no
 	# items -- and the knobs above the stage exist precisely to change them.
-	_root = RuitkRoot.create(container, V.fc(Callable(script, "render"), props))
+	# ISOLATED: its own scheduler, its own frame budget. The stage renders USER CODE -- a component
+	# mid-edit, whose effects the builder neither wrote nor can vet -- into the EDITOR's SceneTree,
+	# the one that also pumps the canvas. On the shared lane a preview that will not settle spends
+	# the budget the tool it lives in needs to stay usable, and the symptom is the whole editor
+	# stuttering rather than one panel misbehaving.
+	_root = RuitkRoot.create_isolated(container, V.fc(Callable(script, "render"), props))
 	_mounted_path = Paths.canon(focus_path)
 	return _root != null
 

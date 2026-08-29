@@ -297,7 +297,10 @@ func _render() -> void:
 		"revision": _revision,
 	}
 	if _root == null:
-		_root = RuitkRoot.create(_cards, V.fc(Callable(CanvasView, "render"), props))
+		# ISOLATED, like the preview stage: a budget of its own on the editor's shared tree. A tree
+		# of a hundred cards is a big render, and it must not be able to eat the frames the preview
+		# beside it is also asking for.
+		_root = RuitkRoot.create_isolated(_cards, V.fc(Callable(CanvasView, "render"), props))
 	else:
 		_root.set_root(V.fc(Callable(CanvasView, "render"), props))
 	_pass_mouse_through(_cards)

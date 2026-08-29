@@ -119,7 +119,9 @@ runtime**; the classes are available as soon as the files exist. Enabling the pl
   ping-pong `alternate` buddies); cycles are severed explicitly for GC.
 - **`scheduler.gd` (`RuitkScheduler`)** — the four-lane (High/Normal/Low/Idle) frame scheduler behind
   sliced renders (per-lane Callable dedup, Low-cancel under High pressure, Idle only on quiet frames,
-  unbudgeted batched-effects flush). Lazy per-`SceneTree`, pumped from `process_frame` — no autoload.
+  unbudgeted batched-effects flush). Lazy per-`SceneTree`, pumped from `process_frame` — no autoload. `RuitkRoot.create_isolated`
+  gives one root a scheduler and frame budget of its OWN — how the builder keeps two surfaces on
+  the editor's shared tree from spending each other's frames.
 - **`fail.gd` (`RuitkFail`)** — the cooperative render-failure latch: a failing render calls
   `RuitkFail.render(reason)` (GDScript can't throw) and the reconciler unwinds to the nearest error
   boundary.

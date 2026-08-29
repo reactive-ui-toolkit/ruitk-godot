@@ -23,7 +23,7 @@ const ROOT := "res://tests/__builder_preview_tmp/ui"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 93
+const ASSERTION_FLOOR := 98
 
 var _fails := 0
 var _passes := 0
@@ -171,6 +171,22 @@ func _test_compile_and_mount() -> void:
 	var container := _mount(preview)
 	await process_frame
 	_eq(container.get_child_count(), 1, "the focus mounted one root node")
+	# ON A SCHEDULER OF ITS OWN. The stage renders user code -- a component mid-edit, whose
+	# effects the builder neither wrote nor can vet -- into the EDITOR's SceneTree, the one that
+	# also pumps the canvas beside it. Sharing that tree's scheduler means sharing its frame
+	# budget, so a preview that will not settle stalls the tool it is a panel of.
+	var root_obj = preview._root
+	_check(root_obj.scheduler() != null, "the mount owns a scheduler")
+	_check(root_obj.scheduler() != RuitkScheduler.for_tree(container.get_tree()),
+		"and it is NOT the editor tree's shared one")
+	_eq(root_obj.scheduler().budget_ms(), 4.0,
+		"with a frame budget of its own, like the reference's per-pane BuilderRenderScheduler")
+	preview.unmount()
+	_check(not container.get_tree().process_frame.is_connected(root_obj.scheduler().pump),
+		"and unmount takes the pump with it -- a session opens the builder many times")
+	_check(preview.mount(container, _focus()), "re-mounted for the rest of the checks")
+	await process_frame
+
 	var box := container.get_child(0)
 	_eq(box.get_class(), "VBoxContainer", "which is the component's own root element")
 	_eq(box.get("theme_override_constants/separation"), 8,

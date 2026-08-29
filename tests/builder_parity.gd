@@ -133,6 +133,7 @@ const PARITY := [
 	["state panel", "func _refresh_state"],
 	["OnRecompiled (one hand-off per round)", "signal round_finished"],
 	["the pane can ask why a module failed", "func last_error_for"],
+	["BuilderRenderScheduler (a frame budget of its own)", "RuitkRoot.create_isolated"],
 	# Chrome
 	["Toast", "func toast"],
 	["ToggleHelp", "func show_help"],
