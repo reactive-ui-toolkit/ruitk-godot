@@ -1,0 +1,44 @@
+import { DemoBox } from "~/examples/demos/demo_box"
+import { ThemedPanel } from "./themed_panel"
+import * as Palette from "./theme.style"
+
+## Style modules and `@uss` -- the two ways a look lives outside the markup that uses it.
+##
+## `import * as Palette` brings in `theme.style.guitkx`, a STYLE MODULE: no markup, no component,
+## only exported values. Each `Palette.*` below is a style dictionary named once and used from
+## wherever it is wanted, instead of a literal repeated at three call sites -- which is how "all
+## the cards look the same" quietly stops being true.
+##
+## The Theme half lives in `themed_panel.guitkx`, because `@uss` themes a component's ROOT
+## element and so a themed subtree IS a component.
+export DemoStyleModule() -> RuitkVNode {
+	var on = useState(true)
+	var tints := [Color(0.95, 0.35, 0.4), Color(0.4, 0.85, 0.5), Color(0.4, 0.6, 0.95)]
+
+	return (
+		<DemoBox title="Style modules — .style.guitkx + @uss">
+			<PanelContainer style={ Palette.PANEL }>
+				<VBoxContainer style={ Palette.ROW }>
+					<Label text="Styled from a module" style={ Palette.HEADING } />
+					<Label
+						text="PANEL, HEADING, BODY and ROW are exports of theme.style.guitkx -- named once, used here."
+						style={ Palette.BODY } />
+				</VBoxContainer>
+			</PanelContainer>
+
+			<ThemedPanel />
+
+			<Label text="An exported FUNCTION is a style that takes arguments:" style={ Palette.BODY } />
+			<HBoxContainer style={ Palette.ROW }>
+				@for (t in tints) {
+					return (
+						<PanelContainer key={ str(t) } style={ Palette.swatch(t, on[0]) } />
+					)
+				}
+			</HBoxContainer>
+			<Button
+				text={ "Dim the swatches" if on[0] else "Light the swatches" }
+				onPressed={ func(): on[1].call(not on[0]) } />
+		</DemoBox>
+	)
+}

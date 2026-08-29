@@ -4,6 +4,68 @@ All notable changes to **Reactive UI Toolkit — Godot** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.15.0] — 2026-08-27
+
+The **UI Builder** release. The headline ships in the editor addon (0.13.0); what lands in
+the runtime addon is the compiler surface the builder is built on, plus the vocabulary and
+documentation for two features that were implemented and taught nowhere.
+
+### Added — compiler analysis API
+
+The builder reads a `.guitkx` file's structure without compiling it, and writes edits back
+as text. That needs the compiler to answer questions it previously only answered to itself.
+These are additive; nothing existing changed shape.
+
+- **`RuitkGuitkx.decl_structure(source, decl)`** — the declaration's spans: its body open,
+  its markup root, and the setup region before it. What lets a caller insert a line into a
+  component's setup, or find where its markup begins, without re-parsing.
+- **`RuitkGuitkxCodegen.strip_class_name(gd)`** — generated source with its `class_name`
+  line removed. Anything that loads generated code *without being the real module* needs
+  this: the two-pass parse gate's throwaway and the builder's preview mirror are both
+  shadows of a module already registered under that name, and a second script claiming it
+  is a parse failure for code that is perfectly correct. Scanned through the header rather
+  than tested on the first line, so an added header line cannot silently defeat it.
+- **`RuitkGuitkxJsxScan.element_end(...)` / `.scan_open_tag(...)`** — the element and
+  open-tag scanners, promoted from `_`-private. Locating the end of an element in the
+  *source text* is what an edit operation needs to insert a sibling after it.
+- **`RuitkGuitkxResolve.resolve_specifier(spec, from, root, must_exist := true)`** — the
+  new fourth argument resolves a specifier for a file that does not exist yet, which is
+  what a planned rename is. `binding_of` is promoted from `_binding_of` for the same
+  reason: mapping a name back to its module is now something outside the resolver asks.
+
+### Added — `@uss` / `@theme` and `.style.guitkx` in the vocabulary and the docs
+
+Both were implemented and taught nowhere.
+
+- `uss` and `theme` join `vocabulary.json`'s `directives` — the family's declared
+  vocabulary of record, and the file the language server reads.
+- The `.guitkx` schema shipped with the editor addon and the IDE extensions now describes
+  `@uss` correctly (it read "(reserved)") and lists `@theme` alongside it, so both complete
+  and hover in every editor.
+- The docs site's **Styling** page gains a **Style modules** section — authoring,
+  importing, applying, and the eager-import cycle rule that separates value imports from
+  component imports — and a **`@uss` / `@theme`** section covering the one-per-file rule,
+  the single-root-element requirement, and how a Theme and a style dict compose.
+
+### Added — a shipped `.style.guitkx` example
+
+`examples/demos/style_module/` is the first shipped example of a style module and of
+`@uss`: a `theme.style.guitkx` exporting both style dictionaries and a *parameterised*
+style (an exported function), a `demo_theme.tres` attached with `@uss`, and a component
+using both. It joins the gallery as **Style modules**. The pre-existing **Styling** demo's
+hand-written `styling.style.gd` stays as it was — it demonstrates the plain-GDScript route,
+which is still valid.
+
+### Known limitation — style modules are inert in editor code
+
+A generated `.gd` is not a `@tool` script, and Godot **never runs a non-tool script's
+`static var` initialisers in the editor**. A `.style.guitkx` module read from `@tool`
+editor code therefore comes back empty — silently, every key missing. Runtime and the
+Fast Refresh path are unaffected; this is editor-time only. Export a *function* instead of
+a value when editor code has to read it (static funcs do run). Documented on the Styling
+page, and it is why the builder's own canvas palette is a hand-written `@tool` script while
+the rest of the canvas is `.guitkx`.
+
 ## [0.14.0] — 2026-07-31
 
 The settings + family-parity release, one wave: every runtime tunable is now a native

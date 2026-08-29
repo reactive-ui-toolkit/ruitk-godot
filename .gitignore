@@ -59,3 +59,15 @@ addons/reactive_ui_toolkit_analyzer/
 .vscode/compileCommands_*
 .vscode/c_cpp_properties.json
 *.code-workspace
+
+# The builder's working roots. Both are transient by design and both clean themselves up, but a
+# crashed editor can leave one behind and neither belongs in a commit:
+#   the preview MIRROR — the open tree, compiled at scratch paths so the preview cannot compile
+#   differently from the build;
+#   the provisional home of a tree that has never been saved, which Save re-homes into the folder
+#   the user picks.
+/__ruitk_builder_preview__~/
+/__ruitk_builder_unsaved__~/
+
+# Builder visual gauntlet: the reference shots are committed, ours are regenerated.
+/Images/current/

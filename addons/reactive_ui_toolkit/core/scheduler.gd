@@ -16,7 +16,8 @@ extends RefCounted
 ##      is still under budget/2 — and it gets a budget/2 sub-budget of its own.
 ##   4. The batched-effects flush runs UNBUDGETED at frame end, every frame.
 ##
-## The per-frame budget (`RuitkConfig.frame_budget_ms`, read live) is CUMULATIVE across all
+## The per-frame budget (`budget_ms()` -- this instance's `frame_budget_ms` when it has one,
+## `RuitkConfig.frame_budget_ms` read live otherwise) is CUMULATIVE across all
 ## lanes: every `_execute_queue` call in one pump measures from the same frame-start
 ## timestamp (:166-204). Budget checks happen BETWEEN actions — a long action overruns
 ## (cooperative, no preemption). A render pass participates as a self-re-enqueueing slice
@@ -39,6 +40,23 @@ enum Priority { HIGH, NORMAL, LOW, IDLE }
 ## timing is too flaky to assert against).
 var time_source: Callable = Callable()
 
+## THIS INSTANCE'S per-frame budget in ms, or -1 to read `RuitkConfig.frame_budget_ms`.
+##
+## The reference gives every editor pane a scheduler of its own with its own `TickBudgetMs`
+## (BuilderRenderScheduler; VISUAL_EDITOR_PLAN VE-10), and the reason it states is structural
+## rather than cosmetic: queues that are process-global with a process-global budget let ONE
+## surface's runaway render starve every other surface sharing the pump. Here the sharing is
+## per-SceneTree rather than per-process, which in a game is the same tree the UI belongs to --
+## but in the EDITOR it is the tree that also runs the builder's canvas, the preview stage and
+## anything else an addon mounted. A root created through `RuitkRoot.create_isolated` owns an
+## instance of this class with its own budget, so a preview that will not settle costs the
+## preview its frames and nobody else theirs.
+var frame_budget_ms := -1.0
+
+## The tree pumping this instance, when it is an OWNED one. The per-SceneTree instances
+## `for_tree` hands out leave this null: they live as long as their tree and are never detached.
+var _pumped_tree: SceneTree = null
+
 # One FIFO Array[Callable] + one dedup tracker Dictionary (Callable -> true) per lane,
 # indexed by Priority (RenderScheduler.cs:10-17).
 var _queues: Array = [[], [], [], []]
@@ -60,6 +78,37 @@ var _last_frame_start_ms := 0.0
 ## connection holds the scheduler alive for the tree's lifetime; entries whose tree died
 ## are pruned on the next lookup.
 static var _by_tree: Dictionary = {}
+
+## An INDEPENDENT scheduler, outside the per-SceneTree table, with a budget of its own.
+##
+## Owned by whoever asks for it: attach it to a tree to have it pumped, and `detach()` it when
+## the surface it serves goes away. `RuitkRoot.create_isolated` does both.
+static func owned(budget_ms := -1.0) -> RuitkScheduler:
+	var sched := RuitkScheduler.new()
+	sched.frame_budget_ms = budget_ms
+	return sched
+
+## Pumps this scheduler from `tree`'s frames. Idempotent, and cheap enough to call on every
+## enqueue -- which is what the reconciler does, because a container is not always inside a tree
+## at the moment its root is created.
+func attach(tree: SceneTree) -> void:
+	if tree == null or _pumped_tree == tree:
+		return
+	detach()
+	_pumped_tree = tree
+	tree.process_frame.connect(pump)
+
+## Stops the pump and drops the connection. A no-op on a `for_tree` instance, which never set
+## `_pumped_tree`; those are pruned by tree identity instead.
+func detach() -> void:
+	if _pumped_tree != null and is_instance_valid(_pumped_tree) \
+			and _pumped_tree.process_frame.is_connected(pump):
+		_pumped_tree.process_frame.disconnect(pump)
+	_pumped_tree = null
+
+## The budget in force: this instance's, or the project-wide default when it has none.
+func budget_ms() -> float:
+	return frame_budget_ms if frame_budget_ms >= 0.0 else RuitkConfig.frame_budget_ms
 
 static func for_tree(tree: SceneTree) -> RuitkScheduler:
 	var tid := tree.get_instance_id()
@@ -127,7 +176,7 @@ func pump() -> void:
 			and _queues[Priority.NORMAL].is_empty() \
 			and _queues[Priority.LOW].is_empty()
 	if not ran_foreground and queues_empty \
-			and _now_ms() - frame_start < RuitkConfig.frame_budget_ms * 0.5:
+			and _now_ms() - frame_start < budget_ms() * 0.5:
 		_idle_executed_count += _execute_queue(Priority.IDLE, frame_start, false)
 	_flush_batched_effects()
 	_rendered_frame_count += 1
@@ -140,7 +189,7 @@ func _execute_queue(priority: Priority, frame_start_ms: float, allow_over_budget
 	var queue: Array = _queues[priority]
 	if queue.is_empty():
 		return 0
-	var budget: float = RuitkConfig.frame_budget_ms
+	var budget: float = budget_ms()
 	var budget_limit: float = budget if allow_over_budget else budget * 0.5
 	if budget_limit < 0.0:
 		budget_limit = 0.0

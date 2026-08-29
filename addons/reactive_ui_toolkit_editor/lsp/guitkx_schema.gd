@@ -23,7 +23,6 @@ static var _loaded := false
 static func _ensure_loaded() -> void:
 	if _loaded:
 		return
-	_loaded = true
 	var raw := ""
 	for p in [_BUNDLED_SCHEMA, _DEV_SCHEMA]:
 		if FileAccess.file_exists(p):
@@ -31,16 +30,31 @@ static func _ensure_loaded() -> void:
 			if raw != "":
 				break
 	if raw == "":
+		# NOT LATCHED. `_loaded` was set BEFORE the read, so one failure -- a file not yet
+		# extracted from a freshly installed addon, a transient read error -- silently disabled
+		# the markup vocabulary for the whole editor process, and nothing anywhere asked whether
+		# the schema had loaded. The compiler's own `env_error` precedent is one folder away.
 		push_warning("GuitkxSchema: guitkx-schema.json not found (bundled or dev path).")
 		return
 	var parsed: Variant = JSON.parse_string(raw)
 	if typeof(parsed) != TYPE_DICTIONARY:
 		push_warning("GuitkxSchema: guitkx-schema.json did not parse to an object.")
 		return
+	_loaded = true
 	_schema = parsed
 	for e in _schema.get("hostElements", []):
 		if e is Dictionary and e.has("tag"):
 			_tags[e["tag"]] = e
+
+## Whether the markup vocabulary is actually available.
+##
+## What a surface asks before it tells the user its list is complete: with no schema the palette
+## is empty and the completion silent, which reads as "this file has nothing to offer" rather
+## than "the vocabulary did not load".
+static func has_schema() -> bool:
+	_ensure_loaded()
+	return not _tags.is_empty()
+
 
 # --- Static vocabulary -------------------------------------------------------------------------
 
@@ -123,6 +137,45 @@ static func property_info(godot_class: String, prop: String) -> Dictionary:
 
 ## The RuitkStyle vocabulary (the `style={ {...} }` dict keys), from the bundled schema:
 ## [{name, type, detail}]. Godot's own tooling has no vocabulary for these.
+## The style vocabulary the runtime ACTUALLY accepts: the curated head from the schema, plus every
+## `StyleBoxFlat` property, read live from ClassDB the same way `RuitkStyle` reads them.
+##
+## The schema's list is 45 hand-maintained entries against a surface of roughly 74, so the
+## per-side and per-corner keys -- `border_width_left`, `corner_radius_top_right`,
+## `content_margin_bottom` and the rest -- could not be reached from any menu, and the list could
+## drift from the engine on any Godot release without anything noticing.
+static func style_keys_live() -> Array:
+	var out: Array = []
+	var seen := {}
+	for entry in style_keys():
+		var spec := entry as Dictionary
+		var name := str(spec.get("name", ""))
+		if name.is_empty() or seen.has(name):
+			continue
+		seen[name] = true
+		out.append(spec)
+	for prop in ClassDB.class_get_property_list("StyleBoxFlat"):
+		var info := prop as Dictionary
+		var name := str(info.get("name", ""))
+		# The same filter `RuitkStyle` applies: groups and category rows are not properties, and
+		# the `resource_*` four belong to Resource rather than to the box.
+		if name.is_empty() or seen.has(name) or name.begins_with("resource_"):
+			continue
+		var usage := int(info.get("usage", 0))
+		if usage & PROPERTY_USAGE_GROUP or usage & PROPERTY_USAGE_SUBGROUP \
+				or usage & PROPERTY_USAGE_CATEGORY:
+			continue
+		if not (usage & PROPERTY_USAGE_EDITOR):
+			continue
+		seen[name] = true
+		out.append({
+			"name": name,
+			"type": type_string(int(info.get("type", TYPE_NIL))),
+			"detail": "StyleBoxFlat.%s" % name,
+		})
+	return out
+
+
 static func style_keys() -> Array:
 	_ensure_loaded()
 	return _schema.get("styleKeys", [])

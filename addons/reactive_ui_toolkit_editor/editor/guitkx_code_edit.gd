@@ -24,13 +24,23 @@ var loaded_mtime := 0           # disk mtime the buffer was loaded from / last s
 ## Editor font zoom (E11), shared across all open editors and the session.
 static var zoom_font_size := 0  # 0 = theme default
 
-var _highlighter: GuitkxCodeHighlighter
+var _highlighter
 var _theme_source: Control
 var _line_diags: Dictionary = {}  # line (int) -> Array of diagnostic records (from the view)
 
 # Signature help (G4): a hand-drawn strip above the caret while it sits inside an event-handler
 # lambda's parameter list. Preload (not the global class name): cold class caches.
 const SignatureScript := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_signature.gd")
+# BY PATH, NOT BY GLOBAL NAME. This widget is reused by the BUILDER's source pane and its island
+# editor, and everything under `builder/` reaches its dependencies through preloads for a stated
+# reason: `ProjectSettings.save()` truncates the editor class cache to what the running process
+# loaded, so a global name can stop resolving mid-session. Naming five of them here put the
+# builder's own availability back inside the hazard it was written to avoid.
+const CompletionScript := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_completion.gd")
+const ContextScript := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_context.gd")
+const HoverScript := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_hover.gd")
+const WorkspaceScript := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_workspace.gd")
+const HighlighterScript := preload("res://addons/reactive_ui_toolkit_editor/editor/guitkx_code_highlighter.gd")
 # M3: the native embedded-GDScript tier. The bridge feature-detects the reactive_ui_toolkit_analyzer
 # GDExtension; instance() is null when it is absent and every call site degrades to markup-only.
 const BridgeScript := preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_analyzer_bridge.gd")
@@ -49,7 +59,7 @@ func _ready() -> void:
 	# Syntax highlighting (own SyntaxHighlighter route). Always assigned; the highlighter honours
 	# KEY_HIGHLIGHTING per line, so the toggle applies live without a plugin reload. Editor-only:
 	# the highlighter reads EditorSettings theme colours.
-	_highlighter = GuitkxCodeHighlighter.new()
+	_highlighter = HighlighterScript.new()
 	syntax_highlighter = _highlighter
 
 	# Refresh highlight colours when the editor theme changes.
@@ -156,7 +166,7 @@ func _signature_refresh() -> void:
 		_signature_hide()
 		return
 	var t := get_text()
-	var off := GuitkxContext.offset_of(t, get_caret_line(), get_caret_column())
+	var off := ContextScript.offset_of(t, get_caret_line(), get_caret_column())
 	var sig: Dictionary = SignatureScript.signature_at(t, off)
 	if sig.is_empty():
 		# M3: signature help inside embedded GDScript calls, through the analyzer. Adapted to the
@@ -408,8 +418,8 @@ func _request_code_completion(_force: bool) -> void:
 	if not RuitkEditorSettings.is_enabled(RuitkEditorSettings.KEY_COMPLETION):
 		return
 	var text := get_text()
-	var off := GuitkxContext.offset_of(text, get_caret_line(), get_caret_column())
-	var items := GuitkxCompletion.for_caret(text, off, file_path)
+	var off := ContextScript.offset_of(text, get_caret_line(), get_caret_column())
+	var items := CompletionScript.for_caret(text, off, file_path)
 	var seen := {}
 	for it in items:
 		seen[str(it["display"])] = true
@@ -456,11 +466,11 @@ func _analyzer_kind_of(kind: String) -> int:
 
 func _kind_of(kind: String) -> int:
 	match kind:
-		GuitkxCompletion.CLASS:
+		CompletionScript.CLASS:
 			return CodeEdit.KIND_CLASS
-		GuitkxCompletion.SIGNAL:
+		CompletionScript.SIGNAL:
 			return CodeEdit.KIND_SIGNAL
-		GuitkxCompletion.MEMBER:
+		CompletionScript.MEMBER:
 			return CodeEdit.KIND_MEMBER
 		_:
 			return CodeEdit.KIND_PLAIN_TEXT
@@ -468,7 +478,7 @@ func _kind_of(kind: String) -> int:
 const HOOKS_GD := "res://addons/reactive_ui_toolkit/core/hooks.gd"
 
 func _on_symbol_validate(symbol: String) -> void:
-	if GuitkxWorkspace.is_component(symbol) or GuitkxHover.HOOKS.has(symbol):
+	if WorkspaceScript.is_component(symbol) or HoverScript.HOOKS.has(symbol):
 		set_symbol_lookup_word_as_valid(true)
 		return
 	# M3: an identifier inside a mapped embedded span is navigable through the analyzer. The check
@@ -477,19 +487,19 @@ func _on_symbol_validate(symbol: String) -> void:
 	if bridge != null:
 		var text := get_text()
 		var pos := get_line_column_at_pos(get_local_mouse_pos())
-		var off := GuitkxContext.offset_of(text, pos.y, pos.x)
+		var off := ContextScript.offset_of(text, pos.y, pos.x)
 		set_symbol_lookup_word_as_valid(bridge.is_embedded_offset(file_path, text, off))
 		return
 	set_symbol_lookup_word_as_valid(false)
 
 func _on_symbol_lookup(symbol: String, line: int, column: int) -> void:
-	var hit := GuitkxWorkspace.lookup(symbol)
+	var hit := WorkspaceScript.lookup(symbol)
 	if not hit.is_empty():
 		definition_requested.emit(str(hit.get("path", "")), int(hit.get("offset", 0)))
 		return
 	# Hooks jump to their implementation in core/hooks.gd (G27 — the VS Code server chains
 	# through virtual-doc stubs; natively a name scan suffices, hooks.gd functions are camelCase).
-	if GuitkxHover.HOOKS.has(symbol) and FileAccess.file_exists(HOOKS_GD):
+	if HoverScript.HOOKS.has(symbol) and FileAccess.file_exists(HOOKS_GD):
 		var src := FileAccess.get_file_as_string(HOOKS_GD)
 		var at := src.find("func %s(" % symbol)
 		if at >= 0:
@@ -501,7 +511,7 @@ func _on_symbol_lookup(symbol: String, line: int, column: int) -> void:
 	var bridge = BridgeScript.instance()
 	if bridge != null:
 		var text := get_text()
-		var hits: Array = bridge.goto_definition(file_path, text, GuitkxContext.offset_of(text, line, column))
+		var hits: Array = bridge.goto_definition(file_path, text, ContextScript.offset_of(text, line, column))
 		if not hits.is_empty():
 			var first := hits[0] as Dictionary
 			definition_requested.emit(str(first.get("path", "")), int(first.get("offset", 0)))
@@ -519,8 +529,8 @@ func _on_symbol_hovered(_symbol: String, line: int, column: int) -> void:
 		tooltip_text = ""
 		return
 	var text := get_text()
-	var off := GuitkxContext.offset_of(text, line, column)
-	var md := GuitkxHover.for_caret(text, off)
+	var off := ContextScript.offset_of(text, line, column)
+	var md := HoverScript.for_caret(text, off)
 	# M3: type-aware hover for embedded GDScript — the inferred type/signature line leads, engine
 	# docs follow. Markup hover keeps priority (a tag is a tag); the analyzer only fills the gap.
 	if md == "":
@@ -556,5 +566,5 @@ func _make_custom_tooltip(for_text: String) -> Object:
 	rtl.fit_content = true
 	rtl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	rtl.custom_minimum_size = Vector2(480, 0)
-	rtl.text = GuitkxHover.md_to_bbcode(for_text)
+	rtl.text = HoverScript.md_to_bbcode(for_text)
 	return rtl

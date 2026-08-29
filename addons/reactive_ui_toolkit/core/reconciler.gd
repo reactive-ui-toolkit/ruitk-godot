@@ -45,6 +45,26 @@ const Scheduler = preload("res://addons/reactive_ui_toolkit/core/scheduler.gd")
 ## unmount. hmr.gd walks this list to re-render after an in-place script reload.
 static var _hmr_live: Array = []
 
+## THE LANE THIS ROOT'S SLICES RUN ON, or null for the shared per-SceneTree scheduler.
+##
+## Set by `RuitkRoot.create_isolated` for a surface that must not be able to starve its
+## neighbours -- an editor preview, chiefly, where the tree is the EDITOR's and everything any
+## addon mounted shares it. See `scheduler.gd`'s `frame_budget_ms`.
+var scheduler: RuitkScheduler = null
+
+## This root's render QUANTUM in ms, or -1 to read `RuitkConfig.time_slice_ms`.
+var time_slice_ms := -1.0
+
+## Slice this root even when the project has `RuitkConfig.time_slicing` off.
+##
+## A root given a budget of its own is given it in order to be BOUNDED; leaving it able to run a
+## whole render in one unyielding pass because a game-facing project setting says so would hand
+## back exactly the stall the budget exists to prevent.
+var force_time_slicing := false
+
+## Set only for the duration of a flush that must complete before control returns (HMR).
+var _force_sync := false
+
 var _container: Node
 var _root_vnode: RuitkVNode = null
 var _root_current: RuitkFiber = null
@@ -193,12 +213,33 @@ func _ensure_tick() -> void:
 	if _tick_pending:
 		return
 	_tick_pending = true
-	if RuitkConfig.time_slicing:
+	if _slicing():
 		var tree := _get_tree_safe()
 		if tree != null:
-			Scheduler.for_tree(tree).enqueue(_scheduled_slice, Scheduler.Priority.NORMAL)
+			_lane(tree).enqueue(_scheduled_slice, Scheduler.Priority.NORMAL)
 			return
 	call_deferred("_tick")
+
+## Whether this root's UPDATE renders yield. Read through here rather than off the static,
+## because three things answer it and they have a precedence: a sync flush in progress wins,
+## then this root's own `force_time_slicing`, then the project setting.
+func _slicing() -> bool:
+	if _force_sync:
+		return false
+	return force_time_slicing or RuitkConfig.time_slicing
+
+## This root's render quantum -- its own when it has one, the project's otherwise.
+func _quantum() -> float:
+	return time_slice_ms if time_slice_ms > 0.0 else RuitkConfig.time_slice_ms
+
+## The scheduler this root's slices go on: its OWN when it was given one, otherwise the shared
+## per-SceneTree instance. Attaching is idempotent, and done here rather than at construction
+## because a container need not be inside a tree when its root is created.
+func _lane(tree: SceneTree) -> RuitkScheduler:
+	if scheduler == null:
+		return Scheduler.for_tree(tree)
+	scheduler.attach(tree)
+	return scheduler
 
 ## Scheduler-lane slice action (time-slicing only): the Normal-lane, self-re-enqueueing
 ## render slice (FiberReconciler.cs ScheduleRootWork/Slice, :405-424). A cancelled tick
@@ -231,8 +272,8 @@ func _tick() -> void:
 	# Quantum check AFTER each completed unit — a long single unit overruns (no preemption);
 	# FiberReconciler.cs ProcessWorkUntilDeadline (:444-455). usec clock: the 2 ms default
 	# quantum is finer than get_ticks_msec's integer grain.
-	var sliced: bool = RuitkConfig.time_slicing
-	var quantum: float = RuitkConfig.time_slice_ms
+	var sliced: bool = _slicing()
+	var quantum: float = _quantum()
 	var start_ms: float = float(Time.get_ticks_usec()) / 1000.0
 	while _next_unit != null:
 		_next_unit = _perform_unit(_next_unit)
@@ -325,7 +366,7 @@ func _park() -> void:
 	_tick_pending = true
 	var tree := _get_tree_safe()
 	if tree != null:
-		Scheduler.for_tree(tree).enqueue(_scheduled_slice, Scheduler.Priority.NORMAL)
+		_lane(tree).enqueue(_scheduled_slice, Scheduler.Priority.NORMAL)
 	else:
 		call_deferred("_tick")
 
@@ -1435,10 +1476,13 @@ func hmr_refresh(scripts: Array, resets: Array, global_rerender: bool) -> int:
 		return 0
 	var marked := _hmr_mark(_root_current, scripts, resets, global_rerender)
 	if marked > 0:
-		var sliced: bool = RuitkConfig.time_slicing
-		RuitkConfig.time_slicing = false
+		# SYNC ON THIS RECONCILER ONLY. This used to flip `RuitkConfig.time_slicing` off and back
+		# around the tick -- a process-global switch, so a refresh on one root also un-sliced every
+		# OTHER root that happened to be mid-pass, and a root asked to slice regardless of the
+		# project setting could not be un-asked for the length of one flush.
+		_force_sync = true
 		_tick()
-		RuitkConfig.time_slicing = sliced
+		_force_sync = false
 	return marked
 
 func _hmr_mark(fiber: RuitkFiber, scripts: Array, resets: Array, global_rerender: bool) -> int:

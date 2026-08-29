@@ -54,6 +54,17 @@ The suites: `core_test.gd` (reconciler/hooks/effects/bailout/context/keyed), `se
 every demo — the real check that generated `.gd` render without error), `doom_game_test.gd` (the
 Doom demo end-to-end), `guitkx_test.gd` (compiler + codegen + imports/resolver/codemod),
 `hmr_test.gd` (Fast Refresh), `guitkx_editor_test.gd` + `guitkx_lsp_test.gd` (editor addon),
+`builder_model_test.gd` + `builder_graph_test.gd` + `builder_preview_test.gd` +
+`builder_canvas_test.gd` + `builder_chrome_test.gd` + `builder_edits_test.gd` + `builder_save_test.gd` (the RUITK
+Builder — the document model,
+the canvas projection with
+golden markup trees, the preview pipeline end to end, the canvas metrics/layout/host, and the
+panes with the single edit funnel, every structural edit as a before/after string, and the
+save/abort/undo matrix against exact disk state),
+`builder_view_build.gd` (the addon's own `.guitkx` output is committed and must stay fresh),
+`builder_parity.gd` (the checklist of every Unity-leg builder feature and the identifier that
+answers it here — the reference lives in a sibling checkout the gate cannot read, so the list
+is the gate),
 `contract_dump.gd -- --check` (GD↔TS grammar goldens). `tests/guitkx_migrate.gd` runs the 0.10.0
 import codemod over `examples/` (idempotent — a clean tree reports 0 migrated). `bench*.gd` /
 `microbench.gd` are benchmarks, not pass/fail tests.
@@ -108,7 +119,9 @@ runtime**; the classes are available as soon as the files exist. Enabling the pl
   ping-pong `alternate` buddies); cycles are severed explicitly for GC.
 - **`scheduler.gd` (`RuitkScheduler`)** — the four-lane (High/Normal/Low/Idle) frame scheduler behind
   sliced renders (per-lane Callable dedup, Low-cancel under High pressure, Idle only on quiet frames,
-  unbudgeted batched-effects flush). Lazy per-`SceneTree`, pumped from `process_frame` — no autoload.
+  unbudgeted batched-effects flush). Lazy per-`SceneTree`, pumped from `process_frame` — no autoload. `RuitkRoot.create_isolated`
+  gives one root a scheduler and frame budget of its OWN — how the builder keeps two surfaces on
+  the editor's shared tree from spending each other's frames.
 - **`fail.gd` (`RuitkFail`)** — the cooperative render-failure latch: a failing render calls
   `RuitkFail.render(reason)` (GDScript can't throw) and the reconciler unwinds to the nearest error
   boundary.
@@ -151,6 +164,51 @@ are synchronous. Preserve these behaviors — they're faithful-to-reference, not
   `.guitkx`-only external edit doesn't reliably flip Godot's changed flag; an mtime staleness guard
   keeps that cheap, and diagnostics are de-duplicated (Godot's Errors dock is append-only). Also hosts
   the in-editor `.guitkx` view, tokenizer/highlighter, and a headless LSP layer (`lsp/`).
+- **RUITK Builder (`addons/reactive_ui_toolkit_editor/builder/`)** — the visual editor for a
+  `.guitkx` tree. **The reference is `../ruitk-unity/Builder/Editor/` (20k lines), not
+  `plans/BUILDER_PORT_PLAN.md`** — the plan says what to build, the source says how it behaves,
+  and the difference is where invented behaviour comes from. Read the C# for any question about
+  what a gesture does. Divergences that are deliberate: the language's own vocabulary wins
+  (`@elif`, not `@else if`; a directive body cannot be empty here — GUITKX0303), `Import .uxml`
+  has no Godot analogue, and the source pane reuses `guitkx_code_edit.gd` rather than porting
+  `CodeField.cs`. `document/` is the
+  model layer: a tree of modules held **in memory**, with disk as a projection computed at Save
+  (nothing is written until then — delete, rename and folder moves included). Deletion is
+  ABSENCE: a module leaves the tree and Save finds the orphan by diffing the last projection,
+  so there are no pending-intent lists for a consumer to forget to join. Everything here is
+  pure or `FileAccess`-only and headlessly testable; its files reference each other through
+  **preload consts**, never global `class_name`s, because `ProjectSettings.save()` truncates
+  the editor class cache to what the running process loaded. `canvas/` projects that model into
+  what the canvas draws — a card per module, a row per line, an edge per import — entirely from
+  the compiler's own analysis (`analyzed_decls`, `decl_structure`, `scan_imports`,
+  `RuitkGuitkxJsxScan.element_end`), so a row's span is exactly what the compiler compiled.
+  `preview/` renders it: the whole tree is **mirrored** to `res://__ruitk_builder_preview__~/`
+  and compiled there through the real compiler at real paths, so the preview cannot compile
+  differently from the build. That root is hidden TWICE — the `~` stops Godot's importer, and a
+  `.gdignore` written into it stops the compiler's own `find_all` sweep, which walks with
+  DirAccess and would otherwise compile the mirror, collide every component with the real one it
+  copies (GUITKX2106), and let the duplicate-binding remediation delete the real generated `.gd`. Dirty means *changed since
+  last built*, not *unsaved*; a failure skips only its dependents; a broken edit keeps the last
+  good render. Cleared on teardown and on open. `canvas/` also holds the surface itself: one
+  `builder_canvas_metrics.gd` every consumer measures with (the Unity leg has two LOD definitions
+  and they disagree), a screen-space `_draw` overlay for the Bezier edges, a host that owns the
+  camera — and `canvas_view.guitkx`, the card layer, **dogfooded**: the builder's own busiest
+  surface is written in the language the builder edits and rendered by this reconciler. Its
+  generated `.gd` is COMMITTED (an installed addon needs its canvas before the compile-on-scan
+  sweep runs) and gated fresh by `tests/builder_view_build.gd`. Pixels are covered by
+  `tests/builder_canvas_capture.gd`, which needs a window and so runs by hand, not in CI.
+  `chrome/` is the window — folder/library/source panes, the diagnostics console, one floating
+  inline editor — and it is the ONE FUNNEL: a keystroke, a canvas drop and a replayed undo all
+  reach the model through `apply_edit`, so they produce the same ledger entry, preview round and
+  re-projection. `edits/` holds the structural operations and the three-band drag resolution.
+  The canvas PALETTE (`canvas/canvas_palette.gd`) is a hand-written `@tool` script rather than a
+  `.style.guitkx` module, and that exception is load-bearing: a generated `.gd` is not `@tool`,
+  and Godot never runs a non-tool script's `static var` initialisers in the editor, so a style
+  module read from editor code comes back EMPTY — silently. Static funcs do run, which is why
+  the rest of the canvas stays `.guitkx`. `plugin.gd` opens the builder from **Reactive UI
+  Toolkit → Builder…** (falling back to Project → Tools), in a `Window` of its own because a
+  plugin gets exactly one main screen and this one is already the `.guitkx` view; the window is
+  hidden rather than freed on close, so a session with unsaved work survives it.
 - **External IDE extensions (`ide-extensions/`)** — a shared TypeScript language server + a TextMate
   grammar, driven by both VS Code and VS2022. Markup intelligence is answered locally from the schema;
   embedded-GDScript intelligence builds a synthetic `.gd` virtual document with a length-preserving
@@ -167,6 +225,12 @@ a `guitkx.config.json` walk-up file.
 `examples/` is **not shipped** — the addon in `addons/reactive_ui_toolkit/` is self-contained. `examples/app.gd`
 (→ `examples/main.tscn`, the project's main scene) mounts the demo gallery. Open the project in Godot 4.x
 and press Play to explore.
+
+The gallery is registered in `examples/demos/gallery_table.guitkx`. Entries bind their demo by
+named import (`{ DemoX }` → the module's global `class_name`); `Style modules` is the exception
+and uses a namespace import, which lowers to a `preload("res://…")` and so needs no class
+registration — the class cache is rewritten by every headless run from whatever THAT process
+registered, and a demo can be present after an editor scan and missing two suites later.
 
 ## Conventions
 

@@ -3,7 +3,8 @@
   "description": "GUITKX element and directive schema for IDE tooling. Per-property completion is resolved from a bundled ClassDB dump against each element's godotClass; this file catalogs the structural attributes, the host-element tag map, and per-element highlight events. NAMING IS 1:1 LOYAL TO GODOT (0.9.0): tags are the official Godot class names (any instantiable ClassDB Node class is a valid tag — this list is the curated everyday set), factories match tags verbatim (V.VBoxContainer), and event handlers are the native signal name with an `on` marker — on + PascalCase(signal) (onPressed -> pressed, onValueChanged -> value_changed) for ANY signal, or the verbatim on_<signal> escape. Style keys are the exact Godot property / theme-item / StyleBoxFlat names. See addons/reactive_ui_toolkit/core/host_config.gd and MIGRATION-0.9.md.",
   "preambleDirectives": [
     { "name": "@class_name", "description": "Override the generated class name (defaults to the component/file name)." },
-    { "name": "@uss", "description": "Associate a Godot Theme/StyleBox resource path for styling (reserved)." }
+    { "name": "@uss", "description": "Apply a Godot Theme resource to the component's root element: `@uss \"res://ui.tres\"`. Accepts res:// and uid:// paths, and ~/ against the guitkx.config.json root. The root's own theme= wins if it sets one. One per file (GUITKX2210), and component files only -- a hook or a value module has no root to theme." },
+    { "name": "@theme", "description": "Alias of @uss, for authors who think of it as a theme rather than a stylesheet. Identical in every respect, including the one-per-file rule." }
   ],
   "declarations": [
     { "keyword": "export", "description": "Mark a declaration cross-file visible (`export Name...`), defer marks with `export { a, b }`, or set the default with `export default Name`." },

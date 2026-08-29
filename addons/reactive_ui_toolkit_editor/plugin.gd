@@ -14,7 +14,11 @@ const PLUGIN_NAME := "ReactiveUITK"
 # The Project > Tools item that opens the settings dialog (family design: ONE settings screen
 # per leg, opened from the plugin's own menu surface). Same string for add/remove.
 const SETTINGS_MENU := "Reactive UI Toolkit Settings..."
+# The Project > Tools item that opens the builder, on a build with no menu bar to hang it from.
+const BUILDER_MENU := "Reactive UI Toolkit Builder..."
 const MAIN_MENU_TITLE := "Reactive UI Toolkit"
+## Main-menu item ids, named so inserting an item cannot silently re-point another.
+enum { MENU_BUILDER, MENU_SETTINGS }
 # The editor's main menu is a MenuBar close under the base control; the cap keeps the search from
 # ever crawling the whole editor tree if the layout changes (in which case we fall back anyway).
 const _MENU_BAR_SEARCH_DEPTH := 8
@@ -31,6 +35,12 @@ var _references: Control
 var _search: Control
 var _fs_debounce: Timer
 var _settings_dialog: AcceptDialog  # lazy; shared by the menu entries and the toolbar button
+# The builder lives in a window of its own rather than a second main screen: this plugin already
+# owns one (the .guitkx view), and a plugin has exactly one. Lazy, and kept between openings so a
+# tree with unsaved work survives closing the window.
+var _builder_window: Window = null
+var _builder_context: EditorContextMenuPlugin = null
+var _builder: Control = null
 var _main_menu: PopupMenu = null  # top-level "Reactive UI Toolkit" menu; null when on the fallback
 var _tools_fallback := false  # true when the Project > Tools item was registered instead
 var _deps_ok := false
@@ -72,6 +82,14 @@ func _enter_tree() -> void:
 	# The dialog itself is sectioned per addon: Runtime (from the reactive_ui_toolkit addon,
 	# when installed) and Editor (this addon), so settings come from both without requiring both.
 	_register_settings_menu()
+
+	# "Open in RUITK Builder" on a `.guitkx` in the FileSystem dock. The start screen tells the
+	# user to open an existing tree from there, and until now nothing in the editor could.
+	var context_script := load("res://addons/reactive_ui_toolkit_editor/builder/builder_context_menu.gd")
+	if context_script != null:
+		_builder_context = context_script.new()
+		_builder_context.open_requested.connect(open_builder_on)
+		add_context_menu_plugin(EditorContextMenuPlugin.CONTEXT_SLOT_FILESYSTEM, _builder_context)
 
 	# M3: announce the native analyzer once per session — embedded-GDScript intelligence
 	# (type-aware completion/hover/diagnostics inside {expr} and setup code) turns on when the
@@ -136,7 +154,15 @@ func _exit_tree() -> void:
 		return
 	if _tools_fallback:
 		remove_tool_menu_item(SETTINGS_MENU)
+		remove_tool_menu_item(BUILDER_MENU)
 		_tools_fallback = false
+	if _builder_context != null:
+		remove_context_menu_plugin(_builder_context)
+		_builder_context = null
+	if _builder_window != null:
+		_builder_window.queue_free()   # takes the builder with it; a disabled plugin leaves no window
+		_builder_window = null
+		_builder = null
 	if _main_menu != null:
 		_main_menu.queue_free()  # detaches from the MenuBar; disabling the plugin removes the menu
 		_main_menu = null
@@ -187,19 +213,25 @@ func _register_settings_menu() -> void:
 	var bar := find_menu_bar(EditorInterface.get_base_control(), _MENU_BAR_SEARCH_DEPTH)
 	if bar == null:
 		add_tool_menu_item(SETTINGS_MENU, _open_settings_dialog)
+		add_tool_menu_item(BUILDER_MENU, _open_builder)
 		_tools_fallback = true
 		print_rich("[color=yellow][reactive_ui_toolkit_editor] main menu bar not found — Settings lives under Project > Tools on this Godot build.[/color]")
 		return
 	_main_menu = PopupMenu.new()
 	# MenuBar renders each child PopupMenu as a top-level menu titled by its node name.
 	_main_menu.name = MAIN_MENU_TITLE
-	_main_menu.add_item("Settings...", 0)
+	_main_menu.add_item("Builder...", MENU_BUILDER)
+	_main_menu.add_separator()
+	_main_menu.add_item("Settings...", MENU_SETTINGS)
 	_main_menu.id_pressed.connect(_on_main_menu_pressed)
 	bar.add_child(_main_menu)
 
+
 func _on_main_menu_pressed(id: int) -> void:
-	if id == 0:
+	if id == MENU_SETTINGS:
 		_open_settings_dialog()
+	elif id == MENU_BUILDER:
+		_open_builder()
 
 ## Breadth-limited search for the editor's main MenuBar. Static and depth-capped on purpose:
 ## testable headless with a synthetic tree, and it can never crawl the whole editor UI — if the
@@ -218,11 +250,26 @@ static func find_menu_bar(node: Node, depth_budget: int) -> MenuBar:
 ## Godot asks every plugin for unsaved state before quitting: a non-empty string joins the editor's
 ## own quit-confirmation dialog (parity plan L4 — without this, quit silently drops buffers).
 func _get_unsaved_status(for_scene: String) -> String:
-	if for_scene.is_empty() and _view != null:
+	if not for_scene.is_empty():
+		return ""
+	var parts := PackedStringArray()
+	if _view != null:
 		var dirty: Array = _view.dirty_files()
 		if not dirty.is_empty():
-			return "Reactive UI Toolkit — Godot Editor: unsaved changes in %s." % ", ".join(dirty)
-	return ""
+			parts.append("unsaved changes in %s" % ", ".join(dirty))
+	# THE BUILDER IS ASKED TOO. Its whole contract is that NOTHING reaches disk until Save, so a
+	# quit with a tree open discards more than any other surface here can -- and it was the one
+	# surface Godot's own save door never asked. The builder even declares a `dirty_changed`
+	# signal "for the plugin's title, or a prompt on close" that nothing had ever connected.
+	if _builder != null and _builder.workspace != null 			and _builder.workspace.has_unsaved_changes():
+		var count := 0
+		for module in _builder.workspace.modules():
+			if module.is_dirty() or not module.is_on_disk() or module.has_moved():
+				count += 1
+		parts.append("the RUITK Builder holds %d unwritten module(s)" % count)
+	if parts.is_empty():
+		return ""
+	return "Reactive UI Toolkit — Godot Editor: %s." % "; ".join(parts)
 
 ## Session persistence across editor restarts (G17): open files, current tab, carets, zoom, wrap
 ## ride Godot's own editor-layout store.
@@ -306,6 +353,12 @@ func _on_fs_settled() -> void:
 	GuitkxWorkspace.rescan()
 	if _view != null:
 		_view.on_workspace_changed()
+	# AND THE BUILDER ADOPTS what changed under it. Its tree lives in memory with disk as a
+	# projection computed at Save, so without this a `.guitkx` edited elsewhere stayed invisible
+	# for the whole session and the first Save wrote the stale buffer back over the newer file.
+	# Clean modules only -- the window decides that, and says so when the two have diverged.
+	if _builder != null and _builder.has_method("adopt_external_changes"):
+		_builder.adopt_external_changes()
 
 func _has_main_screen() -> bool:
 	return true
@@ -374,3 +427,100 @@ func _on_problem_activated(line: int) -> void:
 	_make_visible(true)
 	if _view != null:
 		_view.goto_line(line)
+
+
+# ── The builder ──────────────────────────────────────────────────────────────────────
+
+## Opens the RUITK Builder on the tree the current `.guitkx` belongs to.
+##
+## In a WINDOW of its own, not a second main screen: a plugin has exactly one, and this one is
+## already the `.guitkx` view. A window also matches what the builder is -- a place you go to work
+## on a tree, not a tab you scroll past.
+##
+## The window and its builder are kept between openings. Closing it does NOT discard the session:
+## the builder holds unsaved work by design, and a close that threw it away would make the window
+## button dangerous.
+func _open_builder() -> void:
+	if _builder_window == null:
+		var script := load("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_window.gd")
+		if script == null:
+			printerr("[reactive_ui_toolkit_editor] the builder could not be loaded")
+			return
+		_builder = script.new()
+		_builder_window = Window.new()
+		_builder_window.title = "RUITK Builder"
+		_builder_window.size = Vector2i(1440, 880)
+		_builder_window.min_size = Vector2i(900, 560)
+		# NOT WRAPPED, AND ANCHORED. A Control added to a Window with default anchors takes its
+		# COMBINED MINIMUM SIZE and never follows the window again -- and `wrap_controls` then
+		# sizes the window to that minimum, after which any resize by the user leaves the builder
+		# laid out for a rectangle bigger than the window it is in. The panes draw past the edges
+		# (the source and preview columns end up over the editor behind it), everything outside
+		# the window is unclickable, and the canvas's rect stops agreeing with what is on screen
+		# -- so a press lands on a different part of the canvas than the one under the pointer,
+		# which is every gesture on the surface at once.
+		_builder_window.wrap_controls = false
+		# Hidden, not freed: a session with unsaved work has to survive the window closing.
+		_builder_window.close_requested.connect(func(): _builder_window.hide())
+		_builder_window.add_child(_builder)
+		# FILLS THE WINDOW, AND KEEPS FILLING IT. The anchors are what make the builder follow a
+		# resize; without them its rect is frozen at whatever the first layout computed.
+		_builder.set_anchors_preset(Control.PRESET_FULL_RECT)
+		# THE TITLE CARRIES THE STATE. A save-only builder that looks identical whether or not it
+		# holds unwritten work gives the user nothing to notice before they close the window.
+		_builder.dirty_changed.connect(func(has_unsaved: bool):
+			if _builder_window != null:
+				_builder_window.title = "RUITK Builder *" if has_unsaved else "RUITK Builder")
+		EditorInterface.get_base_control().add_child(_builder_window)
+
+	# A session already open is shown as it is. Only a builder with NOTHING open needs a file to
+	# open a tree from -- and re-pointing an open session at whatever the editor happens to be
+	# showing would take a tree with unsaved work away from under someone.
+	# An empty focus is fine: the builder opens on its start screen, which is where someone with
+	# no tree open is supposed to begin.
+	if _builder.focus_path().is_empty():
+		_builder.open_tree(_builder_focus_path())
+	# THE WINDOW CANNOT BE SMALLER THAN WHAT IS IN IT. A floor of 900x560 was a guess, and the
+	# builder's own layout -- three columns, each with a minimum -- needs more than that: below it
+	# the panes do not reflow, they OVERFLOW, drawing past the window edges onto the editor behind
+	# and leaving the parts outside unclickable. Asked of the content rather than guessed at.
+	var needed := _builder.get_combined_minimum_size()
+	if needed.x > 0.0 and needed.y > 0.0:
+		_builder_window.min_size = Vector2i(
+			maxi(900, int(ceil(needed.x))), maxi(560, int(ceil(needed.y))))
+		_builder_window.size = Vector2i(
+			maxi(_builder_window.size.x, _builder_window.min_size.x),
+			maxi(_builder_window.size.y, _builder_window.min_size.y))
+	_builder_window.popup_centered()
+	# THE KEYBOARD GOES TO THE BUILDER on every route, not only the dock's. Undo, Redo, Save,
+	# Delete and Escape are delivered tree-wide now, but they still need this window to be the one
+	# the editor is talking to.
+	_builder.grab_focus()
+
+
+## Opens the builder on a specific file. What the FileSystem dock's context item calls, and the
+## one entry point that does not have to guess what the user meant.
+func open_builder_on(file_path: String) -> void:
+	_open_builder()
+	if _builder != null and not file_path.is_empty():
+		# THROUGH `load_tree_for`, which keeps unsaved work. `open_tree` replaces the tree
+		# outright, so right-clicking a `.guitkx` while the builder held a half-built component
+		# destroyed the whole session -- every dirty buffer, every unwritten module, every pending
+		# deletion, and the ledger cleared behind it.
+		_builder.load_tree_for(file_path)
+		_builder.grab_focus()
+
+
+## The `.guitkx` a FIRST open should build its tree from: whatever the editor view is showing.
+## "Open the builder" means "on what I am looking at" -- and when I am looking at nothing, the
+## start screen, not the first file the project happens to contain.
+func _builder_focus_path() -> String:
+	if _view != null and _view.has_method("current_path"):
+		var current := str(_view.call("current_path"))
+		if not current.is_empty() and not current.begins_with("res://addons/"):
+			return current
+	# NOTHING, deliberately. This used to answer with the first `.guitkx` anywhere in the project,
+	# which on a fresh install is one of the ADDON's own files -- so opening the builder from the
+	# menu showed the builder's own canvas source, read-only, instead of the start screen. A tree
+	# nobody asked for is worse than no tree: the empty state is there to be the answer.
+	return ""

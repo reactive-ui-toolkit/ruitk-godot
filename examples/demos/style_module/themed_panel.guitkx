@@ -1,0 +1,29 @@
+import * as Palette from "./theme.style"
+
+## The `@uss` half of the styling story, in its own file -- because `@uss` themes a component's
+## ROOT element, and "the subtree that wears this Theme" is exactly the shape a component has.
+##
+## `@uss "res://.../demo_theme.tres"` preloads a Godot `Theme` and hands it to the root element
+## below, so every Control beneath inherits it through the engine's own cascade -- not a second
+## one invented here. `@theme` is the same directive under the name Godot users reach for first.
+## One per file: a root control holds a single Theme.
+##
+## The two compose the way they do in the engine. The Theme sets the floor; a style dictionary on
+## an element wins where it speaks -- see the second Label, which overrides the Theme's font
+## colour while the first one inherits it.
+@uss "res://examples/demos/style_module/demo_theme.tres"
+
+export ThemedPanel() -> RuitkVNode {
+	return (
+		<PanelContainer>
+			<MarginContainer style={ {"margin_left": 12, "margin_top": 12, "margin_right": 12, "margin_bottom": 12} }>
+				<VBoxContainer style={ Palette.ROW }>
+					<Label text="This panel and its labels wear the @uss Theme." />
+					<Label
+						text="...except this one, which overrides the Theme's font colour inline."
+						style={ Palette.BODY } />
+				</VBoxContainer>
+			</MarginContainer>
+		</PanelContainer>
+	)
+}

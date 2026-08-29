@@ -17,7 +17,13 @@ const D = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_diag.gd")
 
 ## Resolve `spec` (an import specifier) relative to the importing `.guitkx` file `from_guitkx`, with
 ## `~/` bound to `root`. Returns { ok, guitkx: <res://…​.guitkx>, gd: <res://…​.gd>, error? }.
-static func resolve_specifier(spec: String, from_guitkx: String, root: String) -> Dictionary:
+##
+## `must_exist` false answers the PATH question alone -- the fold, the boundary check, the implied
+## `.guitkx` extension -- without requiring a file to be there. Compilation always wants the default:
+## an import naming nothing is GUITKX2300. The builder does not, because its modules live in memory
+## until Save, and an import between two unsaved modules is perfectly well-formed. The alternative
+## -- a second copy of the fold living in the builder -- is the drift this function exists to prevent.
+static func resolve_specifier(spec: String, from_guitkx: String, root: String, must_exist: bool = true) -> Dictionary:
 	if spec.begins_with("res://") or spec.begins_with("uid://"):
 		return { "ok": false, "error": "engine-native path (use ./ ../ or ~/)" }
 	var base := ""
@@ -35,7 +41,7 @@ static func resolve_specifier(spec: String, from_guitkx: String, root: String) -
 	if base.begins_with("res://../") or base.begins_with("res://.."):
 		return { "ok": false, "boundary": true, "guitkx": base, "error": "crosses the project boundary" }
 	var guitkx_path := base if base.get_extension() == "guitkx" else base + ".guitkx"
-	if not FileAccess.file_exists(guitkx_path):
+	if must_exist and not FileAccess.file_exists(guitkx_path):
 		return { "ok": false, "error": "no file at %s" % guitkx_path }
 	return { "ok": true, "guitkx": guitkx_path, "gd": guitkx_path.get_basename() + ".gd" }
 
@@ -51,7 +57,7 @@ static func decl_table(guitkx_path: String) -> Dictionary:
 	var key := guitkx_path + "#" + str(hash(src))
 	if _table_cache.has(key):
 		return _table_cache[key]
-	var binding := _binding_of(src)
+	var binding := binding_of(src)
 	# analyzed_decls applies the E-07/E-09 export markers so list-exported / default-marked decls
 	# read as exported here exactly as the emitter sees them (M1.3 single-source-of-truth).
 	var analyzed := Compiler.analyzed_decls(src, 0)
@@ -69,7 +75,7 @@ static func decl_table(guitkx_path: String) -> Dictionary:
 
 ## The binding name of a source (mirrors codegen._binding_name without the FileAccess round-trip):
 ## @class_name override, else first exported decl (marker-applied -- M1.3), else first decl, else "".
-static func _binding_of(src: String) -> String:
+static func binding_of(src: String) -> String:
 	var override := _class_name_override(src)
 	if override != "":
 		return override

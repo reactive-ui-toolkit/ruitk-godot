@@ -55,6 +55,11 @@ func _test_context() -> void:
 	_ok(_ctx(RET + "<Label text={ a < b|" + END)["kind"] == GuitkxContext.KIND_EMBEDDED, "'a < b' inside {} -> embedded (not tag)")
 
 func _test_schema() -> void:
+	# THE LOAD IS NOT LATCHED BY ONE FAILURE. `_loaded` was set BEFORE the read, so a schema file
+	# not yet extracted from a freshly installed addon, or a transient read error, silently
+	# disabled the markup vocabulary for the whole editor process -- and nothing anywhere could
+	# ask whether it had loaded.
+	_ok(GuitkxSchema.has_schema(), "the schema reports that it loaded")
 	var tags := GuitkxSchema.host_tags()
 	_ok(tags.size() >= 20, "host_tags loaded (%d)" % tags.size())
 	_ok(tags.has("Button") and tags.has("VBoxContainer"), "host tags include Button + VBoxContainer")

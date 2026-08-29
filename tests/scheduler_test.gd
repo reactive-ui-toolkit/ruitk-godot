@@ -2,6 +2,8 @@ extends SceneTree
 ## Headless scheduler test suite. Run:
 ##   godot --headless --path <project> --script res://tests/scheduler_test.gd
 ## Exercises RuitkScheduler (the four-lane RenderScheduler port): lane priority order,
+## the per-INSTANCE frame budget and the owned/attach/detach lifecycle behind
+## `RuitkRoot.create_isolated` (the reference's per-pane BuilderRenderScheduler),
 ## High-starves-Normal escalation, Low-cancel-on-High, Idle gating + its budget/2 sub-budget,
 ## per-lane Callable dedup, batch begin/end deferral, the unbudgeted batched-effects flush,
 ## the cumulative per-frame budget, slice self-re-enqueue, pump_now, and metrics — plus the
@@ -43,6 +45,8 @@ func _run() -> void:
 	_test_batched_effects_flush_unbudgeted()
 	_test_slice_self_reenqueue()
 	_test_pump_now()
+	_test_instance_budget_overrides_the_static()
+	_test_owned_scheduler_attaches_and_detaches()
 	await _test_sliced_render_commits()
 	await _test_unmount_cancels_parked_slice()
 	await _test_sync_path_untouched()
@@ -53,6 +57,8 @@ func _run() -> void:
 	await _test_superseded_redirect()
 	await _test_deleted_subtree_silent_bail()
 	await _test_detached_fiber_bail()
+	await _test_isolated_root_owns_its_lane()
+	await _test_hmr_flush_is_per_reconciler()
 	_restore_config()
 	print("\n[scheduler_test] %d passed, %d failed" % [_passes, _fails])
 	quit(1 if _fails > 0 else 0)
@@ -631,3 +637,109 @@ func _ok(cond: bool, msg: String) -> void:
 		_fails += 1
 		printerr("  FAIL: " + msg)
 		push_error("FAIL: " + msg)
+
+
+## An instance's own `frame_budget_ms` bounds its lanes, not the process-wide static.
+##
+## The seam behind `RuitkRoot.create_isolated`: the reference gives every editor pane a
+## scheduler with its own TickBudgetMs precisely so one surface cannot spend another's frames,
+## and a per-instance budget that silently read the global would be the same shared budget under
+## a different name.
+func _test_instance_budget_overrides_the_static() -> void:
+	RuitkConfig.frame_budget_ms = 1000.0
+	var pair := _mk()
+	var s = pair[0]
+	var clock: Dictionary = pair[1]
+	s.frame_budget_ms = 5.0
+	var ran: Array = []
+	for i in 3:
+		s.enqueue(func():
+			ran.append(i)
+			clock["t"] += 4.0, P.NORMAL)
+	s.pump()
+	_ok(ran.size() == 2, "the INSTANCE budget bounds the lane, not the 1000 ms static (ran %d)" % ran.size())
+	_ok(s.budget_ms() == 5.0, "budget_ms() reports the instance's own budget")
+	s.frame_budget_ms = -1.0
+	_ok(s.budget_ms() == 1000.0, "-1 falls back to the project-wide budget")
+	_restore_config()
+
+## An owned scheduler is outside the per-SceneTree table and its pump is the caller's to end.
+func _test_owned_scheduler_attaches_and_detaches() -> void:
+	var s = SchedulerScript.owned(7.0)
+	_ok(s.budget_ms() == 7.0, "owned() carries the budget it was made with")
+	_ok(s != SchedulerScript.for_tree(self), "an owned scheduler is NOT the tree's shared one")
+	s.attach(self)
+	_ok(process_frame.is_connected(s.pump), "attach() pumps it from the tree")
+	s.attach(self)   # idempotent: a second connect would be an engine error
+	_ok(process_frame.is_connected(s.pump), "attaching twice to the same tree is a no-op")
+	s.detach()
+	_ok(not process_frame.is_connected(s.pump), "detach() drops the pump")
+	s.detach()
+	_ok(not process_frame.is_connected(s.pump), "detaching twice is safe")
+	var shared = SchedulerScript.for_tree(self)
+	shared.detach()
+	_ok(process_frame.is_connected(shared.pump),
+		"detach() on a for_tree instance does nothing -- it never claimed the connection")
+
+## An isolated root's sliced renders run on ITS scheduler, and unmount takes the pump with them.
+func _test_isolated_root_owns_its_lane() -> void:
+	RuitkConfig.time_slicing = true
+	RuitkConfig.time_slice_ms = 0.0
+	RuitkConfig.frame_budget_ms = 1000.0
+	var c := Control.new()
+	root.add_child(c)
+	var ctrl := { "set": null }
+	var comp := func(_p, _ch):
+		var s = Hooks.useState(0)
+		ctrl["set"] = s[1]
+		return V.Label({ "text": "n %d" % s[0] })
+	var app := RuitkRoot.create_isolated(c, V.fc(comp), 4.0, 2.0)
+	var own = app.scheduler()
+	_ok(own != null, "an isolated root owns a scheduler")
+	_ok(own != SchedulerScript.for_tree(self), "and it is not the tree's shared instance")
+	_ok(own.budget_ms() == 4.0, "with the budget it was created with")
+	_ok(c.get_child(0).text == "n 0", "the mount itself is still synchronous")
+	var shared_before: int = SchedulerScript.for_tree(self)._executed_action_count
+	ctrl["set"].call(1)
+	var settled := false
+	for i in 100:
+		await process_frame
+		if c.get_child(0).text == "n 1":
+			settled = true
+			break
+	_ok(settled, "the update commits across pumps of the root's OWN scheduler")
+	_ok(SchedulerScript.for_tree(self)._executed_action_count == shared_before,
+		"and the shared scheduler ran nothing on its behalf")
+	app.unmount()
+	_ok(not process_frame.is_connected(own.pump),
+		"unmount detaches the pump -- an editor opens the builder many times a session")
+	c.queue_free()
+	_restore_config()
+	await process_frame
+
+## An HMR flush un-slices ONE reconciler, not the process.
+##
+## It used to write `RuitkConfig.time_slicing = false` and put it back, which reached every other
+## root mid-pass -- and could not un-ask an isolated root, whose `force_time_slicing` says slice
+## regardless of what that static holds.
+func _test_hmr_flush_is_per_reconciler() -> void:
+	RuitkConfig.time_slicing = true
+	RuitkConfig.time_slice_ms = 0.0
+	RuitkConfig.frame_budget_ms = 1000.0
+	var c := Control.new()
+	root.add_child(c)
+	var probe := { "renders": 0 }
+	var comp := func(_p, _ch):
+		probe["renders"] += 1
+		return V.Label({ "text": "r %d" % probe["renders"] })
+	var app := RuitkRoot.create_isolated(c, V.fc(comp), 4.0, 2.0)
+	_ok(probe["renders"] == 1, "mounted once")
+	app._reconciler.hmr_refresh([], [], true)
+	_ok(probe["renders"] == 2, "the flush rendered before control returned")
+	_ok(c.get_child(0).text == "r 2",
+		"AND committed -- an isolated root's force_time_slicing does not outrank a sync flush")
+	_ok(RuitkConfig.time_slicing == true, "the process-wide switch was never written")
+	app.unmount()
+	c.queue_free()
+	_restore_config()
+	await process_frame

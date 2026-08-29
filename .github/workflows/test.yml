@@ -150,6 +150,47 @@ jobs:
       - name: Editor addon tests (substrate, data safety, goto-def, find bar, deps handshake, schema sync)
         run: godot --headless --path . --script res://tests/guitkx_editor_test.gd
 
+      # The builder's document model: paths, tree, orphans, naming, specifier round trips,
+      # save/abort projection, cross-file ledger. Pure + FileAccess-only, so it needs no
+      # editor -- and it references its own files through preload consts rather than global
+      # class_names, because a suite that calls ProjectSettings.save() (the settings dialog
+      # above does) rewrites .godot/global_script_class_cache.cfg down to whatever THAT
+      # process had loaded. Order here is therefore free.
+      - name: Builder document-model tests (C0 -- module/tree/naming/specifiers/workspace/ledger)
+        run: godot --headless --path . --script res://tests/builder_model_test.gd
+
+      - name: Builder graph-projection tests (C1 -- cards/rows/edges, golden markup projections)
+        run: godot --headless --path . --script res://tests/builder_graph_test.gd
+
+      - name: Builder preview-pipeline tests (C2 -- scratch mirror, compile order, live mount)
+        run: godot --headless --path . --script res://tests/builder_preview_test.gd
+
+      - name: Builder canvas tests (C3 -- LOD bands, camera, cull, edge curve, saved layout)
+        run: godot --headless --path . --script res://tests/builder_canvas_test.gd
+
+      - name: Builder chrome tests (C4 -- panes, the one funnel, undo across files, inline editor)
+        run: godot --headless --path . --script res://tests/builder_chrome_test.gd
+
+      - name: Builder edit-operation tests (C5 -- structural edits, the three drop bands, drag)
+        run: godot --headless --path . --script res://tests/builder_edits_test.gd
+
+      - name: Builder save/abort/history tests (C6 -- the disk-state matrix, formatter pass, journal)
+        run: godot --headless --path . --script res://tests/builder_save_test.gd
+
+      # The builder's canvas is written in .guitkx and its generated .gd is COMMITTED -- it has to
+      # be, because a user who installs the addon gets the folder as-is and the plugin needs its
+      # own canvas before the compile-on-scan sweep has run. Committed output goes stale; this
+      # recompiles it and fails if the bytes moved. The fix is to commit what it rewrote.
+      - name: Addon .guitkx freshness tripwire (the shipped canvas .gd must match its source)
+        run: godot --headless --path . --script res://tests/builder_view_build.gd
+
+      - name: Builder parity sweep (every Unity-leg feature has an answer here)
+        # The reference is ../ruitk-unity/Builder/Editor/, which is NOT in this repo — so this
+        # holds the checklist derived from it and fails when an entry stops being answered.
+        # Written after a run of user-found gaps that were all the same shape: a mechanism that
+        # existed with nothing wired to it. A list is the only thing that catches that.
+        run: godot --headless --path . --script res://tests/builder_parity.gd
+
       # Codemod tripwires (M8.6): both runners must be no-ops on the committed tree — a non-zero
       # count means pre-0.10 syntax (migrate) or wrapper keywords (modernize) were committed; the
       # runner exits 1 after fixing the files locally, so the fix is "commit what it rewrote".
