@@ -1138,6 +1138,66 @@ static func seed_positions(graph: Graph, root_index: int) -> void:
 		next_row_y += tallest + LAYOUT_GAP
 
 
+## Pushes apart any two cards whose rectangles intersect. Returns the paths that MOVED.
+##
+## THE SEED IS NOT THE LAYOUT. `seed_positions` spaces rows by the tallest card in them and is
+## correct -- but it only ever runs for a card with NO saved position, and a saved position is
+## restored verbatim for the life of the layout file. A card's height is a function of its
+## CONTENT, so every hook added, every import written and every change to the height model itself
+## leaves the stored positions describing a tree that no longer exists. Nothing re-checked them,
+## so the cards drifted into each other and stayed there: the overlap is not a placement bug, it
+## is the absence of a correction.
+##
+## Pushed DOWN, never sideways: the seed is row-based, so vertical separation is the direction
+## that preserves the reading order. Only a card that actually intersects something moves, so a
+## layout the user has arranged by hand is left alone.
+##
+## Measured with the FULL-band width and `card_height` -- the tallest layout -- because the gutter
+## has to survive every zoom, not just the one on screen.
+static func resolve_overlaps(graph: Graph) -> PackedStringArray:
+	var moved := PackedStringArray()
+	if graph == null or graph.cards.size() < 2:
+		return moved
+
+	# Sorted top-down, then left-to-right: a deterministic order is what makes the result stable
+	# across runs, and an unstable layout is worse than an overlapping one.
+	var order: Array[int] = []
+	for i in range(graph.cards.size()):
+		order.append(i)
+	order.sort_custom(func(a: int, b: int) -> bool:
+		var ca := graph.cards[a]
+		var cb := graph.cards[b]
+		if not is_equal_approx(ca.y, cb.y):
+			return ca.y < cb.y
+		if not is_equal_approx(ca.x, cb.x):
+			return ca.x < cb.x
+		return a < b)
+
+	var placed: Array[Rect2] = []
+	for index in order:
+		var card := graph.cards[index]
+		var rect := Rect2(card.x, card.y,
+			Metrics.CARD_WIDTH_FULL, Metrics.card_height(card))
+		# A CAP, not a while(true). Overlap resolution that cannot terminate is a frozen editor,
+		# and the bound is the only thing separating the two.
+		var guard := 0
+		var settled := false
+		while not settled and guard < graph.cards.size() + 2:
+			settled = true
+			guard += 1
+			for other in placed:
+				if not rect.intersects(other):
+					continue
+				rect.position.y = other.position.y + other.size.y + LAYOUT_GAP
+				settled = false
+		placed.append(rect)
+		if not is_equal_approx(rect.position.y, card.y):
+			card.y = rect.position.y
+			card.x = rect.position.x
+			moved.append(card.file_path)
+	return moved
+
+
 # ── Row helpers ──────────────────────────────────────────────────────────────────────
 
 static func _line(kind: Graph.LineKind, text: String, at: int, end_at: int,

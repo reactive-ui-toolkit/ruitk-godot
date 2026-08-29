@@ -165,6 +165,7 @@ func show_graph(new_graph: Graph) -> void:
 
 func set_camera(new_camera: Vector2, new_zoom: float) -> void:
 	var was_lod := Metrics.lod_of(zoom)
+	var was_zoom := zoom
 	camera = new_camera
 	zoom = Metrics.clamp_zoom(new_zoom)
 	queue_redraw()
@@ -173,7 +174,10 @@ func set_camera(new_camera: Vector2, new_zoom: float) -> void:
 	# the reconciler, with a commit each time. The tree only has to be rebuilt when what it says
 	# changes: a new LOD band, or a card crossing the cull edge.
 	_apply_camera()
-	if Metrics.lod_of(zoom) != was_lod or _near_signature() != _near_seen:
+	# A ZOOM CHANGE IS A RE-LAYOUT, because the zoom is now IN the layout. A pan is still two
+	# property writes -- that is the whole reason the camera sits on the container.
+	if not is_equal_approx(zoom, was_zoom) or Metrics.lod_of(zoom) != was_lod \
+			or _near_signature() != _near_seen:
 		_render()
 	else:
 		_settle_frames = SETTLE_FRAMES
@@ -310,7 +314,10 @@ func _apply_camera() -> void:
 	if _cards == null:
 		return
 	_cards.position = camera
-	_cards.scale = Vector2(maxf(zoom, 0.0001), maxf(zoom, 0.0001))
+	# SCALE STAYS AT ONE. The container carries the PAN and nothing else: a Control scale stretches
+	# rasterized glyphs, which is the blur. The zoom is in the layout -- card positions, widths and
+	# every font size are measured for it -- so the tree is built at the size it is drawn at.
+	_cards.scale = Vector2.ONE
 	if _edges != null:
 		_edges.camera = camera
 		_edges.zoom = zoom
@@ -422,7 +429,10 @@ func _collect_cards(node: Node, out: Dictionary) -> void:
 			var index := int(str(child.name).substr(5))
 			if index >= 0 and index < graph.cards.size():
 				var card_control := child as Control
-				var entry := { "height": card_control.size.y, "rows": {} }
+				# BACK TO CARD-LOCAL UNITS. The card is laid out at the zoom now, so its `size` is
+				# screen pixels -- and every consumer of this (`card_at`, the drop resolution)
+				# measures in card-local world units.
+				var entry := { "height": card_control.size.y / maxf(zoom, 0.0001), "rows": {} }
 				_collect_rows(card_control, card_control.get_global_rect().position,
 					maxf(zoom, 0.0001), entry["rows"])
 				out[index] = entry
@@ -719,6 +729,18 @@ func _drop_data(at_position: Vector2, data: Variant) -> void:
 
 ## A markup ROW is draggable, which is how a subtree is re-parented.
 func _get_drag_data(at_position: Vector2) -> Variant:
+	# TWO GESTURES CANNOT BOTH OWN THE LEFT DRAG.
+	#
+	# The card move starts at DRAG_THRESHOLD (4px) and follows the mouse live; Godot's own
+	# drag-and-drop arbitration fires a little later, calls this, and TAKES THE GESTURE OVER --
+	# so the card followed the pointer for a few pixels, stopped dead, and the drop then reordered
+	# a markup row instead. Dragging a card appeared to do nothing except rearrange something else.
+	#
+	# The title bar is the card's own handle and is answered here with null, which is how a
+	# Control declines a drag. The kind chip inside it still carries the MODULE, and a press on a
+	# row still carries the row -- those are DnD payloads and they are meant to be.
+	if _moving >= 0:
+		return null
 	var index := card_at(at_position)
 	if index < 0:
 		return null
@@ -738,6 +760,11 @@ func _get_drag_data(at_position: Vector2) -> Variant:
 			"path": card_here.file_path,
 			"card_id": card_here.module_id,
 		}
+	# THE TITLE BAR MOVES THE CARD. Declining here leaves the press to `_handle_motion`, which
+	# owns the live move.
+	if Metrics.on_title_bar(card_here, Metrics.screen_to_world(at_position, camera, zoom),
+			Metrics.card_width_for(lod), lod):
+		return null
 	var hit := row_at(index, at_position)
 	if not bool(hit.get("found", false)):
 		return null
@@ -798,6 +825,12 @@ func _handle_motion(motion: InputEventMouseMotion) -> void:
 		var world := Metrics.screen_to_world(_pressed_at, camera, zoom)
 		_grab_offset = world - Vector2(card.x, card.y)
 		_moving = _press_index
+	elif _press_index >= 0:
+		# A DRAG THAT STARTED ON A CARD BUT NOT ON ITS TITLE BAR IS GODOT'S. It is a row being
+		# re-parented or a kind chip carrying its module, and `_get_drag_data` answers it a few
+		# pixels later -- so this must NOT start a pan. It used to, which meant every attempt to
+		# drag a row also slid the whole canvas out from under the pointer.
+		return
 	else:
 		_panning = true
 		_pan_from = motion.position

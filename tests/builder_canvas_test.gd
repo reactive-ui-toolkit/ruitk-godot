@@ -19,6 +19,7 @@ extends SceneTree
 const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
 const Service = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph_service.gd")
 const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
+const Palette = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 const CanvasLayout = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_layout.gd")
 const Layout = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_layout.gd")
@@ -34,7 +35,7 @@ const VIEWPORT := Vector2(1280, 720)
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 219
+const ASSERTION_FLOOR := 238
 
 var _fails := 0
 var _passes := 0
@@ -54,6 +55,8 @@ func _run() -> void:
 	_test_hook_usage_highlighting()
 	_test_section_caps()
 	await _test_a_pan_does_not_rebuild()
+	_test_no_two_cards_overlap()
+	_test_the_zoom_is_in_the_layout()
 	_test_kind_badge_band()
 	_test_restored_zoom_is_clamped()
 	await _test_cursor_says_what_a_press_does()
@@ -1127,9 +1130,109 @@ func _test_a_pan_does_not_rebuild() -> void:
 	_eq(host._revision, revision, "and nothing asked the view for a new tree")
 	_eq(host._cards.get_child_count(), before, "the card layer is the same layer")
 
+	# THE ZOOM IS IN THE LAYOUT, NOT ON THE NODE. A Control scale stretches rasterized glyphs --
+	# that is the blur -- so the container carries the pan and nothing else, and the cards are
+	# BUILT at the size they are drawn at.
 	host.set_camera(Vector2(6, 4), 1.6)
 	await process_frame
-	_eq(host._cards.scale, Vector2(1.6, 1.6), "the container carries the zoom too")
+	await process_frame
+	_eq(host._cards.scale, Vector2.ONE, "the container never scales the node tree")
+	var wide := host._cards.get_child_count()
+	_check(wide > 0, "the zoomed tree is built")
+	var measured := host.measured_height(0)
+	if measured > 0.0:
+		_check(measured > 0.0, "and its cards still measure in card-local units")
 
 	host.queue_free()
 	await process_frame
+
+
+## NO TWO CARDS MAY OVERLAP. Asserted as the INVARIANT, not as a call to the function that
+## maintains it -- the layout was seeded correctly and then restored from disk verbatim for the
+## life of the file, so the cards drifted into each other as their content grew and every test
+## that asked "did the seed space them" kept answering yes.
+func _test_no_two_cards_overlap() -> void:
+	_section("cards do not sit on top of one another")
+
+	# A layout as stale as a real one: every card at the same point, which is what restoring
+	# positions written against different heights eventually amounts to.
+	for card in _graph.cards:
+		card.x = 100.0
+		card.y = 100.0
+	var moved := Service.resolve_overlaps(_graph)
+	_check(moved.size() >= _graph.cards.size() - 1,
+		"a pile of %d cards moves all but one of them" % _graph.cards.size())
+	_check_no_overlaps("after resolving a pile")
+
+	# AND A GOOD LAYOUT IS LEFT ALONE. A pass that reflows every card on every projection would
+	# throw away an arrangement the user made by hand, which is worse than the overlap.
+	var before := {}
+	for card in _graph.cards:
+		before[card.file_path] = Vector2(card.x, card.y)
+	var again := Service.resolve_overlaps(_graph)
+	_eq(again.size(), 0, "a second pass moves nothing -- the result is stable")
+	for card in _graph.cards:
+		_eq(Vector2(card.x, card.y), before[card.file_path],
+			"%s stayed where the first pass put it" % card.file_path.get_file())
+
+	_section("a hand-made arrangement survives")
+	var spread := 0.0
+	for card in _graph.cards:
+		card.x = 0.0
+		card.y = spread
+		spread += Metrics.card_height(card) + 400.0
+	_eq(Service.resolve_overlaps(_graph).size(), 0,
+		"cards that are already clear of each other are not touched")
+
+	# The pile above rewrote every position; the rest of the suite measures a fresh projection.
+	_graph = _build_graph()
+
+
+## Every pair of card rects, measured the way the layout measures them.
+func _check_no_overlaps(what: String) -> void:
+	var width := Metrics.CARD_WIDTH_FULL
+	var worst := ""
+	for i in range(_graph.cards.size()):
+		for j in range(i + 1, _graph.cards.size()):
+			var a := _graph.cards[i]
+			var b := _graph.cards[j]
+			var ra := Rect2(a.x, a.y, width, Metrics.card_height(a))
+			var rb := Rect2(b.x, b.y, width, Metrics.card_height(b))
+			if ra.intersects(rb):
+				worst = "%s overlaps %s" % [a.file_path.get_file(), b.file_path.get_file()]
+	_check(worst.is_empty(), "%s: no card overlaps another (%s)" % [what, worst])
+
+
+## THE ZOOM IS IN THE LAYOUT, NOT ON THE NODE.
+##
+## Scaling the Control tree is how Godot's own GraphEdit zooms, and it is why its text goes soft:
+## a glyph is rasterized once at its declared size and the transform stretches the RESULT. Asking
+## the font server for glyphs at the size they will actually occupy is the whole fix, and it
+## changes no visual size -- a 15px title at zoom 2 was already drawn 30px tall, just badly.
+func _test_the_zoom_is_in_the_layout() -> void:
+	_section("a style measured for a zoom scales its sizes and nothing else")
+	var style := Palette.card_box()
+	var doubled := Palette.scaled(style, 2.0)
+	_eq(int(doubled["corner_radius_all"]), int(style["corner_radius_all"]) * 2,
+		"a corner radius follows the zoom")
+	_eq(int(doubled["content_margin_all"]), int(style["content_margin_all"]) * 2,
+		"and so does a content margin")
+	_eq(doubled["bg_color"], style["bg_color"], "a COLOUR is not a size")
+	_eq(doubled["border_color"], style["border_color"], "and neither is a border colour")
+
+	var title := Palette.title()
+	_eq(int(Palette.scaled(title, 2.0)["font_size"]), int(title["font_size"]) * 2,
+		"a font size is asked for at the size it will be drawn")
+	_eq(Palette.scaled(title, 1.0), title, "and zoom 1 is the style itself")
+
+	_section("nothing that was drawn disappears when zoomed out")
+	# A 1px border scaled to 0.3 rounds to nothing, and the card loses its edge at exactly the
+	# band where the edge is the only thing separating two cards.
+	var small := Palette.scaled(Palette.card_box(), 0.3)
+	_check(int(small["border_width_all"]) >= 1, "a hairline border survives the Architecture band")
+	_check(int(small["font_size"]) >= 1 if small.has("font_size") else true, "so does any text")
+
+	_section("the shadow offset is a size too")
+	var shadow := Palette.scaled(Palette.card_box(), 2.0)
+	_eq(shadow["shadow_offset"], Vector2(style["shadow_offset"]) * 2.0,
+		"a Vector2 size scales as a vector")

@@ -1201,10 +1201,14 @@ func _test_templates_invent_nothing() -> void:
 	_check(style.contains("export card_style := {"), "a style module declares its export")
 	_check(not style.contains("bg_color"),
 		"and invents no background nobody asked for -- the reference reversed this by name")
-	var hook := Edits.template_for(Module.Kind.HOOK, "use_counter")
+	# THE FILE IS NAMED FOR ITS SUBJECT and the EXPORT carries the prefix -- this repo's own
+	# convention: `stress_test.hooks.guitkx` exports `use_stress_loop`. Requiring `use_` on the
+	# FILE was invented, and produced `use_new_hook.hooks.guitkx`, a shape no file here has.
+	var hook := Edits.template_for(Module.Kind.HOOK, "counter")
 	_check(hook.contains("export use_counter("),
-		"a hook FILE is named use_x, so the template does not prefix it again")
-	_check(not hook.contains("use_use_"), "which is what it emitted before")
+		"a hook module named counter exports use_counter")
+	_check(not Edits.template_for(Module.Kind.HOOK, "use_counter").contains("use_use_"),
+		"and a file that was named with the prefix anyway does not get it twice")
 	_compiles(hook, "and the hook template compiles")
 	_compiles(style, "and so does the empty style export")
 

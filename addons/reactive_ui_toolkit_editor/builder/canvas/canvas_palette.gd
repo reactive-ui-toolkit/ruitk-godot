@@ -51,6 +51,53 @@ static func _code(style: Dictionary) -> Dictionary:
 ## between it and the lattice, and at the Cards layer a screen of them reads as a wallpaper rather
 ## than as objects you can pick up. The numbers are Unity's: an 18px falloff offset 6px down at
 ## 0.35 alpha.
+## THE SAME STYLE, MEASURED FOR A ZOOM.
+##
+## The canvas used to zoom by scaling the Control tree, which is how Godot's own GraphEdit does it
+## and why its text goes soft: a glyph is rasterized once at its declared size and the transform
+## stretches the RESULT. Zoomed in the card got bigger and blurrier; zoomed out it became mush
+## rather than a simplified card.
+##
+## Scaling the LAYOUT instead -- font sizes, margins, radii, borders -- asks the font server for
+## glyphs at the size they will actually occupy, so every band is rendered sharp. The visual sizes
+## are unchanged: a 15px title at zoom 2 was already drawn 30px tall, it was just drawn badly.
+##
+## COLOURS ARE NOT SIZES. Scaled by name rather than by "is it a number", or an alpha would be
+## multiplied into nonsense.
+static func scaled(style: Dictionary, zoom: float) -> Dictionary:
+	if is_equal_approx(zoom, 1.0):
+		return style
+	var out := {}
+	for key in style:
+		var name := str(key)
+		var value: Variant = style[key]
+		if not _is_size_key(name):
+			out[key] = value
+			continue
+		if value is Vector2:
+			out[key] = (value as Vector2) * zoom
+		elif value is int:
+			# AT LEAST ONE PIXEL for anything that was going to be drawn at all: a 1px border
+			# scaled to 0.3 rounds to nothing, and the card loses its edge at the very band where
+			# the edge is the only thing telling two cards apart.
+			out[key] = maxi(1, int(round(float(value) * zoom)))
+		elif value is float:
+			out[key] = maxf(1.0, float(value) * zoom)
+		else:
+			out[key] = value
+	return out
+
+
+## Whether a style key names a SIZE, and so follows the zoom.
+static func _is_size_key(name: String) -> bool:
+	if name == "font_size" or name == "separation" or name == "shadow_size" \
+			or name == "shadow_offset" or name == "custom_minimum_size":
+		return true
+	return name.begins_with("content_margin") or name.begins_with("corner_radius") \
+		or name.begins_with("border_width") or name.begins_with("margin_") \
+		or name.begins_with("expand_margin")
+
+
 static func card_box() -> Dictionary:
 	return {
 		"bg_color": Color(0.137, 0.137, 0.161),

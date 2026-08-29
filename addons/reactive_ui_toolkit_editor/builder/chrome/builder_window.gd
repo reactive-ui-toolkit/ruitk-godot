@@ -1202,9 +1202,17 @@ func reproject() -> void:
 	if layout == null or not Paths.same(layout.root_path, graph.root_path):
 		layout = CanvasLayout.for_graph(graph)
 	layout.apply_to(graph)
+	var adopted := layout.adopt_unplaced(graph)
+	# THE RESTORED POSITIONS ARE CHECKED, not trusted. A saved position is restored verbatim and a
+	# card's height follows its CONTENT, so a hook added or an import written after the layout was
+	# written leaves the two describing different trees -- and the cards sit on top of each other
+	# until someone drags them apart by hand.
+	var healed := Service.resolve_overlaps(graph)
+	for path in healed:
+		layout.set_position(str(path), Vector2(graph.card_of(path).x, graph.card_of(path).y))
 	# AND AN ADOPTED SLOT IS SAVED. It was computed, applied, and the bool discarded -- so the
 	# position a new card was given lived exactly as long as the window did.
-	if layout.adopt_unplaced(graph):
+	if adopted or not healed.is_empty():
 		layout.save(Time.get_datetime_string_from_system(true))
 	if layout.has_saved_view:
 		# THROUGH `set_camera`, not by writing the fields. The direct write skipped the clamp, the
@@ -2962,8 +2970,11 @@ func _validate_name(kind: int, name: String) -> String:
 	# The validator and the template were contradicting each other, and the template was right.
 	if not RegEx.create_from_string("^[a-z][a-z0-9_]*$").search(name):
 		return "snake_case file name required"
-	if kind == Module.Kind.HOOK and not name.begins_with("use_"):
-		return "hook file names start with 'use_' (use_something)"
+	# NO `use_` ON THE FILE. This repo names a hook module after the thing it companions --
+	# `doom_game_screen.hooks.guitkx`, `stress_test.hooks.guitkx` -- and puts the prefix on the
+	# EXPORT inside it (`use_doom_game`, `use_stress_loop`). Requiring it on the file name was
+	# invented here and matches nothing in the project: it would have produced
+	# `use_new_hook.hooks.guitkx`, which is a name no file in this codebase has.
 
 	var folder := _create_folder(kind, name)
 	if folder.is_empty():

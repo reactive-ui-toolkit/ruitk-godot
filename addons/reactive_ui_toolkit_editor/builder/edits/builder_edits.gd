@@ -1308,10 +1308,12 @@ const DIRECTIVE_SUPPORT := {
 static func template_for(kind: int, name: String) -> String:
 	match kind:
 		Module.Kind.HOOK:
-			# THE NAME AS GIVEN. A hook file is named `use_something` -- the prompt's validator
-			# requires it and the default name already carries it -- so prefixing again produced
-			# `export use_use_new_hook()`, which is what the file said the first time anyone made one.
-			return "export %s() -> Variant {\n%sreturn null\n}\n" % [name, _default_unit()]
+			# THE EXPORT CARRIES THE PREFIX, the file does not. `stress_test.hooks.guitkx` exports
+			# `use_stress_loop`; `doom_game_screen.hooks.guitkx` exports `use_doom_game`. Derived
+			# from the file name rather than typed twice, and `use_` is not doubled if a file was
+			# named with it anyway.
+			var hook_name := name if name.begins_with("use_") else "use_%s" % name
+			return "export %s() -> Variant {\n%sreturn null\n}\n" % [hook_name, _default_unit()]
 		Module.Kind.STYLE, Module.Kind.VALUE:
 			# EMPTY. This seeded a `"bg_color": Color(0.2, 0.2, 0.24)` entry nobody asked for, so
 			# every style module in the tree began by claiming a background it did not want -- and

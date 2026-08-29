@@ -149,7 +149,9 @@ static func kind_label(k: Kind) -> String:
 static func default_name_for(k: Kind) -> String:
 	match k:
 		Kind.HOOK:
-			return "use_new_hook"
+			# The FILE, which is named for its subject like every other module here. The `use_`
+			# belongs to the exported hook, and `template_for` puts it there.
+			return "new_hook"
 		Kind.STYLE:
 			return "new_style"
 		Kind.UTIL:

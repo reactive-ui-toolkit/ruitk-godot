@@ -38,7 +38,7 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 		selected_row_index: int = -1, highlight_names = null) -> RuitkVNode {
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var lod = M.lod_of(zoom)
-	var card_w = M.card_width_for(lod)
+	var card_w = M.card_width_for(lod) * zoom
 	var cards = graph.cards if graph != null else []
 
 	return (
@@ -54,10 +54,10 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 				# fifty modules stopped meaning fifty component re-renders per motion event.
 				# The card's own contents are still laid out once in card-local units whatever
 				# the zoom, because the scale is above them.
-				var pos = Vector2(c.x, c.y)
+				var pos = Vector2(c.x, c.y) * zoom
 				return (
 					<CanvasCard key={ c.file_path } card={ c } lod={ lod } index={ i }
-						is_selected={ i == selected } at={ pos } near={ near }
+						is_selected={ i == selected } at={ pos } near={ near } zoom={ zoom }
 						on_add={ on_add } revision={ revision }
 						sel_section={ selected_row_section if i == selected else -1 }
 						sel_row={ selected_row_index if i == selected else -1 }
@@ -82,7 +82,7 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 ## (A `#` comment inside a markup block is a TEXT CHILD, not a comment. Two of them in a
 ## directive body is two roots, and GUITKX0108 says so. Notes about markup live out here.)
 export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
-		at = Vector2.ZERO, near: bool = true, index: int = -1,
+		at = Vector2.ZERO, near: bool = true, index: int = -1, zoom: float = 1.0,
 		on_add = null, revision: int = 0, sel_section: int = -1,
 		sel_row: int = -1, highlight_names = null) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
@@ -96,13 +96,13 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 					custom_minimum_size={ Vector2(card_w, 0) } size={ Vector2(card_w, 0) }
 					clip_contents={ true }
 					mouse_filter={ Control.MOUSE_FILTER_IGNORE }
-					style={ P.card_box_selected() if is_selected else P.card_box() }>
-					<VBoxContainer style={ {"separation": 4} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
-						<CanvasCardHeader card={ card } lod={ lod } />
+					style={ P.scaled(P.card_box_selected() if is_selected else P.card_box(), zoom) }>
+					<VBoxContainer style={ P.scaled({"separation": 4}, zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+						<CanvasCardHeader card={ card } lod={ lod } zoom={ zoom } />
 						@if (M.shows_sections(lod)) {
 							return (
 								<CanvasCardSections card={ card } lod={ lod } index={ index } on_add={ on_add }
-				revision={ revision } sel_section={ sel_section } sel_row={ sel_row }
+				zoom={ zoom } revision={ revision } sel_section={ sel_section } sel_row={ sel_row }
 				highlight_names={ highlight_names } />
 							)
 						}
@@ -114,12 +114,12 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 			# brings it back.
 			return (
 				<PanelContainer position={ at }
-					custom_minimum_size={ Vector2(card_w, M.drawn_height(card, lod)) }
+					custom_minimum_size={ Vector2(card_w, M.drawn_height(card, lod) * zoom) }
 					mouse_filter={ Control.MOUSE_FILTER_IGNORE }
-					style={ P.card_placeholder() }>
-					<MarginContainer style={ {"margin_left": 10, "margin_top": 10, "margin_right": 10} }
+					style={ P.scaled(P.card_placeholder(), zoom) }>
+					<MarginContainer style={ P.scaled({"margin_left": 10, "margin_top": 10, "margin_right": 10}, zoom) }
 							mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
-						<CanvasCardHeader card={ card } lod={ lod } />
+						<CanvasCardHeader card={ card } lod={ lod } zoom={ zoom } />
 					</MarginContainer>
 				</PanelContainer>
 			)
@@ -130,25 +130,25 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 
 ## The card's identity row: kind badge, title, and -- at the pill LOD -- nothing else, because a
 ## pill is what a card looks like when the whole tree is on screen at once.
-export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
+export CanvasCardHeader(card = null, lod: int = 1, zoom: float = 1.0) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var Model = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
 	var tint = P.kind_tint(int(card.kind))
 
 	return (
-		<PanelContainer style={ P.card_header_band(tint) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
-		<HBoxContainer style={ {"separation": 6} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
-			<PanelContainer style={ P.kind_badge(tint) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+		<PanelContainer style={ P.scaled(P.card_header_band(tint), zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+		<HBoxContainer style={ P.scaled({"separation": 6}, zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+			<PanelContainer style={ P.scaled(P.kind_badge(tint), zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 				<Label text={ Model.kind_word(int(card.kind)) }
-					style={ P.pill_badge_text(tint) if lod == M.Lod.PILL else P.kind_badge_text(tint) } />
+					style={ P.scaled(P.pill_badge_text(tint) if lod == M.Lod.PILL else P.kind_badge_text(tint), zoom) } />
 			</PanelContainer>
-			<Label text={ card.title } style={ P.pill_title() if lod == M.Lod.PILL else P.title() }
+			<Label text={ card.title } style={ P.scaled(P.pill_title() if lod == M.Lod.PILL else P.title(), zoom) }
 				clip_text={ true } text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS }
 				size_flags_horizontal={ Control.SIZE_EXPAND_FILL } />
 			@if (card.read_only) {
 				return (
-					<Label text="read-only" style={ P.read_only() } />
+					<Label text="read-only" style={ P.scaled(P.read_only(), zoom) } />
 				)
 			}
 		</HBoxContainer>
@@ -164,7 +164,7 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 ## export, carrying which dictionary it adds to, and a second card-level one would be a button
 ## that has to guess which. "+ style" adds a whole new export and has nothing to guess about.
 export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = null,
-		revision: int = 0, sel_section: int = -1,
+		zoom: float = 1.0, revision: int = 0, sel_section: int = -1,
 		sel_row: int = -1, highlight_names = null) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
@@ -175,12 +175,12 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 	var draws_island = M.draws_section(M.Section.ISLAND, lod)
 
 	return (
-		<VBoxContainer style={ {"separation": 4} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+		<VBoxContainer style={ P.scaled({"separation": 4}, zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 			@if (M.has_signature_section(card)) {
 				return (
-					<HBoxContainer style={ {"separation": 0} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
-						<Label text={ M.signature_head(card.signature) } style={ P.signature_name() } />
-						<Label text={ M.signature_tail(card.signature) } style={ P.signature() }
+					<HBoxContainer style={ P.scaled({"separation": 0}, zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+						<Label text={ M.signature_head(card.signature) } style={ P.scaled(P.signature_name(), zoom) } />
+						<Label text={ M.signature_tail(card.signature) } style={ P.scaled(P.signature(), zoom) }
 							autowrap_mode={ TextServer.AUTOWRAP_WORD }
 							size_flags_horizontal={ Control.SIZE_EXPAND_FILL } />
 					</HBoxContainer>
@@ -188,13 +188,13 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 			}
 			@if (not card.imports.is_empty()) {
 				return (
-					<CanvasCardSection heading="IMPORTS" cap={ M.section_scroll_h(card, M.Section.IMPORTS, lod) }>
+					<CanvasCardSection heading="IMPORTS" cap={ M.section_scroll_h(card, M.Section.IMPORTS, lod) } zoom={ zoom }>
 						@for (i in range(card.imports.size())) {
 							var row = card.imports[i]
 							return (
 								<PanelContainer key={ str(row.at) } name={ "row-1-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
-										style={ P.row_selected() if (sel_section == 1 and sel_row == i) else P.row_plain() }>
-									<Label text={ row.text } style={ P.import_row() }
+										style={ P.scaled(P.row_selected() if (sel_section == 1 and sel_row == i) else P.row_plain(), zoom) }>
+									<Label text={ row.text } style={ P.scaled(P.import_row(), zoom) }
 										text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
 								</PanelContainer>
 							)
@@ -204,33 +204,33 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 			}
 			@if (M.has_body_section(card)) {
 				return (
-					<CanvasCardSection heading="BODY — HOOKS & STATE" cap={ M.section_scroll_h(card, M.Section.BODY, lod) }>
-						<HFlowContainer style={ {"separation": 4} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+					<CanvasCardSection heading="BODY — HOOKS & STATE" cap={ M.section_scroll_h(card, M.Section.BODY, lod) } zoom={ zoom }>
+						<HFlowContainer style={ P.scaled({"separation": 4}, zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 							@for (i in range(card.body.size())) {
 								var row = card.body[i]
 								return (
 									<PanelContainer key={ str(row.at) } name={ "row-2-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
-											style={ P.row_selected() if (sel_section == 2 and sel_row == i) else P.chip() }>
-										<Label text={ row.text } style={ P.chip_text() }
+											style={ P.scaled(P.row_selected() if (sel_section == 2 and sel_row == i) else P.chip(), zoom) }>
+										<Label text={ row.text } style={ P.scaled(P.chip_text(), zoom) }
 										text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
 									</PanelContainer>
 								)
 							}
-							<CanvasAddChip label="+ hook" what="hook" index={ index } on_add={ on_add } />
-							<CanvasAddChip label="+ code" what="code" index={ index } on_add={ on_add } />
+							<CanvasAddChip label="+ hook" what="hook" index={ index } on_add={ on_add } zoom={ zoom } />
+							<CanvasAddChip label="+ code" what="code" index={ index } on_add={ on_add } zoom={ zoom } />
 						</HFlowContainer>
 					</CanvasCardSection>
 				)
 			}
 			@if (draws_markup and not card.markup.is_empty()) {
 				return (
-					<CanvasCardSection heading="RETURN — MARKUP" cap={ M.section_scroll_h(card, M.Section.MARKUP, lod) }>
+					<CanvasCardSection heading="RETURN — MARKUP" cap={ M.section_scroll_h(card, M.Section.MARKUP, lod) } zoom={ zoom }>
 						@for (i in range(card.markup.size())) {
 							var row = card.markup[i]
 							return (
 								<PanelContainer key={ str(row.at) } name={ "row-3-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
-										style={ P.row_selected() if (sel_section == 3 and sel_row == i) else (P.row_highlighted() if M.row_mentions(row, highlight_names) else P.row_plain()) }>
-									<CanvasMarkupRow row={ row } lod={ lod } />
+										style={ P.scaled(P.row_selected() if (sel_section == 3 and sel_row == i) else (P.row_highlighted() if M.row_mentions(row, highlight_names) else P.row_plain()), zoom) }>
+									<CanvasMarkupRow row={ row } lod={ lod } zoom={ zoom } />
 								</PanelContainer>
 							)
 						}
@@ -239,32 +239,32 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 			}
 			@if (draws_exports and M.has_exports_section(card)) {
 				return (
-					<CanvasCardSection heading="EXPORTS" cap={ M.section_scroll_h(card, M.Section.EXPORTS, lod) }>
+					<CanvasCardSection heading="EXPORTS" cap={ M.section_scroll_h(card, M.Section.EXPORTS, lod) } zoom={ zoom }>
 						@for (i in M.drawn_export_rows(card, lod)) {
 							var row = card.export_detail[i]
 							return (
 								<PanelContainer key={ str(row.at) + row.text } name={ "row-4-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
-										style={ P.row_selected() if (sel_section == 4 and sel_row == i) else P.row_plain() }>
-									<Label text={ "  ".repeat(row.depth) + row.text } style={ P.export_row() }
+										style={ P.scaled(P.row_selected() if (sel_section == 4 and sel_row == i) else P.row_plain(), zoom) }>
+									<Label text={ "  ".repeat(row.depth) + row.text } style={ P.scaled(P.export_row(), zoom) }
 										clip_text={ true }
 										text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
 								</PanelContainer>
 							)
 						}
-						<HFlowContainer style={ {"separation": 4} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
-							<CanvasAddChip label="+ style" what="style" index={ index } on_add={ on_add } />
+						<HFlowContainer style={ P.scaled({"separation": 4}, zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+							<CanvasAddChip label="+ style" what="style" index={ index } on_add={ on_add } zoom={ zoom } />
 						</HFlowContainer>
 					</CanvasCardSection>
 				)
 			}
 			@if (draws_island and not card.island_lines.is_empty()) {
 				return (
-					<CanvasCardSection heading="SETUP" cap={ M.section_scroll_h(card, M.Section.ISLAND, lod) }>
+					<CanvasCardSection heading="SETUP" cap={ M.section_scroll_h(card, M.Section.ISLAND, lod) } zoom={ zoom }>
 						@for (i in range(card.island_lines.size())) {
 							return (
 								<PanelContainer key={ str(i) } name={ "row-5-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
-										style={ P.row_selected() if (sel_section == 5 and sel_row == i) else P.row_plain() }>
-									<Label text={ card.island_lines[i] } style={ P.island_row() } clip_text={ true }
+										style={ P.scaled(P.row_selected() if (sel_section == 5 and sel_row == i) else P.row_plain(), zoom) }>
+									<Label text={ card.island_lines[i] } style={ P.scaled(P.island_row(), zoom) } clip_text={ true }
 										text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
 								</PanelContainer>
 							)
@@ -283,19 +283,20 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 ## `cap` is the section's ceiling in card-local units, or 0 for a section that fits. A capped
 ## section becomes a scroller: the reference caps every one of them (§8.2) because an uncapped
 ## section is what grows a card until it overlaps its neighbours.
-export CanvasCardSection(heading: String = "", cap: float = 0.0) -> RuitkVNode {
+export CanvasCardSection(heading: String = "", cap: float = 0.0,
+		zoom: float = 1.0) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	return (
-		<VBoxContainer style={ {"separation": 2} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+		<VBoxContainer style={ P.scaled({"separation": 2}, zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 			<ColorRect color={ Color(0.24, 0.24, 0.29, 0.9) }
-				custom_minimum_size={ Vector2(0, 1) } />
-			<Label text={ heading } style={ P.section_head() } />
+				custom_minimum_size={ Vector2(0, maxf(1.0, zoom)) } />
+			<Label text={ heading } style={ P.scaled(P.section_head(), zoom) } />
 			@if (cap > 0.0) {
 				return (
-					<ScrollContainer custom_minimum_size={ Vector2(0, cap) }
+					<ScrollContainer custom_minimum_size={ Vector2(0, cap * zoom) }
 							horizontal_scroll_mode={ ScrollContainer.SCROLL_MODE_DISABLED }
 							mouse_filter={ Control.MOUSE_FILTER_PASS }>
-						<VBoxContainer style={ {"separation": 2} }
+						<VBoxContainer style={ P.scaled({"separation": 2}, zoom) }
 								size_flags_horizontal={ Control.SIZE_EXPAND_FILL }
 								mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 							{ children }
@@ -305,7 +306,7 @@ export CanvasCardSection(heading: String = "", cap: float = 0.0) -> RuitkVNode {
 			}
 			@else {
 				return (
-					<VBoxContainer style={ {"separation": 2} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+					<VBoxContainer style={ P.scaled({"separation": 2}, zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 						{ children }
 					</VBoxContainer>
 				)
@@ -317,7 +318,7 @@ export CanvasCardSection(heading: String = "", cap: float = 0.0) -> RuitkVNode {
 
 ## One row of the markup tree: indented to its depth, coloured by what it is, with its attribute
 ## run beside it.
-export CanvasMarkupRow(row = null, lod: int = 1) -> RuitkVNode {
+export CanvasMarkupRow(row = null, lod: int = 1, zoom: float = 1.0) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var Model = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
@@ -329,20 +330,20 @@ export CanvasMarkupRow(row = null, lod: int = 1) -> RuitkVNode {
 		style = P.directive_row()
 
 	return (
-		<HBoxContainer style={ {"separation": 6} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+		<HBoxContainer style={ P.scaled({"separation": 6}, zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 			@if (row.badge_text != "" and M.shows_detail(lod)) {
 				return (
-					<PanelContainer style={ P.directive_badge(row.badge) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
-						<Label text={ row.badge_text } style={ P.directive_badge_text(row.badge) } />
+					<PanelContainer style={ P.scaled(P.directive_badge(row.badge), zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+						<Label text={ row.badge_text } style={ P.scaled(P.directive_badge_text(row.badge), zoom) } />
 					</PanelContainer>
 				)
 			}
-			<Label text={ "    ".repeat(row.depth) + row.text } style={ style } clip_text={ true }
+			<Label text={ "    ".repeat(row.depth) + row.text } style={ P.scaled(style, zoom) } clip_text={ true }
 				text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS }
 				size_flags_horizontal={ Control.SIZE_EXPAND_FILL } />
 			@if (row.attrs_text != "" and M.shows_attributes(lod)) {
 				return (
-					<Label text={ row.attrs_text } style={ P.attrs() } clip_text={ true }
+					<Label text={ row.attrs_text } style={ P.scaled(P.attrs(), zoom) } clip_text={ true }
 						text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS }
 						size_flags_horizontal={ Control.SIZE_SHRINK_END } />
 				)
@@ -359,14 +360,14 @@ export CanvasMarkupRow(row = null, lod: int = 1) -> RuitkVNode {
 ## does not take focus, show a hover or answer the keyboard is a thing that only works for people
 ## using a mouse.
 export CanvasAddChip(label: String = "+", what: String = "", index: int = -1,
-		on_add = null) -> RuitkVNode {
+		on_add = null, zoom: float = 1.0) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var target = index
 	var kind = what
 	var sink = on_add
 
 	return (
-		<Button text={ label } flat={ true } style={ P.add_chip() }
+		<Button text={ label } flat={ true } style={ P.scaled(P.add_chip(), zoom) }
 			onPressed={ func(): (sink.call(target, kind) if sink != null else null) } />
 	)
 }
