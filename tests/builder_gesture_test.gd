@@ -35,7 +35,7 @@ const CHILD := """export Child(n: int = 0) -> RuitkVNode {
 }
 """
 
-const ASSERTION_FLOOR := 62
+const ASSERTION_FLOOR := 71
 
 var _fails := 0
 var _passes := 0
@@ -52,6 +52,7 @@ func _run() -> void:
 	await _test_adding_an_attribute_reaches_the_buffer()
 	await _test_a_moved_card_stays_moved()
 	await _test_the_drawn_card_actually_moves()
+	await _test_every_edit_reaches_the_card()
 	await _test_the_header_band_is_what_is_drawn()
 	await _test_the_builder_fills_the_window_it_is_in()
 	await _test_an_attribute_run_gets_room_to_be_seen()
@@ -186,6 +187,12 @@ func _window() -> BuilderWindow:
 	ws.create_new(ROOT.path_join("app.guitkx"), APP)
 	w.workspace = ws
 	w.preview.workspace = ws
+	# THE LEDGER RESOLVES IDENTITY THROUGH THIS. Without it an entry cannot name the module it
+	# describes, and undo walks back nothing -- which is a broken FIXTURE that reads exactly like
+	# a broken undo.
+	w.ledger.id_of = func(path: String) -> String:
+		var module = w.workspace.try_get(path)
+		return module.id if module != null else ""
 	w.reproject()
 	w.select_module(ROOT.path_join("app.guitkx"))
 	return w
@@ -753,3 +760,116 @@ func _test_the_drawn_card_actually_moves() -> void:
 
 	w.queue_free()
 	await process_frame
+
+
+## EVERY EDIT REACHES THE CARD ON SCREEN.
+##
+## The card layer is reconciled and `graph` is mutated IN PLACE, so an edit that changes what a
+## card should show, without changing any PROP the view is handed, is correctly bailed out of by
+## the reconciler and never drawn. That is what hid the card drag for a week, and a drag is only
+## one of the things that mutates the graph in place -- adding a row, adding a hook, deleting a
+## row and undoing any of them all do.
+##
+## So each is asserted on the RENDERED TREE, which is the only place the difference shows.
+func _test_every_edit_reaches_the_card() -> void:
+	var w := _window()
+	await _settle(w)
+	var canvas = w.canvas()
+	var path := ROOT.path_join("app.guitkx")
+	var index: int = w.graph.index_of(path)
+	_ok(index >= 0, "the app card is on the canvas")
+	if index < 0:
+		w.queue_free()
+		return
+
+	var markup_before := _count_named(canvas._cards, "row-3-")
+	var body_before := _count_named(canvas._cards, "row-2-")
+	var first_card := canvas._find_named(canvas._cards, "card-%d" % index)
+	var card_height_before: float = first_card.size.y if first_card != null else 0.0
+	_ok(markup_before > 0, "it draws markup rows to begin with (%d)" % markup_before)
+
+	_section_note("adding an element")
+	var card = w.graph.cards[index]
+	var root_row: int = Metrics.first_element_row(card)
+	w._menu_target = path
+	w._menu_card = index
+	w._menu_section = int(Metrics.Section.MARKUP)
+	w._menu_row_index = root_row
+	w._menu_row = card.markup[root_row]
+	w._search_purpose = "child"
+	w._on_search_picked("Button")
+	await _settle(w)
+	_ok(_count_named(canvas._cards, "row-3-") > markup_before,
+		"the new element is DRAWN on the card (%d -> %d)"
+			% [markup_before, _count_named(canvas._cards, "row-3-")])
+
+	_section_note("adding a hook")
+	var buffer_before: String = w.workspace.try_get(path).buffer_text
+	w._on_card_add(index, "hook")
+	await _settle(w)
+	var buffer_after: String = w.workspace.try_get(path).buffer_text
+	# THE MODEL AND THE VIEW, SEPARATELY. Which of the two failed is the whole question.
+	_ok(buffer_after != buffer_before, "the hook reached the BUFFER")
+	# MEASURED ON THE DRAWN CARD rather than by counting named nodes: a row created during an
+	# update comes out with Godot's default name instead of the one the view gives it, so a name
+	# count under-reports what is actually on screen. The card growing is the rendered consequence
+	# of a chip appearing, and a model that changed without redrawing cannot fake it.
+	var taller := canvas._find_named(canvas._cards, "card-%d" % index)
+	_ok(taller != null and taller.size.y > card_height_before,
+		"the card GREW when the hook was added (%s -> %s)"
+			% [card_height_before, taller.size.y if taller != null else -1.0])
+
+	_section_note("undo puts it back on the card")
+	var buffer_before_undo: String = w.workspace.try_get(path).buffer_text
+	w.undo()
+	await _settle(w)
+	_ok(w.workspace.try_get(path).buffer_text != buffer_before_undo,
+		"undo reverts the BUFFER")
+	_ok(w.graph.cards[index].body.size() < 2, "and the projection follows it")
+
+	# NOT ASSERTED, BECAUSE IT IS NOT TRUE YET: that the card SHRINKS back. Measured on a real
+	# render, the drawn card goes 190 -> 204 when a hook is added and stays at 204 when the add is
+	# undone -- the growth reaches the view and the removal does not, and a fresh mount of the same
+	# graph draws it correctly at 190. So the update path drops the removal somewhere in this
+	# nesting (a chip inside an HFlowContainer inside a section). Writing an assertion that passed
+	# over that would be the exact habit that hid the card drag for a week; it is named here and
+	# in the commit instead, and it is the next thing to chase.
+
+	_section_note("selection is visible")
+	canvas.select_card(-1)
+	await _settle(w)
+	canvas.select_card(index)
+	await _settle(w)
+	_ok(canvas.selected == index, "the canvas holds the selection")
+	var node := canvas._find_named(canvas._cards, "card-%d" % index)
+	_ok(node != null, "and the selected card is still drawn")
+
+	w.queue_free()
+	await process_frame
+
+
+## How many nodes under `node` have a name starting with `prefix`.
+##
+## THIS UNDER-REPORTS AFTER AN EDIT, and that is a finding rather than a flaw in the helper: a row
+## node created during an update comes out carrying Godot's default name instead of the one the
+## view gives it, so it stops being findable. `_collect_rows` finds rows BY NAME, which means the
+## measured hit-test quietly degrades to the modelled one after every structural edit. Filed
+## separately; it is why the assertions here measure the drawn CARD instead of counting rows.
+func _count_named(node: Node, prefix: String) -> int:
+	var found := 0
+	for child in node.get_children():
+		if child is Control and str(child.name).begins_with(prefix):
+			found += 1
+		found += _count_named(child, prefix)
+	return found
+
+
+func _names_of(node: Node, out: PackedStringArray) -> void:
+	for child in node.get_children():
+		if child is Control and str(child.name).begins_with("row-"):
+			out.append(str(child.name))
+		_names_of(child, out)
+
+
+func _section_note(what: String) -> void:
+	print("  -- ", what)
