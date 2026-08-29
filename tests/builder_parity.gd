@@ -197,6 +197,11 @@ const PARITY := [
 	["a clean round takes back the space it took", "FILLED_BY_ROUND"],
 	["create_module goes through the one placement rule", "return _create_named(kind, _unused_name"],
 	["a placeholder is the height of the card it stands for", "M.drawn_height(card, lod)"],
+	["a module with no exports is still in the palette", "if not out.has(card.title):"],
+	["the search matches what the row SHOWS", "lstrip"],
+	["+ new opens under the chip that opened it", "_new_button.get_screen_position()"],
+	["a recovery starts with a ledger that describes THAT tree", "func restore_recovery"],
+	["a history walk redraws once", "_walking_history"],
 	["a scrollable section eats the plain wheel; Ctrl+wheel is still the zoom", "func _input"],
 	["UB-78: the signature is two runs, cut at the paren", "func signature_head"],
 	# The preview

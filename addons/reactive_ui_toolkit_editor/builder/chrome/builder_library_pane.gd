@@ -82,6 +82,9 @@ var _selected_path := ""
 ## Sections the user asked to see in full, by kind. Read by the rebuild, so the extra rows land
 ## INSIDE their own section rather than after everything else.
 var _expanded_fully := {}
+
+## The "+ new" chip, so its menu opens under IT rather than at the pane's corner.
+var _new_button: Button = null
 var _search_field: LineEdit = null
 var _create_menu: PopupMenu = null
 var _body: VBoxContainer = null
@@ -94,6 +97,7 @@ func _init() -> void:
 	var new_button := Button.new()
 	new_button.text = "+ new"
 	new_button.flat = true
+	_new_button = new_button
 	new_button.pressed.connect(_open_create_menu)
 	add_child(Parts.pane_header("Library", new_button))
 
@@ -112,7 +116,9 @@ func _init() -> void:
 	_search_field.placeholder_text = "search library..."
 	_search_field.clear_button_enabled = true
 	_search_field.text_changed.connect(func(text: String):
-		_search = text.strip_edges().to_lower()
+		# THE BRACKETS ARE PART OF WHAT IS SHOWN, so they are part of what a person types. Matching
+		# the bare name meant typing `<But` -- copying the row in front of them -- matched nothing.
+		_search = text.strip_edges().to_lower().lstrip("<").rstrip(">")
 		rebuild())
 	add_child(_search_field)
 
@@ -191,6 +197,14 @@ func _module_entries(kind: int) -> PackedStringArray:
 		return out
 	for card in graph.cards:
 		if card.kind != kind:
+			continue
+		if card.exports.is_empty():
+			# A MODULE WITH NO EXPORTS IS STILL A MODULE. Listing per EXPORT meant a style file
+			# the user had just created -- or one mid-edit, or one whose declaration will not
+			# parse -- vanished from the palette entirely, which reads as the builder having lost
+			# it. Named by its title, which is what the card is named by too.
+			if not out.has(card.title):
+				out.append(card.title)
 			continue
 		for export_name in card.exports:
 			out.append(export_name)
@@ -425,6 +439,11 @@ func is_section_expanded(kind: String) -> bool:
 ## Opens the create menu under the `+ new` button.
 func _open_create_menu() -> void:
 	_create_menu.position = Vector2i(get_screen_position() + Vector2(24, 28))
+	# UNDER THE CHIP THAT OPENED IT. It popped at the pane's top-left corner, which on a tall
+	# pane is a long way from the button the user just pressed.
+	if _new_button != null:
+		_create_menu.position = Vector2i(_new_button.get_screen_position()
+			+ Vector2(0, _new_button.size.y))
 	_create_menu.popup()
 
 

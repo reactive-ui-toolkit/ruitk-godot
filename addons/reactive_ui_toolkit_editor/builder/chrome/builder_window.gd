@@ -139,6 +139,9 @@ var _folders_folded := false
 ## The style entry whose value the menu is currently asking about.
 var _pending_style := {}
 
+## Set for the length of a history jump, so the redraw happens once rather than per entry.
+var _walking_history := false
+
 var _drift_checked := false
 
 ## The tag drift check is a one-shot too, and it sweeps ClassDB -- which is not something to put
@@ -225,11 +228,20 @@ func _show_history() -> void:
 ## Walks the ledger to `target` applied entries, in whichever direction gets there.
 func _jump_history_to(target: int) -> void:
 	var moved := false
+	# ONE REDRAW FOR THE WALK, not one per entry crossed. Every step re-projected the graph, fed
+	# the source pane and asked the preview for a round -- so jumping back twenty actions did
+	# twenty of each, and the canvas visibly stepped through history rather than arriving at it.
+	_walking_history = true
 	while ledger.cursor() > target and undo():
 		moved = true
 	while ledger.cursor() < target and redo():
 		moved = true
+	_walking_history = false
 	if moved:
+		reproject()
+		_rebind_focus_if_missing()
+		_source.refresh_from_model()
+		preview.request_refresh()
 		toast("History — %d action(s) applied" % ledger.cursor())
 
 
@@ -1442,6 +1454,10 @@ func _offer_recovery() -> void:
 func restore_recovery() -> bool:
 	if workspace == null or not Journal.try_restore(workspace):
 		return false
+	# THE LEDGER DESCRIBES THE TREE IT WAS RECORDED AGAINST. A restore adopts a DIFFERENT tree,
+	# so every entry still in it names modules that are no longer there -- and the first Ctrl+Z
+	# after a recovery replayed a change against whatever now happened to hold that path.
+	ledger.clear()
 	reproject()
 	_source.refresh_from_model()
 	preview.request_refresh()
@@ -3553,6 +3569,9 @@ func _replay(entry, reverse: bool) -> void:
 		changes.reverse()
 	for change in changes:
 		_replay_change(change, reverse)
+	if _walking_history:
+		# The walk redraws once at the end; see `_jump_history_to`.
+		return
 	reproject()
 	# UNDOING A CREATION REMOVES THE MODULE THE FOCUS NAMES. `_focus_path` is a path, so after
 	# that the window went on naming a file that no longer exists: the status bar showed it, the
