@@ -15,6 +15,7 @@ extends SceneTree
 const BuilderWindow = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_window.gd")
 const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
 const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
+const CanvasLayout = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_layout.gd")
 
 const ROOT := "res://tests/__builder_gesture_tmp/ui"
 const APP := """import { Child } from "./child"
@@ -34,7 +35,7 @@ const CHILD := """export Child(n: int = 0) -> RuitkVNode {
 }
 """
 
-const ASSERTION_FLOOR := 43
+const ASSERTION_FLOOR := 54
 
 var _fails := 0
 var _passes := 0
@@ -55,6 +56,7 @@ func _run() -> void:
 	await _test_a_card_drags_inside_a_real_window()
 	await _test_a_pan_cannot_latch_on()
 	await _test_a_foreign_drag_does_not_pan_the_canvas()
+	await _test_every_band_of_a_card_moves_it_except_a_markup_row()
 
 	print("")
 	if _passes < ASSERTION_FLOOR:
@@ -169,6 +171,11 @@ func _test_a_row_menu_opens_where_the_click_was() -> void:
 # ── Rig ──────────────────────────────────────────────────────────────────────────────
 
 func _window() -> BuilderWindow:
+	# A CARD MOVED IN ONE TEST IS SAVED, and `user://` outlives the window -- so the next test
+	# opened on positions the last one dragged to, its probes landed off the canvas, and the
+	# assertions behind them SKIPPED rather than failed. A suite that quietly stops checking is
+	# the failure this whole file exists to stop happening.
+	CanvasLayout.clear_all()
 	var w := BuilderWindow.new()
 	w.size = Vector2(1400, 800)
 	root.add_child(w)
@@ -367,6 +374,7 @@ func _test_the_header_band_is_what_is_drawn() -> void:
 ## outside it becomes unclickable while the canvas's rect stops agreeing with what is on screen.
 ## Nothing exercised the plugin's own path, so nothing could see it.
 func _test_the_builder_fills_the_window_it_is_in() -> void:
+	CanvasLayout.clear_all()
 	var host := Window.new()
 	host.size = Vector2i(1200, 700)
 	host.wrap_controls = false
@@ -475,6 +483,7 @@ func _widths(node: Node, attrs: String) -> Vector2:
 ## a `Window`, which is its own Viewport with its own input routing, and that is the arrangement
 ## that was broken.
 func _test_a_card_drags_inside_a_real_window() -> void:
+	CanvasLayout.clear_all()
 	var host := Window.new()
 	host.size = Vector2i(1500, 900)
 	host.wrap_controls = false
@@ -525,6 +534,7 @@ func _test_a_card_drags_inside_a_real_window() -> void:
 
 ## A builder over one module of the caller's own source.
 func _window_with(source: String) -> BuilderWindow:
+	CanvasLayout.clear_all()
 	var w := BuilderWindow.new()
 	w.size = Vector2(1400, 800)
 	root.add_child(w)
@@ -591,6 +601,90 @@ func _test_a_foreign_drag_does_not_pan_the_canvas() -> void:
 	await _drag(empty, empty - Vector2(90, 50))
 	_ok(not canvas.camera.is_equal_approx(before),
 		"but a drag on empty canvas the canvas DID see still pans it")
+
+	w.queue_free()
+	await process_frame
+
+
+## EVERY PART OF A CARD MOVES IT, EXCEPT A MARKUP ROW.
+##
+## The motion handler stood down for ANY row under the press, while only a MARKUP row ever
+## produced a drag payload. So a press on the signature line, an import row, a hook chip, or the
+## part of the header below `HEADER_H` deferred to a drag-and-drop that never started: the card
+## did not move, the canvas did not pan, and the press did nothing whatever. Which is precisely
+## what "dragging the card does not work" looks like from the outside.
+##
+## Driven at zoom 2.0, because that is where the drawn header runs past the constant the band was
+## derived from -- the case that made the header itself unusable as a handle.
+func _test_every_band_of_a_card_moves_it_except_a_markup_row() -> void:
+	var w := _window()
+	await _settle(w)
+	var canvas = w.canvas()
+	var card = w.graph.cards[0]
+	canvas.set_camera(Vector2(420, 240) - Vector2(card.x, card.y) * 2.0, 2.0)
+	await _settle(w)
+	var width := Metrics.card_width_for(Metrics.lod_of(canvas.zoom))
+
+	# The header, top and bottom: the bottom is the part below HEADER_H that the measured band
+	# has to cover, and the part a person actually grabs.
+	for offset in [6.0, Metrics.HEADER_H - 4.0, canvas.measured_header(0) - 2.0]:
+		if offset <= 0.0:
+			continue
+		var before := Vector2(card.x, card.y)
+		# RE-CENTRED FIRST. Each probe drags the card, so the next one has to be aimed afresh --
+		# otherwise the card walks out of the viewport and the probes land on nothing.
+		canvas.set_camera(Vector2(120, 120) - Vector2(card.x, card.y) * canvas.zoom, canvas.zoom)
+		await _settle(w)
+		var at := _global_of(canvas, Vector2(card.x + width * 0.5, card.y + offset))
+		_ok(canvas.get_global_rect().has_point(at),
+			"the header probe at %s is on the canvas (%s in %s)"
+				% [offset, at, canvas.get_global_rect()])
+		if not canvas.get_global_rect().has_point(at):
+			continue
+		await _drag(at, at + Vector2(70, 45))
+		_ok(not before.is_equal_approx(Vector2(card.x, card.y)),
+			"a press %s units into the header MOVES the card" % offset)
+
+	# A NON-MARKUP row -- the signature line -- is not a drag payload, so it moves the card too.
+	var stack: Array = Metrics.section_stack(card)
+	for entry in stack:
+		var spec := entry as Dictionary
+		var section := int(spec["section"])
+		if section == int(Metrics.Section.MARKUP):
+			continue
+		var y := float(spec["top"]) + float(spec["lead"]) + float(spec["row_height"]) * 0.5
+		var before2 := Vector2(card.x, card.y)
+		canvas.set_camera(Vector2(120, 120) - Vector2(card.x, card.y) * canvas.zoom, canvas.zoom)
+		await _settle(w)
+		var at2 := _global_of(canvas, Vector2(card.x + width * 0.5, card.y + y))
+		_ok(canvas.get_global_rect().has_point(at2),
+			"the section-%d probe is on the canvas" % section)
+		if not canvas.get_global_rect().has_point(at2):
+			continue
+		_ok(not canvas._would_drag_a_row(0, at2 - canvas.get_global_rect().position),
+			"section %d is not a row this canvas drags" % section)
+		await _drag(at2, at2 + Vector2(60, 35))
+		_ok(not before2.is_equal_approx(Vector2(card.x, card.y)),
+			"so a press in section %d moves the card" % section)
+		break
+
+	# A MARKUP row IS a payload, so it belongs to the drop protocol and must NOT move the card.
+	var markup_y := -1.0
+	for entry in stack:
+		var spec := entry as Dictionary
+		if int(spec["section"]) == int(Metrics.Section.MARKUP):
+			markup_y = float(spec["top"]) + float(spec["lead"]) + float(spec["row_height"]) * 0.5
+	if markup_y > 0.0:
+		canvas.set_camera(Vector2(120, 120) - Vector2(card.x, card.y) * canvas.zoom, canvas.zoom)
+		await _settle(w)
+		var at3 := _global_of(canvas, Vector2(card.x + width * 0.5, card.y + markup_y))
+		if canvas.get_global_rect().has_point(at3):
+			_ok(canvas._would_drag_a_row(0, at3 - canvas.get_global_rect().position),
+				"a markup row IS a row this canvas drags")
+			var before3 := Vector2(card.x, card.y)
+			await _drag(at3, at3 + Vector2(60, 35))
+			_ok(before3.is_equal_approx(Vector2(card.x, card.y)),
+				"and dragging one does NOT move the card -- it re-parents the row")
 
 	w.queue_free()
 	await process_frame

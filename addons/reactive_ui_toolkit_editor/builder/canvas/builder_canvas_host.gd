@@ -799,6 +799,26 @@ func _drop_data(at_position: Vector2, data: Variant) -> void:
 
 
 ## A markup ROW is draggable, which is how a subtree is re-parented.
+## Whether a press here would hand Godot a ROW to carry, rather than move the card.
+##
+## ONE definition, asked by `_get_drag_data` AND by the motion handler. They used to decide
+## separately and disagree: the motion handler stood down for ANY row under the press, while only
+## a MARKUP row ever produced a payload. So a press on the signature line, an import row, a hook
+## chip, or the part of the header below `HEADER_H` deferred to a drag-and-drop that never
+## started -- the card did not move, the canvas did not pan, and the press did nothing at all.
+func _would_drag_a_row(index: int, at_position: Vector2) -> bool:
+	if graph == null or index < 0 or index >= graph.cards.size():
+		return false
+	var hit := row_at(index, at_position)
+	if not bool(hit.get("found", false)):
+		return false
+	# MARKUP ONLY. Every other section's rows are not things this canvas re-parents by dragging.
+	if int(hit["section"]) != int(Metrics.Section.MARKUP):
+		return false
+	var row_index := int(hit["index"])
+	return row_index >= 0 and row_index < graph.cards[index].markup.size()
+
+
 func _get_drag_data(at_position: Vector2) -> Variant:
 	# TWO GESTURES CANNOT BOTH OWN THE LEFT DRAG.
 	#
@@ -831,14 +851,12 @@ func _get_drag_data(at_position: Vector2) -> Variant:
 	if Metrics.on_title_bar(card_here, Metrics.screen_to_world(at_position, camera, zoom),
 			Metrics.card_width_for(lod), lod, measured_header(index)):
 		return null
+	if not _would_drag_a_row(index, at_position):
+		return null
 	var hit := row_at(index, at_position)
-	if not bool(hit.get("found", false)):
-		return null
 	var card := graph.cards[index]
-	var rows: Array = card.markup if int(hit["section"]) == int(Metrics.Section.MARKUP) else []
+	var rows: Array = card.markup
 	var row_index := int(hit["index"])
-	if row_index < 0 or row_index >= rows.size():
-		return null
 
 	var ghost := Label.new()
 	ghost.text = str(rows[row_index].text)
@@ -921,7 +939,7 @@ func _handle_motion(motion: InputEventMouseMotion) -> void:
 		# ANYWHERE ELSE ON THE CARD MOVES THE CARD. The padding, a section heading, the gap under
 		# the last row: none of them is a row, so `_get_drag_data` declines and without this the
 		# press would do nothing whatever -- a dead patch covering most of a card's area.
-		if bool(row_at(_press_index, _pressed_at).get("found", false)):
+		if _would_drag_a_row(_press_index, _pressed_at):
 			return
 		var body_card := graph.cards[_press_index]
 		var body_world := Metrics.screen_to_world(_pressed_at, camera, zoom)
