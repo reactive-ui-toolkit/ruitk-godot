@@ -117,12 +117,35 @@ func report(summary) -> void:
 
 
 func _summarize(summary) -> String:
+	var considered := int(summary.considered.size())
 	if not summary.failures.is_empty():
-		return "%d failed, %d skipped, %d built" % [
-			summary.failures.size(), summary.skipped.size(), summary.rebuilt.size()]
+		return "%d failed, %d skipped, %d built, of %d considered%s" % [
+			summary.failures.size(), summary.skipped.size(), summary.rebuilt.size(),
+			considered, _why(summary)]
 	if summary.rebuilt.is_empty():
+		# A ROUND THAT DECIDED NOTHING NEEDED BUILDING SAYS SO. An empty line here is
+		# indistinguishable from the round not having run, which is the question a person watching
+		# a preview that has not changed is actually asking.
+		return "" if considered == 0 else "nothing to rebuild — %d module(s) already current" % considered
+	return "%d module(s) rebuilt, no problems%s" % [summary.rebuilt.size(), _why(summary)]
+
+
+## WHY the round rebuilt what it did, from the reasons it already recorded.
+##
+## `Summary.reasons` is filled on every round with exactly two strings -- "text changed" and
+## "dependency rebuilt" -- and had no consumer at all: the one piece of data that answers "why did
+## THAT recompile" was collected and dropped. Capped, because a first round on a large tree
+## rebuilds everything and a list of forty file names is not a summary.
+func _why(summary) -> String:
+	if summary.reasons.is_empty():
 		return ""
-	return "%d module(s) rebuilt, no problems" % summary.rebuilt.size()
+	var parts := PackedStringArray()
+	for path in summary.reasons:
+		if parts.size() >= 3:
+			parts.append("…")
+			break
+		parts.append("%s (%s)" % [str(path).get_file(), str(summary.reasons[path])])
+	return " — " + ", ".join(parts)
 
 
 ## Adds diagnostics that are not compile failures -- the warnings and hints a module carries even

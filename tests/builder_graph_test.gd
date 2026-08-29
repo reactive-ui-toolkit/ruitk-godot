@@ -27,7 +27,7 @@ const ROOT := "res://tests/__builder_graph_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 178
+const ASSERTION_FLOOR := 181
 
 var _fails := 0
 var _passes := 0
@@ -384,12 +384,26 @@ AppHooks.use_facts  →  facts @11""",
 
 
 func _test_island() -> void:
-	_section("the code island is setup minus the hook lines")
+	_section("the code island IS its own span, so a commit cannot delete what it hid")
+	# It used to filter out blank lines and hook-chip lines while the write-back range went on
+	# SPANNING them -- and `Edits.set_island` replaces that inclusive range with the island text.
+	# So committing an island edit deleted every interior blank and every `useState` line that
+	# happened to sit between two statements of setup, without the user touching either.
+	#
+	# The cost is that a hook appears twice on the card: as a chip in BODY, which is the state
+	# summary, and here, which is the code. That is worth strictly more than a silent deletion.
 	var app := _card("app.guitkx")
-	_eq("\n".join(app.island_lines), "var count = s[0]",
-		"the hook-call lines are chips, so the island holds what is left")
-	_eq(app.island_start_line, 10, "and the range it occupies starts where that line is")
-	_eq(app.island_end_line, 10, "and ends there")
+	_eq("\n".join(app.island_lines), """var s = useState(0)
+var count = s[0]
+var facts = AppHooks.use_facts(level)""",
+		"the setup is shown whole -- hook lines included, because the range includes them")
+	_eq(app.island_start_line, 9, "the range starts at the first non-blank setup line")
+	_eq(app.island_end_line, 11, "and ends at the last")
+	_eq(app.island_source_lines.size(), app.island_lines.size(),
+		"every displayed line records which source line it is")
+	_eq(int(app.island_source_lines[0]), app.island_start_line, "the first maps to the first")
+	_eq(int(app.island_source_lines[app.island_source_lines.size() - 1]), app.island_end_line,
+		"and the last to the last -- what lets a click on row N reach line N")
 	_section("a HOOK module has one too -- hiding it makes the card lie")
 	# `decl_structure` is component-shaped and answers `{ok: false}` for anything else, so a hook's
 	# plain setup lines were nowhere on its card: the body showed a chip per hook call and the

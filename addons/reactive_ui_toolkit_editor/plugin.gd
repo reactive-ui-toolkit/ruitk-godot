@@ -353,6 +353,12 @@ func _on_fs_settled() -> void:
 	GuitkxWorkspace.rescan()
 	if _view != null:
 		_view.on_workspace_changed()
+	# AND THE BUILDER ADOPTS what changed under it. Its tree lives in memory with disk as a
+	# projection computed at Save, so without this a `.guitkx` edited elsewhere stayed invisible
+	# for the whole session and the first Save wrote the stale buffer back over the newer file.
+	# Clean modules only -- the window decides that, and says so when the two have diverged.
+	if _builder != null and _builder.has_method("adopt_external_changes"):
+		_builder.adopt_external_changes()
 
 func _has_main_screen() -> bool:
 	return true

@@ -191,6 +191,15 @@ func show_module(file_path: String) -> void:
 			if not _rendered_path.is_empty() else ""
 		return
 
+	# IT MOUNTED AND ITS RENDER FAILED. The boundary caught it, so the stage holds a fallback
+	# rather than nothing -- and saying nothing about that is the worst of the three, because the
+	# component is visibly there and visibly wrong.
+	var render_failure: String = preview.mount_error()
+	if not render_failure.is_empty():
+		_note.text = "%s built, but its render failed — %s" % [_path.get_file(), render_failure]
+		_origin.text = "the boundary is holding the stage"
+		return
+
 	# IT BUILT AND WOULD NOT MOUNT, or it failed this round: name the file and the reason.
 	var failure := _round_error(_path)
 	if not failure.is_empty():

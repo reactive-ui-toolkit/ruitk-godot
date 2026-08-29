@@ -116,6 +116,9 @@ var _pending := false
 var _pending_since := 0
 
 var _root: RuitkRoot = null
+
+## The reason the mounted component's render failed, or "".
+var _mount_error := ""
 var _mounted_path := ""
 
 
@@ -601,9 +604,32 @@ func mount(container: Node, focus_path: String, props := {}) -> bool:
 	# the one that also pumps the canvas. On the shared lane a preview that will not settle spends
 	# the budget the tool it lives in needs to stay usable, and the symptom is the whole editor
 	# stuttering rather than one panel misbehaving.
-	_root = RuitkRoot.create_isolated(container, V.fc(Callable(script, "render"), props))
+	# BEHIND AN ERROR BOUNDARY. The stage renders USER CODE mid-edit -- a component whose render
+	# may call `RuitkFail.render` through any of the runtime's own guards -- straight into the
+	# editor's tree. Without a boundary the failure unwound to the ROOT, which for this mount means
+	# the stage goes blank and the reason is nowhere: the runtime's documented substitute for
+	# try/catch existed and this, of all mounts, was not using it.
+	_mount_error = ""
+	_root = RuitkRoot.create_isolated(container, V.error_boundary({
+		"fallback": V.Label({ "text": "this component's render failed — see the console" }),
+		"on_error": func(reason): _on_mount_failed(str(reason)),
+	}, [V.fc(Callable(script, "render"), props)]))
 	_mounted_path = Paths.canon(focus_path)
 	return _root != null
+
+
+## A render failure inside the mounted component, or "".
+##
+## Reported rather than swallowed: the boundary keeps the stage alive, and the pane needs the
+## reason to say why what is on it is a fallback rather than the component.
+func mount_error() -> String:
+	return _mount_error
+
+
+func _on_mount_failed(reason: String) -> void:
+	_mount_error = reason
+	compile_finished.emit(_mounted_path, false, reason)
+	trace.emit("preview: the mounted component's render failed -- %s" % reason)
 
 
 ## The reconciler's committed fiber tree for the current mount, or null.
@@ -626,6 +652,7 @@ func is_mounted() -> bool:
 
 
 func unmount() -> void:
+	_mount_error = ""
 	if _root != null:
 		_root.unmount()
 		_root = null

@@ -802,6 +802,15 @@ func _wire() -> void:
 	# GO-TO-DEFINITION LANDS ON THE CANVAS TOO. A module in the open tree is a card, and taking the
 	# reader to the file without taking them to the card leaves the two halves of the builder
 	# pointing at different things.
+	# THE FIELD SHOWS THE FAILURE, not only the toast. A toast has faded by the time the reader
+	# looks back at the text.
+	_source.complained.connect(func(_message: String): _source.set_error(true))
+	_source.edit_applied.connect(func(_p: String, _t: String): _source.set_error(false))
+	_source.edit_cancelled.connect(func(_p: String, _t: String): _source.set_error(false))
+	# AND THE HOVER REACHES BOTH SURFACES. Hovering a hook chip warmed the card's markup rows and
+	# did nothing to the pane showing the code those rows came from.
+	_canvas.hover_names_changed.connect(func(names: PackedStringArray):
+		_source.set_trace_names(names))
 	_source.definition_requested.connect(_on_definition_requested)
 	_source.diagnostic_clicked.connect(func(file_path: String, line: int, _record: Variant):
 		if not file_path.is_empty():
@@ -1212,10 +1221,21 @@ func tick() -> void:
 	_journal_tick()
 	if not preview.is_due():
 		return
-	var summary = preview.compile_dirty(_preview_pane.rendered_path() if _preview_pane != null else _focus_path)
+	_run_round()
+	_refresh_status()
+
+
+## One compile round, reported.
+##
+## There were two call sites and only one of them reported: the round forced by `select_module`
+## discarded its Summary while making the console visible with the PREVIOUS round's rows -- so
+## selecting a module that failed to build showed a console full of stale successes.
+func _run_round() -> void:
+	var anchor := _preview_pane.rendered_path() if _preview_pane != null else _focus_path
+	var summary = preview.compile_dirty(anchor)
 	if summary != null:
 		_console.report(summary)
-	_refresh_status()
+	return
 
 
 ## How often unsaved work is written to the crash journal, in milliseconds.
@@ -2302,6 +2322,22 @@ func _export_owning(card, row_index: int) -> String:
 ## Synthesised rather than stored, because the island is a line RANGE on the card and every other
 ## consumer speaks in offsets. Built from the card's own `island_start_line`/`island_end_line`
 ## against the live buffer, so `Edits.remove` and the source-pane jump are both span-exact.
+## One DISPLAYED island line as a row, with the source line it came from.
+##
+## Falls back to the whole island when the mapping is not available -- an older projection, or a
+## row index the card no longer has.
+func _island_line_row(card, row_index: int):
+	if card == null or row_index < 0 or row_index >= card.island_source_lines.size():
+		return _island_row(card)
+	var line := int(card.island_source_lines[row_index])
+	var row := Graph.Line.new()
+	row.kind = Graph.LineKind.PLAIN
+	row.text = str(card.island_lines[row_index]) if row_index < card.island_lines.size() else ""
+	row.source_line = line
+	row.source_text = row.text
+	return row
+
+
 func _island_row(card):
 	if card == null or card.island_start_line <= 0 or workspace == null:
 		return null
@@ -2341,12 +2377,11 @@ func _row_of(card_index: int, section: int, row_index: int):
 		Metrics.Section.EXPORTS:
 			rows = card.export_detail
 		Metrics.Section.ISLAND:
-			# The SETUP block is edited whole, not row by row: it is GDScript, and half a
-			# statement is not a thing to write back. But it is NOT the first markup row, which is
-			# what this returned -- so clicking any setup line selected the component's return
-			# root, jumped the source pane to it, and Delete removed the element the component
-			# exists to return.
-			return _island_row(card)
+			# THE LINE THAT WAS CLICKED. The block is still edited whole -- activation opens the
+			# island editor on the card's own span -- but a CLICK is a request to be shown a
+			# place, and answering every one of them with the island's first line means clicking
+			# the eighth line of a setup scrolls the pane to the first.
+			return _island_line_row(card, row_index)
 		_:
 			return null
 	return rows[row_index] if row_index >= 0 and row_index < rows.size() else null
@@ -3348,7 +3383,7 @@ func select_module(file_path: String) -> void:
 		# "select a component to see it rendered" while a component was selected, until some later
 		# edit happened to rebuild it. Selecting IS the request.
 		if preview.built_script(_focus_path) == null:
-			preview.compile_dirty(_preview_pane.rendered_path() if _preview_pane != null else _focus_path)
+			_run_round()
 		_preview_pane.show_module(_focus_path)
 	preview.request_refresh()
 	_refresh_status()
@@ -3750,9 +3785,22 @@ func adopt_external_changes() -> void:
 	if workspace == null or workspace.modules().is_empty():
 		return
 	var paths := PackedStringArray()
+	# AND WHICH ONES DIVERGED. `reload_clean_from_disk` correctly declines to clobber a module
+	# with unsaved edits -- and said nothing about it, so a file edited in two places looked
+	# exactly like a file nobody had touched, right up until Save wrote one version over the
+	# other. Kept as a console line rather than a dialog: the user's copy IS the right one to
+	# keep, and the only thing missing was being told.
+	var contested := PackedStringArray()
 	for module in workspace.modules():
 		paths.append(module.file_path())
+		if module.is_dirty() and FileAccess.file_exists(module.file_path()):
+			contested.append(module.file_path())
 	var touched := workspace.reload_clean_from_disk(paths)
+	for path in contested:
+		_console.add_diagnostics(path, [{
+			"code": "", "severity": Console.SEVERITY_WARNING, "line": -1,
+			"message": "changed on disk AND edited here -- your version is kept; Save overwrites it",
+		}])
 	if touched.is_empty():
 		return
 	reproject()

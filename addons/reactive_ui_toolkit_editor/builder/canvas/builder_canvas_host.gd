@@ -66,6 +66,10 @@ signal card_moved(index: int, to: Vector2)
 ## selects, does not do.
 signal card_activated(card_index: int)
 
+## The set of names a hovered hook chip binds changed. The CARD warms its own rows from
+## `highlight_names` directly; this is for the surfaces that are not the card.
+signal hover_names_changed(names: PackedStringArray)
+
 var graph: Graph = null
 var camera := Vector2.ZERO
 var zoom := 1.0
@@ -199,6 +203,7 @@ func _track_hover(at: Vector2) -> void:
 	if names == highlight_names:
 		return
 	highlight_names = names
+	hover_names_changed.emit(names)
 	_render()
 
 

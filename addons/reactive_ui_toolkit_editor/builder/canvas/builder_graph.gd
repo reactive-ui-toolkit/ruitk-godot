@@ -178,6 +178,13 @@ class Card extends RefCounted:
 	## Setup-code lines that are not hook calls, shown as the card's code island, and the 1-based
 	## inclusive source range they occupy (0 = none) -- an island edit replaces exactly that range.
 	var island_lines: PackedStringArray = PackedStringArray()
+	## The SOURCE LINE of each entry in `island_lines`, 1-based and the same length.
+	##
+	## The island is a contiguous run, so this is arithmetic today -- but it is the answer every
+	## consumer actually needs, and deriving it at four call sites is how three of them come to
+	## disagree with the fifth.
+	var island_source_lines: PackedInt32Array = PackedInt32Array()
+
 	var island_start_line: int = 0
 	var island_end_line: int = 0
 

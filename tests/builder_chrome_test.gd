@@ -60,6 +60,7 @@ func _run() -> void:
 	await _test_an_edit_reaches_the_card()
 	await _test_library_pane()
 	await _test_folder_pane_routing()
+	await _test_source_pane_surfaces()
 	await _test_source_pane()
 	_test_console()
 	await _test_inline_editor()
@@ -2211,6 +2212,65 @@ func _test_folder_pane_routing() -> void:
 	_check(w.layout == null or w.layout.folders_folded, "the layout remembers it")
 	w._fold_folders(false)
 	_check(w._folders.visible, "and unfolding brings it back")
+
+	w.queue_free()
+	await process_frame
+
+
+## THE SOURCE PANE'S OWN SURFACES: the failure mark, the open edit, the bands and the line a row
+## points at.
+func _test_source_pane_surfaces() -> void:
+	var w := _window()
+	await process_frame
+	var path := ROOT.path_join("app.guitkx")
+	w.select_module(path)
+	await process_frame
+	var pane := w.source_pane()
+
+	_section("an open edit is not overwritten by a change from elsewhere")
+	# `refresh_from_model` runs after every canvas gesture, and it replaced the buffer under
+	# whatever was being typed -- losing the text AND the editor's undo history, since assigning
+	# `text` clears it.
+	pane._set_editing(true)
+	pane.editor().text = "export App() -> RuitkVNode { return ( <Label /> ) }"
+	var complaints: Array = []
+	pane.complained.connect(func(m: String): complaints.append(m))
+	w.workspace.apply_edit(path, "export App() -> RuitkVNode { return ( <Button /> ) }")
+	pane.refresh_from_model()
+	_check(pane.editor().text.contains("Label"), "the open edit survives")
+	_check(not complaints.is_empty(), "and the user is told the file changed under them")
+	pane._set_editing(false)
+
+	_section("a failed apply marks the field, and a good one clears it")
+	pane.set_error(true)
+	_check(pane.editor().has_theme_stylebox_override("normal"),
+		"the field itself carries the failure -- a toast has faded by the time you look back")
+	pane.set_error(false)
+	_check(not pane.editor().has_theme_stylebox_override("normal"), "and a good apply clears it")
+
+	_section("read mode is not a disabled state")
+	# Godot draws a non-editable buffer in `font_readonly_color`, which in the editor theme is
+	# roughly half opacity -- and this pane is read-only almost all the time.
+	_check(pane.editor().has_theme_color_override("font_readonly_color"),
+		"the read-only colour is overridden, so the file reads as the file")
+
+	_section("the line a row points at gets a band of its own")
+	# A file with lines in it: the edit above collapsed the fixture to one.
+	w.workspace.apply_edit(path, "export App() -> RuitkVNode {
+	return (
+		<Label />
+	)
+}
+")
+	pane.refresh_from_model()
+	pane.goto_line(2)
+	_eq(pane._selected_line, 2, "the pane remembers which line was asked for")
+	_check(pane.editor().get_line_background_color(1).a > 0.0,
+		"and paints it -- the caret-line tint follows the caret and cannot say 'this one'")
+
+	_section("a hovered hook chip warms the source, not only the card")
+	pane.set_trace_names(PackedStringArray(["count"]))
+	_eq(pane._trace_names.size(), 1, "the pane took the names")
 
 	w.queue_free()
 	await process_frame

@@ -52,6 +52,12 @@ var _revert: Button = null
 var _snapshot := ""
 var _editing := false
 
+## The line a card row pointed at, banded so it reads as a place rather than as a caret position.
+var _selected_line := 0
+
+## The names a hovered hook chip binds. Warmed here as well as on the card.
+var _trace_names := PackedStringArray()
+
 
 func _init() -> void:
 	add_theme_constant_override("separation", 2)
@@ -110,6 +116,16 @@ func _init() -> void:
 	_editor.gutters_draw_fold_gutter = false
 	_editor.draw_tabs = false
 	_editor.editable = false
+	# SRC-13: READ MODE IS NOT A DISABLED STATE. Godot's TextEdit draws a non-editable buffer in
+	# `font_readonly_color`, which in the editor theme is the code at roughly half opacity -- and
+	# this pane is read-only almost all the time, so the builder's source view was permanently
+	# dimmed and read as greyed-out furniture rather than as the file.
+	_editor.add_theme_color_override("font_readonly_color",
+		_editor.get_theme_color("font_color", "CodeEdit"))
+	# SRC-09: DOUBLE-CLICK ENTERS EDIT MODE. The only way in was the toggle button, so the gesture
+	# every other code surface uses did what a non-editable CodeEdit does -- select a word -- and
+	# the pane stayed read-only with no hint that it could be anything else.
+	_editor.gui_input.connect(_on_editor_gui_input)
 	_editor.text_changed.connect(_on_text_changed)
 	_editor.definition_requested.connect(func(target: String, offset: int):
 		definition_requested.emit(target, offset))
@@ -126,6 +142,8 @@ func _init() -> void:
 func goto_line(line: int) -> void:
 	if _editor == null or line <= 0 or line > _editor.get_line_count():
 		return
+	_selected_line = line
+	_repaint_line_bands()
 	_editor.set_caret_line(line - 1)
 	_editor.set_caret_column(0)
 	# ADJUST, DO NOT CENTRE. `center_viewport_to_caret` scrolls the line to the middle whether or
@@ -169,6 +187,90 @@ func show_module(file_path: String) -> void:
 ## Re-reads the buffer from the model, for a change that came from somewhere else -- an undo, a
 ## drag on the canvas, an import rewritten by a move. The caret is kept where it was, because
 ## losing it on every canvas gesture makes the two surfaces unusable together.
+## Marks the field as holding text that would not parse, or clears the mark.
+##
+## A toast has faded by the time the reader looks back at the text, so a failed apply left no
+## trace anywhere near the thing that failed -- and the pane went on looking exactly like a pane
+## whose content is fine.
+func set_error(on: bool) -> void:
+	if _editor == null:
+		return
+	if not on:
+		_editor.remove_theme_stylebox_override("normal")
+		_editor.remove_theme_stylebox_override("focus")
+		return
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.118, 0.106, 0.114)
+	box.set_border_width_all(1)
+	box.border_color = Color(0.94, 0.38, 0.38)
+	box.set_content_margin_all(4)
+	_editor.add_theme_stylebox_override("normal", box)
+	_editor.add_theme_stylebox_override("focus", box)
+
+
+## The names a hovered hook chip binds, so the pane can warm the same lines the canvas does.
+##
+## Half of the contract line was implemented: hovering a chip highlighted the matching MARKUP ROWS
+## on the card and did nothing at all to the source, which is the surface showing the code those
+## rows came from.
+func set_trace_names(names: PackedStringArray) -> void:
+	if _editor == null or names == _trace_names:
+		return
+	_trace_names = names
+	_repaint_line_bands()
+
+
+## Puts the caret on `line` (1-based) and BANDS it, so the row that was clicked is visible as a
+## place rather than only as a caret position.
+func _repaint_line_bands() -> void:
+	if _editor == null:
+		return
+	for i in range(_editor.get_line_count()):
+		_editor.set_line_background_color(i, Color(0, 0, 0, 0))
+	if _selected_line > 0 and _selected_line <= _editor.get_line_count():
+		# The clicked row's own band: the caret-line tint follows the caret wherever it goes next,
+		# so it cannot say "this is the line you asked for".
+		_editor.set_line_background_color(_selected_line - 1, Color(1.0, 0.835, 0.310, 0.14))
+	if _trace_names.is_empty():
+		return
+	for i in range(_editor.get_line_count()):
+		var text := _editor.get_line(i)
+		for name in _trace_names:
+			if _mentions_word(text, str(name)):
+				_editor.set_line_background_color(i, Color(0.361, 0.588, 0.965, 0.12))
+				break
+
+
+## Word-boundary match, so `count` does not warm a line mentioning `counter`.
+static func _mentions_word(haystack: String, needle: String) -> bool:
+	if needle.is_empty():
+		return false
+	var at := haystack.find(needle)
+	while at != -1:
+		var before_ok := at == 0 or not _is_word_char(haystack[at - 1])
+		var after := at + needle.length()
+		var after_ok := after >= haystack.length() or not _is_word_char(haystack[after])
+		if before_ok and after_ok:
+			return true
+		at = haystack.find(needle, at + 1)
+	return false
+
+
+static func _is_word_char(c: String) -> bool:
+	return c == "_" or (c >= "0" and c <= "9") or (c >= "a" and c <= "z") or (c >= "A" and c <= "Z")
+
+
+## Double-click on a read-only listing is the gesture that starts editing it.
+func _on_editor_gui_input(event: InputEvent) -> void:
+	if _editing or not (event is InputEventMouseButton):
+		return
+	var button := event as InputEventMouseButton
+	if button.double_click and button.button_index == MOUSE_BUTTON_LEFT:
+		_set_editing(true)
+		if _edit_toggle != null:
+			_edit_toggle.set_pressed_no_signal(true)
+
+
 func refresh_from_model() -> void:
 	if workspace == null or _path.is_empty():
 		return
@@ -178,9 +280,17 @@ func refresh_from_model() -> void:
 		return
 	if module.buffer_text == _editor.text:
 		return
+	if _editing:
+		# AN OPEN EDIT IS NOT OVERWRITTEN. This is called after every canvas gesture, and it
+		# replaced the buffer under whatever the user was typing -- losing the text AND the
+		# editor's undo history, since assigning `text` clears it. The edit wins; the change is
+		# still in the model, and leaving edit mode adopts it.
+		complained.emit("%s changed elsewhere — apply or revert to see it." % _path.get_file())
+		return
 	var line := _editor.get_caret_line()
 	var column := _editor.get_caret_column()
 	_editor.text = module.buffer_text
+	_repaint_line_bands()
 	_editor.set_caret_line(clampi(line, 0, maxi(0, _editor.get_line_count() - 1)))
 	_editor.set_caret_column(clampi(column, 0,
 		_editor.get_line(_editor.get_caret_line()).length()))

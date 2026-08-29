@@ -598,30 +598,40 @@ static func _fill_island(card: Graph.Card, source: String, structure: Dictionary
 	var first_line := _line_of(source, body_at)
 	var setup_lines := setup.split("\n")
 
-	var kept := PackedStringArray()
-	var start_line := 0
-	var end_line := 0
+	# THE ISLAND IS ITS OWN SPAN. This filtered out blank lines and hook-chip lines while
+	# `island_start_line`/`island_end_line` went on spanning them -- and `Edits.set_island`
+	# replaces that inclusive range with the island text. So committing an island edit DELETED
+	# every interior blank line, and every `useState` line that happened to sit between two
+	# statements of setup, without the user having touched either.
+	#
+	# The cost of showing the setup whole is that a hook appears twice on the card: once as a chip
+	# in BODY, which is the state summary, and once here, which is the code. That repetition is
+	# worth strictly more than a commit that silently removes lines -- and "SETUP" is a truthful
+	# label for the whole run, which is what a person editing it as a block expects to be editing.
+	var first_kept := -1
+	var last_kept := -1
 	for k in range(setup_lines.size()):
-		var raw := setup_lines[k]
-		if raw.strip_edges().is_empty():
+		if str(setup_lines[k]).strip_edges().is_empty():
 			continue
-		var line1 := first_line + k
-		var is_hook := false
-		for chip in card.body:
-			if chip.source_line == line1:
-				is_hook = true
-				break
-		if is_hook:
-			continue
-		kept.append(raw)
-		if start_line == 0:
-			start_line = line1
-		end_line = line1
-	if kept.is_empty():
+		if first_kept < 0:
+			first_kept = k
+		last_kept = k
+	if first_kept < 0:
 		return
+	# LEADING AND TRAILING BLANKS ARE TRIMMED, interior ones are not: a blank line between two
+	# statements is the author's paragraph break and it survives a round trip; blank lines at the
+	# ends are the gap between the island and the code around it.
+	var kept := PackedStringArray()
+	var source_lines := PackedInt32Array()
+	for k in range(first_kept, last_kept + 1):
+		kept.append(setup_lines[k])
+		source_lines.append(first_line + k)
 	card.island_lines = _strip_common_indent(kept)
-	card.island_start_line = start_line
-	card.island_end_line = end_line
+	# WHICH SOURCE LINE EACH DISPLAYED LINE IS. Clicking island row N used to jump the source pane
+	# to the island's FIRST line whatever row was clicked, because nothing recorded the mapping.
+	card.island_source_lines = source_lines
+	card.island_start_line = first_line + first_kept
+	card.island_end_line = first_line + last_kept
 
 
 ## Removes the indentation every line shares, so the island reads as a block rather than as a

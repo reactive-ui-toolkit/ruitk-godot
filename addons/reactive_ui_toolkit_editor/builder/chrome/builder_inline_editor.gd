@@ -75,6 +75,11 @@ func open_at(rect: Rect2, initial: String, for_token: Variant, seeded := false) 
 	_token = for_token
 	_initial = initial
 	text = initial
+	# THE GLYPHS FOLLOW THE ROW. This editor opens OVER the row it edits, and the row is drawn at
+	# the canvas zoom -- so at Layer 3 the field held text half the size of the line under it, and
+	# zoomed out far enough the field was a box with one clipped character in it. Sized from the
+	# rect the caller measured, which is the drawn row.
+	add_theme_font_size_override("font_size", clampi(int(rect.size.y * 0.55), 11, 26))
 	position = rect.position
 	size = Vector2(maxf(rect.size.x, 60.0), maxf(rect.size.y, 22.0))
 	visible = true
