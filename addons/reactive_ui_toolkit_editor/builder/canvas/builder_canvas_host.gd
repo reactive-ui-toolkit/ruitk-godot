@@ -826,11 +826,20 @@ func _handle_motion(motion: InputEventMouseMotion) -> void:
 		_grab_offset = world - Vector2(card.x, card.y)
 		_moving = _press_index
 	elif _press_index >= 0:
-		# A DRAG THAT STARTED ON A CARD BUT NOT ON ITS TITLE BAR IS GODOT'S. It is a row being
-		# re-parented or a kind chip carrying its module, and `_get_drag_data` answers it a few
-		# pixels later -- so this must NOT start a pan. It used to, which meant every attempt to
-		# drag a row also slid the whole canvas out from under the pointer.
-		return
+		# A DRAG THAT STARTED ON A ROW IS GODOT'S: it is a row being re-parented or a kind chip
+		# carrying its module, and `_get_drag_data` answers it a few pixels later. This must not
+		# start a pan -- it used to, so every attempt to drag a row also slid the canvas out from
+		# under the pointer.
+		#
+		# ANYWHERE ELSE ON THE CARD MOVES THE CARD. The padding, a section heading, the gap under
+		# the last row: none of them is a row, so `_get_drag_data` declines and without this the
+		# press would do nothing whatever -- a dead patch covering most of a card's area.
+		if bool(row_at(_press_index, _pressed_at).get("found", false)):
+			return
+		var body_card := graph.cards[_press_index]
+		var body_world := Metrics.screen_to_world(_pressed_at, camera, zoom)
+		_grab_offset = body_world - Vector2(body_card.x, body_card.y)
+		_moving = _press_index
 	else:
 		_panning = true
 		_pan_from = motion.position
