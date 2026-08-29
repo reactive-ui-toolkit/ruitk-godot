@@ -102,7 +102,20 @@ func report(summary) -> void:
 
 	for failure in summary.failures:
 		var f := failure as Dictionary
-		_add_row(SEVERITY_ERROR, str(f["path"]), str(f["error"]))
+		var listed := f.get("diagnostics", []) as Array
+		if listed.is_empty():
+			_add_row(SEVERITY_ERROR, str(f["path"]), str(f["error"]))
+			continue
+		# ONE ROW PER DIAGNOSTIC, warnings included and each with its own line. The console showed
+		# the module's FIRST error and nothing else, so a file with three mistakes reported one --
+		# and every warning the compiler produced was discarded on the way here.
+		for d in listed:
+			var record := d as Dictionary
+			var line := int(record.get("line", -1))
+			var where: String = str(f["path"]) if line < 0 \
+				else "%s:%d" % [str(f["path"]), line + 1]
+			_add_row(SEVERITY_ERROR if int(record.get("severity", 0)) == 0 else SEVERITY_WARNING,
+				where, "%s %s" % [str(record.get("code", "")), str(record.get("message", ""))])
 	for skipped in summary.skipped:
 		var s := skipped as Dictionary
 		_add_row(SEVERITY_WARNING, str(s["path"]),

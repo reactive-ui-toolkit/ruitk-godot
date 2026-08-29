@@ -30,6 +30,65 @@ const STRUCTURAL := [
 ## From the signature rather than from the file: the card is projected from the buffer, so the
 ## signature is current with what the user has typed, and a second parse of the same declaration
 ## is a second thing to keep in step.
+## THE COLLECTIONS IN SCOPE at a row: what a `@for` could sensibly loop over.
+##
+## Gathered from the three places a name can come from -- the component's own parameters, the
+## `var` bindings its hook chips make, and the `var` lines of its setup island. The wrap menu
+## seeded a literal `range(1)` and offered nothing else, so every `@for` this builder wrote had
+## to be retyped by hand before it meant anything.
+static func collections_in_scope(card: Graph.Card) -> PackedStringArray:
+	var out := PackedStringArray()
+	if card == null:
+		return out
+	for prop in props_of_component(card):
+		var name := str((prop as Dictionary).get("name", ""))
+		if not name.is_empty() and not out.has(name):
+			out.append(name)
+	for row in card.body:
+		for name in _bindings_in(str(row.text)):
+			if not out.has(name):
+				out.append(name)
+	for line in card.island_lines:
+		for name in _bindings_in(str(line)):
+			if not out.has(name):
+				out.append(name)
+	return out
+
+
+## The names a line binds with `var`, including a destructuring `var a := x[0]` (one name).
+static func _bindings_in(line: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	var re := RegEx.create_from_string("\\bvar\\s+([A-Za-z_][A-Za-z0-9_]*)")
+	for m in re.search_all(line):
+		out.append(m.get_string(1))
+	return out
+
+
+## A plural name's singular, for a loop variable.
+##
+## The reference singularises rather than writing `item` every time, and the reason shows the
+## moment there are two loops in one component: `for item in items` nested inside `for item in
+## rows` is a shadowing bug the language will not warn about.
+static func singular_of(name: String) -> String:
+	var bare := name
+	if bare.ends_with("ies") and bare.length() > 3:
+		return bare.substr(0, bare.length() - 3) + "y"
+	for suffix in ["ses", "xes", "zes", "ches", "shes"]:
+		if bare.ends_with(suffix):
+			return bare.substr(0, bare.length() - 2)
+	# NOT EVERY TRAILING s IS A PLURAL: `status`, `address` and `axis` are all singular already,
+	# and stripping the s gives a word that is not one.
+	var not_plural := false
+	for ending in ["ss", "us", "is"]:
+		if bare.ends_with(ending):
+			not_plural = true
+			break
+	if bare.ends_with("s") and not not_plural and bare.length() > 1:
+		return bare.substr(0, bare.length() - 1)
+	# Not plural, or not plural in a way worth guessing at: name it after what it holds.
+	return bare + "_item"
+
+
 static func props_of_component(card: Graph.Card) -> Array:
 	var out: Array = []
 	if card == null:

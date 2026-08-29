@@ -1291,6 +1291,20 @@ static func _indent_of_line(line: String) -> String:
 	return line.substr(0, i)
 
 
+## WHICH DIRECTIVES THE BUILDER CAN CREATE FROM NOTHING, and which only exist as clauses of a
+## construct it already made.
+##
+## `@elif`, `@else`, `@case` and `@default` are false not because they are unsupported -- the row
+## menu adds all four -- but because they cannot WRAP a row on their own: an `@else` with no
+## `@if` above it is not a thing the language has. Written down so the drift check has something
+## to compare the schema against, rather than a list inferred from a menu.
+const DIRECTIVE_SUPPORT := {
+	"@if": true, "@elif": false, "@else": false,
+	"@for": true, "@while": true,
+	"@match": true, "@case": false, "@default": false,
+}
+
+
 static func template_for(kind: int, name: String) -> String:
 	match kind:
 		Module.Kind.HOOK:

@@ -259,7 +259,8 @@ func compile_dirty(focus_path: String) -> Summary:
 			_built.erase(key)
 			failed_roots[key] = path
 			_last_error[key] = str(result["error"])
-			summary.failures.append({ "path": path, "error": str(result["error"]) })
+			summary.failures.append({ "path": path, "error": str(result["error"]),
+				"diagnostics": result.get("diagnostics", []) })
 		compile_finished.emit(path, bool(result["ok"]), str(result.get("error", "")))
 		if Paths.key(path) == Paths.key(focus):
 			summary.focus_ok = bool(result["ok"])
@@ -307,7 +308,12 @@ func _build(module: Module) -> Dictionary:
 		return { "ok": false, "env_error": true,
 			"error": "the .guitkx compiler is not ready — the last good render is still showing" }
 	if not bool(result.get("ok", false)):
-		return { "ok": false, "error": _first_error(result) }
+		# THE WHOLE LIST GOES WITH THE FAILURE. Only the first error survived, so a module with
+		# three mistakes reported one and a module with no errors but four warnings reported
+		# nothing at all -- and a warning is exactly the class of thing a person wants told
+		# BEFORE it becomes an error.
+		return { "ok": false, "error": _first_error(result),
+			"diagnostics": result.get("diagnostics", []) }
 
 	var gd_path := mirrored.get_basename() + ".gd"
 	var generated := Codegen.strip_class_name(str(result.get("gd", "")))

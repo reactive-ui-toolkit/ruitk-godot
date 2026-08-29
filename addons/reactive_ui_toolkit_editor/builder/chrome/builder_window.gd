@@ -134,6 +134,10 @@ var _folders_header: Button = null
 var _folders_column: VBoxContainer = null
 var _folders_folded := false
 
+## The drift check is a one-shot: it compares two static tables and its answer cannot change
+## while the process runs.
+var _drift_checked := false
+
 var _deletions_agreed := false
 
 ## Set only while a save is resuming from its own empty-module question.
@@ -1034,6 +1038,29 @@ func _fold_folders(folded: bool) -> void:
 		layout.save(Time.get_datetime_string_from_system(true))
 
 
+## Warns once if the language grew a directive this builder cannot offer.
+##
+## The schema is the vocabulary of record and `Edits.DIRECTIVE_SUPPORT` is what the builder can
+## do with it. Nothing compared them, so a directive added to the language would simply never
+## appear in the wrap menu -- silently, and with no test that could notice, because the menu is
+## built from a list that would still be complete with respect to itself.
+func _warn_on_directive_drift() -> void:
+	if _drift_checked:
+		return
+	_drift_checked = true
+	var missing := PackedStringArray()
+	for entry in Schema.control_flow():
+		var name := str(entry.get("directive", "")) if entry is Dictionary else str(entry)
+		if name.is_empty():
+			continue
+		if not Edits.DIRECTIVE_SUPPORT.has(name):
+			missing.append(name)
+	if missing.is_empty():
+		return
+	push_warning("[builder] the language has directive(s) this builder cannot offer: %s"
+		% ", ".join(missing))
+
+
 ## Says why an import resolves to nothing.
 ##
 ## The canvas already draws a broken edge as a red dashed stub -- louder than the reference's
@@ -1148,6 +1175,7 @@ func reproject() -> void:
 	_library.graph = graph
 	_library.rebuild()
 	_report_unresolved_imports()
+	_warn_on_directive_drift()
 	_refresh_status()
 
 
@@ -1978,6 +2006,25 @@ func _style_key_items(row) -> Array:
 	return items
 
 
+## Opens the collection menu for a `@for` wrap. False when there is nothing to offer, in which
+## case the caller falls through to the literal header and the user edits it.
+func _offer_for_collections(card) -> bool:
+	if card == null:
+		return false
+	var found := Attributes.collections_in_scope(card)
+	if found.is_empty():
+		return false
+	var items: Array = []
+	for name in found:
+		items.append(SearchMenu.item(str(name), str(name),
+			"as %s" % Attributes.singular_of(str(name))))
+	_search_purpose = "for_collection"
+	_search_menu.open_menu("loop over", items, _menu_screen_at(),
+		func(typed: String) -> Dictionary:
+			return { "label": "loop over %s" % typed, "payload": typed })
+	return true
+
+
 ## The freeform row for an ATTRIBUTE menu: the typed name, untyped.
 func _freeform_attribute() -> Callable:
 	return func(typed: String) -> Dictionary:
@@ -2177,12 +2224,23 @@ func _on_search_picked(payload: Variant) -> void:
 			return
 		"wrap":
 			var header := str(payload)
+			if header.begins_with("@for") and _offer_for_collections(card):
+				# THE COLLECTION IS PART OF THE HEADER, so it is asked for before the wrap rather
+				# than left as a `range(1)` the user must find and retype. Returning here leaves
+				# the row and the target intact for the second menu.
+				return
 			if header == "@match":
 				after = Edits.wrap_in_match(before, _menu_row)
 				what = "Wrap %s in @match" % _menu_row.text.strip_edges()
 			else:
 				after = Edits.wrap_in_directive(before, _menu_row, header)
 				what = "Wrap %s in %s" % [_menu_row.text.strip_edges(), header.split(" ")[0]]
+			_seed_header_edit = header
+		"for_collection":
+			var over := str(payload)
+			var header := "@for (%s in %s)" % [Attributes.singular_of(over), over]
+			after = Edits.wrap_in_directive(before, _menu_row, header)
+			what = "Wrap %s in @for" % _menu_row.text.strip_edges()
 			_seed_header_edit = header
 		"style_entry":
 			var pick := payload as Dictionary
@@ -2291,7 +2349,16 @@ func _on_inline_committed(token: Variant, text: String, applied := false) -> voi
 	var what := ""
 	match str(spec.get("kind", "")):
 		"directive":
-			after = Edits.set_directive_header(before, row, text)
+			if text.strip_edges().is_empty():
+				# AN EMPTIED HEADER IS A REQUEST TO REMOVE THE DIRECTIVE, not a request for
+				# `@if ()` -- which is GUITKX2508 and stops the module compiling. Clearing a field
+				# is the obvious way to say "I do not want this one", and the attribute editor
+				# already reads it that way.
+				after = Edits.delete_clause(before, row) if row.clause_index > 0 \
+					else Edits.unwrap_directive(before, row)
+				what = "Remove %s" % row.badge_text
+			else:
+				after = Edits.set_directive_header(before, row, text)
 			what = "Edit %s" % row.badge_text
 		"island":
 			after = Edits.set_island(before, int(spec.get("from", 0)), int(spec.get("to", 0)), text)

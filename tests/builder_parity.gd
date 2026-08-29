@@ -175,6 +175,13 @@ const PARITY := [
 	["an unresolved import is explained", "func _report_unresolved_imports"],
 	["the delete fall-through says what it deleted", "Ctrl+Z to put it back"],
 	["a replay re-points a focus it removed", "_rebind_focus_if_missing()"],
+	["every diagnostic reaches the console, warnings included", "for d in listed:"],
+	["an emptied directive header removes the directive", "func delete_clause"],
+	["the formatter reads the options for the FILE", "func _options_for"],
+	["a schema-drift warning", "func _warn_on_directive_drift"],
+	["the directive capability table", "DIRECTIVE_SUPPORT"],
+	["@for loops over something in scope", "func collections_in_scope"],
+	["and singularises its loop variable", "func singular_of"],
 	["a scrollable section eats the plain wheel; Ctrl+wheel is still the zoom", "func _input"],
 	["UB-78: the signature is two runs, cut at the paren", "func signature_head"],
 	# The preview

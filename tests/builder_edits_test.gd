@@ -26,7 +26,7 @@ const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/docum
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 301
+const ASSERTION_FLOOR := 309
 
 var _fails := 0
 var _passes := 0
@@ -61,6 +61,7 @@ func _initialize() -> void:
 	_test_drag_survives_a_rerender()
 	_test_orphaned_directive()
 	_test_templates_invent_nothing()
+	_test_for_collections()
 
 	print("")
 	# A FLOOR ON THE COUNT. A suite that stops at a broken dependency prints ALL PASS on however
@@ -1205,3 +1206,32 @@ func _test_templates_invent_nothing() -> void:
 	_check(not hook.contains("use_use_"), "which is what it emitted before")
 	_compiles(hook, "and the hook template compiles")
 	_compiles(style, "and so does the empty style export")
+
+
+## A `@for` LOOPS OVER SOMETHING THAT EXISTS, and names its variable after it.
+##
+## The wrap menu seeded a literal `range(1)` and offered nothing else, so every `@for` the
+## builder wrote had to be retyped by hand before it meant anything.
+func _test_for_collections() -> void:
+	_section("the collections in scope at a row")
+	var source := "export Deck(cards = null, title: String = \"\") -> RuitkVNode {\n" \
+		+ "\tvar rows = useState([])\n" \
+		+ "\tvar entries = rows[0]\n" \
+		+ "\treturn (\n\t\t<VBoxContainer />\n\t)\n}\n"
+	var card := _card(source)
+	var found := Attributes.collections_in_scope(card)
+	_check(found.has("cards"), "a component parameter is in scope")
+	_check(found.has("title"), "every parameter is offered -- the type is not always written down")
+	_check(found.has("rows") or found.has("entries"),
+		"and so are the names its setup binds (%s)" % ", ".join(found))
+
+	_section("the loop variable is the collection's singular")
+	# `for item in items` nested inside `for item in rows` is a shadowing bug the language will
+	# not warn about, which is why the reference singularises rather than always writing `item`.
+	_eq(Attributes.singular_of("cards"), "card", "cards -> card")
+	_eq(Attributes.singular_of("entries"), "entry", "entries -> entry")
+	_eq(Attributes.singular_of("boxes"), "box", "boxes -> box")
+	_eq(Attributes.singular_of("deck"), "deck_item",
+		"a name that is not plural is named after what it holds instead of being mangled")
+	_eq(Attributes.singular_of("status"), "status_item",
+		"and a word ending in -ss is not a plural")

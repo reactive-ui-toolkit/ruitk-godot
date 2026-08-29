@@ -32,6 +32,7 @@ const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document
 const BuilderTree = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_tree.gd")
 const Specifiers = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_specifiers.gd")
 const Formatter = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_formatter.gd")
+const EditorConfig = preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_config.gd")
 
 signal changed
 
@@ -774,10 +775,23 @@ func formatted(text: String) -> String:
 	return text if out.is_empty() else out
 
 
+## The formatter options in force for a path: the explicit override when one is set, the
+## `guitkx.config.json` walk-up otherwise.
+func _options_for(file_path: String) -> Dictionary:
+	if not formatter_options.is_empty():
+		return formatter_options
+	return EditorConfig.formatter_opts_for(file_path)
+
+
 func _format(module: Module) -> void:
 	if not format_on_save:
 		return
-	var result: Dictionary = Formatter.format(module.buffer_text, formatter_options)
+	# PER FILE. `formatter_options` is a single shared dictionary that nothing ever assigned, so
+	# every module in every tree was formatted with the compiler's defaults -- and a project with
+	# a `guitkx.config.json` beside its UI had that file ignored by the one tool most likely to
+	# rewrite against it. The walk-up loader existed; the builder was not calling it.
+	var result: Dictionary = Formatter.format(module.buffer_text,
+		_options_for(module.file_path()))
 	if bool(result.get("fell_back", false)) or not bool(result.get("ok", false)):
 		return
 	var text := str(result.get("text", ""))
