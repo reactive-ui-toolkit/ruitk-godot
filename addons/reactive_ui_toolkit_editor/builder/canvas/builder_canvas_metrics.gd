@@ -670,7 +670,10 @@ static func edge_point(from: Vector2, to: Vector2, zoom: float, t: float) -> Vec
 ## THE THREE BANDS. A drop resolves by where in a row's height it landed: the top third means
 ## "before this row", the bottom third "after it", and the middle -- the widest target, because
 ## it is the commonest intent -- means "inside it".
-const BAND_EDGE := 1.0 / 3.0
+## THE REFERENCE'S EDGE, not an even third. 0.3 gives the INSIDE band 40% of the row rather than
+## 33%, and inside is both the commonest drop and the only one of the three that cannot be
+## reached from a neighbouring row -- before/after are two ways of saying the same place.
+const BAND_EDGE := 0.3
 
 
 ## Which row of a card a card-local point is over: { section, index, band, found }.

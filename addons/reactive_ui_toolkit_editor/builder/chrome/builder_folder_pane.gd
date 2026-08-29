@@ -262,7 +262,11 @@ func rebuild() -> void:
 		# has the legend in view and is not colour-blind; a shape carries it for everyone.
 		row.set_text(0, "%s  %s" % [KIND_GLYPH.get(module.kind, "•"), module.file_path().get_file()])
 		row.set_text(1, _state_of(module))
-		row.set_tooltip_text(0, "%s -- %s" % [module.file_path(), KIND_LABEL.get(module.kind, "")])
+		# NO DANGLING SEPARATOR. `KIND_LABEL` has no entry for UNKNOWN, so a module whose kind
+		# could not be read got a tooltip ending in " -- ".
+		var kind_word := str(KIND_LABEL.get(module.kind, ""))
+		row.set_tooltip_text(0, module.file_path() if kind_word.is_empty() \
+			else "%s -- %s" % [module.file_path(), kind_word])
 		row.set_metadata(0, module.file_path())
 		# TINTED BY KIND, from the same palette the card badges and the toolbar legend use. The
 		# tree was the one surface where a component and its style companion were the same colour,
@@ -328,7 +332,9 @@ func _ensure_folder(parent: TreeItem, folders: Dictionary, path: String, label: 
 	if folders.has(path):
 		return folders[path]
 	var item := create_item(parent)
-	item.set_text(0, "▸ " + label)
+	# NO TEXT CARET. Godot's Tree draws a real fold arrow beside this, which points the right way
+	# and can be clicked; a second, frozen one next to it said "collapsed" on an open folder.
+	item.set_text(0, label)
 	item.set_selectable(0, false)
 	item.set_selectable(1, false)
 	item.set_custom_color(0, Color(0.55, 0.58, 0.64))
@@ -353,7 +359,13 @@ func _common_root(modules: Array) -> String:
 	var common := PackedStringArray()
 	var first := true
 	for module in modules:
-		var parts := str(module.folder).trim_prefix("res://").split("/", false)
+		var folder := str(module.folder)
+		# A MODULE OUTSIDE `res://` CANNOT VOTE. `user://` and absolute paths reach here through
+		# the recovery journal, and folding one into the shared prefix collapses it to nothing --
+		# which put every folder in the tree at the root, flat.
+		if not folder.begins_with("res://"):
+			continue
+		var parts := folder.trim_prefix("res://").split("/", false)
 		if first:
 			common = parts
 			first = false

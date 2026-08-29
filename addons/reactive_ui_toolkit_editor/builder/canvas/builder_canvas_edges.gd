@@ -37,10 +37,8 @@ const STYLE_DASH_OFF := 5.0
 ## The canvas grid: world-space cell size, the screen spacing below which it stops being drawn,
 ## and the dot itself.
 const GRID_SPACING := 64.0
-const GRID_MIN_SCREEN_SPACING := 14.0
-const GRID_DOT := 2.0
-const GRID_COLOR := Color(0.34, 0.34, 0.40, 0.55)
-
+# The grid constants used to be declared here AS WELL as on the host that draws it -- two copies,
+# one of them dead, which is the duplication UB-79 was filed about. The host owns them.
 const EDGE_COLOR := Color(0.482, 0.545, 0.647, 0.85)
 const EDGE_COLOR_SELECTED := Color(0.50, 0.74, 1.0, 1.0)
 const BROKEN_COLOR := Color(0.902, 0.451, 0.451, 0.9)
@@ -165,6 +163,12 @@ func _draw() -> void:
 
 func _draw_anchors(card: Graph.Card, index: int, card_width: float) -> void:
 	if not Metrics.is_near_viewport(card, card_width, camera, zoom, size):
+		return
+	# A PILL HAS NO ROWS, so every edge leaves from the same point -- and a dot per edge drawn
+	# there is N circles stacked on one another, which at Architecture zoom is a blob wider than
+	# the pill it sits on. `edge_source_anchor` already collapses to that point; the dots do not
+	# need to be drawn saying so.
+	if Metrics.lod_of(zoom) == Metrics.Lod.PILL:
 		return
 	# One dot per import row, down the card's left column -- so a card with four imports shows
 	# four distinct arrival points rather than four lines converging on one.

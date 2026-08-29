@@ -925,7 +925,12 @@ func _wire() -> void:
 		apply_edit(path, restore, "Revert %s" % path.get_file()))
 	_source.complained.connect(toast)
 	_preview_pane.component_picked.connect(select_module)
-	_console.location_activated.connect(select_module)
+	# AND THE LINE, NOT ONLY THE FILE. The row that knows exactly where to send the reader was the
+	# one row whose stored path did not resolve, because the line was baked into it.
+	_console.location_activated.connect(func(file_path: String, line: int):
+		select_module(file_path)
+		if line > 0:
+			_source.goto_line(line))
 	_card_menu.id_pressed.connect(_on_card_menu)
 	_canvas_menu.id_pressed.connect(run_command)
 	ledger.changed.connect(_refresh_status)
@@ -1730,6 +1735,16 @@ func _show_row_menu(at: Vector2) -> void:
 	_row_menu.popup()
 
 
+## Whether a directive row HAS a header to edit.
+##
+## `@else` and `@default` do not: they are the fallback arm, and there is no expression in them.
+## Offering "Edit header..." on one opened an editor over an empty string whose commit
+## `set_directive_header` then refused -- a menu entry that does nothing, which is worse than one
+## that is missing.
+static func _has_editable_header(row) -> bool:
+	return row != null and row.badge_text != "@else" and row.badge_text != "@default"
+
+
 ## The module an import row names, or "" when the specifier resolves to nothing in this tree.
 func _import_target(card, row_index: int) -> String:
 	if graph == null or card == null or row_index < 0 or row_index >= card.imports.size():
@@ -1810,7 +1825,8 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 		return
 
 	if row.kind == Graph.LineKind.DIRECTIVE:
-		_row_menu.add_item("Edit header...", RowMenuId.EDIT_HEADER)
+		if _has_editable_header(row):
+			_row_menu.add_item("Edit header...", RowMenuId.EDIT_HEADER)
 		# Clause operations belong to the CONSTRUCT head (@if), not to a bound continuation
 		# (@else) -- adding an else to an else is not a thing the language has.
 		if row.badge_text == "@if" and row.clause_index == 0:
@@ -3234,30 +3250,28 @@ func _rename_to(name: String) -> void:
 	toast("Renamed to %s — applies on Save" % destination.get_file())
 
 
+## Creates a module with an auto-chosen name, WHERE THE CREATE RULE SAYS -- not beside the focus.
+##
+## This used to place relative to `_focus_path`, which is the exact mechanism the reference's
+## UB-207 exists to forbid: a component created while looking at a deep child was born in that
+## child's folder rather than where the tree's own rule puts it. It was also reachable and wired
+## to nothing, so the divergence sat there waiting for the first caller. It goes through
+## `_create_folder` / `_create_named` now, which is the one placement rule.
 func create_module(kind: int) -> String:
 	if workspace == null:
 		return ""
-	var folder := _focus_path.get_base_dir()
+	var folder := _create_folder(kind, "")
 	if folder.is_empty():
 		return ""
-	var base := _unused_name(folder, kind)
-	var path := folder.path_join(base + Module.suffix_for(kind))
-	var module := workspace.create_new(path, Edits.template_for(kind, base))
-	if module == null:
-		return ""
-	ledger.record_creation(path)
-	reproject()
-	select_module(path)
-	preview.request_refresh()
-	return path
+	return _create_named(kind, _unused_name(folder, kind))
 
 
-## A name nothing in the folder is using yet -- "NewComponent", then "NewComponent2", and so on.
+## A name nothing in the folder is using yet -- "new_component", then "new_component2", and so on.
 func _unused_name(folder: String, kind: int) -> String:
 	var stem := Module.default_name_for(kind)
 	var attempt := stem
 	var n := 1
-	while workspace.try_get(folder.path_join(attempt + Module.suffix_for(kind))) != null:
+	while not workspace.is_path_available(folder.path_join(attempt + Module.suffix_for(kind))):
 		n += 1
 		attempt = "%s%d" % [stem, n]
 	return attempt
@@ -4089,15 +4103,22 @@ func _refresh_status() -> void:
 	# "RightSide.guitkx | 5 file(s), 0 dirty" — WHAT IS OPEN first, then the shape of the tree.
 	# A count with no filename tells a user how much work is loaded but not which of it they are
 	# looking at, and the builder's whole left column is about which one that is.
-	if workspace == null or workspace.modules().is_empty():
+	var empty := workspace == null or workspace.modules().is_empty()
+	if empty:
 		_status.text = "No tree open — double-click a .guitkx in the FileSystem dock, or start one below"
-		return
+	# NO EARLY RETURN. The button gating and the `dirty_changed` emit sat BELOW this, so on the
+	# start screen Save and Abort stayed enabled over a tree that does not exist and the editor's
+	# own quit prompt was never told the builder was clean.
 	var dirty_count := 0
-	for module in workspace.modules():
-		if module.is_dirty():
-			dirty_count += 1
-	var open_name := _focus_path.get_file() if not _focus_path.is_empty() else "no module selected"
-	_status.text = "%s  |  %d file(s), %d dirty" % [open_name, workspace.modules().size(), dirty_count]
+	if not empty:
+		for module in workspace.modules():
+			if module.is_dirty():
+				dirty_count += 1
+	if not empty:
+		var open_name := _focus_path.get_file() if not _focus_path.is_empty() \
+			else "no module selected"
+		_status.text = "%s  |  %d file(s), %d dirty" % [
+			open_name, workspace.modules().size(), dirty_count]
 	for button in _toolbar.get_children():
 		if not button.has_meta("command"):
 			continue

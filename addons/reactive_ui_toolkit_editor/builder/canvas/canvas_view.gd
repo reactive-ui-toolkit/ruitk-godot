@@ -79,7 +79,7 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 		for __cf0_once in 1:
 			# A culled card still occupies its estimated height, so nothing reflows when a pan
 			# brings it back.
-			__cf0 = V.PanelContainer({ "position": at, "custom_minimum_size": Vector2(card_w, M.card_height(card)), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_placeholder() }, [V.MarginContainer({ "style": {"margin_left": 10, "margin_top": 10, "margin_right": 10}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod })])])
+			__cf0 = V.PanelContainer({ "position": at, "custom_minimum_size": Vector2(card_w, M.drawn_height(card, lod)), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_placeholder() }, [V.MarginContainer({ "style": {"margin_left": 10, "margin_top": 10, "margin_right": 10}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod })])])
 			continue
 	return __cf0
 

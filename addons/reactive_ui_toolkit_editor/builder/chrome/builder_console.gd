@@ -17,7 +17,11 @@ const Preview = preload("res://addons/reactive_ui_toolkit_editor/builder/preview
 const Parts = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_chrome_parts.gd")
 
 ## A row naming a module was activated: open it.
-signal location_activated(file_path: String)
+## A diagnostic row was activated. `line` is 1-based, or 0 when the row names no line.
+##
+## The line used to be baked into the stored PATH ("app.guitkx:12"), so the one row that knows
+## exactly where to send the reader was the one row whose path did not resolve to a file.
+signal location_activated(file_path: String, line: int)
 
 const SEVERITY_ERROR := 0
 const SEVERITY_WARNING := 1
@@ -96,6 +100,11 @@ func copy_text() -> String:
 func report(summary) -> void:
 	if summary == null:
 		return
+	# WHAT FILLED IT. The console comes forward on a failed round; once the failure is fixed it
+	# went on standing over the canvas with an empty list, and the only way back was to run a
+	# Trace or Help dump and dismiss THAT. A round that reports nothing takes back the space it
+	# took -- but only if a round is what put it there, never a Trace or a Help the user asked for.
+	_filled_by = FILLED_BY_ROUND
 	_rows.clear()
 	_list.clear()
 	_sync_visibility()
@@ -112,10 +121,10 @@ func report(summary) -> void:
 		for d in listed:
 			var record := d as Dictionary
 			var line := int(record.get("line", -1))
-			var where: String = str(f["path"]) if line < 0 \
-				else "%s:%d" % [str(f["path"]), line + 1]
 			_add_row(SEVERITY_ERROR if int(record.get("severity", 0)) == 0 else SEVERITY_WARNING,
-				where, "%s %s" % [str(record.get("code", "")), str(record.get("message", ""))])
+				str(f["path"]),
+				"%s %s" % [str(record.get("code", "")), str(record.get("message", ""))],
+				line + 1 if line >= 0 else 0)
 	for skipped in summary.skipped:
 		var s := skipped as Dictionary
 		_add_row(SEVERITY_WARNING, str(s["path"]),
@@ -126,6 +135,8 @@ func report(summary) -> void:
 			"the round ran out of its frame budget -- the rest is still queued")
 
 	_summary.text = _summarize(summary)
+	if _rows.is_empty() and _filled_by == FILLED_BY_ROUND:
+		visible = false
 	_sync_visibility()
 
 
@@ -169,19 +180,21 @@ func add_diagnostics(file_path: String, diagnostics: Array) -> void:
 		var record := d as Dictionary
 		var severity := int(record.get("severity", SEVERITY_ERROR))
 		var line := int(record.get("line", -1))
-		var where := file_path if line < 0 else "%s:%d" % [file_path, line + 1]
-		_add_row(severity, where, "%s %s" % [str(record.get("code", "")), str(record.get("message", ""))])
+		_add_row(severity, file_path,
+			"%s %s" % [str(record.get("code", "")), str(record.get("message", ""))],
+			line + 1 if line >= 0 else 0)
 
 
-func _add_row(severity: int, file_path: String, message: String) -> void:
+func _add_row(severity: int, file_path: String, message: String, line := 0) -> void:
 	var mark := "ERROR" if severity == SEVERITY_ERROR else "warn "
-	var where := "" if file_path.is_empty() else file_path.get_file() + ": "
+	var where := "" if file_path.is_empty() else file_path.get_file() \
+		+ (":%d" % line if line > 0 else "") + ": "
 	_list.add_item("%s  %s%s" % [mark, where, message])
 	_sync_visibility()
 	_list.set_item_tooltip(_list.item_count - 1, "%s\n%s" % [file_path, message])
 	if severity == SEVERITY_ERROR:
 		_list.set_item_custom_fg_color(_list.item_count - 1, Color(0.90, 0.45, 0.45))
-	_rows.append({ "severity": severity, "path": file_path, "message": message })
+	_rows.append({ "severity": severity, "path": file_path, "line": line, "message": message })
 
 
 func rows() -> Array:
@@ -200,7 +213,8 @@ func _on_item_activated(index: int) -> void:
 		return
 	var path := str((_rows[index] as Dictionary)["path"])
 	if not path.is_empty():
-		location_activated.emit(path)
+		location_activated.emit(path, int((_rows[index] as Dictionary).get("line", 0)) \
+			if index >= 0 and index < _rows.size() else 0)
 
 
 ## Dumps the session's own state into the console: what the tree holds, what is dirty, what the
@@ -210,6 +224,7 @@ func _on_item_activated(index: int) -> void:
 ## session is in memory until Save, so when something looks wrong there is otherwise NOTHING to
 ## inspect — no file to open, no log to read. This is the only window into the live state.
 func trace(workspace, ledger, preview) -> void:
+	_filled_by = FILLED_BY_TRACE
 	_rows.clear()
 	_list.clear()
 	_sync_visibility()
@@ -241,7 +256,17 @@ func trace(workspace, ledger, preview) -> void:
 
 ## The interaction model, in the console, on request. The hint bar along the bottom carries the
 ## short form permanently; this is the long form for when the short one was not enough.
+## Which of the three things filled the console. A clean round hides itself; a Trace or a Help
+## dump is something the user asked for and stays until they dismiss it.
+const FILLED_BY_ROUND := 0
+const FILLED_BY_TRACE := 1
+const FILLED_BY_HELP := 2
+
+var _filled_by := FILLED_BY_ROUND
+
+
 func show_help() -> void:
+	_filled_by = FILLED_BY_HELP
 	_rows.clear()
 	_list.clear()
 	_sync_visibility()

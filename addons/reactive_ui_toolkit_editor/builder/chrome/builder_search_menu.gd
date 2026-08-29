@@ -69,6 +69,9 @@ func _init() -> void:
 	column.add_child(_error)
 
 	var scroll := ScrollContainer.new()
+	# THE LIST FOLLOWS THE KEYBOARD. Walking down past the fold moved the highlight to a row
+	# that was not on screen, so the menu answered a keypress by showing nothing new.
+	scroll.follow_focus = true
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	column.add_child(scroll)

@@ -223,9 +223,13 @@ func record_move(from_path: String, to_path: String) -> void:
 	if standalone:
 		_open_default("rename")
 	var c := _change(to_path, ChangeKind.MOVE, from_path, to_path)
-	# Identity is resolved from where the module came FROM: by now it already sits at the
-	# destination, but the path the caller knows the gesture by is the origin.
-	c.module_id = _id_for(from_path)
+	# THE ORIGIN LOOKUP ONLY WINS WHEN IT ANSWERS. By the time this is called the module already
+	# sits at the destination, so `_id_for(from_path)` finds nothing -- and assigning it
+	# unconditionally overwrote the id `_change` had just resolved correctly from `to_path` with
+	# an empty string, which is the one thing a replay resolves identity by.
+	var from_id := _id_for(from_path)
+	if not from_id.is_empty():
+		c.module_id = from_id
 	_open.changes.append(c)
 	if standalone:
 		_commit()

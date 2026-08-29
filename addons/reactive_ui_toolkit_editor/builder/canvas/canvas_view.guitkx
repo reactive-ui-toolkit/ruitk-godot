@@ -114,7 +114,7 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 			# brings it back.
 			return (
 				<PanelContainer position={ at }
-					custom_minimum_size={ Vector2(card_w, M.card_height(card)) }
+					custom_minimum_size={ Vector2(card_w, M.drawn_height(card, lod)) }
 					mouse_filter={ Control.MOUSE_FILTER_IGNORE }
 					style={ P.card_placeholder() }>
 					<MarginContainer style={ {"margin_left": 10, "margin_top": 10, "margin_right": 10} }

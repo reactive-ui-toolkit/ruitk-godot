@@ -191,6 +191,12 @@ const PARITY := [
 	["the camera lives on the container, not in every card", "func _apply_camera"],
 	["a pan only rebuilds when the cull set changes", "func _near_signature"],
 	["the open tree enters the completion index", "LspWorkspace.reindex(module.file_path()"],
+	["the drop bands are 0.3 / 0.7", "const BAND_EDGE := 0.3"],
+	["Edit header is not offered where it does nothing", "func _has_editable_header"],
+	["a diagnostic row carries its line separately", "signal location_activated(file_path: String, line: int)"],
+	["a clean round takes back the space it took", "FILLED_BY_ROUND"],
+	["create_module goes through the one placement rule", "return _create_named(kind, _unused_name"],
+	["a placeholder is the height of the card it stands for", "M.drawn_height(card, lod)"],
 	["a scrollable section eats the plain wheel; Ctrl+wheel is still the zoom", "func _input"],
 	["UB-78: the signature is two runs, cut at the paren", "func signature_head"],
 	# The preview
