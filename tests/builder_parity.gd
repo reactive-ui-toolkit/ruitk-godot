@@ -56,7 +56,7 @@ const PARITY := [
 	["CreateModule", "func _create_named"],
 	["BirthPathFor (the folder convention)", "func _birth_folder"],
 	["FamilyOwnerFor", "func _family_owner"],
-	["ShowRenamePrompt", "CardMenuId.RENAME"],
+	["ShowRenamePrompt", "func _rename_to"],
 	["RenameTargetPath (shared by prompt and rename)", "func rename_target"],
 	["RenameModule (export + bindings + uses)", "func rename_export"],
 	["ValidateRenameName", "func _validate_rename"],
@@ -142,7 +142,8 @@ const PARITY := [
 	["a tool failure is not a source failure", "env_error"],
 	["SetActiveMode", "func _on_layer_chosen"],
 	["BuildLegend", "func legend_entry"],
-	["OnKeyDown", "func _typing_focused"],
+	["OnKeyDown (tree-wide chords)", "func _shortcut_input"],
+	["the typing guard, which stands them down", "func _typing_focused"],
 	["DeleteSelection", "func _delete_selection"],
 	["row selection, one thing at a time", "func select_row"],
 	["hovering a hook chip highlights its usages", "func row_mentions"],
@@ -168,7 +169,11 @@ const PARITY := [
 const DELIBERATE := [
 	["ImportUxml", "no Godot analogue -- a .tscn importer is a separate project with its own design"],
 	["CodeField", "the source pane reuses guitkx_code_edit.gd, which is the .guitkx editor's own"],
-	["BuilderLspClient", "the editor addon's LSP layer already backs the code editor"],
+	["BuilderLspClient (the TRANSPORT only)",
+		"the editor addon's LSP layer owns the process and the protocol. What the Unity client "
+		+ "CARRIED is listed above as its own entries -- diagnostics on the surface, the "
+		+ "GUITKX0105 vocabulary, the live index -- because skipping the transport used to absorb "
+		+ "them and leave the area with no coverage at all"],
 ]
 
 
