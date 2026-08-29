@@ -94,6 +94,9 @@ var highlight_names := PackedStringArray()
 ## pre-layout fallback, which is what Unity does and says it does.
 var _measured := {}
 
+## The zoom `_measured` was taken at. A measurement is only an answer for its own zoom.
+var _measured_zoom := 0.0
+
 var _cards: Control = null
 var _edges: Edges = null
 var _root: RuitkRoot = null
@@ -421,6 +424,13 @@ func _measure_cards() -> void:
 	_collect_cards(_cards, fresh)
 	if not fresh.is_empty():
 		_measured = fresh
+		# THE ZOOM THESE WERE TAKEN AT. Card geometry USED to be zoom-independent -- the container
+		# carried the scale, so a rect measured at one zoom was valid at every other. Now the zoom
+		# is in the layout, so a measurement belongs to exactly one zoom and dividing it by a
+		# different one produces nonsense: a header measured at 0.75 and read back at 1.25 reports
+		# a band hundreds of units tall, and `card_at` and `row_at` read off the same cache. That
+		# is a canvas where zooming in stops every gesture working.
+		_measured_zoom = zoom
 
 
 func _collect_cards(node: Node, out: Dictionary) -> void:
@@ -432,7 +442,17 @@ func _collect_cards(node: Node, out: Dictionary) -> void:
 				# BACK TO CARD-LOCAL UNITS. The card is laid out at the zoom now, so its `size` is
 				# screen pixels -- and every consumer of this (`card_at`, the drop resolution)
 				# measures in card-local world units.
-				var entry := { "height": card_control.size.y / maxf(zoom, 0.0001), "rows": {} }
+				var entry := {
+					"height": card_control.size.y / maxf(zoom, 0.0001),
+					# THE HEADER IS MEASURED TOO. `HEADER_H` is a model constant and the title bar
+					# band is derived from it -- so if the drawn header is taller than the constant,
+					# the part of it below the constant is not the title bar as far as the mouse is
+					# concerned: the press falls through to whatever the model thinks is under it,
+					# and dragging a card by the obvious place does something else entirely. Rows
+					# have been measured against reality since CANVAS-01; the header never was.
+					"header": _measured_header_of(card_control) / maxf(zoom, 0.0001),
+					"rows": {},
+				}
 				_collect_rows(card_control, card_control.get_global_rect().position,
 					maxf(zoom, 0.0001), entry["rows"])
 				out[index] = entry
@@ -446,6 +466,30 @@ func _collect_cards(node: Node, out: Dictionary) -> void:
 ## they are inside the viewport -- so a row scrolled past the bottom still has a rect, one that
 ## sits over the section BELOW it. Measured unclipped, the hit-test would report a row nobody can
 ## see for a click on a row they can.
+## The drawn height of a card's header band, in SCREEN pixels, or 0 when it is not there.
+func _measured_header_of(card_control: Control) -> float:
+	var found := _find_named(card_control, "card-header")
+	return found.size.y if found != null else 0.0
+
+
+func _find_named(node: Node, wanted: String) -> Control:
+	for child in node.get_children():
+		if child is Control and str(child.name) == wanted:
+			return child as Control
+		var deeper := _find_named(child, wanted)
+		if deeper != null:
+			return deeper
+	return null
+
+
+## The measured header height of a card in CARD-LOCAL units, or 0 when nothing was measured.
+func measured_header(card_index: int) -> float:
+	if not _measurements_are_current():
+		return 0.0
+	var entry: Variant = _measured.get(card_index)
+	return float((entry as Dictionary).get("header", 0.0)) if entry is Dictionary else 0.0
+
+
 func _collect_rows(node: Node, origin: Vector2, scale: float, out: Dictionary,
 		clip := Rect2()) -> void:
 	for child in node.get_children():
@@ -474,6 +518,8 @@ func _collect_rows(node: Node, origin: Vector2, scale: float, out: Dictionary,
 
 ## The measured rect of one row, or an empty Rect2 when nothing was measured.
 func measured_row(card_index: int, section: int, row_index: int) -> Rect2:
+	if not _measurements_are_current():
+		return Rect2()
 	var entry: Variant = _measured.get(card_index)
 	if not (entry is Dictionary):
 		return Rect2()
@@ -484,8 +530,16 @@ func measured_row(card_index: int, section: int, row_index: int) -> Rect2:
 
 ## The measured height of a card, or 0.0 when nothing was measured.
 func measured_height(card_index: int) -> float:
+	if not _measurements_are_current():
+		return 0.0
 	var entry: Variant = _measured.get(card_index)
 	return float((entry as Dictionary)["height"]) if entry is Dictionary else 0.0
+
+
+## Whether the cache belongs to the zoom being asked about. Stale measurements are not a smaller
+## answer than none -- they are a WRONG one, and every consumer has an honest fallback.
+func _measurements_are_current() -> bool:
+	return not _measured.is_empty() and is_equal_approx(_measured_zoom, zoom)
 
 
 ## Shrinks every card back to its content. Returns true when something actually moved.
@@ -605,7 +659,7 @@ func _get_cursor_shape(at_position := Vector2.ZERO) -> CursorShape:
 	var lod := Metrics.lod_of(zoom)
 	var world := Metrics.screen_to_world(at_position, camera, zoom)
 	var width := Metrics.card_width_for(lod)
-	if Metrics.on_title_bar(graph.cards[index], world, width, lod):
+	if Metrics.on_title_bar(graph.cards[index], world, width, lod, measured_header(index)):
 		return Control.CURSOR_MOVE            # drag the card
 	if bool(row_at(index, at_position).get("found", false)):
 		return Control.CURSOR_POINTING_HAND
@@ -660,7 +714,8 @@ func _handle_button(event: InputEventMouseButton) -> void:
 				_press_on_title = _press_index >= 0 and Metrics.on_title_bar(
 					graph.cards[_press_index],
 					Metrics.screen_to_world(event.position, camera, zoom),
-					Metrics.card_width_for(Metrics.lod_of(zoom)), Metrics.lod_of(zoom))
+					Metrics.card_width_for(Metrics.lod_of(zoom)), Metrics.lod_of(zoom),
+					measured_header(_press_index))
 				select_card(_press_index)
 				var hit := row_at(_press_index, event.position)
 				if bool(hit.get("found", false)):
@@ -756,7 +811,7 @@ func _get_drag_data(at_position: Vector2) -> Variant:
 	#
 	# Declining here leaves the press to `_handle_motion`, which owns the live move.
 	if Metrics.on_title_bar(card_here, Metrics.screen_to_world(at_position, camera, zoom),
-			Metrics.card_width_for(lod), lod):
+			Metrics.card_width_for(lod), lod, measured_header(index)):
 		return null
 	var hit := row_at(index, at_position)
 	if not bool(hit.get("found", false)):
@@ -862,6 +917,8 @@ func row_at(index: int, screen_position: Vector2) -> Dictionary:
 ##
 ## Returns the same shape as `Metrics.row_hit`, bands included, so every consumer is unchanged.
 func _measured_hit(card_index: int, local: Vector2) -> Dictionary:
+	if not _measurements_are_current():
+		return { "found": false }
 	var entry: Variant = _measured.get(card_index)
 	if not (entry is Dictionary):
 		return { "found": false }

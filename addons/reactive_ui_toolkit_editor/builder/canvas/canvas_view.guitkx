@@ -38,7 +38,9 @@ export CanvasView(graph = null, camera = Vector2.ZERO, zoom: float = 1.0,
 		selected_row_index: int = -1, highlight_names = null) -> RuitkVNode {
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var lod = M.lod_of(zoom)
-	var card_w = M.card_width_for(lod) * zoom
+	# WORLD UNITS. This one feeds `is_near_viewport`, which compares against card coordinates --
+	# scaling it made the cull window wrong by the zoom in the direction that culls visible cards.
+	var card_w = M.card_width_for(lod)
 	var cards = graph.cards if graph != null else []
 
 	return (
@@ -87,7 +89,11 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 		sel_row: int = -1, highlight_names = null) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
-	var card_w = M.card_width_for(lod)
+	# SCREEN PIXELS. This is the width the box is DRAWN at, and the zoom is in the layout -- so a
+	# card whose fonts were scaled while its frame was not had its own text overflowing it, and the
+	# model believed the card was `card_width_for(lod)` WORLD units wide while it covered that many
+	# SCREEN pixels: at Layer 3 the hit band ran a quarter of a card past the visible edge.
+	var card_w = M.card_width_for(lod) * zoom
 
 	return (
 		@if (near) {
@@ -119,7 +125,7 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 					style={ P.scaled(P.card_placeholder(), zoom) }>
 					<MarginContainer style={ P.scaled({"margin_left": 10, "margin_top": 10, "margin_right": 10}, zoom) }
 							mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
-						<CanvasCardHeader card={ card } lod={ lod } zoom={ zoom } />
+						<CanvasCardHeader card={ card } lod={ lod } zoom={ zoom } measurable={ false } />
 					</MarginContainer>
 				</PanelContainer>
 			)
@@ -130,14 +136,16 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 
 ## The card's identity row: kind badge, title, and -- at the pill LOD -- nothing else, because a
 ## pill is what a card looks like when the whole tree is on screen at once.
-export CanvasCardHeader(card = null, lod: int = 1, zoom: float = 1.0) -> RuitkVNode {
+export CanvasCardHeader(card = null, lod: int = 1, zoom: float = 1.0,
+		measurable: bool = true) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var Model = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
 	var tint = P.kind_tint(int(card.kind))
 
 	return (
-		<PanelContainer style={ P.scaled(P.card_header_band(tint), zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+		<PanelContainer name={ "card-header" if measurable else "card-header-far" }
+				style={ P.scaled(P.card_header_band(tint), zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 		<HBoxContainer style={ P.scaled({"separation": 6}, zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 			<PanelContainer style={ P.scaled(P.kind_badge(tint), zoom) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 				<Label text={ Model.kind_word(int(card.kind)) }

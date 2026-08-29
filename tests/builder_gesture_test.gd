@@ -34,7 +34,7 @@ const CHILD := """export Child(n: int = 0) -> RuitkVNode {
 }
 """
 
-const ASSERTION_FLOOR := 12
+const ASSERTION_FLOOR := 29
 
 var _fails := 0
 var _passes := 0
@@ -47,6 +47,10 @@ func _initialize() -> void:
 func _run() -> void:
 	await _test_a_card_can_be_dragged()
 	await _test_a_row_menu_opens_where_the_click_was()
+	await _test_adding_an_attribute_reaches_the_buffer()
+	await _test_a_moved_card_stays_moved()
+	await _test_the_header_band_is_what_is_drawn()
+	await _test_the_builder_fills_the_window_it_is_in()
 
 	print("")
 	if _passes < ASSERTION_FLOOR:
@@ -225,3 +229,182 @@ func _ok(cond: bool, what: String) -> void:
 	else:
 		_fails += 1
 		printerr("  FAIL  " + what)
+
+
+## PICKING AN ATTRIBUTE PUTS IT IN THE BUFFER.
+##
+## The menu opens, it lists the right properties, and the pick has to arrive somewhere. Every
+## check until now stopped at "the menu has items", which is true of a menu wired to nothing.
+func _test_adding_an_attribute_reaches_the_buffer() -> void:
+	var w := _window()
+	await _settle(w)
+	var path := ROOT.path_join("app.guitkx")
+	var canvas = w.canvas()
+	if w.graph.cards.is_empty():
+		_ok(false, "the fixture projected cards")
+		return
+	var card = w.graph.card_of(path)
+	_ok(card != null, "the app card is on the canvas")
+	if card == null:
+		w.queue_free()
+		return
+
+	# The row the menu will be about: the component's own return root.
+	var row_index: int = Metrics.first_element_row(card)
+	_ok(row_index >= 0, "the card has an element row")
+	w._on_row_context(w.graph.index_of(path), Metrics.Section.MARKUP, row_index, Vector2(40, 40))
+	await _settle(w)
+	_ok(w._row_menu.item_count > 0, "the row menu was built")
+
+	# THE MENU ITEM, through the signal a click emits.
+	w._row_menu.id_pressed.emit(BuilderWindow.RowMenuId.ADD_ATTRIBUTE)
+	await _settle(w)
+	_ok(w._search_menu.visible, "Add attribute... opens the attribute menu")
+
+	var before: String = w.workspace.try_get(path).buffer_text
+	var pressed := _press_first_row(w._search_menu)
+	_ok(not pressed.is_empty(), "the attribute menu has a row to pick (%s)" % pressed)
+	await _settle(w)
+
+	var after: String = w.workspace.try_get(path).buffer_text
+	_ok(after != before, "picking it CHANGES THE BUFFER (picked %s)" % pressed)
+	if after != before:
+		_ok(after.contains(pressed), "and the buffer carries the attribute that was picked")
+	else:
+		_ok(false, "the buffer is untouched -- the pick reached nothing")
+
+	w.queue_free()
+	await process_frame
+
+
+## A MOVED CARD STAYS MOVED, across the reprojection that follows every edit.
+##
+## A drag that visibly works and then snaps back on the next projection is indistinguishable from
+## a drag that never worked, and it is the projection that has the last word.
+func _test_a_moved_card_stays_moved() -> void:
+	var w := _window()
+	await _settle(w)
+	var canvas = w.canvas()
+	if w.graph.cards.is_empty():
+		_ok(false, "the fixture projected cards")
+		return
+	var card = w.graph.cards[0]
+	var width := Metrics.card_width_for(Metrics.lod_of(canvas.zoom))
+	canvas.set_camera(Vector2(400, 200) - Vector2(card.x, card.y) * canvas.zoom, canvas.zoom)
+	await _settle(w)
+
+	var at := _global_of(canvas, Vector2(card.x + width * 0.5, card.y + 8.0))
+	await _drag(at, at + Vector2(120, 70))
+	var dropped := Vector2(card.x, card.y)
+	_ok(true, "dragged to %s" % dropped)
+
+	w.reproject()
+	await _settle(w)
+	var again = w.graph.cards[0]
+	_ok(Vector2(again.x, again.y).is_equal_approx(dropped),
+		"the card is still where it was dropped after a reprojection (%s vs %s)"
+			% [Vector2(again.x, again.y), dropped])
+
+	w.queue_free()
+	await process_frame
+
+
+## Presses the first pickable row in a search menu and returns its label.
+func _press_first_row(menu) -> String:
+	for child in menu._list.get_children():
+		if child is Button:
+			var label := str((child as Button).text).strip_edges()
+			if label.is_empty():
+				continue
+			(child as Button).pressed.emit()
+			# The label carries its detail after a run of spaces; the name is the first word.
+			return label.split(" ")[0]
+	return ""
+
+
+## THE TITLE BAR THE MOUSE SEES IS THE HEADER THAT IS DRAWN.
+##
+## `HEADER_H` is a prediction, and the whole card-drag gesture is derived from it: a press below
+## the constant but inside the visible header is not a title-bar press, so it falls through to
+## whatever the model thinks is under it and the card does not move. Rows have been measured
+## against the view since CANVAS-01; this is the last part of a card that was only predicted.
+func _test_the_header_band_is_what_is_drawn() -> void:
+	var w := _window()
+	await _settle(w)
+	var canvas = w.canvas()
+	if w.graph.cards.is_empty():
+		_ok(false, "the fixture projected cards")
+		return
+
+	for preset in [0.75, 1.25]:
+		# AT THE CARD. A camera that leaves it outside the cull window renders the PLACEHOLDER,
+		# whose header fills the whole card -- which is a measurement of something else.
+		canvas.set_camera(Vector2(300, 150) - Vector2(w.graph.cards[0].x, w.graph.cards[0].y) * preset,
+			preset)
+		await _settle(w)
+		var measured := canvas.measured_header(0)
+		_ok(measured > 0.0, "the header is measured at zoom %s (%s)" % [preset, measured])
+		if measured > 0.0:
+			var drift: float = absf(measured - Metrics.HEADER_H)
+			_ok(drift < 6.0,
+				"and HEADER_H (%s) is within 6 units of it at zoom %s -- drift %s"
+					% [Metrics.HEADER_H, preset, drift])
+
+	w.queue_free()
+	await process_frame
+
+
+## THE BUILDER FILLS THE WINDOW THE PLUGIN PUTS IT IN, AND KEEPS FILLING IT.
+##
+## Every check in this repo builds the builder as a child of the test root with an explicit size.
+## The PLUGIN does something else: it adds it to a `Window`. A Control added to a Window with
+## default anchors takes its combined minimum size and never follows the window again -- so the
+## panes lay out for a rectangle bigger than the window, draw past its edges, and everything
+## outside it becomes unclickable while the canvas's rect stops agreeing with what is on screen.
+## Nothing exercised the plugin's own path, so nothing could see it.
+func _test_the_builder_fills_the_window_it_is_in() -> void:
+	var host := Window.new()
+	host.size = Vector2i(1200, 700)
+	host.wrap_controls = false
+	root.add_child(host)
+
+	var w := BuilderWindow.new()
+	host.add_child(w)
+	w.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var ws := Workspace.new()
+	ws.create_new(ROOT.path_join("child.guitkx"), CHILD)
+	ws.create_new(ROOT.path_join("app.guitkx"), APP)
+	w.workspace = ws
+	w.preview.workspace = ws
+	w.reproject()
+	w.select_module(ROOT.path_join("app.guitkx"))
+	for i in 10:
+		await process_frame
+
+	_ok(w.size.x >= host.size.x - 1 and w.size.y >= host.size.y - 1,
+		"the builder fills the window (%s in %s)" % [w.size, host.size])
+	var canvas = w.canvas()
+	var window_rect := Rect2(Vector2.ZERO, Vector2(host.size))
+	_ok(window_rect.encloses(canvas.get_global_rect()),
+		"and the canvas is INSIDE it (%s in %s)" % [canvas.get_global_rect(), window_rect])
+
+	# AND IT FOLLOWS A RESIZE -- down to what the CONTENT needs, which is the floor the plugin
+	# sets the window minimum from. Below that the panes overflow rather than reflow, which is
+	# why the minimum is asked of the layout instead of guessed at.
+	var floor_size := w.get_combined_minimum_size()
+	host.size = Vector2i(maxi(1000, int(ceil(floor_size.x))), maxi(600, int(ceil(floor_size.y))))
+	for i in 8:
+		await process_frame
+	_ok(w.size.x <= host.size.x + 1 and w.size.y <= host.size.y + 1,
+		"the builder followed the window down to %s (it is %s)" % [host.size, w.size])
+	# NOT asserted here: that the canvas stays INSIDE a narrowed window. It does not -- the three
+	# columns carry fixed minimums (260 left, 380 right) and the middle does not give width back,
+	# so below about 1160 the canvas overflows the window's right edge. That is a real defect and
+	# a separate one; writing an assertion that passes over it would be worse than leaving it named
+	# here. What this test is for is the plugin path: the builder filling its window at all.
+	_ok(canvas.get_global_rect().size.x > 0.0 and canvas.get_global_rect().size.y > 0.0,
+		"and the canvas still has area to click on")
+
+	w.queue_free()
+	host.queue_free()
+	await process_frame

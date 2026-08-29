@@ -595,15 +595,25 @@ static func _is_word_char(ch: String) -> bool:
 ##
 ## A PILL IS ALL TITLE: at that band the card has no rows to compete with, and requiring the top
 ## 38 world-units of a card drawn at a third of its size would leave a handle a few pixels tall.
+## `measured` is the header's REAL height in card-local units when the canvas has measured one,
+## and 0 before anything has been laid out.
+##
+## `HEADER_H` is a prediction. If the drawn header is taller than it -- a longer title wrapping,
+## a theme with more padding, a font the editor picked -- then the part of the header below the
+## constant is not the title bar as far as the mouse is concerned, and a press there falls through
+## to whatever the model believes is beneath: a phantom row, which turns the drag into a row drag
+## and leaves the card where it was. Rows have been measured against the view since CANVAS-01 for
+## exactly this reason. The header is the last piece of a card that was still only predicted.
 static func on_title_bar(card: Graph.Card, world: Vector2, card_width: float,
-		lod := Lod.FULL) -> bool:
+		lod := Lod.FULL, measured := 0.0) -> bool:
 	if card == null:
 		return false
 	if world.x < card.x or world.x > card.x + card_width:
 		return false
 	if lod == Lod.PILL:
 		return world.y >= card.y and world.y <= card.y + drawn_height(card, lod)
-	return world.y >= card.y and world.y <= card.y + HEADER_H
+	var band: float = measured if measured > 0.0 else HEADER_H
+	return world.y >= card.y and world.y <= card.y + band
 
 
 ## Where an edge arrives: the TOP-LEFT CORNER of the target card.

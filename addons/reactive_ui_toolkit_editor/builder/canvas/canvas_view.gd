@@ -30,7 +30,9 @@ static func render(props: Dictionary, children: Array) -> RuitkVNode:
 	var highlight_names = props.get("highlight_names", null)
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var lod = M.lod_of(zoom)
-	var card_w = M.card_width_for(lod) * zoom
+	# WORLD UNITS. This one feeds `is_near_viewport`, which compares against card coordinates --
+	# scaling it made the cull window wrong by the zoom in the direction that culls visible cards.
+	var card_w = M.card_width_for(lod)
 	var cards = graph.cards if graph != null else []
 	var __cf0: Array = []
 	for i in range(cards.size()):
@@ -65,7 +67,11 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 	var highlight_names = props.get("highlight_names", null)
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
-	var card_w = M.card_width_for(lod)
+	# SCREEN PIXELS. This is the width the box is DRAWN at, and the zoom is in the layout -- so a
+	# card whose fonts were scaled while its frame was not had its own text overflowing it, and the
+	# model believed the card was `card_width_for(lod)` WORLD units wide while it covered that many
+	# SCREEN pixels: at Layer 3 the hit band ran a quarter of a card past the visible edge.
+	var card_w = M.card_width_for(lod) * zoom
 	var __cf0 = null
 	if near:
 		for __cf0_once in 1:
@@ -80,7 +86,7 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 		for __cf0_once in 1:
 			# A culled card still occupies its estimated height, so nothing reflows when a pan
 			# brings it back.
-			__cf0 = V.PanelContainer({ "position": at, "custom_minimum_size": Vector2(card_w, M.drawn_height(card, lod) * zoom), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.scaled(P.card_placeholder(), zoom) }, [V.MarginContainer({ "style": P.scaled({"margin_left": 10, "margin_top": 10, "margin_right": 10}, zoom), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod, "zoom": zoom })])])
+			__cf0 = V.PanelContainer({ "position": at, "custom_minimum_size": Vector2(card_w, M.drawn_height(card, lod) * zoom), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.scaled(P.card_placeholder(), zoom) }, [V.MarginContainer({ "style": P.scaled({"margin_left": 10, "margin_top": 10, "margin_right": 10}, zoom), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod, "zoom": zoom, "measurable": false })])])
 			continue
 	return __cf0
 
@@ -89,6 +95,7 @@ static func CanvasCardHeader(props: Dictionary, children: Array) -> RuitkVNode:
 	var card = props.get("card", null)
 	var lod = props.get("lod", 1)
 	var zoom = props.get("zoom", 1.0)
+	var measurable = props.get("measurable", true)
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var Model = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
@@ -98,7 +105,7 @@ static func CanvasCardHeader(props: Dictionary, children: Array) -> RuitkVNode:
 		for __cf0_once in 1:
 			__cf0 = V.Label({ "text": "read-only", "style": P.scaled(P.read_only(), zoom) })
 			continue
-	return V.PanelContainer({ "style": P.scaled(P.card_header_band(tint), zoom), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.HBoxContainer({ "style": P.scaled({"separation": 6}, zoom), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.PanelContainer({ "style": P.scaled(P.kind_badge(tint), zoom), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.Label({ "text": Model.kind_word(int(card.kind)), "style": P.scaled(P.pill_badge_text(tint) if lod == M.Lod.PILL else P.kind_badge_text(tint), zoom) })]), V.Label({ "text": card.title, "style": P.scaled(P.pill_title() if lod == M.Lod.PILL else P.title(), zoom), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS, "size_flags_horizontal": Control.SIZE_EXPAND_FILL }), __cf0])])
+	return V.PanelContainer({ "name": "card-header" if measurable else "card-header-far", "style": P.scaled(P.card_header_band(tint), zoom), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.HBoxContainer({ "style": P.scaled({"separation": 6}, zoom), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.PanelContainer({ "style": P.scaled(P.kind_badge(tint), zoom), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.Label({ "text": Model.kind_word(int(card.kind)), "style": P.scaled(P.pill_badge_text(tint) if lod == M.Lod.PILL else P.kind_badge_text(tint), zoom) })]), V.Label({ "text": card.title, "style": P.scaled(P.pill_title() if lod == M.Lod.PILL else P.title(), zoom), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS, "size_flags_horizontal": Control.SIZE_EXPAND_FILL }), __cf0])])
 
 # component CanvasCardSections
 static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode:

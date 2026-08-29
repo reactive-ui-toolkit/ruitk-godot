@@ -451,10 +451,21 @@ func _open_builder() -> void:
 		_builder_window.title = "RUITK Builder"
 		_builder_window.size = Vector2i(1440, 880)
 		_builder_window.min_size = Vector2i(900, 560)
-		_builder_window.wrap_controls = true
+		# NOT WRAPPED, AND ANCHORED. A Control added to a Window with default anchors takes its
+		# COMBINED MINIMUM SIZE and never follows the window again -- and `wrap_controls` then
+		# sizes the window to that minimum, after which any resize by the user leaves the builder
+		# laid out for a rectangle bigger than the window it is in. The panes draw past the edges
+		# (the source and preview columns end up over the editor behind it), everything outside
+		# the window is unclickable, and the canvas's rect stops agreeing with what is on screen
+		# -- so a press lands on a different part of the canvas than the one under the pointer,
+		# which is every gesture on the surface at once.
+		_builder_window.wrap_controls = false
 		# Hidden, not freed: a session with unsaved work has to survive the window closing.
 		_builder_window.close_requested.connect(func(): _builder_window.hide())
 		_builder_window.add_child(_builder)
+		# FILLS THE WINDOW, AND KEEPS FILLING IT. The anchors are what make the builder follow a
+		# resize; without them its rect is frozen at whatever the first layout computed.
+		_builder.set_anchors_preset(Control.PRESET_FULL_RECT)
 		# THE TITLE CARRIES THE STATE. A save-only builder that looks identical whether or not it
 		# holds unwritten work gives the user nothing to notice before they close the window.
 		_builder.dirty_changed.connect(func(has_unsaved: bool):
@@ -469,6 +480,17 @@ func _open_builder() -> void:
 	# no tree open is supposed to begin.
 	if _builder.focus_path().is_empty():
 		_builder.open_tree(_builder_focus_path())
+	# THE WINDOW CANNOT BE SMALLER THAN WHAT IS IN IT. A floor of 900x560 was a guess, and the
+	# builder's own layout -- three columns, each with a minimum -- needs more than that: below it
+	# the panes do not reflow, they OVERFLOW, drawing past the window edges onto the editor behind
+	# and leaving the parts outside unclickable. Asked of the content rather than guessed at.
+	var needed := _builder.get_combined_minimum_size()
+	if needed.x > 0.0 and needed.y > 0.0:
+		_builder_window.min_size = Vector2i(
+			maxi(900, int(ceil(needed.x))), maxi(560, int(ceil(needed.y))))
+		_builder_window.size = Vector2i(
+			maxi(_builder_window.size.x, _builder_window.min_size.x),
+			maxi(_builder_window.size.y, _builder_window.min_size.y))
 	_builder_window.popup_centered()
 	# THE KEYBOARD GOES TO THE BUILDER on every route, not only the dock's. Undo, Redo, Save,
 	# Delete and Escape are delivered tree-wide now, but they still need this window to be the one

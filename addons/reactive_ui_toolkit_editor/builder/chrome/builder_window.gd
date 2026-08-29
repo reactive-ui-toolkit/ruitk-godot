@@ -2987,8 +2987,20 @@ func _validate_name(kind: int, name: String) -> String:
 	# and not this one. Every file under `examples/` is snake_case, and `template_for` already
 	# derives the PascalCase EXPORT from the snake_case file name, saying so in its own comment.
 	# The validator and the template were contradicting each other, and the template was right.
-	if not RegEx.create_from_string("^[a-z][a-z0-9_]*$").search(name):
-		return "snake_case file name required"
+	# THE NAME AS TYPED. The reference writes the file the user asked for --
+	# `Path.Combine(folder, name, name + ".uitkx")` -- with no case transform anywhere, so
+	# `NewComponent` gives `NewComponent.uitkx` exporting `NewComponent`: ONE name, everywhere.
+	#
+	# This forced a lower-case-only spelling, so asking for `NewComponent` was REFUSED and the
+	# only accepted answer produced `new_component.guitkx` whose card then read `new_component`
+	# beside a declaration reading `NewComponent` -- two names for one thing, in the one tool
+	# whose job is to show you what you have. The examples being snake_case is a convention of
+	# the demos, not a rule the builder gets to impose on someone else's project.
+	#
+	# Still a legal identifier, because it becomes one: the file stem is what `template_for`
+	# derives the declaration from and what an import specifier names.
+	if not RegEx.create_from_string("^[A-Za-z_][A-Za-z0-9_]*$").search(name):
+		return "letters, digits and underscores only, starting with a letter"
 	# NO `use_` ON THE FILE. This repo names a hook module after the thing it companions --
 	# `doom_game_screen.hooks.guitkx`, `stress_test.hooks.guitkx` -- and puts the prefix on the
 	# EXPORT inside it (`use_doom_game`, `use_stress_loop`). Requiring it on the file name was

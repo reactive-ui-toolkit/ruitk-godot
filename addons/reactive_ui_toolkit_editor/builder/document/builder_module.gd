@@ -149,17 +149,21 @@ static func kind_label(k: Kind) -> String:
 static func default_name_for(k: Kind) -> String:
 	match k:
 		Kind.HOOK:
-			# The FILE, which is named for its subject like every other module here. The `use_`
-			# belongs to the exported hook, and `template_for` puts it there.
-			return "new_hook"
+			# The FILE, named for its subject like every other module here. The `use_` belongs to
+			# the exported hook, and `template_for` puts it there.
+			return "NewHook"
 		Kind.STYLE:
-			return "new_style"
+			return "NewStyle"
 		Kind.UTIL:
-			return "new_util"
+			return "NewUtil"
 		Kind.VALUE:
-			return "new_value"
+			return "NewValue"
 		_:
-			return "new_component"
+			# THE NAME THE DECLARATION WILL HAVE. A component exports PascalCase (GUITKX2100), and
+			# the reference names the file the same thing -- so the card, the file and the export
+			# all read `NewComponent` instead of the card reading `new_component` beside a
+			# declaration that says something else.
+			return "NewComponent"
 
 
 static func suffix_for(k: Kind) -> String:

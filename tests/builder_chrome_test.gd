@@ -507,12 +507,16 @@ func _test_unplaced_tree_is_placed_before_written() -> void:
 	w.open_tree("")
 	await process_frame
 
-	# SNAKE_CASE: these name a FILE, and every file in this leg is snake_case. `template_for`
-	# derives the PascalCase EXPORT from it.
+	# THE NAME AS TYPED. The reference writes the file the user asked for, with no case transform,
+	# so `NewComponent` gives `NewComponent.guitkx` exporting `NewComponent` -- one name for one
+	# thing. Forcing lower case refused the spelling a person actually types and produced a card
+	# reading `new_component` beside a declaration reading `NewComponent`.
 	_eq(w._validate_name(Module.Kind.COMPONENT, "fresh"), "",
-		"a name is accepted with no tree open")
-	_check(not w._validate_name(Module.Kind.COMPONENT, "Fresh").is_empty(),
-		"and PascalCase is refused -- that is the export's convention, not the file's")
+		"a lower-case name is accepted with no tree open")
+	_eq(w._validate_name(Module.Kind.COMPONENT, "Fresh"), "",
+		"and so is PascalCase -- the file is named what the user typed")
+	_check(not w._validate_name(Module.Kind.COMPONENT, "has space").is_empty(),
+		"but it still has to be a legal identifier")
 	var made: String = w._create_named(Module.Kind.COMPONENT, "fresh")
 	_check(made.begins_with(Workspace.UNSAVED_ROOT),
 		"a first module is born at the provisional root (%s)" % made)
