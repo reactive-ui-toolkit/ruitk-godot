@@ -17,7 +17,16 @@ extends LineEdit
 
 ## The edit was accepted. `token` is whatever the opener passed in, so the caller can tell which
 ## row it opened this for without keeping the state itself.
-signal committed(token: Variant, text: String)
+## The edit was accepted. `applied` is true when the user ENDED it deliberately -- Enter here,
+## Ctrl+Enter in the island editor -- and false when it ended because focus went elsewhere.
+##
+## The difference is "done, next" versus "done": an advance run continues on the first and stops
+## on the second, and with one channel for both there was no way to tell them apart.
+signal committed(token: Variant, text: String, applied: bool)
+
+## The editor closed, by any route -- committed, cancelled, or replaced by the next edit. What a
+## listener needs to put a buffer or a highlight back the way it found it.
+signal closed(token: Variant)
 ## `undo_seeding` is true when the builder had written the text being edited as part of opening
 ## the editor, so cancelling should take that back as well.
 signal cancelled(token: Variant, undo_seeding: bool)
@@ -38,7 +47,7 @@ func _init() -> void:
 	select_all_on_focus = false
 	# Above the canvas and its overlay, so a click lands here rather than starting a pan.
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	text_submitted.connect(func(_t: String): commit())
+	text_submitted.connect(func(_t: String): commit(true))
 	focus_exited.connect(_on_focus_exited)
 
 
@@ -76,7 +85,7 @@ func open_at(rect: Rect2, initial: String, for_token: Variant, seeded := false) 
 	caret_column = text.length()
 
 
-func commit() -> void:
+func commit(applied := false) -> void:
 	if not _open:
 		return
 	var value := text
@@ -88,7 +97,7 @@ func commit() -> void:
 	# Emitted AFTER closing, so a handler that opens the editor again -- moving to the next
 	# attribute, say -- is not immediately closed by the tail of this call.
 	if value != was:
-		committed.emit(for_token, value)
+		committed.emit(for_token, value, applied)
 
 
 func cancel() -> void:
@@ -101,6 +110,8 @@ func cancel() -> void:
 
 
 func _close() -> void:
+	var was_token := _token
+	closed.emit(was_token)
 	_open = false
 	_seeded = false
 	visible = false

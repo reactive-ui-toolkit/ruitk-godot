@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 358
+const ASSERTION_FLOOR := 370
 
 var _fails := 0
 var _passes := 0
@@ -652,6 +652,37 @@ func _test_library_pane() -> void:
 	_check(names.has("VBoxContainer"), "a leading element is offered")
 	_check(names.has("useState"), "and a leading hook")
 
+	_section("expanding a section puts the rest INSIDE it")
+	# `_show_all` called `rebuild()` and then `add_child`ed the remaining entries -- and add_child
+	# APPENDS, so rows 6..N of the elements section landed at the very bottom of the pane, under
+	# every other section and outside the heading that counts them. It also cleared the search box
+	# to get there, throwing away what the user had typed.
+	var folded_children := pane._body.get_child_count()
+	pane._expanded_fully[LibraryPane.ENTRY_ELEMENT] = true
+	pane.rebuild()
+	await process_frame
+	_check(pane._body.get_child_count() > folded_children, "expanding shows more rows")
+	var element_rows := 0
+	var seen_next_heading := false
+	var counted_after_heading := 0
+	for child in pane._body.get_children():
+		var text := str(child.text) if child is Button else ""
+		if text.begins_with("v ") or text.begins_with("> "):
+			if element_rows > 0:
+				seen_next_heading = true
+			continue
+		if seen_next_heading:
+			counted_after_heading += 1
+		elif element_rows >= 0 and not text.is_empty():
+			element_rows += 1
+	_check(element_rows > LibraryPane.FOLD_AFTER,
+		"and they land under their OWN heading, before the next one starts")
+	_check(pane._body.get_children().back() is Button,
+		"the pane still ends in a row rather than a dumped tail")
+	pane._expanded_fully[LibraryPane.ENTRY_ELEMENT] = false
+	pane.rebuild()
+	await process_frame
+
 	_section("the list folds, or nobody can read it")
 	var elements := 0
 	for e in entries:
@@ -808,7 +839,10 @@ func _test_inline_editor() -> void:
 
 	var committed: Array = []
 	var cancelled: Array = []
-	editor.committed.connect(func(t: Variant, text: String): committed.append([t, text]))
+	var closed: Array = []
+	editor.committed.connect(func(t: Variant, text: String, applied: bool):
+		committed.append([t, text, applied]))
+	editor.closed.connect(func(t: Variant): closed.append(t))
 	editor.cancelled.connect(func(t: Variant, undo_seeding: bool): cancelled.append([t, undo_seeding]))
 
 	editor.open_at(Rect2(10, 10, 120, 22), "before", "attr:text")
@@ -821,11 +855,18 @@ func _test_inline_editor() -> void:
 	_eq(committed.size(), 1, "committing reports once")
 	_eq(str((committed[0] as Array)[1]), "after", "with the new text")
 	_check(not editor.is_open() and not editor.visible, "and closes")
+	# HOW IT ENDED, not just that it did. `commit()` with no argument is the focus-lost path;
+	# Enter passes true. An advance run continues on one and stops on the other, and with a single
+	# channel for both there was no way to tell "done, next" from "done".
+	_check(not bool((committed[0] as Array)[2]),
+		"a commit from losing focus is not a deliberate finish")
+	_eq(closed.size(), 1, "and the close channel reports it too")
 
 	_section("an edit that changed nothing is not an edit")
 	editor.open_at(Rect2(10, 10, 120, 22), "same", "attr:x")
 	editor.commit()
 	_eq(committed.size(), 1, "committing unchanged text reports nothing")
+	_eq(closed.size(), 2, "but the editor still says it closed -- every route reports that")
 
 	_section("escape cancels")
 	editor.open_at(Rect2(10, 10, 120, 22), "keep", "attr:y")
@@ -874,6 +915,18 @@ func _test_inline_editor() -> void:
 	editor.text = "@if (count > 2)"
 	editor.commit()
 	_eq(cancelled.size(), cancels_before, "nothing is undone -- the wrap was wanted after all")
+
+	_section("a finish and a walk-away are different endings")
+	# What an advance run continues on. With one channel for both there was no way to tell "done,
+	# next" from "done", so the style-entry run could not exist.
+	var before_deliberate := committed.size()
+	var closes_before := closed.size()
+	editor.open_at(Rect2(10, 10, 120, 22), "one", "attr:deliberate")
+	editor.text = "two"
+	editor.commit(true)
+	_eq(committed.size(), before_deliberate + 1, "the deliberate commit reported")
+	_check(bool((committed[before_deliberate] as Array)[2]), "and Enter IS a deliberate finish")
+	_eq(closed.size(), closes_before + 1, "and the close channel reported it as well")
 
 	editor.cancel()
 	editor.queue_free()
@@ -1189,7 +1242,7 @@ func _test_island_editor_is_multiline() -> void:
 var b = 2
 var c = a + b"
 	var got := []
-	editor.committed.connect(func(_t: Variant, text: String): got.append(text))
+	editor.committed.connect(func(_t: Variant, text: String, _applied: bool): got.append(text))
 	editor.open_at(Rect2(0, 0, 400, 120), body, { "kind": "island" })
 	_eq(editor.text, body, "seeded with every line")
 	_eq(editor.get_line_count(), 3, "as three lines")

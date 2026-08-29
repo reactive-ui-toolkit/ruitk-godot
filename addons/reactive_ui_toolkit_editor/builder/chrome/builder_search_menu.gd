@@ -34,7 +34,7 @@ var _search: LineEdit = null
 var _list: VBoxContainer = null
 var _error: Label = null
 var _items: Array = []
-var _freeform_label := ""
+var _freeform := Callable()
 var _validate: Callable = Callable()
 var _prompting := false
 
@@ -61,7 +61,11 @@ func _init() -> void:
 	_error = Label.new()
 	_error.add_theme_font_size_override("font_size", Parts.HINT_FONT_SIZE)
 	_error.add_theme_color_override("font_color", Color(0.90, 0.45, 0.45))
-	_error.visible = false
+	# ALWAYS PRESENT, never toggled. Showing and hiding it moved the Create row up and down under
+	# the pointer, so a second click after a rejected name landed on whatever had slid into place.
+	_error.visible = true
+	_error.text = ""
+	_error.custom_minimum_size = Vector2(0, Parts.HINT_FONT_SIZE + 4)
 	column.add_child(_error)
 
 	var scroll := ScrollContainer.new()
@@ -90,17 +94,23 @@ static func heading(text: String) -> Dictionary:
 
 ## Opens the menu at a SCREEN point.
 ##
-## `freeform_label` is a format string taking the typed text (`"Add \"%s\""`); empty means the
-## menu offers only what it was given.
-func open_menu(title: String, items: Array, at: Vector2, freeform_label := "") -> void:
+## `freeform` is a FACTORY, not a format string: it takes the trimmed text and returns either
+## `{ label, payload }` or `{}` to decline. It has to be, because the payload SHAPE differs per
+## menu -- a style-entry pick is a `{export, key, value}` dictionary while an attribute pick is a
+## bare name -- and a format string could only ever produce the string. The style-entry menu was
+## the one that broke: its freeform row emitted the typed text, the handler read `payload as
+## Dictionary`, and typing a key the schema does not list did nothing at all.
+##
+## An empty Callable means the menu offers only what it was given.
+func open_menu(title: String, items: Array, at: Vector2, freeform := Callable()) -> void:
 	_prompting = false
 	_validate = Callable()
 	_items = items
-	_freeform_label = freeform_label
+	_freeform = freeform
 	_title.text = title
 	_search.text = ""
 	_search.placeholder_text = "filter..."
-	_error.visible = false
+	_error.text = ""
 	_rebuild()
 	popup(Rect2i(Vector2i(at), Vector2i(WIDTH, HEIGHT)))
 	_search.grab_focus()
@@ -115,11 +125,11 @@ func open_name_prompt(title: String, placeholder: String, validate: Callable, at
 	_prompting = true
 	_validate = validate
 	_items = []
-	_freeform_label = ""
+	_freeform = Callable()
 	_title.text = title
 	_search.text = initial
 	_search.placeholder_text = placeholder
-	_error.visible = false
+	_error.text = ""
 	_rebuild()
 	popup(Rect2i(Vector2i(at), Vector2i(WIDTH, PROMPT_HEIGHT)))
 	_search.grab_focus()
@@ -134,6 +144,10 @@ func _rebuild() -> void:
 		child.queue_free()
 
 	if _prompting:
+		# THE ERROR CLEARS WHILE YOU TYPE. It was written on a rejected name and then left there,
+		# so the reason the LAST attempt failed sat under the field contradicting the one being
+		# typed -- and the user had to read it to find out it was stale.
+		_error.text = ""
 		_list.add_child(_row("Create", func(): _submit(), Parts.TITLE_COLOR))
 		return
 
@@ -162,9 +176,14 @@ func _rebuild() -> void:
 		shown += 1
 
 	var typed := _search.text.strip_edges()
-	if not _freeform_label.is_empty() and not typed.is_empty():
-		_list.add_child(_row(_freeform_label % typed, func(): _pick(typed), FREEFORM_COLOR))
-		return
+	if _freeform.is_valid() and not typed.is_empty():
+		var made: Variant = _freeform.call(typed)
+		if made is Dictionary and not (made as Dictionary).is_empty():
+			var spec2 := made as Dictionary
+			var payload2: Variant = spec2.get("payload")
+			_list.add_child(_row(str(spec2.get("label", typed)),
+				func(): _pick(payload2), FREEFORM_COLOR))
+			return
 	if shown == 0:
 		var none := Label.new()
 		none.text = "(no matches)"
@@ -186,6 +205,8 @@ func _row(text: String, on_press: Callable, tint: Color) -> Button:
 	var row := Button.new()
 	row.text = text
 	row.flat = true
+	# A row you can click looks like one.
+	row.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	row.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	row.add_theme_color_override("font_color", tint)
 	row.pressed.connect(on_press)
@@ -206,7 +227,6 @@ func _submit() -> void:
 			var reason := str(_validate.call(typed))
 			if not reason.is_empty():
 				_error.text = reason
-				_error.visible = true
 				return
 		hide()
 		submitted.emit(typed)

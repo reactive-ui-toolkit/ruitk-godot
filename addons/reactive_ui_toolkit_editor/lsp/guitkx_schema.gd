@@ -23,7 +23,6 @@ static var _loaded := false
 static func _ensure_loaded() -> void:
 	if _loaded:
 		return
-	_loaded = true
 	var raw := ""
 	for p in [_BUNDLED_SCHEMA, _DEV_SCHEMA]:
 		if FileAccess.file_exists(p):
@@ -31,16 +30,31 @@ static func _ensure_loaded() -> void:
 			if raw != "":
 				break
 	if raw == "":
+		# NOT LATCHED. `_loaded` was set BEFORE the read, so one failure -- a file not yet
+		# extracted from a freshly installed addon, a transient read error -- silently disabled
+		# the markup vocabulary for the whole editor process, and nothing anywhere asked whether
+		# the schema had loaded. The compiler's own `env_error` precedent is one folder away.
 		push_warning("GuitkxSchema: guitkx-schema.json not found (bundled or dev path).")
 		return
 	var parsed: Variant = JSON.parse_string(raw)
 	if typeof(parsed) != TYPE_DICTIONARY:
 		push_warning("GuitkxSchema: guitkx-schema.json did not parse to an object.")
 		return
+	_loaded = true
 	_schema = parsed
 	for e in _schema.get("hostElements", []):
 		if e is Dictionary and e.has("tag"):
 			_tags[e["tag"]] = e
+
+## Whether the markup vocabulary is actually available.
+##
+## What a surface asks before it tells the user its list is complete: with no schema the palette
+## is empty and the completion silent, which reads as "this file has nothing to offer" rather
+## than "the vocabulary did not load".
+static func has_schema() -> bool:
+	_ensure_loaded()
+	return not _tags.is_empty()
+
 
 # --- Static vocabulary -------------------------------------------------------------------------
 

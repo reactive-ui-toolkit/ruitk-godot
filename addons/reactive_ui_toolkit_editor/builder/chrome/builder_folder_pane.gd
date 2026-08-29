@@ -78,6 +78,9 @@ func _init() -> void:
 	hide_root = true
 	allow_rmb_select = true
 	select_mode = Tree.SELECT_ROW
+	# THE POINTER SAYS THE ROWS ARE ACTIONABLE. A Tree draws the OS arrow, so this pane -- where
+	# every row can be clicked, dragged and dropped on -- read exactly like a static listing.
+	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 	item_collapsed.connect(_on_item_collapsed)

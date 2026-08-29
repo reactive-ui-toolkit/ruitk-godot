@@ -34,7 +34,7 @@ const VIEWPORT := Vector2(1280, 720)
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 212
+const ASSERTION_FLOOR := 215
 
 var _fails := 0
 var _passes := 0
@@ -55,6 +55,7 @@ func _run() -> void:
 	_test_section_caps()
 	_test_kind_badge_band()
 	_test_restored_zoom_is_clamped()
+	await _test_cursor_says_what_a_press_does()
 	_test_lod_bands()
 	await _test_card_can_be_moved()
 	await _test_canvas_can_be_panned()
@@ -783,6 +784,34 @@ func _test_layout_repath() -> void:
 
 
 # ── Host ─────────────────────────────────────────────────────────────────────────────
+
+## THE POINTER SAYS WHAT WILL HAPPEN. Every surface drew the OS arrow, so a title bar you can
+## drag, a chip that carries the module and empty canvas you can pan all looked the same.
+func _test_cursor_says_what_a_press_does() -> void:
+	_section("the canvas has a cursor for each of its bands")
+	var host := Host.new()
+	host.size = VIEWPORT
+	root.add_child(host)
+	host.show_graph(_graph)
+	host.set_camera(Vector2.ZERO, 1.0)
+	await process_frame
+	await process_frame
+
+	_eq(host._get_cursor_shape(Vector2(VIEWPORT.x - 4, VIEWPORT.y - 4)), Control.CURSOR_DRAG,
+		"empty canvas is a surface you pan")
+	var card := _graph.cards[0]
+	var width := Metrics.card_width_for(Metrics.lod_of(1.0))
+	var title := Metrics.world_to_screen(Vector2(card.x + width * 0.6, card.y + 8.0),
+		host.camera, host.zoom)
+	_eq(host._get_cursor_shape(title), Control.CURSOR_MOVE, "a title bar moves the card")
+	var chip := Metrics.world_to_screen(Vector2(card.x + 8.0, card.y + 8.0),
+		host.camera, host.zoom)
+	_eq(host._get_cursor_shape(chip), Control.CURSOR_POINTING_HAND,
+		"and the kind chip carries the module, which is a different gesture")
+
+	host.queue_free()
+	await process_frame
+
 
 func _test_host_renders_each_lod() -> void:
 	_section("the canvas renders, and the LOD bands are visible in what it builds")

@@ -531,6 +531,31 @@ func _input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 
+## THE POINTER SAYS WHAT WILL HAPPEN. Every surface in this builder drew the OS arrow: a card
+## title bar you can drag, a kind chip that carries the module, a row you can click and empty
+## canvas you can pan all looked identical, so the only way to find out what a press would do was
+## to press. The reference has a cursor for each; these are Godot's nearest equivalents.
+func _get_cursor_shape(at_position := Vector2.ZERO) -> CursorShape:
+	if _panning or _moving >= 0:
+		return Control.CURSOR_MOVE
+	if graph == null:
+		return Control.CURSOR_ARROW
+	var index := card_at(at_position)
+	if index < 0:
+		# Empty canvas is a pannable surface, and a drag here is how you move around it.
+		return Control.CURSOR_DRAG
+	var lod := Metrics.lod_of(zoom)
+	var world := Metrics.screen_to_world(at_position, camera, zoom)
+	var width := Metrics.card_width_for(lod)
+	if Metrics.on_kind_badge(graph.cards[index], world, width, lod):
+		return Control.CURSOR_POINTING_HAND   # the module's own handle
+	if Metrics.on_title_bar(graph.cards[index], world, width, lod):
+		return Control.CURSOR_MOVE            # drag the card
+	if bool(row_at(index, at_position).get("found", false)):
+		return Control.CURSOR_POINTING_HAND
+	return Control.CURSOR_ARROW
+
+
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		_handle_button(event as InputEventMouseButton)

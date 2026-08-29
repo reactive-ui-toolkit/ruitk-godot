@@ -777,6 +777,15 @@ func _wire() -> void:
 	_canvas.card_selected.connect(_on_card_selected)
 	_canvas.card_add_requested.connect(_on_card_add)
 	_canvas.row_clicked.connect(_on_row_clicked)
+	# GO-TO-DEFINITION LANDS ON THE CANVAS TOO. A module in the open tree is a card, and taking the
+	# reader to the file without taking them to the card leaves the two halves of the builder
+	# pointing at different things.
+	_source.definition_requested.connect(_on_definition_requested)
+	_source.diagnostic_clicked.connect(func(file_path: String, line: int, _record: Variant):
+		if not file_path.is_empty():
+			select_module(file_path)
+		_source.goto_line(line + 1)
+		_console.visible = true)
 	_canvas.row_activated.connect(_on_row_activated)
 	_canvas.card_activated.connect(func(index: int):
 		if graph == null or index < 0 or index >= graph.cards.size():
@@ -796,6 +805,11 @@ func _wire() -> void:
 	# An ABANDONED inline edit still has to clear what it was about: leaving `_menu_row` pointing
 	# at a row after the user pressed Escape means the next Delete acts on a row they walked away
 	# from.
+	# EVERY CLOSE, whatever route it took. Clearing the row was written on the CANCEL path alone,
+	# so a committed edit left `_menu_row` pointing at the row it had finished with -- and the
+	# next Delete acted on a row the user had walked away from. The commit path is the common one.
+	_inline.closed.connect(_on_editor_closed)
+	_island.closed.connect(_on_editor_closed)
 	_inline.cancelled.connect(func(_token: Variant, undo_seeding: bool):
 		_menu_row = null
 		# ESCAPE ON A SEEDED EDITOR TAKES THE SEEDING BACK. The builder wrote that `@if (true)`
@@ -1355,7 +1369,9 @@ func _on_row_activated(card_index: int, section: int, row_index: int, at: Vector
 			if Edits.has_span(row):
 				_inline.open_at(rect, row.source_text,
 					{ "kind": "island", "path": card.file_path, "row": row,
-						"from": row.source_line, "to": row.source_line })
+						"from": row.source_line, "to": row.source_line,
+						# WHICH EXPORT TO ADVANCE INTO when this one is finished with Enter.
+						"advance_export": _export_owning(card, row_index) })
 			else:
 				_on_card_add(card_index, "entry")
 		Metrics.Section.MARKUP:
@@ -1371,7 +1387,7 @@ func _on_row_activated(card_index: int, section: int, row_index: int, at: Vector
 				_search_purpose = "attribute"
 				_search_menu.open_menu("add an attribute to <%s>" % row.name,
 					Attributes.menu_for(row.name, row, _component_named(row.name)),
-					_menu_screen_at(), "add \"%s\"")
+					_menu_screen_at(), _freeform_attribute())
 		_:
 			return
 
@@ -1390,6 +1406,32 @@ func _navigate_to_component(name: String) -> bool:
 			select_module(card.file_path)
 			return true
 	return false
+
+
+## A resolved definition: go to the module, and frame its card when it is one of ours.
+##
+## A target OUTSIDE the open tree -- `hooks.gd`, an analyzer hit in the runtime addon -- is not
+## something this window can show, so it says so rather than silently doing nothing, which is what
+## an unlistened-to signal already did.
+func _on_definition_requested(file_path: String, offset: int) -> void:
+	if workspace == null or file_path.is_empty():
+		return
+	if workspace.try_get(file_path) == null:
+		toast("%s is outside this tree — open it in the script editor" % file_path.get_file())
+		return
+	select_module(file_path)
+	if graph != null:
+		var index := graph.index_of(file_path)
+		if index >= 0:
+			_canvas.frame_card(index)
+	var text := _buffer_of(file_path)
+	# OFFSET TO LINE, because the pane jumps by line. Counting newlines up to the offset is the
+	# whole conversion, and doing it here keeps the widget's contract (offsets) intact.
+	var line := 1
+	for i in range(mini(offset, text.length())):
+		if text[i] == "\n":
+			line += 1
+	_source.goto_line(line)
 
 
 ## Where a row sits on screen, so an editor can open OVER the thing it edits rather than at
@@ -1724,7 +1766,9 @@ func _on_row_menu(id: int) -> void:
 		RowMenuId.ADD_CHILD:
 			_search_purpose = "child"
 			_search_menu.open_menu("add a child to %s" % row.text.strip_edges(),
-				_tag_items(), _menu_screen_at(), "add <%s>")
+				_tag_items(), _menu_screen_at(),
+				func(typed: String) -> Dictionary:
+					return { "label": "add <%s>" % typed, "payload": typed })
 			return
 		RowMenuId.ADD_ATTRIBUTE:
 			_search_purpose = "attribute"
@@ -1732,12 +1776,12 @@ func _on_row_menu(id: int) -> void:
 			_search_menu.open_menu(
 				"attributes of <%s>" % tag,
 				Attributes.menu_for(tag, row, _component_named(tag)),
-				_menu_screen_at(), "add \"%s\" (untyped)")
+				_menu_screen_at(), _freeform_attribute())
 			return
 		RowMenuId.ADD_STYLE_ENTRY:
 			_search_purpose = "style_entry"
 			_search_menu.open_menu("add an entry to %s" % row.name, _style_key_items(row),
-				_menu_screen_at(), "add \"%s\"")
+				_menu_screen_at(), _freeform_style_key(str(row.name)))
 			return
 		RowMenuId.APPLY_STYLE:
 			_search_purpose = "style"
@@ -1824,6 +1868,23 @@ func _style_key_items(row) -> Array:
 			"export": owner, "key": key_name, "value": _style_seed(key_name, key_type),
 		}, key_type))
 	return items
+
+
+## The freeform row for an ATTRIBUTE menu: the typed name, untyped.
+func _freeform_attribute() -> Callable:
+	return func(typed: String) -> Dictionary:
+		return { "label": "add \"%s\" (untyped)" % typed, "payload": typed }
+
+
+## The freeform row for a STYLE-KEY menu: a key the schema does not list is still a key the
+## dictionary can hold, so it is offered -- but as the `{export, key, value}` the handler reads,
+## not as the bare string, which is what made this row do nothing at all.
+func _freeform_style_key(export_name: String) -> Callable:
+	return func(typed: String) -> Dictionary:
+		return {
+			"label": "add \"%s\"" % typed,
+			"payload": { "export": export_name, "key": typed, "value": _style_seed(typed) },
+		}
 
 
 ## What a fresh style entry is worth. Seeded, like every other header this builder writes.
@@ -2091,7 +2152,24 @@ func _on_search_submitted(text: String) -> void:
 
 ## An inline edit was committed. Dispatched by the token the editor was opened with, so one
 ## floating field serves every in-place edit the canvas offers.
-func _on_inline_committed(token: Variant, text: String) -> void:
+## An in-place editor closed: committed, cancelled or replaced by the next edit.
+##
+## Clears what it was about, and re-syncs the language index for the file it was editing --
+## completion inside the source pane answers from that index, and an edit made on the CANVAS is
+## the case where it would otherwise go stale without anybody typing in the pane at all.
+func _on_editor_closed(token: Variant) -> void:
+	_menu_row = null
+	if not (token is Dictionary) or workspace == null:
+		return
+	var path := str((token as Dictionary).get("path", ""))
+	if path.is_empty():
+		return
+	var module := workspace.try_get(path)
+	if module != null:
+		_reindex_language(path)
+
+
+func _on_inline_committed(token: Variant, text: String, applied := false) -> void:
 	if not (token is Dictionary) or workspace == null:
 		return
 	var spec := token as Dictionary
@@ -2132,6 +2210,52 @@ func _on_inline_committed(token: Variant, text: String) -> void:
 			return
 	if after != before:
 		apply_edit(path, after, what)
+	_advance_style_entry(spec, applied)
+
+
+## THE ADVANCE RUN: finishing one style entry with Enter opens the menu for the next.
+##
+## The reference's `AdvanceStyleEntry`. Adding entries to a style dictionary is a RUN -- nobody
+## adds exactly one -- and without this each one costs a right-click, a menu, a pick and a click
+## into the field. Only on a deliberate finish: clicking away means the user is going somewhere
+## else, and re-opening a menu over where they clicked would be the tool arguing with them.
+func _advance_style_entry(spec: Dictionary, applied: bool) -> void:
+	if not applied:
+		return
+	var export_name := str(spec.get("advance_export", ""))
+	if export_name.is_empty() or graph == null:
+		return
+	var card := graph.card_of(str(spec.get("path", "")))
+	if card == null:
+		return
+	var anchor = _export_header_named(card, export_name)
+	if anchor == null:
+		return
+	_menu_row = anchor
+	_search_purpose = "style_entry"
+	_search_menu.open_menu("add another entry to %s" % export_name,
+		_style_key_items(anchor), _menu_screen_at(), _freeform_style_key(export_name))
+
+
+## The EXPORT HEAD row named `export_name` on this card, or null.
+func _export_header_named(card, export_name: String):
+	for row in card.export_detail:
+		if row.badge == Graph.Badge.STYLE_HEADER and str(row.name) == export_name:
+			return row
+	return null
+
+
+## Which export a style ENTRY row belongs to: the nearest head above it.
+func _export_owning(card, row_index: int) -> String:
+	if card == null or row_index < 0 or row_index >= card.export_detail.size():
+		return ""
+	var i := row_index
+	while i >= 0:
+		var row = card.export_detail[i]
+		if row.badge == Graph.Badge.STYLE_HEADER:
+			return str(row.name)
+		i -= 1
+	return ""
 
 
 ## The row under the pointer, from the section the hit-test named.
@@ -2234,7 +2358,7 @@ func _on_card_add(index: int, what: String) -> void:
 			_menu_row = anchor
 			_search_purpose = "style_entry"
 			_search_menu.open_menu("add an entry to %s" % export_name,
-				_style_key_items(anchor), _menu_screen_at(), "add \"%s\"")
+				_style_key_items(anchor), _menu_screen_at(), _freeform_style_key(export_name))
 			return
 		_:
 			return

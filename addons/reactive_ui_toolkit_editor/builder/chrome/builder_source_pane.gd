@@ -31,6 +31,15 @@ signal edit_cancelled(file_path: String, restore: String)
 ## Something the user should be told, from a pane that has no toast of its own.
 signal complained(message: String)
 
+## Ctrl+click or F12 on a name the widget could resolve: a component tag, a hook, an identifier
+## the analyzer knows. The widget does the whole resolution and emits it; nothing listened, so
+## go-to-definition worked everywhere in this addon EXCEPT the pane the builder puts in front of
+## the user.
+signal definition_requested(file_path: String, offset: int)
+
+## A click on the diagnostics gutter, carrying the record that drew the mark.
+signal diagnostic_clicked(file_path: String, line: int, record: Variant)
+
 var workspace: Workspace = null
 
 var _title: Label = null
@@ -102,6 +111,10 @@ func _init() -> void:
 	_editor.draw_tabs = false
 	_editor.editable = false
 	_editor.text_changed.connect(_on_text_changed)
+	_editor.definition_requested.connect(func(target: String, offset: int):
+		definition_requested.emit(target, offset))
+	_editor.gutter_diagnostic_clicked.connect(func(line: int, record: Variant):
+		diagnostic_clicked.emit(_path, line, record))
 	add_child(_editor)
 
 

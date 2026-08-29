@@ -107,7 +107,6 @@ const PARITY := [
 	["the editor takes the size of what it edits", "func _row_rect_on_screen"],
 	["drop hint (band + caret)", "func _draw_drop_hint"],
 	["source pane chords (Ctrl+Enter / Esc)", "func _unhandled_key_input"],
-	["AdvanceStyleEntry", "RowMenuId.ADD_STYLE_ENTRY"],
 	# Drag and drop
 	["OnCanvasRowDrop", "func _on_canvas_drop"],
 	["drag sources", "func _get_drag_data"],
@@ -143,6 +142,13 @@ const PARITY := [
 	["UB-112: a template invents no content", "export %s := {"],
 	["the delete rule takes an emptied directive with it", "func orphaned_directive"],
 	["every mutation reports itself", "Renamed to %s"],
+	["AdvanceStyleEntry", "func _advance_style_entry"],
+	["the freeform row builds its own payload", "func _freeform_style_key"],
+	["BuilderCursor", "func _get_cursor_shape"],
+	["the inline editor says HOW an edit ended", "signal closed(token: Variant)"],
+	["go-to-definition from the source pane", "func _on_definition_requested"],
+	["a gutter click goes to its diagnostic", "signal diagnostic_clicked"],
+	["+N more expands INSIDE its section", "_expanded_fully"],
 	["a scrollable section eats the plain wheel; Ctrl+wheel is still the zoom", "func _input"],
 	["UB-78: the signature is two runs, cut at the paren", "func signature_head"],
 	# The preview

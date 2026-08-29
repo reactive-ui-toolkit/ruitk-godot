@@ -27,7 +27,16 @@ extends "res://addons/reactive_ui_toolkit_editor/editor/guitkx_code_edit.gd"
 ## cache to what the running process loaded and a global name can vanish mid-session.
 
 ## The edit was accepted. `token` is whatever the caller attached.
-signal committed(token: Variant, text: String)
+## The edit was accepted. `applied` is true when the user ENDED it deliberately -- Enter here,
+## Ctrl+Enter in the island editor -- and false when it ended because focus went elsewhere.
+##
+## The difference is "done, next" versus "done": an advance run continues on the first and stops
+## on the second, and with one channel for both there was no way to tell them apart.
+signal committed(token: Variant, text: String, applied: bool)
+
+## The editor closed, by any route -- committed, cancelled, or replaced by the next edit. What a
+## listener needs to put a buffer or a highlight back the way it found it.
+signal closed(token: Variant)
 
 ## The edit was abandoned. `undo_seeding` is true when the builder itself wrote the text being
 ## edited as part of opening the editor, so cancelling should take that back too.
@@ -89,7 +98,7 @@ func open_at(rect: Rect2, initial: String, for_token: Variant, seeded := false) 
 	set_caret_column(get_line(get_line_count() - 1).length())
 
 
-func commit() -> void:
+func commit(applied := false) -> void:
 	if not _open:
 		return
 	var value := text
@@ -99,7 +108,7 @@ func commit() -> void:
 	var was := _initial
 	_close()
 	if value != was:
-		committed.emit(for_token, value)
+		committed.emit(for_token, value, applied)
 
 
 func cancel() -> void:
@@ -112,6 +121,8 @@ func cancel() -> void:
 
 
 func _close() -> void:
+	var was_token := _token
+	closed.emit(was_token)
 	_open = false
 	_seeded = false
 	visible = false

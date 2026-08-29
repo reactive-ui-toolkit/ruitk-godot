@@ -75,6 +75,10 @@ var _selected_component := ""
 
 ## The file the selection belongs to, when it has one. A name alone cannot tell two modules apart.
 var _selected_path := ""
+
+## Sections the user asked to see in full, by kind. Read by the rebuild, so the extra rows land
+## INSIDE their own section rather than after everything else.
+var _expanded_fully := {}
 var _search_field: LineEdit = null
 var _create_menu: PopupMenu = null
 var _body: VBoxContainer = null
@@ -217,6 +221,7 @@ func _add_section(kind: String, heading: String, entries: PackedStringArray) -> 
 		return
 
 	var header := Button.new()
+	row_cursor(header)
 	header.flat = true
 	header.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	header.text = "%s  %s  (%d)" % ["v" if _expanded.get(kind, true) else ">", heading, filtered.size()]
@@ -230,28 +235,37 @@ func _add_section(kind: String, heading: String, entries: PackedStringArray) -> 
 
 	# A filter is the user asking to see everything that matches, so it overrides the fold: the
 	# whole point of typing four characters is that the answer is short.
-	var limit: int = filtered.size() if not _search.is_empty() else mini(filtered.size(), FOLD_AFTER)
+	# FULL EXPANSION IS PART OF THE MODEL the rebuild reads, not a second pass after it. It used
+	# to call `rebuild()` and then `add_child` the remaining entries -- and `add_child` APPENDS,
+	# so rows 6..N of the components section landed at the very bottom of the pane, under every
+	# other section, outside the heading that counts them. It also cleared the search box to get
+	# there, throwing away what the user had typed.
+	var full := bool(_expanded_fully.get(kind, false))
+	var limit: int = filtered.size() if not _search.is_empty() or full \
+		else mini(filtered.size(), FOLD_AFTER)
 	for i in range(limit):
 		_body.add_child(_entry_row(kind, str(filtered[i])))
 	if limit < filtered.size():
 		var more := Button.new()
+		row_cursor(more)
 		more.flat = true
 		more.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		more.text = "    + %d more" % (filtered.size() - limit)
 		more.pressed.connect(func():
-			_search_field.text = ""
-			_search = ""
-			_expanded[kind] = true
-			_show_all(kind, filtered))
+			_expanded_fully[kind] = true
+			rebuild())
 		_body.add_child(more)
-
-
-func _show_all(kind: String, entries: PackedStringArray) -> void:
-	# Expanding one section fully is a one-shot: the next rebuild folds it again, which is what
-	# keeps the pane usable after the user has moved on to something else.
-	rebuild()
-	for i in range(FOLD_AFTER, entries.size()):
-		_body.add_child(_entry_row(kind, str(entries[i])))
+	elif full and filtered.size() > FOLD_AFTER:
+		# AND IT FOLDS BACK. A one-way expansion leaves a pane that only ever gets longer.
+		var less := Button.new()
+		row_cursor(less)
+		less.flat = true
+		less.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		less.text = "    - show less"
+		less.pressed.connect(func():
+			_expanded_fully[kind] = false
+			rebuild())
+		_body.add_child(less)
 
 
 ## Godot's drag protocol, on the pane rather than on each row: the pane knows which row the
@@ -317,6 +331,7 @@ func _is_selected(kind: String, name: String) -> bool:
 
 func _entry_row(kind: String, name: String) -> Button:
 	var row := Button.new()
+	row_cursor(row)
 	# NOT flat. A palette entry is a drag handle and a click target, and flat text on a panel
 	# background reads as a label -- the two things you are meant to drag looked exactly like the
 	# heading above them.
@@ -413,3 +428,9 @@ func select_entry(file_path: String, name: String) -> void:
 	_selected_path = file_path
 	_selected_component = name
 	rebuild()
+
+
+## A row the pointer can act on looks like one. Every pane here builds bare `Button`s, which draw
+## the OS arrow -- so a list you can click read exactly like a list you cannot.
+static func row_cursor(button: Button) -> void:
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
