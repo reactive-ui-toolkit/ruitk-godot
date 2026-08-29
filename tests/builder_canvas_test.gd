@@ -34,7 +34,7 @@ const VIEWPORT := Vector2(1280, 720)
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 215
+const ASSERTION_FLOOR := 219
 
 var _fails := 0
 var _passes := 0
@@ -53,6 +53,7 @@ func _run() -> void:
 	_test_hit_test_matches_what_is_drawn()
 	_test_hook_usage_highlighting()
 	_test_section_caps()
+	await _test_a_pan_does_not_rebuild()
 	_test_kind_badge_band()
 	_test_restored_zoom_is_clamped()
 	await _test_cursor_says_what_a_press_does()
@@ -1100,3 +1101,35 @@ func _test_anchors_land_on_the_drawn_card() -> void:
 
 	_check(float(width_of[Metrics.Lod.PILL]) < float(width_of[Metrics.Lod.FULL]),
 		"a pill is drawn shorter than a full card, which is the whole point")
+
+
+## A PAN IS TWO PROPERTY WRITES, not a re-render of every card.
+##
+## The camera used to be baked into each card position prop, so dragging across a tree of fifty
+## modules re-ran fifty components per motion event -- through the reconciler, with a commit each
+## time. The card tree is a function of the graph, the LOD and the cull set; a camera move that
+## changes none of those has nothing to say.
+func _test_a_pan_does_not_rebuild() -> void:
+	_section("panning moves the container, it does not rebuild the cards")
+	var host := Host.new()
+	host.size = VIEWPORT
+	root.add_child(host)
+	host.show_graph(_graph)
+	host.set_camera(Vector2.ZERO, 1.0)
+	await process_frame
+	await process_frame
+
+	var before := host._cards.get_child_count()
+	var revision := host._revision
+	host.set_camera(Vector2(6, 4), 1.0)
+	await process_frame
+	_eq(host._cards.position, Vector2(6, 4), "the container carries the pan")
+	_eq(host._revision, revision, "and nothing asked the view for a new tree")
+	_eq(host._cards.get_child_count(), before, "the card layer is the same layer")
+
+	host.set_camera(Vector2(6, 4), 1.6)
+	await process_frame
+	_eq(host._cards.scale, Vector2(1.6, 1.6), "the container carries the zoom too")
+
+	host.queue_free()
+	await process_frame

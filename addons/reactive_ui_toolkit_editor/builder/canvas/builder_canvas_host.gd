@@ -135,7 +135,9 @@ func _init() -> void:
 	_cards = Control.new()
 	_cards.name = "Cards"
 	_cards.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_cards.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# NOT ANCHORED. This node IS the camera: its position is the pan and its scale is the zoom,
+	# so it cannot also be a full-rect child whose position the layout owns.
+	_cards.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	add_child(_cards)
 
 	_edges = Edges.new()
@@ -162,10 +164,20 @@ func show_graph(new_graph: Graph) -> void:
 
 
 func set_camera(new_camera: Vector2, new_zoom: float) -> void:
+	var was_lod := Metrics.lod_of(zoom)
 	camera = new_camera
 	zoom = Metrics.clamp_zoom(new_zoom)
 	queue_redraw()
-	_render()
+	# THE PAN IS TWO PROPERTY WRITES. It used to be a changed prop on every card, so dragging the
+	# canvas across a tree of fifty modules re-ran fifty components per motion event -- through
+	# the reconciler, with a commit each time. The tree only has to be rebuilt when what it says
+	# changes: a new LOD band, or a card crossing the cull edge.
+	_apply_camera()
+	if Metrics.lod_of(zoom) != was_lod or _near_signature() != _near_seen:
+		_render()
+	else:
+		_settle_frames = SETTLE_FRAMES
+		set_process(true)
 	# ANNOUNCED, like `fit_to_view` does. Only the fit emitted, so everything downstream of the
 	# camera -- the saved layout, and the layer selector that is supposed to name the band on
 	# screen -- was updated by one of the two ways the camera moves and not by the other. A
@@ -293,9 +305,36 @@ func _on_card_add(index: int, what: String) -> void:
 	card_add_requested.emit(index, what)
 
 
+## Puts the camera on the container. One node moves; nothing re-renders.
+func _apply_camera() -> void:
+	if _cards == null:
+		return
+	_cards.position = camera
+	_cards.scale = Vector2(maxf(zoom, 0.0001), maxf(zoom, 0.0001))
+	if _edges != null:
+		_edges.camera = camera
+		_edges.zoom = zoom
+		_edges.queue_redraw()
+
+
+## WHICH CARDS ARE INSIDE THE CULL WINDOW, as a string. What decides whether a camera move needs
+## a re-render at all: the card tree is a function of the graph, the LOD and this.
+func _near_signature() -> String:
+	if graph == null:
+		return ""
+	var card_width := Metrics.card_width_for(Metrics.lod_of(zoom))
+	var bits := PackedStringArray()
+	for i in range(graph.cards.size()):
+		if Metrics.is_near_viewport(graph.cards[i], card_width, camera, zoom, size):
+			bits.append(str(i))
+	return ",".join(bits)
+
+
 func _render() -> void:
 	if graph == null:
 		return
+	_near_seen = _near_signature()
+	_apply_camera()
 	var props := {
 		"graph": graph,
 		"camera": camera,
@@ -333,6 +372,10 @@ func _render() -> void:
 const SETTLE_FRAMES := 8
 
 var _settle_frames := 0
+
+## The cull set the current card tree was built for. A camera move that does not change it does
+## not need a new tree.
+var _near_seen := ""
 
 
 func _process(_delta: float) -> void:

@@ -188,6 +188,9 @@ const PARITY := [
 	["an import of a real file outside the tree is pulled in", "func _pull_in_reachable_files"],
 	["a host-tag drift warning", "func _warn_on_tag_drift"],
 	["CollectStateNames", "func _state_names"],
+	["the camera lives on the container, not in every card", "func _apply_camera"],
+	["a pan only rebuilds when the cull set changes", "func _near_signature"],
+	["the open tree enters the completion index", "LspWorkspace.reindex(module.file_path()"],
 	["a scrollable section eats the plain wheel; Ctrl+wheel is still the zoom", "func _input"],
 	["UB-78: the signature is two runs, cut at the paren", "func signature_head"],
 	# The preview

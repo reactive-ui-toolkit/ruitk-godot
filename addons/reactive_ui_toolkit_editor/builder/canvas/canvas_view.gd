@@ -38,11 +38,14 @@ static func render(props: Dictionary, children: Array) -> RuitkVNode:
 		# One VIEWPORT of slack: a card built only when it crosses the edge appears a
 		# frame late during a pan, and the edge painter has no anchor to land on.
 		var near = M.is_near_viewport(c, card_w, camera, zoom, viewport)
-		# Position is SCREEN space and scale is the zoom, so the card's own contents are
-		# laid out once in card-local units whatever the zoom is -- a layout that had to
-		# re-measure every label at every zoom would re-wrap text as the user scrolled.
-		var pos = M.world_to_screen(Vector2(c.x, c.y), camera, zoom)
-		__cf0.append(V.fc(CanvasCard, { "card": c, "lod": lod, "index": i, "is_selected": i == selected, "at": pos, "zoom": zoom, "near": near, "on_add": on_add, "revision": revision, "sel_section": selected_row_section if i == selected else -1, "sel_row": selected_row_index if i == selected else -1, "highlight_names": highlight_names }, [], c.file_path))
+		# POSITION IS WORLD SPACE. The camera lives on the CONTAINER now -- its position
+		# is the pan and its scale is the zoom -- so a pan is two property writes on one
+		# node instead of a changed prop on every card, and dragging across a tree of
+		# fifty modules stopped meaning fifty component re-renders per motion event.
+		# The card's own contents are still laid out once in card-local units whatever
+		# the zoom, because the scale is above them.
+		var pos = Vector2(c.x, c.y)
+		__cf0.append(V.fc(CanvasCard, { "card": c, "lod": lod, "index": i, "is_selected": i == selected, "at": pos, "near": near, "on_add": on_add, "revision": revision, "sel_section": selected_row_section if i == selected else -1, "sel_row": selected_row_index if i == selected else -1, "highlight_names": highlight_names }, [], c.file_path))
 		continue
 	return V.Control({ "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [__cf0])
 
@@ -52,7 +55,6 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 	var lod = props.get("lod", 1)
 	var is_selected = props.get("is_selected", false)
 	var at = props.get("at", Vector2.ZERO)
-	var zoom = props.get("zoom", 1.0)
 	var near = props.get("near", true)
 	var index = props.get("index", -1)
 	var on_add = props.get("on_add", null)
@@ -71,13 +73,13 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 				for __cf1_once in 1:
 					__cf1 = V.fc(CanvasCardSections, { "card": card, "lod": lod, "index": index, "on_add": on_add, "revision": revision, "sel_section": sel_section, "sel_row": sel_row, "highlight_names": highlight_names })
 					continue
-			__cf0 = V.PanelContainer({ "name": "card-%d" % index, "position": at, "scale": Vector2(zoom, zoom), "custom_minimum_size": Vector2(card_w, 0), "size": Vector2(card_w, 0), "clip_contents": true, "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_box_selected() if is_selected else P.card_box() }, [V.VBoxContainer({ "style": {"separation": 4}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod }), __cf1])])
+			__cf0 = V.PanelContainer({ "name": "card-%d" % index, "position": at, "custom_minimum_size": Vector2(card_w, 0), "size": Vector2(card_w, 0), "clip_contents": true, "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_box_selected() if is_selected else P.card_box() }, [V.VBoxContainer({ "style": {"separation": 4}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod }), __cf1])])
 			continue
 	else:
 		for __cf0_once in 1:
 			# A culled card still occupies its estimated height, so nothing reflows when a pan
 			# brings it back.
-			__cf0 = V.PanelContainer({ "position": at, "scale": Vector2(zoom, zoom), "custom_minimum_size": Vector2(card_w, M.card_height(card)), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_placeholder() }, [V.MarginContainer({ "style": {"margin_left": 10, "margin_top": 10, "margin_right": 10}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod })])])
+			__cf0 = V.PanelContainer({ "position": at, "custom_minimum_size": Vector2(card_w, M.card_height(card)), "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_placeholder() }, [V.MarginContainer({ "style": {"margin_left": 10, "margin_top": 10, "margin_right": 10}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod })])])
 			continue
 	return __cf0
 

@@ -1008,6 +1008,14 @@ func open_tree(focus_path: String) -> void:
 		var module := workspace.try_get(path)
 		return module.id if module != null else ""
 	_focus_path = Paths.canon(focus_path)
+	# THE WHOLE TREE ENTERS THE INDEX AT OPEN. Completion and go-to-definition answer from it, and
+	# it was only ever fed by `_reindex_language` on an EDIT -- so a module the session had not
+	# yet typed into was invisible to both, and the builder's own tree was the one thing its
+	# code editor could not complete against. In-memory text, not disk: under the save-only
+	# contract those differ, and the buffer is what the user is looking at.
+	for module in workspace.modules():
+		if not module.read_only:
+			LspWorkspace.reindex(module.file_path(), module.buffer_text)
 	_validate_tree("after loading %s" % focus_path.get_file())
 	reproject()
 	select_module(_focus_path)
