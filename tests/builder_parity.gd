@@ -77,6 +77,7 @@ const PARITY := [
 	["double-click a workspace entry to FRAME its card", "signal entry_framed"],
 	["style / util / hook MODULE sections", "const ENTRY_HOOK_MODULE"],
 	["ShowAttributeMenu", "func menu_for"],
+	["the language index follows the buffers", "func _reindex_language"],
 	["ShowRemoveAttributeMenu", "RowMenuId.REMOVE_ATTRIBUTE"],
 	["an IMPORT row has its own menu", "RowMenuId.REMOVE_IMPORT"],
 	["a BODY chip has its own menu", "RowMenuId.EDIT_BODY_LINE"],

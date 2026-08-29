@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 346
+const ASSERTION_FLOOR := 350
 
 var _fails := 0
 var _passes := 0
@@ -69,6 +69,7 @@ func _run() -> void:
 	await _test_double_click_edits_in_place()
 	await _test_row_menu_fits_its_section()
 	await _test_island_editor_is_multiline()
+	await _test_language_index_follows_the_buffers()
 	await _test_diagnostics_reach_the_surface()
 	await _test_source_pane_keyboard()
 	await _test_delete_refuses_what_it_must()
@@ -1209,6 +1210,55 @@ var d = 4"
 ").size(), 4, "and all four lines intact")
 
 	editor.queue_free()
+	_drop(w)
+
+
+## THE LANGUAGE LAYER KNOWS WHAT THE BUILDER IS HOLDING.
+##
+## `GuitkxWorkspace` is the index behind component-tag completion, Ctrl+hover validation and
+## go-to-definition, and it is built entirely FROM DISK. Under the save-only contract the disk is
+## the tree as it was before the session started -- so completion missed every component the user
+## had created and offered every one they had renamed away.
+func _test_language_index_follows_the_buffers() -> void:
+	var w := _window()
+	await process_frame
+	var LspWorkspace = preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_workspace.gd")
+
+	_section("a component created in session becomes a completion candidate")
+	var made := ROOT.path_join("components/badge/badge.guitkx")
+	w.workspace.create_new(made,
+		"export SessionBadge() -> RuitkVNode {
+	return (
+		<Label />
+	)
+}
+")
+	w.reproject()
+	w._reindex_language(made)
+	await process_frame
+	_check(LspWorkspace.is_component("SessionBadge"),
+		"the language layer knows a tag that exists only in memory")
+
+	_section("and an edit to it is followed")
+	w.apply_edit(made,
+		"export RenamedBadge() -> RuitkVNode {
+	return (
+		<Label />
+	)
+}
+",
+		"rename the export")
+	await process_frame
+	_check(LspWorkspace.is_component("RenamedBadge"), "the new name is known")
+	_check(not LspWorkspace.is_component("SessionBadge"),
+		"and the old one is gone -- reindex erases every entry for the path before re-adding")
+
+	_section("deleting it takes it out of the vocabulary")
+	w.delete_module(made)
+	await process_frame
+	_check(not LspWorkspace.is_component("RenamedBadge"),
+		"a deleted module stops being a completion candidate")
+
 	_drop(w)
 
 

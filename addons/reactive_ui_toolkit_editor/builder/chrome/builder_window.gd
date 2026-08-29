@@ -43,6 +43,7 @@ const Parts = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/bu
 const SearchMenu = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_search_menu.gd")
 const Attributes = preload("res://addons/reactive_ui_toolkit_editor/builder/edits/builder_attributes.gd")
 const Compiler = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx.gd")
+const LspWorkspace = preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_workspace.gd")
 const Schema = preload("res://addons/reactive_ui_toolkit_editor/lsp/guitkx_schema.gd")
 const PreviewPane = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_preview_pane.gd")
 const Palette = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
@@ -1037,6 +1038,25 @@ func known_component_tags() -> PackedStringArray:
 
 
 ## Compiles one module and paints what it says onto the source pane and the console.
+## Tells the language layer what the builder is holding.
+##
+## `GuitkxWorkspace` is the index behind user-component tag completion, Ctrl+hover validation and
+## go-to-definition, and it is built entirely FROM DISK. Under the save-only contract the disk is
+## the state of the tree before the session started -- so completion offered components the user
+## had renamed away, missed every one they had created, and go-to-definition opened files that no
+## longer say what it thought.
+##
+## Pushed from the one edit funnel, so nothing else has to remember to. Cheap: `reindex` is a
+## regex pass over one buffer, and it only ever runs on a buffer that just changed.
+func _reindex_language(file_path: String) -> void:
+	if workspace == null:
+		return
+	var module := workspace.try_get(file_path)
+	if module == null or module.read_only:
+		return
+	LspWorkspace.reindex(file_path, module.buffer_text)
+
+
 func _publish_diagnostics(file_path: String) -> void:
 	if workspace == null or _source == null or not Paths.same(file_path, _source.path()):
 		return
@@ -1063,6 +1083,7 @@ func _after_model_change(file_path: String) -> void:
 	_source.refresh_from_model()
 	preview.request_refresh()
 	_refresh_status()
+	_reindex_language(file_path)
 	_publish_diagnostics(file_path)
 
 
@@ -2605,6 +2626,10 @@ func _rename_to(name: String) -> void:
 		_repath_layout(owned_folder, destination.get_base_dir(), true)
 	_repath_layout(from_path, destination)
 	reproject()
+	# THE INDEX FOLLOWS THE FILE. `reindex` erases every entry pointing at a path before re-adding,
+	# so re-indexing the new path and the old one drops the stale tag and installs the new.
+	LspWorkspace.reindex(from_path, "")
+	_reindex_language(destination)
 	select_module(destination)
 	_source.refresh_from_model()
 	preview.request_refresh()
@@ -3294,6 +3319,8 @@ func delete_module(file_path: String) -> bool:
 		return false
 	ledger.record_deletion(file_path, module)
 	ledger.end()
+	# A deleted module stops being a completion candidate.
+	LspWorkspace.reindex(file_path, "")
 	reproject()
 	_rebind_focus_if_missing()
 	_source.refresh_from_model()
