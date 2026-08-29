@@ -80,7 +80,14 @@ func open_at(rect: Rect2, initial: String, for_token: Variant, seeded := false) 
 	# zoomed out far enough the field was a box with one clipped character in it. Sized from the
 	# rect the caller measured, which is the drawn row.
 	add_theme_font_size_override("font_size", clampi(int(rect.size.y * 0.55), 11, 26))
-	position = rect.position
+	size = Vector2(maxf(rect.size.x, 120.0), maxf(rect.size.y, 22.0))
+	# CLAMPED INSIDE THE WINDOW, and lifted three pixels. A row near the right edge of the canvas
+	# put the field half off-screen, and one at the bottom put it under the hint bar -- so the
+	# commonest edit on the busiest part of the surface was the one you could not see.
+	var room := get_parent_area_size()
+	position = Vector2(
+		clampf(rect.position.x, 4.0, maxf(4.0, room.x - size.x - 4.0)),
+		clampf(rect.position.y - 3.0, 4.0, maxf(4.0, room.y - size.y - 4.0)))
 	size = Vector2(maxf(rect.size.x, 60.0), maxf(rect.size.y, 22.0))
 	visible = true
 	_open = true

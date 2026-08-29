@@ -575,16 +575,23 @@ func save_all() -> int:
 
 ## Discards every pending change by re-reading the tree. Abort IS load re-run, which is why
 ## it needs no bookkeeping of its own. Returns how many pending changes were dropped.
-func abort_all() -> int:
+## `prefer` is the path the caller is looking at. Anchoring the reload on it matters because the
+## anchor decides which TREE comes back: the first on-disk module in list order can be one the
+## walk-up puts under a different root, so aborting could hand back a neighbouring tree.
+func abort_all(prefer := "") -> int:
 	if not _tree.has_unsaved_work():
 		return 0
 	var reverted := _tree.orphaned_paths().size()
 	var anchor := ""
+	var wanted := Paths.canon(prefer)
 	for module in _tree.modules():
 		if module.is_dirty() or not module.is_on_disk() or module.has_moved():
 			reverted += 1
-		if anchor.is_empty() and module.is_on_disk():
-			anchor = module.disk_path
+		if module.is_on_disk():
+			if not wanted.is_empty() and Paths.same(module.file_path(), wanted):
+				anchor = module.disk_path
+			elif anchor.is_empty():
+				anchor = module.disk_path
 
 	if anchor.is_empty():
 		# Nothing was ever written, so there is nothing to go back to.

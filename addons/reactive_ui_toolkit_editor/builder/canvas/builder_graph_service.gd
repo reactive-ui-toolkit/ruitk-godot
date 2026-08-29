@@ -258,6 +258,15 @@ static func populate_card(card: Graph.Card, text: String) -> void:
 ## too broken to yield a declaration.
 static func classify(text: String, file_path: String, decls: Array = []) -> Module.Kind:
 	var rows := decls if not decls.is_empty() else (Compiler.analyzed_decls(text)["decls"] as Array)
+	# THE SUFFIX WINS FOR STYLE AND HOOK. `card.style.guitkx` IS a style module whatever is
+	# declared inside it -- the document layer's `split_file_name` has always said so, and the
+	# folder convention, the create rules and the companion placement all depend on it. Reading
+	# the declaration first badged a `.style.guitkx` holding a function as a util, so the same
+	# file was two different kinds depending on which layer you asked.
+	if not file_path.is_empty():
+		var by_name := Module.kind_of(file_path)
+		if by_name == Module.Kind.STYLE or by_name == Module.Kind.HOOK:
+			return by_name
 	var binding := _binding_decl(text, rows)
 	if binding.is_empty():
 		return Module.kind_of(file_path) if not file_path.is_empty() else Module.Kind.UNKNOWN

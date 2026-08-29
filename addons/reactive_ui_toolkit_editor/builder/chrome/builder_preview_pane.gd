@@ -143,12 +143,16 @@ func _module_note(file_path: String) -> String:
 	if index < 0:
 		return ""
 	var card = graph.cards[index]
+	# ASKED OF THE EDGES, which are already resolved. A substring match on the import ROW TEXT
+	# reported `Card` as a consumer of `CardHeader` -- and missed an aliased import entirely --
+	# so the one line telling a reader who depends on this module was wrong in both directions.
 	var consumers: PackedStringArray = PackedStringArray()
-	for other in graph.cards:
-		for row in other.imports:
-			if str(row.text).contains(card.title):
-				consumers.append(other.title)
-				break
+	for edge in graph.edges_to(index):
+		if edge.from_index < 0 or edge.from_index >= graph.cards.size():
+			continue
+		var from_title := str(graph.cards[edge.from_index].title)
+		if not consumers.has(from_title):
+			consumers.append(from_title)
 	var used := ("used by " + ", ".join(consumers)) if not consumers.is_empty() 		else "nothing imports it yet"
 	return "%s — %s" % [card.signature if not card.signature.is_empty() else card.title, used]
 

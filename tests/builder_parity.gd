@@ -202,6 +202,10 @@ const PARITY := [
 	["+ new opens under the chip that opened it", "_new_button.get_screen_position()"],
 	["a recovery starts with a ledger that describes THAT tree", "func restore_recovery"],
 	["a history walk redraws once", "_walking_history"],
+	["the file suffix decides for style and hook", "if by_name == Module.Kind.STYLE"],
+	["the consumer list is resolved, not substring-matched", "for edge in graph.edges_to(index):"],
+	["the inline editor stays inside the window", "get_parent_area_size()"],
+	["abort goes back to the tree you were in", "func abort_all(prefer"],
 	["a scrollable section eats the plain wheel; Ctrl+wheel is still the zoom", "func _input"],
 	["UB-78: the signature is two runs, cut at the paren", "func signature_head"],
 	# The preview

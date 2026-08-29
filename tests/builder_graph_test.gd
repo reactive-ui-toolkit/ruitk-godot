@@ -27,7 +27,7 @@ const ROOT := "res://tests/__builder_graph_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 181
+const ASSERTION_FLOOR := 184
 
 var _fails := 0
 var _passes := 0
@@ -44,6 +44,7 @@ func _initialize() -> void:
 	_test_import_rows()
 	_test_edges()
 	_test_hook_chips()
+	_test_kind_follows_the_suffix()
 	_test_island()
 	_test_markup_golden()
 	_test_root_is_not_the_focus()
@@ -381,6 +382,32 @@ AppHooks.use_facts  →  facts @11""",
 
 	_section("a util module has no chips either")
 	_eq(_card("util.guitkx").body.size(), 0, "nothing in it looks like a hook")
+
+
+## THE SUFFIX DECIDES for style and hook, whatever is declared inside.
+##
+## `card.style.guitkx` IS a style module -- the document layer's `split_file_name` has always
+## said so, and the folder convention, the create rules and the companion placement all depend on
+## it. Reading the declaration first badged a `.style.guitkx` holding a function as a util, so the
+## same file was two different kinds depending on which layer you asked.
+func _test_kind_follows_the_suffix() -> void:
+	_section("a .style.guitkx is a style module whatever it holds")
+	_eq(Service.classify("export helper() -> int {
+	return 1
+}
+",
+		"res://ui/card.style.guitkx"), Module.Kind.STYLE,
+		"a function in a .style.guitkx is still a style module")
+	_eq(Service.classify("export use_x() -> int {
+	return 1
+}
+",
+		"res://ui/x.hooks.guitkx"), Module.Kind.HOOK, "and .hooks.guitkx is a hook module")
+	_eq(Service.classify("export thing() -> int {
+	return 1
+}
+", "res://ui/thing.guitkx"),
+		Module.Kind.UTIL, "everything else is read from the declaration, as before")
 
 
 func _test_island() -> void:

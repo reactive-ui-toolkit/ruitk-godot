@@ -3522,7 +3522,9 @@ func _place_tree_in(folder: String) -> bool:
 func abort() -> int:
 	if workspace == null:
 		return 0
-	var reverted := workspace.abort_all()
+	# ANCHORED ON THE FOCUS. Which tree comes back is decided by the anchor, and the first on-disk
+	# module in list order can sit under a different root than the one the user is working in.
+	var reverted := workspace.abort_all(_focus_path)
 	ledger.clear()
 	Journal.clear()
 	reproject()
