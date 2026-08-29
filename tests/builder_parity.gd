@@ -128,6 +128,8 @@ const PARITY := [
 	["detailVisible: export heads at Layer 2, entries at Layer 3", "func draws_export_row"],
 	["DotColor(kind) -- an anchor dot is its import's kind", "func edge_tint"],
 	["the lattice coarsens instead of vanishing", "doublings"],
+	["UB-23: every card section is capped and scrolls", "func section_cap"],
+	["a scrollable section eats the plain wheel; Ctrl+wheel is still the zoom", "func _input"],
 	["UB-78: the signature is two runs, cut at the paren", "func signature_head"],
 	# The preview
 	["UsageFor", "func _usage_note"],

@@ -126,7 +126,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 				var row = card.imports[i]
 				__cf2.append(V.PanelContainer({ "name": "row-1-%d" % i, "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.row_selected() if (sel_section == 1 and sel_row == i) else P.row_plain() }, [V.Label({ "text": row.text, "style": P.import_row(), "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS })], str(row.at)))
 				continue
-			__cf1 = V.fc(CanvasCardSection, { "heading": "IMPORTS" }, [__cf2])
+			__cf1 = V.fc(CanvasCardSection, { "heading": "IMPORTS", "cap": M.section_scroll_h(card, M.Section.IMPORTS, lod) }, [__cf2])
 			continue
 	var __cf3 = null
 	if M.has_body_section(card):
@@ -136,7 +136,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 				var row = card.body[i]
 				__cf4.append(V.PanelContainer({ "name": "row-2-%d" % i, "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.row_selected() if (sel_section == 2 and sel_row == i) else P.chip() }, [V.Label({ "text": row.text, "style": P.chip_text(), "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS })], str(row.at)))
 				continue
-			__cf3 = V.fc(CanvasCardSection, { "heading": "BODY — HOOKS & STATE" }, [V.HFlowContainer({ "style": {"separation": 4}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [__cf4, V.fc(CanvasAddChip, { "label": "+ hook", "what": "hook", "index": index, "on_add": on_add }), V.fc(CanvasAddChip, { "label": "+ code", "what": "code", "index": index, "on_add": on_add })])])
+			__cf3 = V.fc(CanvasCardSection, { "heading": "BODY — HOOKS & STATE", "cap": M.section_scroll_h(card, M.Section.BODY, lod) }, [V.HFlowContainer({ "style": {"separation": 4}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [__cf4, V.fc(CanvasAddChip, { "label": "+ hook", "what": "hook", "index": index, "on_add": on_add }), V.fc(CanvasAddChip, { "label": "+ code", "what": "code", "index": index, "on_add": on_add })])])
 			continue
 	var __cf5 = null
 	if draws_markup and not card.markup.is_empty():
@@ -146,7 +146,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 				var row = card.markup[i]
 				__cf6.append(V.PanelContainer({ "name": "row-3-%d" % i, "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.row_selected() if (sel_section == 3 and sel_row == i) else (P.row_highlighted() if M.row_mentions(row, highlight_names) else P.row_plain()) }, [V.fc(CanvasMarkupRow, { "row": row, "lod": lod })], str(row.at)))
 				continue
-			__cf5 = V.fc(CanvasCardSection, { "heading": "RETURN — MARKUP" }, [__cf6])
+			__cf5 = V.fc(CanvasCardSection, { "heading": "RETURN — MARKUP", "cap": M.section_scroll_h(card, M.Section.MARKUP, lod) }, [__cf6])
 			continue
 	var __cf7 = null
 	if draws_exports and M.has_exports_section(card):
@@ -156,7 +156,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 				var row = card.export_detail[i]
 				__cf8.append(V.PanelContainer({ "name": "row-4-%d" % i, "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.row_selected() if (sel_section == 4 and sel_row == i) else P.row_plain() }, [V.Label({ "text": "  ".repeat(row.depth) + row.text, "style": P.export_row(), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS })], str(row.at) + row.text))
 				continue
-			__cf7 = V.fc(CanvasCardSection, { "heading": "EXPORTS" }, [__cf8, V.HFlowContainer({ "style": {"separation": 4}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.fc(CanvasAddChip, { "label": "+ style", "what": "style", "index": index, "on_add": on_add })])])
+			__cf7 = V.fc(CanvasCardSection, { "heading": "EXPORTS", "cap": M.section_scroll_h(card, M.Section.EXPORTS, lod) }, [__cf8, V.HFlowContainer({ "style": {"separation": 4}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.fc(CanvasAddChip, { "label": "+ style", "what": "style", "index": index, "on_add": on_add })])])
 			continue
 	var __cf9 = null
 	if draws_island and not card.island_lines.is_empty():
@@ -165,15 +165,25 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 			for i in range(card.island_lines.size()):
 				__cf10.append(V.PanelContainer({ "name": "row-5-%d" % i, "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.row_selected() if (sel_section == 5 and sel_row == i) else P.row_plain() }, [V.Label({ "text": card.island_lines[i], "style": P.island_row(), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS })], str(i)))
 				continue
-			__cf9 = V.fc(CanvasCardSection, { "heading": "SETUP" }, [__cf10])
+			__cf9 = V.fc(CanvasCardSection, { "heading": "SETUP", "cap": M.section_scroll_h(card, M.Section.ISLAND, lod) }, [__cf10])
 			continue
 	return V.VBoxContainer({ "style": {"separation": 4}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [__cf0, __cf1, __cf3, __cf5, __cf7, __cf9])
 
 # component CanvasCardSection
 static func CanvasCardSection(props: Dictionary, children: Array) -> RuitkVNode:
 	var heading = props.get("heading", "")
+	var cap = props.get("cap", 0.0)
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
-	return V.VBoxContainer({ "style": {"separation": 2}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.ColorRect({ "color": Color(0.24, 0.24, 0.29, 0.9), "custom_minimum_size": Vector2(0, 1) }), V.Label({ "text": heading, "style": P.section_head() }), (children)])
+	var __cf0 = null
+	if cap > 0.0:
+		for __cf0_once in 1:
+			__cf0 = V.ScrollContainer({ "custom_minimum_size": Vector2(0, cap), "horizontal_scroll_mode": ScrollContainer.SCROLL_MODE_DISABLED, "mouse_filter": Control.MOUSE_FILTER_PASS }, [V.VBoxContainer({ "style": {"separation": 2}, "size_flags_horizontal": Control.SIZE_EXPAND_FILL, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [(children)])])
+			continue
+	else:
+		for __cf0_once in 1:
+			__cf0 = V.VBoxContainer({ "style": {"separation": 2}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [(children)])
+			continue
+	return V.VBoxContainer({ "style": {"separation": 2}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.ColorRect({ "color": Color(0.24, 0.24, 0.29, 0.9), "custom_minimum_size": Vector2(0, 1) }), V.Label({ "text": heading, "style": P.section_head() }), __cf0])
 
 # component CanvasMarkupRow
 static func CanvasMarkupRow(props: Dictionary, children: Array) -> RuitkVNode:

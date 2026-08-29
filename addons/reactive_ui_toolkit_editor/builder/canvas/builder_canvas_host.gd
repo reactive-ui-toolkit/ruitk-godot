@@ -375,17 +375,36 @@ func _collect_cards(node: Node, out: Dictionary) -> void:
 		_collect_cards(child, out)
 
 
-func _collect_rows(node: Node, origin: Vector2, scale: float, out: Dictionary) -> void:
+## `clip` is the running visible rect in GLOBAL coordinates, empty when nothing clips.
+##
+## A capped section is a `ScrollContainer`, and its children are laid out in full whether or not
+## they are inside the viewport -- so a row scrolled past the bottom still has a rect, one that
+## sits over the section BELOW it. Measured unclipped, the hit-test would report a row nobody can
+## see for a click on a row they can.
+func _collect_rows(node: Node, origin: Vector2, scale: float, out: Dictionary,
+		clip := Rect2()) -> void:
 	for child in node.get_children():
+		var here := clip
 		if child is Control:
 			var control := child as Control
 			var name := str(control.name)
+			if control is ScrollContainer:
+				var box := control.get_global_rect()
+				here = box if here.size == Vector2.ZERO else here.intersection(box)
 			if name.begins_with("row-"):
 				var parts := name.substr(4).split("-")
 				if parts.size() == 2:
-					var local := (control.get_global_rect().position - origin) / scale
-					out["%s:%s" % [parts[0], parts[1]]] = Rect2(local, control.size)
-		_collect_rows(child, origin, scale, out)
+					var rect := control.get_global_rect()
+					if here.size != Vector2.ZERO:
+						rect = here.intersection(rect)
+						# Gone, or a sliver at the edge of the viewport. A one-pixel strip is not
+						# something a person can aim at, and treating it as hittable makes the row
+						# above it unreachable along its own bottom edge.
+						if rect.size.y <= 2.0:
+							continue
+					out["%s:%s" % [parts[0], parts[1]]] = Rect2(
+						(rect.position - origin) / scale, rect.size / scale)
+		_collect_rows(child, origin, scale, out, here)
 
 
 ## The measured rect of one row, or an empty Rect2 when nothing was measured.
@@ -482,6 +501,27 @@ const GRID_SPACING := 64.0
 const GRID_MIN_SCREEN_SPACING := 14.0
 const GRID_DOT := 2.0
 const GRID_COLOR := Color(0.34, 0.34, 0.40, 0.55)
+
+
+## CTRL+WHEEL IS ALWAYS THE ZOOM, even over something that consumes the plain wheel.
+##
+## A capped card section is a `ScrollContainer`, and a `ScrollContainer` handles the wheel -- so
+## over a long markup body the plain wheel scrolls the section and never reaches `_gui_input`.
+## That is the behaviour the reference chose ("a scrollable section consumes the plain wheel;
+## Ctrl+wheel stays a zoom everywhere"), and it only holds if the zoom has a route that does not
+## go through the GUI pick. `_input` runs before the GUI does, so this is that route.
+func _input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var button := event as InputEventMouseButton
+	if not button.pressed or not button.ctrl_pressed:
+		return
+	if button.button_index != MOUSE_BUTTON_WHEEL_UP and button.button_index != MOUSE_BUTTON_WHEEL_DOWN:
+		return
+	if not get_global_rect().has_point(button.global_position):
+		return
+	_handle_button(button)
+	get_viewport().set_input_as_handled()
 
 
 func _gui_input(event: InputEvent) -> void:

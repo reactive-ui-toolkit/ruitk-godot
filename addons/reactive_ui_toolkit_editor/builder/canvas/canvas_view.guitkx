@@ -185,7 +185,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 			}
 			@if (not card.imports.is_empty()) {
 				return (
-					<CanvasCardSection heading="IMPORTS">
+					<CanvasCardSection heading="IMPORTS" cap={ M.section_scroll_h(card, M.Section.IMPORTS, lod) }>
 						@for (i in range(card.imports.size())) {
 							var row = card.imports[i]
 							return (
@@ -201,7 +201,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 			}
 			@if (M.has_body_section(card)) {
 				return (
-					<CanvasCardSection heading="BODY — HOOKS & STATE">
+					<CanvasCardSection heading="BODY — HOOKS & STATE" cap={ M.section_scroll_h(card, M.Section.BODY, lod) }>
 						<HFlowContainer style={ {"separation": 4} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 							@for (i in range(card.body.size())) {
 								var row = card.body[i]
@@ -221,7 +221,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 			}
 			@if (draws_markup and not card.markup.is_empty()) {
 				return (
-					<CanvasCardSection heading="RETURN — MARKUP">
+					<CanvasCardSection heading="RETURN — MARKUP" cap={ M.section_scroll_h(card, M.Section.MARKUP, lod) }>
 						@for (i in range(card.markup.size())) {
 							var row = card.markup[i]
 							return (
@@ -236,7 +236,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 			}
 			@if (draws_exports and M.has_exports_section(card)) {
 				return (
-					<CanvasCardSection heading="EXPORTS">
+					<CanvasCardSection heading="EXPORTS" cap={ M.section_scroll_h(card, M.Section.EXPORTS, lod) }>
 						@for (i in M.drawn_export_rows(card, lod)) {
 							var row = card.export_detail[i]
 							return (
@@ -256,7 +256,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 			}
 			@if (draws_island and not card.island_lines.is_empty()) {
 				return (
-					<CanvasCardSection heading="SETUP">
+					<CanvasCardSection heading="SETUP" cap={ M.section_scroll_h(card, M.Section.ISLAND, lod) }>
 						@for (i in range(card.island_lines.size())) {
 							return (
 								<PanelContainer key={ str(i) } name={ "row-5-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
@@ -277,14 +277,36 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 ## A titled group inside a card. Its own component so every section has the same lead, the same
 ## separation and the same heading treatment -- three places to change it is how two of them stop
 ## matching.
-export CanvasCardSection(heading: String = "") -> RuitkVNode {
+## `cap` is the section's ceiling in card-local units, or 0 for a section that fits. A capped
+## section becomes a scroller: the reference caps every one of them (§8.2) because an uncapped
+## section is what grows a card until it overlaps its neighbours.
+export CanvasCardSection(heading: String = "", cap: float = 0.0) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	return (
 		<VBoxContainer style={ {"separation": 2} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 			<ColorRect color={ Color(0.24, 0.24, 0.29, 0.9) }
 				custom_minimum_size={ Vector2(0, 1) } />
 			<Label text={ heading } style={ P.section_head() } />
-			{ children }
+			@if (cap > 0.0) {
+				return (
+					<ScrollContainer custom_minimum_size={ Vector2(0, cap) }
+							horizontal_scroll_mode={ ScrollContainer.SCROLL_MODE_DISABLED }
+							mouse_filter={ Control.MOUSE_FILTER_PASS }>
+						<VBoxContainer style={ {"separation": 2} }
+								size_flags_horizontal={ Control.SIZE_EXPAND_FILL }
+								mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+							{ children }
+						</VBoxContainer>
+					</ScrollContainer>
+				)
+			}
+			@else {
+				return (
+					<VBoxContainer style={ {"separation": 2} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+						{ children }
+					</VBoxContainer>
+				)
+			}
 		</VBoxContainer>
 	)
 }

@@ -33,7 +33,7 @@ const VIEWPORT := Vector2(1280, 720)
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 195
+const ASSERTION_FLOOR := 205
 
 var _fails := 0
 var _passes := 0
@@ -51,6 +51,7 @@ func _run() -> void:
 	_test_section_predicates_are_shared()
 	_test_hit_test_matches_what_is_drawn()
 	_test_hook_usage_highlighting()
+	_test_section_caps()
 	_test_lod_bands()
 	await _test_card_can_be_moved()
 	await _test_canvas_can_be_panned()
@@ -340,6 +341,56 @@ func _card_with_everything() -> Graph.Card:
 	card.island_start_line = 1
 	card.island_end_line = 1
 	return card
+
+
+## A SECTION HAS A CEILING, AND EVERY CONSUMER READS THE SAME ONE.
+##
+## UB-23: no card section was capped, so a component with a long markup body grew a card until it
+## overlapped its neighbours -- and the overlap was blamed on the layout, which had placed the card
+## correctly for the height it was told about.
+func _test_section_caps() -> void:
+	_section("a long section is capped, and the cap is in the model")
+	var tall := Graph.Card.new()
+	tall.title = "Tall"
+	tall.kind = Module.Kind.COMPONENT
+	for i in 60:
+		tall.markup.append(_line(Graph.LineKind.ELEMENT, "Label %d" % i))
+	var stack: Array = Metrics.section_stack(tall)
+	var markup := {}
+	for row in stack:
+		if int((row as Dictionary)["section"]) == int(Metrics.Section.MARKUP):
+			markup = row as Dictionary
+	_check(not markup.is_empty(), "the card has a markup section")
+	_check(bool(markup["scrolls"]), "60 rows is past the cap, so the section scrolls")
+	_eq(int(markup["all_rows"]), 60, "the model still knows how many rows there are")
+	_check(int(markup["rows"]) < 60, "but only the ones inside the cap are addressable at rest")
+	_eq(float(markup["height"]), Metrics.SECTION_OVERHEAD_H + Metrics.section_cap(
+		int(Metrics.Section.MARKUP)), "and the section is its lead plus its cap, no taller")
+	_eq(Metrics.section_scroll_h(tall, int(Metrics.Section.MARKUP)),
+		Metrics.section_cap(int(Metrics.Section.MARKUP)),
+		"which is the height the view gives the scroller")
+
+	var short := Graph.Card.new()
+	short.title = "Short"
+	short.kind = Module.Kind.COMPONENT
+	short.markup.append(_line(Graph.LineKind.ELEMENT, "Label"))
+	_eq(Metrics.section_scroll_h(short, int(Metrics.Section.MARKUP)), 0.0,
+		"a section that fits gets no scroller -- three rows in a 340px box is not a cap, it is a hole")
+
+	# AND THE CARD IS BOUNDED. This is the whole point: an uncapped card is what overlaps the one
+	# below it, and the layout cannot place what it is lied to about.
+	_check(Metrics.estimate_card_height(tall) < 60.0 * Metrics.MARKUP_ROW_H,
+		"a 60-row card is not 60 rows tall")
+
+	# AN ANCHOR CANNOT FLOAT BELOW ITS OWN SECTION. A scrolled-out row is still a row an edge
+	# leaves from, and drawn where the row WOULD be it is a dot past the card's bottom edge.
+	var deep := Metrics.edge_source_anchor(tall, 59, Metrics.card_width_for(Metrics.Lod.FULL),
+		Metrics.Lod.FULL, Metrics.Section.MARKUP)
+	_check(deep.y <= tall.y + Metrics.estimate_card_height(tall),
+		"the anchor of a scrolled-out row is clamped inside the card")
+	var near_top := Metrics.edge_source_anchor(tall, 0, Metrics.card_width_for(Metrics.Lod.FULL),
+		Metrics.Lod.FULL, Metrics.Section.MARKUP)
+	_check(deep.y > near_top.y, "and rows above the cap still anchor in order")
 
 
 func _line(kind: int, text: String) -> Graph.Line:

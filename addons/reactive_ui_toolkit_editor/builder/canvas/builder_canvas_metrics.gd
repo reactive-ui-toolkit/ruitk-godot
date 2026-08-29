@@ -336,15 +336,59 @@ static func section_stack(card: Graph.Card, lod := Lod.FULL) -> Array:
 	return out
 
 
+## THE CEILING ON ONE SECTION, in card-local units, or 0 for a section that has none.
+##
+## The reference's caps (§8.2), and the reason it set them is UB-23: no section was capped, so a
+## component with a long markup body grew a card until it overlapped its neighbours -- which is
+## what PRODUCED the overlap defect above it. A capped section scrolls; see `CanvasCardSection`.
+static func section_cap(section: int) -> float:
+	match section:
+		int(Section.IMPORTS):
+			return 140.0
+		int(Section.BODY):
+			return 260.0
+		int(Section.EXPORTS):
+			return 280.0
+		int(Section.MARKUP):
+			return 340.0
+		int(Section.ISLAND):
+			return 220.0
+		_:
+			return 0.0   # the signature is one wrapped line; capping it would cut a name in half
+
+
+## The scroller height for one section, or 0.0 when it fits and needs none.
+##
+## What the view asks so it only builds a `ScrollContainer` where there is something to scroll: a
+## capped scroller around a three-row section would be three rows of content in a 340px box.
+static func section_scroll_h(card: Graph.Card, section: int, lod := Lod.FULL) -> float:
+	for entry in section_stack(card, lod):
+		var spec := entry as Dictionary
+		if int(spec["section"]) != section:
+			continue
+		return section_cap(section) if bool(spec.get("scrolls", false)) else 0.0
+	return 0.0
+
+
 static func _section_row(section: Section, top: float, lead: float, rows: int,
 		row_height: float) -> Dictionary:
+	var content := rows * row_height
+	var cap := section_cap(int(section))
+	var scrolls := cap > 0.0 and content > cap
+	var shown := cap if scrolls else content
 	return {
 		"section": section,
 		"top": top,
 		"lead": lead,
-		"rows": rows,
+		# WHAT IS ON SCREEN, not what exists. A scrolled-out row is not at a place the mouse can
+		# reach at scroll zero, and the model path is the fallback for exactly the moment before
+		# the real rects have been measured -- reporting rows below the cap there would put a drop
+		# on a row nobody can see.
+		"rows": rows if not scrolls else int(shown / row_height),
+		"all_rows": rows,
+		"scrolls": scrolls,
 		"row_height": row_height,
-		"height": lead + rows * row_height,
+		"height": lead + shown,
 	}
 
 
@@ -483,12 +527,17 @@ static func edge_source_anchor(card: Graph.Card, import_index: int,
 	# a dot hanging in space below a pill, joined to a curve that appeared to start at nothing.
 	if lod == Lod.PILL:
 		return Vector2(card.x + card_width, card.y + HEADER_H * 0.5)
-	for entry in section_stack(card):
+	for entry in section_stack(card, lod):
 		var spec := entry as Dictionary
 		if int(spec["section"]) != int(section):
 			continue
 		var pitch := float(spec.get("row_height", IMPORT_ROW_H))
-		y = card.y + float(spec["top"]) + SECTION_OVERHEAD_H 			+ (float(maxi(0, import_index)) + 0.5) * pitch
+		var first := card.y + float(spec["top"]) + float(spec["lead"])
+		y = first + (float(maxi(0, import_index)) + 0.5) * pitch
+		# CLAMPED INTO THE SECTION. A capped section scrolls, so the row an edge leaves from can
+		# be below the viewport -- and an anchor drawn where the row WOULD be is a dot floating
+		# past the card's own bottom edge with a curve joined to it.
+		y = minf(y, card.y + float(spec["top"]) + float(spec["height"]) - pitch * 0.5)
 		break
 	return Vector2(card.x + card_width, y)
 
