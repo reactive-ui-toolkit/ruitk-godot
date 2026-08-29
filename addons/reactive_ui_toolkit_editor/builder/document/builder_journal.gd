@@ -64,7 +64,25 @@ static func peek() -> Dictionary:
 	var tree := payload.get("tree", {}) as Dictionary
 	if (tree.get("modules", []) as Array).is_empty():
 		return {}
-	return { "modules": int(payload.get("modules", 0)), "saved_at": str(payload.get("saved_at", "")) }
+	# THE PATHS AS WELL AS THE COUNT. The offer wants to NAME what it is offering back, and it was
+	# reading `modules` -- a COUNT -- as a list, which is an invalid cast that threw every time the
+	# builder opened with work journalled. So the one feature that exists to save a crashed
+	# session's work crashed instead, every time, and had never once run to completion.
+	var paths := PackedStringArray()
+	for entry in (tree.get("modules", []) as Array):
+		if entry is Dictionary:
+			var where := str((entry as Dictionary).get("disk_path", ""))
+			if where.is_empty():
+				where = str((entry as Dictionary).get("path", ""))
+			if where.is_empty():
+				where = str((entry as Dictionary).get("name", ""))
+			if not where.is_empty():
+				paths.append(where)
+	return {
+		"modules": int(payload.get("modules", 0)),
+		"paths": paths,
+		"saved_at": str(payload.get("saved_at", "")),
+	}
 
 
 static func try_restore(workspace: BuilderWorkspace) -> bool:

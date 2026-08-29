@@ -35,7 +35,7 @@ const CHILD := """export Child(n: int = 0) -> RuitkVNode {
 }
 """
 
-const ASSERTION_FLOOR := 54
+const ASSERTION_FLOOR := 57
 
 var _fails := 0
 var _passes := 0
@@ -46,6 +46,7 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	_test_the_recovery_offer_can_be_built()
 	await _test_a_card_can_be_dragged()
 	await _test_a_row_menu_opens_where_the_click_was()
 	await _test_adding_an_attribute_reaches_the_buffer()
@@ -688,3 +689,24 @@ func _test_every_band_of_a_card_moves_it_except_a_markup_row() -> void:
 
 	w.queue_free()
 	await process_frame
+
+
+## THE RECOVERY OFFER CAN ACTUALLY BE BUILT.
+##
+## `peek()` returns `modules` as a COUNT and the offer read it as a LIST -- an invalid cast that
+## threw on every open with work journalled. So the one feature whose whole job is handing back a
+## crashed session's work crashed instead, every single time, and the next Save cleared what it
+## had been holding. It was never once seen to run.
+func _test_the_recovery_offer_can_be_built() -> void:
+	var Journal = load("res://addons/reactive_ui_toolkit_editor/builder/document/builder_journal.gd")
+	var ws := Workspace.new()
+	ws.create_new(ROOT.path_join("app.guitkx"), APP)
+	Journal.capture(ws, "just now")
+	var pending: Dictionary = Journal.peek()
+	_ok(not pending.is_empty(), "a journalled session is offered back")
+	_ok(pending.has("paths"), "and the offer can NAME what it is holding")
+	var listed: PackedStringArray = pending.get("paths", PackedStringArray())
+	_ok(listed.size() > 0 or int(pending.get("modules", 0)) > 0,
+		"with something to show (%d path(s), %d module(s))"
+			% [listed.size(), int(pending.get("modules", 0))])
+	Journal.clear()

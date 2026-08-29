@@ -1434,9 +1434,14 @@ func _offer_recovery() -> void:
 	var pending := pending_recovery()
 	if pending.is_empty():
 		return
+	# NAMED FROM `paths`. `modules` is a COUNT, and casting an int to Array threw here on every
+	# open with a pending journal -- so the recovery offer never appeared and the work it was
+	# holding was cleared by the next Save.
 	var names := PackedStringArray()
-	for entry in (pending.get("modules", []) as Array):
+	for entry in (pending.get("paths", PackedStringArray()) as PackedStringArray):
 		names.append("    " + str(entry).get_file())
+	if names.is_empty():
+		names.append("    %d module(s)" % int(pending.get("modules", 0)))
 	var dialog := ConfirmationDialog.new()
 	dialog.title = "Restore unsaved work?"
 	dialog.dialog_text = ("A previous session left unsaved work, last seen %s:

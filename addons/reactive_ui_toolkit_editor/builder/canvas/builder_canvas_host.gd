@@ -681,6 +681,7 @@ func _get_cursor_shape(at_position := Vector2.ZERO) -> CursorShape:
 
 
 func _gui_input(event: InputEvent) -> void:
+	_trace_input(event)
 	if event is InputEventMouseButton:
 		_handle_button(event as InputEventMouseButton)
 	elif event is InputEventMouseMotion:
@@ -803,6 +804,28 @@ func _drop_data(at_position: Vector2, data: Variant) -> void:
 ## TEMPORARY INSTRUMENTATION. Prints the drag state for the first few motions after a press, so
 ## a single attempt in a real editor says where the gesture dies. Remove once the report is in.
 var _drag_trace_left := 0
+
+
+## Prints the FIRST events this control receives at all. If nothing appears, `_gui_input` is not
+## being called and the problem is routing into the canvas, not anything inside it.
+func _trace_input(event: InputEvent) -> void:
+	if _input_trace_left <= 0:
+		return
+	if not (event is InputEventMouseButton or event is InputEventMouseMotion):
+		return
+	_input_trace_left -= 1
+	var kind := "BUTTON" if event is InputEventMouseButton else "motion"
+	var extra := ""
+	if event is InputEventMouseButton:
+		var b := event as InputEventMouseButton
+		extra = " button=%d pressed=%s" % [b.button_index, b.pressed]
+	print("[RUITK input] ", kind, " at=", (event as InputEventMouse).position, extra,
+		" | rect=", get_global_rect(), " filter=", mouse_filter,
+		" cards=", (graph.cards.size() if graph != null else -1),
+		" zoom=", zoom, " measured_zoom=", _measured_zoom)
+
+
+var _input_trace_left := 24
 
 
 func _trace_drag(motion: InputEventMouseMotion) -> void:
