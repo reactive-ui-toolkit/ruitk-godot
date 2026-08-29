@@ -1,6 +1,6 @@
 @tool
 class_name RuitkBuilderIslandEditor
-extends TextEdit
+extends "res://addons/reactive_ui_toolkit_editor/editor/guitkx_code_edit.gd"
 ## The MULTILINE in-place editor: a card's setup island, edited where it sits.
 ##
 ## A sibling of `builder_inline_editor.gd` rather than a mode of it, because the two differ in the
@@ -16,6 +16,15 @@ extends TextEdit
 ##
 ## The signal contract is deliberately identical to the inline editor's, so the window's one
 ## commit funnel serves both.
+##
+## IT IS THE `.guitkx` CODE EDITOR, not a bare TextEdit. A card's setup island is GDScript, and
+## the addon already has a control that colours it, completes in it and carries a diagnostics
+## gutter -- the same one the source pane uses. Editing code in a field with none of that is the
+## defect SM-03 names, and the fix was to stop writing a second editor beside the one that exists.
+##
+## Extended by PATH rather than by `class_name`: everything under `builder/` reaches its
+## dependencies through preloads, because `ProjectSettings.save()` truncates the editor class
+## cache to what the running process loaded and a global name can vanish mid-session.
 
 ## The edit was accepted. `token` is whatever the caller attached.
 signal committed(token: Variant, text: String)
@@ -41,6 +50,12 @@ func _init() -> void:
 	wrap_mode = TextEdit.LINE_WRAPPING_NONE
 	scroll_smooth = false
 	focus_exited.connect(_on_focus_exited)
+
+
+func _ready() -> void:
+	# The colouring, the completion and the gutters come from the shared editor's own setup, so
+	# the island reads exactly like the same code does in the source pane.
+	configure()
 
 
 func is_open() -> bool:
@@ -113,6 +128,10 @@ func _gui_input(event: InputEvent) -> void:
 	if not key.pressed:
 		return
 	if key.keycode == KEY_ESCAPE:
+		# A completion popup goes with the editor. Godot's CodeEdit does not report whether one is
+		# open, so this closes both rather than guessing -- and Ctrl+Space is the only way to have
+		# opened one, so the common Escape has nothing to cancel but the edit.
+		cancel_code_completion()
 		cancel()
 		accept_event()
 	elif (key.ctrl_pressed or key.meta_pressed) \

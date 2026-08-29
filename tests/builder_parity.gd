@@ -103,7 +103,7 @@ const PARITY := [
 	["OnDirectiveEdited", "RowMenuId.EDIT_HEADER"],
 	# Islands and style entries
 	["OnIslandEdited", "func set_island"],
-	["a MULTILINE island editor", "class_name RuitkBuilderIslandEditor"],
+	["a MULTILINE island editor, syntax-coloured", "guitkx_code_edit.gd\""],
 	["double-click to edit a row in place", "signal row_activated"],
 	["the editor takes the size of what it edits", "func _row_rect_on_screen"],
 	["drop hint (band + caret)", "func _draw_drop_hint"],
