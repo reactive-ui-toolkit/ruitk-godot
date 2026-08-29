@@ -182,6 +182,11 @@ const PARITY := [
 	["the directive capability table", "DIRECTIVE_SUPPORT"],
 	["@for loops over something in scope", "func collections_in_scope"],
 	["and singularises its loop variable", "func singular_of"],
+	["a style entry value is chosen, not seeded", "func _value_items"],
+	["an attribute offers the values it can take", "func _attribute_value_items"],
+	["an enum offers its own constants", "func values_for"],
+	["an import of a real file outside the tree is pulled in", "func _pull_in_reachable_files"],
+	["a host-tag drift warning", "func _warn_on_tag_drift"],
 	["a scrollable section eats the plain wheel; Ctrl+wheel is still the zoom", "func _input"],
 	["UB-78: the signature is two runs, cut at the paren", "func signature_head"],
 	# The preview

@@ -222,6 +222,69 @@ static func _binding_for(hook_name: String) -> String:
 ## SEEDED WITH SOMETHING THAT COMPILES, never a placeholder. An attribute added and left for a
 ## moment is an attribute the preview is compiling, and `text={value}` names an identifier that
 ## does not exist -- the user gets an error for an edit they have not finished making.
+## THE VALUES WORTH OFFERING for a type, seeded value first.
+##
+## A style entry's value was seeded once and then unreachable from the canvas: the only way to
+## change `Color(0.2, 0.2, 0.24)` was to open the source pane and type over it, which is the one
+## thing the canvas exists to avoid. An enum-hinted property offers its own constants; everything
+## else offers the handful of literals that are actually written for that type.
+static func values_for(type: String, godot_class := "", prop := "") -> Array:
+	var out: Array = []
+	var seeded := default_value(type)
+	out.append({ "label": str(seeded["value"]), "quoted": bool(seeded["quoted"]) })
+
+	# AN ENUM KNOWS ITS OWN VALUES. `property_info`'s hint string is the engine's list, so the
+	# menu offers what the property actually accepts rather than a guess from its type name.
+	if not godot_class.is_empty() and not prop.is_empty():
+		var info := Schema.property_info(godot_class, prop)
+		if int(info.get("hint", 0)) == PROPERTY_HINT_ENUM:
+			for entry in str(info.get("hint_string", "")).split(",", false):
+				var name := str(entry).split(":")[0].strip_edges()
+				if name.is_empty():
+					continue
+				var literal := "%s.%s" % [godot_class, name.to_upper().replace(" ", "_")]
+				if not _has_label(out, literal):
+					out.append({ "label": literal, "quoted": false })
+			return out
+
+	for extra in _literals_for(type):
+		if not _has_label(out, str(extra)):
+			out.append({ "label": str(extra), "quoted": type == "String" \
+				or type == "StringName" or type == "NodePath" })
+	return out
+
+
+static func _has_label(items: Array, label: String) -> bool:
+	for item in items:
+		if str((item as Dictionary)["label"]) == label:
+			return true
+	return false
+
+
+## The literals a type is actually written with. Short lists on purpose: a menu of everything a
+## float could be is a menu nobody reads.
+static func _literals_for(type: String) -> PackedStringArray:
+	match type:
+		"bool":
+			return PackedStringArray(["true", "false"])
+		"Color":
+			return PackedStringArray(["Color.WHITE", "Color.BLACK", "Color.TRANSPARENT",
+				"Color(0.2, 0.2, 0.24)", "Color(0.36, 0.59, 0.96)"])
+		"int":
+			return PackedStringArray(["0", "1", "2", "4", "8", "16"])
+		"float":
+			return PackedStringArray(["0.0", "0.5", "1.0", "2.0"])
+		"Vector2":
+			return PackedStringArray(["Vector2.ZERO", "Vector2.ONE", "Vector2(0, 1)"])
+		"Array":
+			return PackedStringArray(["[]"])
+		"Dictionary":
+			return PackedStringArray(["{}"])
+		"String", "StringName":
+			return PackedStringArray([])
+	return PackedStringArray([])
+
+
 static func default_value(type: String) -> Dictionary:
 	match type:
 		"String", "StringName", "NodePath":

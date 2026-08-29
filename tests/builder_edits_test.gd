@@ -26,7 +26,7 @@ const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/docum
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 309
+const ASSERTION_FLOOR := 315
 
 var _fails := 0
 var _passes := 0
@@ -62,6 +62,7 @@ func _initialize() -> void:
 	_test_orphaned_directive()
 	_test_templates_invent_nothing()
 	_test_for_collections()
+	_test_value_vocabulary()
 
 	print("")
 	# A FLOOR ON THE COUNT. A suite that stops at a broken dependency prints ALL PASS on however
@@ -1235,3 +1236,40 @@ func _test_for_collections() -> void:
 		"a name that is not plural is named after what it holds instead of being mangled")
 	_eq(Attributes.singular_of("status"), "status_item",
 		"and a word ending in -ss is not a plural")
+
+
+## A VALUE IS CHOSEN, not seeded once and left unreachable.
+##
+## `Color(0.2, 0.2, 0.24)` was written into every colour entry and the only way to change it was
+## the source pane -- which is the one thing the canvas exists to avoid.
+func _test_value_vocabulary() -> void:
+	_section("the values worth offering for a type")
+	var bools := Attributes.values_for("bool")
+	_check(bools.size() >= 2, "a bool has two answers and both are offered")
+	var labels := PackedStringArray()
+	for entry in bools:
+		labels.append(str((entry as Dictionary)["label"]))
+	_check(labels.has("true") and labels.has("false"), "which are true and false (%s)"
+		% ", ".join(labels))
+	_eq(str((bools[0] as Dictionary)["label"]), "true",
+		"the seeded value comes first -- it is the one the builder would have written")
+
+	var colours := Attributes.values_for("Color")
+	_check(colours.size() > 1, "a colour offers more than the seed")
+	var strings := Attributes.values_for("String")
+	_check(bool((strings[0] as Dictionary)["quoted"]),
+		"a String value carries its quoting, so the writer does not have to")
+
+	_section("an enum offers its OWN constants, not the type's generic literals")
+	# `property_info`'s hint string is the engine's list, so the menu offers what the property
+	# actually accepts rather than a guess from its type name.
+	var aligned := Attributes.values_for("int", "Label", "horizontal_alignment")
+	var names := PackedStringArray()
+	for entry in aligned:
+		names.append(str((entry as Dictionary)["label"]))
+	var has_enum := false
+	for name in names:
+		if str(name).begins_with("Label."):
+			has_enum = true
+			break
+	_check(has_enum, "Label.horizontal_alignment offers Label.* constants (%s)" % ", ".join(names))

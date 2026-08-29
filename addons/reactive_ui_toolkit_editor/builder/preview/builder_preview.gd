@@ -171,6 +171,16 @@ func compile_dirty(focus_path: String) -> Summary:
 	_pending = false
 	var focus := Paths.canon(focus_path)
 
+	# BEFORE THE ROUND, never during it. The mirror is total, so an import the workspace does not
+	# hold cannot compile in the preview even when the file it names exists on disk: adding
+	# `import { X } from "../shared/x"` to a module whose tree was loaded without `shared/`
+	# produced a preview failure for a line that is perfectly correct. The fix a user would reach
+	# for -- opening the other file -- is what this does for them.
+	#
+	# A PRE-PASS, because the walk below indexes `workspace.modules()` and adding to it while
+	# iterating is how a round comes to disagree with itself about which modules it is building.
+	_pull_in_reachable_files()
+
 	var by_path := {}
 	for module in workspace.modules():
 		var p := module.file_path()
@@ -453,6 +463,28 @@ func _visit(key: String, batch: Dictionary, deps_out: Dictionary,
 	order.append(key)
 
 
+## Opens any import target that exists on disk and is not in the tree yet.
+##
+## Tree first, disk second -- the workspace's own `open` re-checks disk and refuses to disturb a
+## module it already holds, so this can only ADD.
+func _pull_in_reachable_files() -> void:
+	if workspace == null:
+		return
+	var wanted := PackedStringArray()
+	for module in workspace.modules():
+		var from: String = module.file_path()
+		if from.is_empty():
+			continue
+		for imp in Specifiers.imports_of(module.buffer_text):
+			var mapped := Specifiers.map(from, str(imp["spec"]))
+			if mapped.is_empty() or workspace.try_get(mapped) != null:
+				continue
+			if FileAccess.file_exists(mapped) and not wanted.has(mapped):
+				wanted.append(mapped)
+	for path in wanted:
+		workspace.open(path)
+
+
 ## The in-tree modules a module imports, as index keys. ONE resolver for the whole builder: the
 ## compile order and the edges the canvas draws have to agree about what an import points at, or
 ## a module compiles before the thing it depends on.
@@ -463,8 +495,9 @@ func _imports_of(module: Module) -> PackedStringArray:
 		return out
 	for imp in Specifiers.imports_of(module.buffer_text):
 		var mapped := Specifiers.map(from, str(imp["spec"]))
-		if not mapped.is_empty():
-			out.append(Paths.key(mapped))
+		if mapped.is_empty():
+			continue
+		out.append(Paths.key(mapped))
 	return out
 
 

@@ -136,7 +136,14 @@ var _folders_folded := false
 
 ## The drift check is a one-shot: it compares two static tables and its answer cannot change
 ## while the process runs.
+## The style entry whose value the menu is currently asking about.
+var _pending_style := {}
+
 var _drift_checked := false
+
+## The tag drift check is a one-shot too, and it sweeps ClassDB -- which is not something to put
+## in front of every reprojection.
+var _tag_drift_checked := false
 
 var _deletions_agreed := false
 
@@ -1061,6 +1068,33 @@ func _warn_on_directive_drift() -> void:
 		% ", ".join(missing))
 
 
+## Warns once if the ENGINE offers instantiable Control classes the palette does not.
+##
+## The language accepts any instantiable ClassDB Node class as a tag; the palette offers a
+## curated list. That is the right default -- sixty entries of engine internals is not a palette
+## -- but nothing anywhere compared the two, so the difference was invisible to everyone
+## including the people maintaining the list. A warning, not a menu: the curation is deliberate.
+func _warn_on_tag_drift() -> void:
+	if _tag_drift_checked:
+		return
+	_tag_drift_checked = true
+	var offered := {}
+	for entry in _library.entries():
+		var spec := entry as Dictionary
+		if str(spec.get("kind", "")) == LibraryPane.ENTRY_ELEMENT:
+			offered[str(spec.get("name", ""))] = true
+	var missing := PackedStringArray()
+	for klass in ClassDB.get_inheriters_from_class("Control"):
+		var name := str(klass)
+		if offered.has(name) or not ClassDB.can_instantiate(name):
+			continue
+		missing.append(name)
+	if missing.is_empty():
+		return
+	push_warning("[builder] the language accepts %d instantiable Control class(es) the palette "
+		% missing.size() + "does not list: %s" % ", ".join(missing))
+
+
 ## Says why an import resolves to nothing.
 ##
 ## The canvas already draws a broken edge as a red dashed stub -- louder than the reference's
@@ -1176,6 +1210,7 @@ func reproject() -> void:
 	_library.rebuild()
 	_report_unresolved_imports()
 	_warn_on_directive_drift()
+	_warn_on_tag_drift()
 	_refresh_status()
 
 
@@ -2001,7 +2036,8 @@ func _style_key_items(row) -> Array:
 			continue
 		var key_type := str(spec.get("type", ""))
 		items.append(SearchMenu.item(key_name, {
-			"export": owner, "key": key_name, "value": _style_seed(key_name, key_type),
+			"export": owner, "key": key_name, "type": key_type,
+			"value": _style_seed(key_name, key_type),
 		}, key_type))
 	return items
 
@@ -2105,6 +2141,38 @@ func _style_items() -> Array:
 ##
 ## The SPELLING matters: `text="hi"` is a quoted string and `style={s}` is an expression, and
 ## writing one back as the other is a compile error. The pair already carries which it was.
+## The label of the row that opens the free-text field instead of picking a value.
+const _TYPE_IT := "__type_it__"
+
+
+## A value menu for a TYPE, with "type a value..." last.
+func _value_items(type_name: String, godot_class := "", prop := "") -> Array:
+	var items: Array = []
+	for entry in Attributes.values_for(type_name, godot_class, prop):
+		var spec := entry as Dictionary
+		items.append(SearchMenu.item(str(spec["label"]), str(spec["label"]), type_name))
+	items.append(SearchMenu.separator())
+	items.append(SearchMenu.item("type a value...", _TYPE_IT))
+	return items
+
+
+## The same, for an attribute of the row the menu was opened on -- so an enum property offers its
+## own constants rather than the type's generic literals.
+func _attribute_value_items(prop: String) -> Array:
+	var tag := str(_menu_row.name) if _menu_row != null else ""
+	var godot_class := Schema.godot_class_for(tag)
+	var info := Schema.property_info(godot_class, prop)
+	var type_name := type_string(int(info.get("type", TYPE_NIL))) if not info.is_empty() else ""
+	var items: Array = []
+	for entry in Attributes.values_for(type_name, godot_class, prop):
+		var spec := entry as Dictionary
+		items.append(SearchMenu.item(str(spec["label"]),
+			{ "value": str(spec["label"]), "quoted": bool(spec["quoted"]) }, type_name))
+	items.append(SearchMenu.separator())
+	items.append(SearchMenu.item("type a value...", _TYPE_IT))
+	return items
+
+
 func _attribute_items(row) -> Array:
 	var items: Array = []
 	for pair in row.attr_pairs:
@@ -2212,16 +2280,37 @@ func _on_search_picked(payload: Variant) -> void:
 				str(seed["value"]), bool(seed["quoted"]))
 			what = "Add %s to %s" % [name, _menu_row.text.strip_edges()]
 		"edit_attribute":
-			# The WRAPPER STAYS OUTSIDE THE FIELD: the user edits the value, not the quotes or
-			# the braces around it, so typing an expression into a string attribute cannot
-			# produce `text=""{x}""`.
+			# THE VALUES IT CAN TAKE, then the field. An enum-hinted property knows its own
+			# constants and a bool has exactly two answers; making the user type either is making
+			# them remember something the schema already holds. "type a value..." is always the
+			# last row, so the field is never further away than one more click.
 			var spec := payload as Dictionary
 			_pending_attribute = spec
-			_search_purpose = "attribute_value"
-			_inline.open_at(Rect2(_menu_at, Vector2(260, 24)), str(spec["value"]),
-				{ "kind": "attribute", "path": _menu_target, "row": _menu_row,
-					"name": str(spec["name"]), "quoted": bool(spec["quoted"]) })
+			_search_purpose = "attribute_value_pick"
+			_search_menu.open_menu("%s =" % str(spec["name"]),
+				_attribute_value_items(str(spec["name"])), _menu_screen_at(),
+				func(typed: String) -> Dictionary:
+					return { "label": "use %s" % typed, "payload": typed })
 			return
+		"attribute_value_pick":
+			var chosen := _pending_attribute
+			if chosen.is_empty():
+				return
+			if payload is String and str(payload) == _TYPE_IT:
+				# The WRAPPER STAYS OUTSIDE THE FIELD: the user edits the value, not the quotes or
+				# the braces around it, so typing an expression into a string attribute cannot
+				# produce `text=""{x}""`.
+				_search_purpose = "attribute_value"
+				_inline.open_at(Rect2(_menu_at, Vector2(260, 24)), str(chosen["value"]),
+					{ "kind": "attribute", "path": _menu_target, "row": _menu_row,
+						"name": str(chosen["name"]), "quoted": bool(chosen["quoted"]) })
+				return
+			_pending_attribute = {}
+			var picked := payload as Dictionary if payload is Dictionary else {}
+			var literal := str(picked.get("value", payload))
+			after = Edits.set_attribute(before, _menu_row, str(chosen["name"]), literal,
+				bool(picked.get("quoted", false)))
+			what = "Edit %s on %s" % [str(chosen["name"]), _menu_row.text.strip_edges()]
 		"wrap":
 			var header := str(payload)
 			if header.begins_with("@for") and _offer_for_collections(card):
@@ -2243,10 +2332,24 @@ func _on_search_picked(payload: Variant) -> void:
 			what = "Wrap %s in @for" % _menu_row.text.strip_edges()
 			_seed_header_edit = header
 		"style_entry":
-			var pick := payload as Dictionary
-			after = Edits.insert_style_entry(before, str(pick["export"]),
-				str(pick["key"]), str(pick["value"]))
-			what = "Add %s to %s" % [str(pick["key"]), str(pick["export"])]
+			# THE VALUE IS ASKED FOR, not seeded and then unreachable. `Color(0.2, 0.2, 0.24)` was
+			# written into every colour entry and the only way to change it was the source pane --
+			# which is the one thing the canvas exists to avoid.
+			_pending_style = payload as Dictionary
+			_search_purpose = "style_value"
+			_search_menu.open_menu("%s =" % str(_pending_style["key"]),
+				_value_items(str(_pending_style.get("type", ""))), _menu_screen_at(),
+				func(typed: String) -> Dictionary:
+					return { "label": "use %s" % typed, "payload": typed })
+			return
+		"style_value":
+			var entry := _pending_style
+			if entry.is_empty():
+				return
+			_pending_style = {}
+			after = Edits.insert_style_entry(before, str(entry["export"]),
+				str(entry["key"]), str(payload))
+			what = "Add %s to %s" % [str(entry["key"]), str(entry["export"])]
 		"style":
 			# THE IMPORT LANDS WITH THE ATTRIBUTE. `style={Palette.CARD}` with nothing importing
 			# `Palette` is a file that does not compile, and a style applied in two commits is a
