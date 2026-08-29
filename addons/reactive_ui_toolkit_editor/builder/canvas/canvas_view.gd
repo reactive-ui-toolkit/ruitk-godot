@@ -220,9 +220,9 @@ static func CanvasMarkupRow(props: Dictionary, children: Array) -> RuitkVNode:
 	var __cf1 = null
 	if row.attrs_text != "" and M.shows_attributes(lod):
 		for __cf1_once in 1:
-			__cf1 = V.Label({ "text": row.attrs_text, "style": P.scaled(P.attrs(), zoom), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS, "size_flags_horizontal": Control.SIZE_SHRINK_END })
+			__cf1 = V.Label({ "text": row.attrs_text, "style": P.scaled(P.attrs(), zoom), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS, "size_flags_horizontal": Control.SIZE_EXPAND_FILL })
 			continue
-	return V.HBoxContainer({ "style": P.scaled({"separation": 6}, zoom), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [__cf0, V.Label({ "text": "    ".repeat(row.depth) + row.text, "style": P.scaled(style, zoom), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS, "size_flags_horizontal": Control.SIZE_EXPAND_FILL }), __cf1])
+	return V.HBoxContainer({ "style": P.scaled({"separation": 6}, zoom), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [__cf0, V.Label({ "text": "    ".repeat(row.depth) + row.text, "style": P.scaled(style, zoom) }), __cf1])
 
 # component CanvasAddChip
 static func CanvasAddChip(props: Dictionary, children: Array) -> RuitkVNode:

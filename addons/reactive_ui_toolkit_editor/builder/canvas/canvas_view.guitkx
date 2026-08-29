@@ -326,6 +326,20 @@ export CanvasCardSection(heading: String = "", cap: float = 0.0,
 
 ## One row of the markup tree: indented to its depth, coloured by what it is, with its attribute
 ## run beside it.
+##
+## THE TAG TAKES ITS OWN WIDTH AND THE ATTRIBUTES TAKE THE REST.
+##
+## These were the other way round: the tag was EXPAND_FILL and the attribute run was SHRINK_END,
+## and BOTH carried `clip_text` -- which drops a Label's minimum width to ZERO. So the tag claimed
+## the whole row and the attribute run was allocated ONE PIXEL: built, measured, laid out and
+## invisible. Every attribute this builder wrote went into the file correctly and was then not
+## shown on the card that wrote it.
+##
+## The tag keeps its natural width so it is always readable; the attributes fill what is left and
+## ellipsise. The card clips its own contents, so neither can escape it.
+##
+## (A `#` comment inside a markup block is a TEXT CHILD, not a comment -- which is why this note
+## is out here. Putting it in there added a Label with the note in it, 693 pixels wide.)
 export CanvasMarkupRow(row = null, lod: int = 1, zoom: float = 1.0) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
@@ -346,14 +360,12 @@ export CanvasMarkupRow(row = null, lod: int = 1, zoom: float = 1.0) -> RuitkVNod
 					</PanelContainer>
 				)
 			}
-			<Label text={ "    ".repeat(row.depth) + row.text } style={ P.scaled(style, zoom) } clip_text={ true }
-				text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS }
-				size_flags_horizontal={ Control.SIZE_EXPAND_FILL } />
+			<Label text={ "    ".repeat(row.depth) + row.text } style={ P.scaled(style, zoom) } />
 			@if (row.attrs_text != "" and M.shows_attributes(lod)) {
 				return (
 					<Label text={ row.attrs_text } style={ P.scaled(P.attrs(), zoom) } clip_text={ true }
 						text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS }
-						size_flags_horizontal={ Control.SIZE_SHRINK_END } />
+						size_flags_horizontal={ Control.SIZE_EXPAND_FILL } />
 				)
 			}
 		</HBoxContainer>

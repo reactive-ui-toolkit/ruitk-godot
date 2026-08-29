@@ -34,7 +34,7 @@ const CHILD := """export Child(n: int = 0) -> RuitkVNode {
 }
 """
 
-const ASSERTION_FLOOR := 29
+const ASSERTION_FLOOR := 36
 
 var _fails := 0
 var _passes := 0
@@ -51,6 +51,8 @@ func _run() -> void:
 	await _test_a_moved_card_stays_moved()
 	await _test_the_header_band_is_what_is_drawn()
 	await _test_the_builder_fills_the_window_it_is_in()
+	await _test_an_attribute_run_gets_room_to_be_seen()
+	await _test_a_card_drags_inside_a_real_window()
 
 	print("")
 	if _passes < ASSERTION_FLOOR:
@@ -408,3 +410,126 @@ func _test_the_builder_fills_the_window_it_is_in() -> void:
 	w.queue_free()
 	host.queue_free()
 	await process_frame
+
+
+## AN ATTRIBUTE THAT WAS WRITTEN IS AN ATTRIBUTE THAT IS SHOWN.
+##
+## The tag Label was EXPAND_FILL and the attribute run SHRINK_END, and BOTH carried `clip_text`,
+## which drops a Label's minimum width to ZERO. The tag claimed the whole row and the attributes
+## were allocated ONE PIXEL: built, measured, laid out and invisible. Every attribute the builder
+## wrote went into the file correctly and was then missing from the card that wrote it -- so the
+## gesture looked broken while the edit had worked perfectly.
+##
+## Asserted on the WIDTH, because the node existing was always true.
+func _test_an_attribute_run_gets_room_to_be_seen() -> void:
+	var w := _window_with("export App() -> RuitkVNode {\n\treturn ( <VBoxContainer alignment={ 0 } /> )\n}\n")
+	await _settle(w)
+	var canvas = w.canvas()
+	var card = w.graph.cards[0]
+	canvas.set_camera(Vector2(300, 150) - Vector2(card.x, card.y) * 1.25, 1.25)
+	await _settle(w)
+
+	_ok(Metrics.shows_attributes(Metrics.lod_of(canvas.zoom)), "Layer 3 draws attribute runs")
+	var row = card.markup[Metrics.first_element_row(card)]
+	_ok(row.attrs_text != "", "the projection carries the attribute (%s)" % row.attrs_text)
+
+	var node := canvas._find_named(canvas._cards, "row-3-%d" % Metrics.first_element_row(card))
+	_ok(node != null, "the row is on the canvas")
+	if node == null:
+		w.queue_free()
+		return
+	# RETURNED, not collected through a lambda: GDScript captures by value, so a closure writing
+	# to an outer local writes to a copy and every width comes back zero.
+	var found := _widths(node, row.attrs_text)
+	var tag_width: float = found.y
+	var widest: float = found.x
+	_ok(tag_width > 8.0, "the tag has width (%s)" % tag_width)
+	_ok(widest > 8.0,
+		"AND SO DOES THE ATTRIBUTE RUN (%s) -- it used to be allocated one pixel" % widest)
+
+	w.queue_free()
+	await process_frame
+
+
+## The rendered widths inside a markup row, as (attribute run, tag).
+func _widths(node: Node, attrs: String) -> Vector2:
+	var out := Vector2.ZERO
+	for child in node.get_children():
+		if child is Label:
+			var label := child as Label
+			if str(label.text) == attrs:
+				out.x = maxf(out.x, label.size.x)
+			elif str(label.text).strip_edges().begins_with("<"):
+				out.y = maxf(out.y, label.size.x)
+		var deeper := _widths(child, attrs)
+		out.x = maxf(out.x, deeper.x)
+		out.y = maxf(out.y, deeper.y)
+	return out
+
+
+## A CARD DRAGS INSIDE A REAL WINDOW -- the combination the plugin actually ships.
+##
+## Every drag check until now built the builder as a child of the test root. The plugin puts it in
+## a `Window`, which is its own Viewport with its own input routing, and that is the arrangement
+## that was broken.
+func _test_a_card_drags_inside_a_real_window() -> void:
+	var host := Window.new()
+	host.size = Vector2i(1500, 900)
+	host.wrap_controls = false
+	root.add_child(host)
+
+	var w := BuilderWindow.new()
+	host.add_child(w)
+	w.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var ws := Workspace.new()
+	ws.create_new(ROOT.path_join("child.guitkx"), CHILD)
+	ws.create_new(ROOT.path_join("app.guitkx"), APP)
+	w.workspace = ws
+	w.preview.workspace = ws
+	w.reproject()
+	w.select_module(ROOT.path_join("app.guitkx"))
+	for i in 12:
+		await process_frame
+
+	var canvas = w.canvas()
+	var card = w.graph.cards[0]
+	var width := Metrics.card_width_for(Metrics.lod_of(canvas.zoom))
+	canvas.set_camera(Vector2(360, 180) - Vector2(card.x, card.y) * canvas.zoom, canvas.zoom)
+	for i in 10:
+		await process_frame
+
+	var at := canvas.get_global_rect().position \
+		+ Metrics.world_to_screen(Vector2(card.x + width * 0.5, card.y + 8.0),
+			canvas.camera, canvas.zoom)
+	_ok(canvas.get_global_rect().has_point(at), "the probe is on the canvas inside the window")
+
+	var before := Vector2(card.x, card.y)
+	host.push_input(_mb(at, true), true)
+	await process_frame
+	for i in range(1, 13):
+		host.push_input(_mm(at.lerp(at + Vector2(110, 60), float(i) / 12.0),
+			MOUSE_BUTTON_MASK_LEFT), true)
+		await process_frame
+	host.push_input(_mb(at + Vector2(110, 60), false), true)
+	await process_frame
+
+	_ok(not before.is_equal_approx(Vector2(card.x, card.y)),
+		"a drag INSIDE THE WINDOW moves the card (%s -> %s)" % [before, Vector2(card.x, card.y)])
+
+	w.queue_free()
+	host.queue_free()
+	await process_frame
+
+
+## A builder over one module of the caller's own source.
+func _window_with(source: String) -> BuilderWindow:
+	var w := BuilderWindow.new()
+	w.size = Vector2(1400, 800)
+	root.add_child(w)
+	var ws := Workspace.new()
+	ws.create_new(ROOT.path_join("app.guitkx"), source)
+	w.workspace = ws
+	w.preview.workspace = ws
+	w.reproject()
+	w.select_module(ROOT.path_join("app.guitkx"))
+	return w
