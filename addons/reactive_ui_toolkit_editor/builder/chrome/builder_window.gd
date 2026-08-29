@@ -56,7 +56,7 @@ const Metrics = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/
 signal dirty_changed(has_unsaved: bool)
 
 ## Menu ids. Named rather than positional, so inserting an item cannot silently re-point another.
-enum MenuId { SAVE, ABORT, UNDO, REDO, FIT_VIEW, REVEAL, HISTORY, TRACE, HELP, _HISTORY_OLD }
+enum MenuId { SAVE, ABORT, UNDO, REDO, FIT_VIEW, REVEAL, HISTORY, TRACE, HELP }
 
 ## The three detail bands, NAMED. The canvas already had them — as a zoom threshold nobody could
 ## see, so a user could not tell which band they were in or ask for one. The Unity leg puts them
@@ -157,11 +157,13 @@ const _NEW_SUBMENU_ITEM := 1
 var _canvas_menu: PopupMenu = null
 var _preview_pane: PreviewPane = null
 var _layers: OptionButton = null
-var _history_menu: PopupMenu = null
 var _hint: Label = null
 var _syncing_layer := false
 var _empty_state: Control = null
 var _toast: Label = null
+
+## The bottom-anchored slot that keeps the toast centred through every `reset_size`.
+var _toast_slot: CenterContainer = null
 ## When the toast should go, in milliseconds since start. 0 = nothing showing.
 var _toast_until := 0
 
@@ -235,19 +237,27 @@ func toast(message: String) -> void:
 		return
 	_toast.text = message
 	_toast.visible = true
+	_toast.modulate.a = 1.0
 	_toast.reset_size()
 	_toast_until = Time.get_ticks_msec() + TOAST_MSEC
 
 
-## How long a toast stays up.
+## How long a toast stays up, and how much of the end of that is a fade.
 const TOAST_MSEC := 3200
+const TOAST_FADE_MSEC := 600
 
 
 func _tick_toast() -> void:
 	if _toast == null or not _toast.visible:
 		return
-	if Time.get_ticks_msec() >= _toast_until:
+	var left := _toast_until - Time.get_ticks_msec()
+	if left <= 0:
 		_toast.visible = false
+		_toast.modulate.a = 1.0
+		return
+	# IT FADES. A pill that vanishes between two frames reads as a glitch; the last 600 ms of its
+	# life are a ramp, which is what makes the disappearance legible as the message expiring.
+	_toast.modulate.a = clampf(float(left) / float(TOAST_FADE_MSEC), 0.0, 1.0)
 
 
 ## The keyboard model, ported from the Unity leg's `OnKeyDown`.
@@ -347,6 +357,15 @@ func _delete_selection() -> void:
 				_menu_row_index = -1
 				return
 	if not _focus_path.is_empty():
+		# THE FALL-THROUGH IS THE DANGEROUS ONE. With no row selected, Delete deletes the whole
+		# focused MODULE -- and the row selection is nulled by the branch above, so a second Delete
+		# after deleting a row falls straight through to it. The confirmation dialog that used to
+		# guard this was dissolved deliberately (the save-only contract means nothing is gone until
+		# Save, and Ctrl+Z puts it back), so what is owed here is not a modal but a sentence saying
+		# what just happened and how to take it back. `delete_module` toasts the deletion; this
+		# says which route reached it.
+		if _live_menu_row() == null and graph != null and graph.cards.size() > 0:
+			toast("Deleted %s — Ctrl+Z to put it back, applies on Save" % _focus_path.get_file())
 		delete_module(_focus_path)
 
 
@@ -495,8 +514,18 @@ func _build_ui() -> void:
 	toast_box.set_corner_radius_all(6)
 	toast_box.set_content_margin_all(10)
 	_toast.add_theme_stylebox_override("normal", toast_box)
-	_toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	add_child(_toast)
+	# BOTTOM CENTRE, CLEAR OF THE CHROME. Anchored top-centre it drew over the toolbar -- the row
+	# carrying the very buttons whose refusals it reports -- and `PRESET_CENTER_TOP` anchors the
+	# LEFT EDGE at the centre, so a message started in the middle and ran right instead of being
+	# centred at all. A CenterContainer keeps it centred through every `reset_size`.
+	_toast_slot = CenterContainer.new()
+	_toast_slot.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_toast_slot.offset_top = -84.0
+	_toast_slot.offset_bottom = -44.0
+	_toast_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast_slot.z_index = 100
+	add_child(_toast_slot)
+	_toast_slot.add_child(_toast)
 
 	_hint = Parts.hint_bar(PackedStringArray([
 		"Wheel: zoom (Ctrl+wheel over a scrolling section)",
@@ -553,10 +582,9 @@ func _build_ui() -> void:
 	_row_menu.id_pressed.connect(_on_row_menu)
 	add_child(_row_menu)
 
-	_history_menu = PopupMenu.new()
-	_history_menu.add_item("Undo", MenuId.UNDO)
-	_history_menu.add_item("Redo", MenuId.REDO)
-	add_child(_history_menu)
+	# ONE HISTORY SURFACE. A second PopupMenu carrying Undo and Redo was built, wired and reachable
+	# from nothing -- `MenuId.HISTORY` opens the searchable list, which is the real one -- so the
+	# builder carried a dead menu and an id that named it.
 
 
 ## The "nothing open yet" panel: what this is, what it will not do behind your back, and the four
@@ -908,7 +936,7 @@ func _wire() -> void:
 		_refresh_status()
 		if _preview_pane != null and not _preview_pane.path().is_empty():
 			_preview_pane.show_module(_preview_pane.rendered_path()))
-	_history_menu.id_pressed.connect(run_command)
+
 
 
 # ── Opening ──────────────────────────────────────────────────────────────────────────
@@ -1006,6 +1034,33 @@ func _fold_folders(folded: bool) -> void:
 		layout.save(Time.get_datetime_string_from_system(true))
 
 
+## Says why an import resolves to nothing.
+##
+## The canvas already draws a broken edge as a red dashed stub -- louder than the reference's
+## answer -- and that is the whole of what the builder said: nothing named the SPECIFIER, nothing
+## named the file it was looked for in, and grepping the addon for the diagnostic produced no
+## hits. A stub with no explanation tells a reader that something is wrong and not what.
+func _report_unresolved_imports() -> void:
+	if graph == null or _console == null:
+		return
+	for edge in graph.edges:
+		if not edge.is_broken() or edge.is_usage:
+			continue
+		if edge.from_index < 0 or edge.from_index >= graph.cards.size():
+			continue
+		var card := graph.cards[edge.from_index]
+		var line := -1
+		if edge.from_row >= 0 and edge.from_row < card.imports.size():
+			line = int(card.imports[edge.from_row].source_line) - 1
+		_console.add_diagnostics(card.file_path, [{
+			"code": "GUITKX2301",
+			"severity": Console.SEVERITY_WARNING,
+			"line": line,
+			"message": "\"%s\" resolves to nothing in this tree -- no module here exports it, and "
+				% edge.specifier + "no file answers that path",
+		}])
+
+
 ## Rebuilds the canvas model from the workspace and re-applies the saved layout.
 ##
 ## The layout is applied and then TOPPED UP: what it already knows keeps its slot, and only a
@@ -1092,6 +1147,7 @@ func reproject() -> void:
 	_folders.rebuild()
 	_library.graph = graph
 	_library.rebuild()
+	_report_unresolved_imports()
 	_refresh_status()
 
 
@@ -1326,12 +1382,6 @@ func run_command(id: int) -> void:
 	match id:
 		MenuId.HISTORY:
 			_show_history()
-			return
-		MenuId._HISTORY_OLD:
-			# The ledger, as a menu. Undo and Redo are the whole of it today; the entries they
-			# would walk are already named in `ledger.entries`, which is what a fuller list draws from.
-			_history_menu.position = Vector2i(get_screen_position() + Vector2(0, 32))
-			_history_menu.popup()
 			return
 		MenuId.TRACE:
 			# A TOGGLE, not a one-shot dump. `Preview` declares `signal trace(message)` and emits
@@ -2496,8 +2546,10 @@ func _body_row_rect(card: Graph.Card, row_index: int) -> Rect2:
 func _on_card_new(kind: int) -> void:
 	if _menu_target.is_empty():
 		return
-	# The clicked card is the anchor, so the new module is born in ITS folder.
-	_focus_path = _menu_target
+	# THE ANCHOR IS `_menu_target`, WHICH `_create_folder` ALREADY READS. Writing `_focus_path`
+	# here moved the focus outside `select_module`, so no pane followed it: the source kept the
+	# old file, the preview kept the old anchor, the folder tree kept its selection -- and if the
+	# user then CANCELLED the prompt, the window was left focused on a module nothing was showing.
 	prompt_create(kind)
 
 
@@ -3275,20 +3327,32 @@ func abort() -> int:
 
 ## Walks one ledger entry back. Every change in it, or none -- a gesture that touched two files is
 ## one action, and undoing it file by file leaves a state the user never authored.
+## `Undo <label>` / `Nothing to undo` -- a command that silently does nothing is a command the
+## user repeats, and undo at the end of a ledger looks exactly like undo that failed.
+func _report_step(label: String, did: bool, verb: String) -> bool:
+	if did:
+		toast("%s %s" % [verb, label] if not label.is_empty() else "%s." % verb)
+	else:
+		toast("Nothing to %s." % verb.to_lower())
+	return did
+
+
 func undo() -> bool:
+	var label := ledger.undo_label()
 	var entry := ledger.undo()
 	if entry == null:
-		return false
+		return _report_step("", false, "Undo")
 	ledger.suppress(func(): _replay(entry, true))
-	return true
+	return _report_step(label, true, "Undo")
 
 
 func redo() -> bool:
+	var label := ledger.redo_label()
 	var entry := ledger.redo()
 	if entry == null:
-		return false
+		return _report_step("", false, "Redo")
 	ledger.suppress(func(): _replay(entry, false))
-	return true
+	return _report_step(label, true, "Redo")
 
 
 func _replay(entry, reverse: bool) -> void:
@@ -3298,6 +3362,11 @@ func _replay(entry, reverse: bool) -> void:
 	for change in changes:
 		_replay_change(change, reverse)
 	reproject()
+	# UNDOING A CREATION REMOVES THE MODULE THE FOCUS NAMES. `_focus_path` is a path, so after
+	# that the window went on naming a file that no longer exists: the status bar showed it, the
+	# source pane kept its buffer and the preview compiled against it. The delete route re-points;
+	# the replay route did not, and a replay is how a delete gets undone.
+	_rebind_focus_if_missing()
 	_source.refresh_from_model()
 	preview.request_refresh()
 

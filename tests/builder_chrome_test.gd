@@ -61,6 +61,7 @@ func _run() -> void:
 	await _test_library_pane()
 	await _test_folder_pane_routing()
 	await _test_source_pane_surfaces()
+	await _test_commands_report_themselves()
 	await _test_source_pane()
 	_test_console()
 	await _test_inline_editor()
@@ -2271,6 +2272,42 @@ func _test_source_pane_surfaces() -> void:
 	_section("a hovered hook chip warms the source, not only the card")
 	pane.set_trace_names(PackedStringArray(["count"]))
 	_eq(pane._trace_names.size(), 1, "the pane took the names")
+
+	w.queue_free()
+	await process_frame
+
+
+## A COMMAND THAT SILENTLY DOES NOTHING IS A COMMAND THE USER REPEATS.
+func _test_commands_report_themselves() -> void:
+	var w := _window()
+	await process_frame
+	var path := ROOT.path_join("app.guitkx")
+	w.select_module(path)
+	await process_frame
+
+	_section("undo and redo at the ends of the ledger say so")
+	# Both returned false and said nothing, so undo at the end of the ledger looked exactly like
+	# undo that failed -- and the natural response to either is to press it again.
+	w.ledger.clear()
+	_check(not w.undo(), "an empty ledger has nothing to undo")
+	_check(w.toast_text().to_lower().contains("nothing to undo"), "and it says so")
+	_check(not w.redo(), "and nothing to redo")
+	_check(w.toast_text().to_lower().contains("nothing to redo"), "and says that too")
+
+	_section("a step that DID something names it")
+	var module := w.workspace.try_get(path)
+	w.apply_edit(path, module.buffer_text + "\n", "Touch the file")
+	_check(w.undo(), "the edit is undoable")
+	_check(w.toast_text().begins_with("Undo"), "and the undo names the action it walked back")
+
+	_section("the trace does not crash on the ledger")
+	# `ledger.entries` is a FUNCTION, and the trace wrote `ledger.entries.size()` -- evaluating a
+	# Callable and calling `.size()` on it. The line was invisible because nothing asserted on
+	# what trace produces.
+	w._console.trace(w.workspace, w.ledger, w.preview)
+	var text := w._console.copy_text()
+	_check(text.contains("history:"), "the trace has a history line")
+	_check(text.contains("preview:"), "and a preview line")
 
 	w.queue_free()
 	await process_frame

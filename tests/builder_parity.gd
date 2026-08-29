@@ -169,6 +169,12 @@ const PARITY := [
 	["Summary.reasons reaches the console", "func _why"],
 	["the mount runs behind an error boundary", "func mount_error"],
 	["a module changed on BOTH sides is reported", "changed on disk AND edited here"],
+	["undo and redo report what they walked", "func _report_step"],
+	["the hint bar wraps rather than clipping", "AUTOWRAP_WORD_SMART"],
+	["the toast is bottom-centred and fades", "TOAST_FADE_MSEC"],
+	["an unresolved import is explained", "func _report_unresolved_imports"],
+	["the delete fall-through says what it deleted", "Ctrl+Z to put it back"],
+	["a replay re-points a focus it removed", "_rebind_focus_if_missing()"],
 	["a scrollable section eats the plain wheel; Ctrl+wheel is still the zoom", "func _input"],
 	["UB-78: the signature is two runs, cut at the paren", "func signature_head"],
 	# The preview

@@ -107,10 +107,16 @@ static func legend_entry(text: String, tint: Color) -> HBoxContainer:
 ## than in documentation nobody opens while dragging.
 static func hint_bar(hints: PackedStringArray) -> Label:
 	var label := Label.new()
-	label.text = "  •  ".join(hints)
+	# NON-BREAKING SPACES AROUND THE BULLET, so a wrap never puts a separator at the head of a
+	# line with nothing before it.
+	label.text = "\u00a0•\u00a0 ".join(hints)
 	label.add_theme_font_size_override("font_size", HINT_FONT_SIZE)
 	label.add_theme_color_override("font_color", HINT_COLOR)
-	label.clip_text = true
+	# WRAPPED, NOT CLIPPED. This is the builder's only permanent statement of its own vocabulary,
+	# and clipping means the last clauses -- which are the least obvious gestures -- vanish on a
+	# narrow window with nothing to say they were ever there.
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.custom_minimum_size = Vector2(0, HINT_FONT_SIZE + 6)
 	return label
 
 
