@@ -27,6 +27,11 @@ const Graph = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/bu
 
 const LAYOUT_DIR := "user://ruitk_builder/layouts"
 
+## Whether the FOLDERS pane is folded away. View state, like the camera: which panes a person
+## works with is a property of the tree they are working on, and re-folding it every session is
+## the kind of small friction that makes a tool feel like it is not listening.
+var folders_folded := false
+
 var root_path := ""
 var members := PackedStringArray()
 var positions := {}
@@ -244,6 +249,7 @@ func to_dict() -> Dictionary:
 		"positions": positions,
 		"camera": [camera.x, camera.y],
 		"zoom": zoom,
+		"folders_folded": folders_folded,
 		"saved_at": saved_at,
 	}
 
@@ -263,6 +269,7 @@ static func from_dict(d: Dictionary) -> Self:
 	if cam is Array and (cam as Array).size() == 2:
 		layout.camera = Vector2(float((cam as Array)[0]), float((cam as Array)[1]))
 	layout.zoom = float(d.get("zoom", 1.0))
+	layout.folders_folded = bool(d.get("folders_folded", false))
 	layout.saved_at = str(d.get("saved_at", ""))
 	return layout
 

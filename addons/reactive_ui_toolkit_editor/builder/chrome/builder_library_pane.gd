@@ -23,7 +23,10 @@ signal entry_activated(kind: String, name: String)
 ## A WORKSPACE entry was double-clicked: bring its card up on the canvas (capability reference
 ## §10). Only the tree's own modules answer this -- a native element and a built-in hook have no
 ## card to go to.
-signal entry_framed(name: String)
+## The user asked to be taken to an entry. Carries the FILE as well as the name: two modules in
+## different folders can export the same name, and a listener resolving by name alone frames
+## whichever one the projection happened to put first.
+signal entry_framed(file_path: String, name: String)
 
 
 ## A new module of `kind` was asked for from the pane's own `+ new` button. The library is where
@@ -137,18 +140,31 @@ func rebuild() -> void:
 		_body.remove_child(child)
 	_sections.clear()
 
-	# Native first, then the tree's own, then hooks -- the order a component is usually assembled
-	# in, and the order the Unity leg uses.
-	_add_section(ENTRY_ELEMENT, "NATIVE ELEMENTS", _element_entries())
-	_add_section(ENTRY_COMPONENT, "CUSTOM COMPONENTS", _component_entries())
-	_add_section(ENTRY_HOOK, "HOOKS", _hook_entries())
-	# The tree's OWN companion modules, each kind its own section. Grouped rather than merged into
-	# one "modules" list: what you do with an entry depends on its kind -- a style module is
-	# dragged onto a row, a util is imported and called -- so a list mixing them is a list you
-	# have to read the suffix of.
-	_add_section(ENTRY_STYLE, "STYLE MODULES", _module_entries(Module.Kind.STYLE))
-	_add_section(ENTRY_UTIL, "UTIL MODULES", _module_entries(Module.Kind.UTIL))
-	_add_section(ENTRY_HOOK_MODULE, "HOOK MODULES", _module_entries(Module.Kind.HOOK))
+	for section in _sections_model():
+		_add_section(str(section["kind"]), str(section["heading"]), section["entries"])
+
+
+## The sections in order, as [{ kind, heading, entries }].
+##
+## Native first, then the tree's own, then hooks -- the order a component is usually assembled in,
+## and the order the reference uses. The tree's OWN companion modules get a section per kind
+## rather than one merged "modules" list, because what you DO with an entry depends on its kind:
+## a style module is dragged onto a row, a util is imported and called.
+##
+## ONE description, read by the rebuild and by reveal-selected. Written twice they would disagree
+## about which section an entry is in, and the fold would open the wrong one.
+func _sections_model() -> Array:
+	return [
+		{ "kind": ENTRY_ELEMENT, "heading": "NATIVE ELEMENTS", "entries": _element_entries() },
+		{ "kind": ENTRY_COMPONENT, "heading": "CUSTOM COMPONENTS", "entries": _component_entries() },
+		{ "kind": ENTRY_HOOK, "heading": "HOOKS", "entries": _hook_entries() },
+		{ "kind": ENTRY_STYLE, "heading": "STYLE MODULES",
+			"entries": _module_entries(Module.Kind.STYLE) },
+		{ "kind": ENTRY_UTIL, "heading": "UTIL MODULES",
+			"entries": _module_entries(Module.Kind.UTIL) },
+		{ "kind": ENTRY_HOOK_MODULE, "heading": "HOOK MODULES",
+			"entries": _module_entries(Module.Kind.HOOK) },
+	]
 
 
 ## The open tree's own components -- what the user is building, offered alongside what the engine
@@ -217,7 +233,11 @@ func _add_section(kind: String, heading: String, entries: PackedStringArray) -> 
 	for entry in entries:
 		if _search.is_empty() or str(entry).to_lower().contains(_search):
 			filtered.append(entry)
-	if filtered.is_empty():
+	# AN EMPTY SECTION STILL HAS ITS HEADING. Returning early meant a tree with no style modules
+	# showed no STYLE MODULES header at all -- so the pane's answer to "can I make one of these"
+	# was indistinguishable from "this builder has no such thing". While FILTERING it is the
+	# opposite: a heading with nothing under it is noise on every keystroke.
+	if filtered.is_empty() and not _search.is_empty():
 		return
 
 	var header := Button.new()
@@ -230,7 +250,7 @@ func _add_section(kind: String, heading: String, entries: PackedStringArray) -> 
 		rebuild())
 	_body.add_child(header)
 	_sections[kind] = header
-	if not bool(_expanded.get(kind, true)):
+	if not bool(_expanded.get(kind, true)) or filtered.is_empty():
 		return
 
 	# A filter is the user asking to see everything that matches, so it overrides the fold: the
@@ -351,7 +371,12 @@ func _entry_row(kind: String, name: String) -> Button:
 	# A hook, a style export and a util are identifiers you call or reference.
 	var tagged := kind == ENTRY_ELEMENT or kind == ENTRY_COMPONENT
 	row.text = "    " + ("<%s>" % name if tagged else name)
-	row.tooltip_text = "%s -- drag onto a card, or click to insert" % name
+	# THE PATH, when the entry HAS one. Every row carried the same sentence -- its own text plus a
+	# gesture the hint bar already states -- so the one thing a tooltip could usefully add, WHICH
+	# FILE this name comes from, was the one thing it did not say.
+	var from := _path_exporting(kind, name)
+	row.tooltip_text = from if not from.is_empty() \
+		else "%s -- drag onto a card, or click to insert" % name
 	row.set_meta("entry_kind", kind)
 	row.set_meta("entry_name", name)
 	row.set_meta("entry_path", _path_exporting(kind, name))
@@ -366,7 +391,7 @@ func _entry_row(kind: String, name: String) -> Button:
 	if _is_workspace_kind(kind):
 		row.gui_input.connect(func(event: InputEvent):
 			if event is InputEventMouseButton 					and (event as InputEventMouseButton).double_click 					and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
-				entry_framed.emit(name))
+				entry_framed.emit(_path_exporting(kind, name), name))
 	return row
 
 
@@ -427,7 +452,27 @@ func select_entry(file_path: String, name: String) -> void:
 		return
 	_selected_path = file_path
 	_selected_component = name
+	_reveal_selected()
 	rebuild()
+
+
+## Opens the fold of whichever section holds the selection.
+##
+## With FOLD_AFTER at five, selecting the sixth component alphabetically highlighted a row that
+## is not on screen -- so the pane's answer to "which one am I looking at" was a blank.
+func _reveal_selected() -> void:
+	if _selected_path.is_empty() and _selected_component.is_empty():
+		return
+	for section in _sections_model():
+		var kind := str(section["kind"])
+		var entries: PackedStringArray = section["entries"]
+		for i in range(entries.size()):
+			if i < FOLD_AFTER:
+				continue
+			if _is_selected(kind, str(entries[i])):
+				_expanded[kind] = true
+				_expanded_fully[kind] = true
+				return
 
 
 ## A row the pointer can act on looks like one. Every pane here builds bare `Button`s, which draw

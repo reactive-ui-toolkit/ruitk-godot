@@ -44,6 +44,33 @@ static func pane_header(title: String, trailing: Control = null) -> HBoxContaine
 	return row
 
 
+## A pane header that FOLDS its pane. The caret is part of the title, so the whole header is the
+## target rather than a chevron the size of a full stop.
+##
+## `on_toggle` is called with no argument; the CALLER owns the folded state and calls
+## `set_folded` back. A widget that remembered would be a second answer to the same question.
+static func folding_pane_header(title: String, on_toggle: Callable) -> Button:
+	var header := Button.new()
+	header.flat = true
+	header.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	header.text = "v  " + title.to_upper()
+	header.add_theme_font_size_override("font_size", TITLE_FONT_SIZE)
+	header.add_theme_color_override("font_color", TITLE_COLOR)
+	header.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	header.tooltip_text = "Show or hide this pane"
+	header.set_meta("pane_title", title.to_upper())
+	header.pressed.connect(on_toggle)
+	return header
+
+
+## Redraws a folding header's caret. Separate from the constructor because the state lives with
+## the caller and this is called every time it changes.
+static func set_folded(header: Button, folded: bool) -> void:
+	if header == null:
+		return
+	header.text = "%s  %s" % [">" if folded else "v", str(header.get_meta("pane_title", ""))]
+
+
 ## A heading INSIDE a pane — "NATIVE ELEMENTS", "HOOKS", "IMPORTS". Smaller and dimmer than a pane
 ## title, because it divides a pane rather than naming one.
 static func section_heading(text: String) -> Label:

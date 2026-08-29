@@ -59,6 +59,7 @@ func _run() -> void:
 	await _test_unplaced_tree_is_placed_before_written()
 	await _test_an_edit_reaches_the_card()
 	await _test_library_pane()
+	await _test_folder_pane_routing()
 	await _test_source_pane()
 	_test_console()
 	await _test_inline_editor()
@@ -2158,6 +2159,58 @@ func _test_a_drop_says_what_happened() -> void:
 	else:
 		_check(not str(landed["did"]).is_empty(),
 			"and one that does not says why, rather than the same sentence every time")
+
+	w.queue_free()
+	await process_frame
+
+
+## THE FOLDER PANE'S REAL ROUTING, not that its methods exist.
+##
+## `has_method("_get_drag_data")` would stay green if the method returned null unconditionally --
+## which is the exact failure the section it guards was written about. These drive the protocol
+## with real payloads against a laid-out pane.
+func _test_folder_pane_routing() -> void:
+	var w := _window()
+	await process_frame
+	var pane := w.folder_pane()
+	var path := ROOT.path_join("app.guitkx")
+
+	_section("a file row is a drop target -- it stands for its own folder")
+	# Refusing it meant dropping a module "beside its neighbours" -- how anyone reading a file
+	# list thinks about where a file goes -- was refused, and the user had to find the FOLDER row,
+	# which in a deep tree can be scrolled off the top.
+	var into_own := pane._drop_target_for({ "source": "module", "path": path },
+		ROOT.path_join("components"))
+	_check(not into_own.is_empty(), "a module may be dropped into another folder")
+	_check(pane._drop_target_for({ "source": "module", "path": path }, path.get_base_dir())
+		.is_empty(), "and not into the one it is already in -- that is not a move")
+
+	_section("a refusal says WHICH refusal")
+	# Godot never calls `_drop_data` for a refused drop, so the specific message had no route to
+	# the user at all: the forbidden cursor said no and nothing said why.
+	var folder := ROOT.path_join("components")
+	_eq(pane._refusal_into({ "source": "folder", "path": folder }, folder.path_join("deep")),
+		"Can't move components inside itself.",
+		"a folder dropped into its own subtree says exactly that")
+	_eq(pane._refusal_into({ "source": "module", "path": path }, path.get_base_dir()),
+		"%s is already in %s." % [path.get_file(), path.get_base_dir().get_file()],
+		"and an already-there drop says THAT, rather than the same sentence")
+	_eq(pane._refusal_into({ "source": "module", "path": path }, folder), "",
+		"a legal drop has nothing to explain")
+
+	_section("the drop mode is set, so the engine paints the target row")
+	_eq(pane.drop_mode_flags, Tree.DROP_MODE_ON_ITEM,
+		"a drag across the pane shows where the file will land")
+
+	_section("the folders pane folds, and the fold rides in the layout")
+	_check(w._folders.visible, "it starts open")
+	w._fold_folders(true)
+	_check(not w._folders.visible, "folding hides the tree")
+	_eq(w._folders_column.custom_minimum_size.y, 0.0,
+		"and gives its 240 units back, so the library below receives the space")
+	_check(w.layout == null or w.layout.folders_folded, "the layout remembers it")
+	w._fold_folders(false)
+	_check(w._folders.visible, "and unfolding brings it back")
 
 	w.queue_free()
 	await process_frame

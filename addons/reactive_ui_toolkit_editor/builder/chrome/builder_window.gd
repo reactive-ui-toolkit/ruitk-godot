@@ -129,6 +129,11 @@ var _seed_header_edit := ""
 
 ## Set only while a save is resuming from its own deletion confirmation, so the second pass does
 ## not ask again.
+## The folder pane's header, the column it heads, and whether it is folded away.
+var _folders_header: Button = null
+var _folders_column: VBoxContainer = null
+var _folders_folded := false
+
 var _deletions_agreed := false
 
 ## Set only while a save is resuming from its own empty-module question.
@@ -400,11 +405,18 @@ func _build_ui() -> void:
 	var folders_column := VBoxContainer.new()
 	folders_column.add_theme_constant_override("separation", 4)
 	folders_column.custom_minimum_size = Vector2(0, 240)
-	folders_column.add_child(Parts.pane_header("Folders"))
+	# FOLDABLE. The left column is two panes in a split, and with the folder tree holding a fixed
+	# 240 units the library below it was a strip -- on a tree of a dozen folders the pane you
+	# actually pick elements out of had four rows. The choice rides in the layout file with the
+	# camera, because which panes a person works with belongs to the tree they are working on.
+	_folders_header = Parts.folding_pane_header("Folders",
+		func(): _fold_folders(not _folders_folded))
+	folders_column.add_child(_folders_header)
 	left.add_child(folders_column)
 	_folders = FolderPane.new()
 	_folders.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	folders_column.add_child(_folders)
+	_folders_column = folders_column
 	_library = LibraryPane.new()
 	left.add_child(_library)
 	# NEGATIVE: a VSplitContainer's offset is measured from the centre, so a positive one hands
@@ -615,9 +627,18 @@ func _canvas_new_menu() -> PopupMenu:
 ## The library is how you find a module by name on a tree too big to scan visually, so the entry
 ## has to be able to take you to it -- otherwise finding it in the list and then finding it on the
 ## canvas are two separate searches.
-func _on_library_framed(name: String) -> void:
+func _on_library_framed(file_path: String, name: String) -> void:
 	if graph == null:
 		return
+	# BY PATH WHEN THERE IS ONE. Resolving by name alone framed the FIRST card that exports it,
+	# so two modules in different folders exporting the same name were indistinguishable and the
+	# gesture took the reader to whichever the projection happened to put first.
+	if not file_path.is_empty():
+		var direct := graph.index_of(file_path)
+		if direct >= 0:
+			_canvas.frame_card(direct)
+			select_module(file_path)
+			return
 	for index in graph.cards.size():
 		if graph.cards[index].exports.has(name):
 			_canvas.frame_card(index)
@@ -771,6 +792,7 @@ func _wire() -> void:
 	# THROUGH `_screen_at`, like every other menu. This was the fifth one, and the only one still
 	# reading a CanvasItem coordinate directly -- which is right only when the host viewport
 	# embeds its subwindows.
+	_folders.refile_refused.connect(func(reason: String): toast(reason))
 	_folders.module_context_requested.connect(func(path: String, _at: Vector2):
 		_open_card_menu(path, _screen_at(get_local_mouse_position())))
 
@@ -960,6 +982,21 @@ func _validate_tree(where: String) -> bool:
 	return problems.is_empty()
 
 
+## Shows or hides the folder tree, and remembers which.
+func _fold_folders(folded: bool) -> void:
+	_folders_folded = folded
+	if _folders != null:
+		_folders.visible = not folded
+	if _folders_column != null:
+		# The column gives its 240 units BACK when folded, so the library below actually receives
+		# the space rather than the fold leaving a hole where the tree was.
+		_folders_column.custom_minimum_size = Vector2(0.0, 0.0 if folded else 240.0)
+	Parts.set_folded(_folders_header, folded)
+	if layout != null and layout.folders_folded != folded:
+		layout.folders_folded = folded
+		layout.save(Time.get_datetime_string_from_system(true))
+
+
 ## Rebuilds the canvas model from the workspace and re-applies the saved layout.
 ##
 ## The layout is applied and then TOPPED UP: what it already knows keeps its slot, and only a
@@ -1025,6 +1062,7 @@ func reproject() -> void:
 		# session could open with the toolbar naming a layer the cards were not drawn at, which is
 		# the same lie CANVAS-01 was about, arriving by a different road.
 		_canvas.set_camera(layout.camera, layout.zoom)
+	_fold_folders(layout.folders_folded)
 	_canvas.show_graph(graph)
 	# A TREE WITH NO SAVED LAYOUT OPENS AT LAYER 2 (capability reference §2), CENTRED -- not
 	# fitted. A fit picks whatever zoom frames the whole graph, so the layer the user lands in
@@ -2545,7 +2583,13 @@ func place_module(module_path: String, target_folder: String) -> bool:
 		# shared mechanics of moving; the ledger entry belongs to the ACTION, which is what the
 		# user would press Ctrl+Z about.
 		ledger.record_move(module_path, destination)
-		workspace.reconcile_imports(snapshot)
+		# AND THE IMPORT REWRITES WITH IT. `reconcile_imports` returns every importer it had to
+		# rewrite and this discarded them -- so undoing a re-file put the module back and left
+		# every specifier pointing at where it had gone, which is a tree that does not compile in
+		# a state the user never authored. `move_folder` records them; this route did not.
+		for rewrite in workspace.reconcile_imports(snapshot):
+			var r := rewrite as Dictionary
+			ledger.record(str(r["file_path"]), str(r["before"]), str(r["after"]))
 	ledger.end()
 	if ok:
 		reproject()
@@ -2795,9 +2839,16 @@ func _create_named(kind: int, name: String) -> String:
 ## A zero point means "no gesture said" -- the library's "+ new", the empty state's button -- and
 ## there the projection's own slot is the honest answer.
 func place_new_card(file_path: String, world: Vector2) -> void:
-	if layout == null or file_path.is_empty() or world == Vector2.ZERO:
+	if layout == null or file_path.is_empty():
 		return
-	layout.set_position(file_path, world)
+	var at := world
+	if at == Vector2.ZERO:
+		# NO GESTURE SAID WHERE -- the library's "+ new", the empty state's button. The middle of
+		# what the user is looking at is the honest answer; the projection's own slot is a
+		# position the camera has no reason to be anywhere near, so the module was created and
+		# then not there.
+		at = Metrics.screen_to_world(_canvas.size * 0.5, _canvas.camera, _canvas.zoom)
+	layout.set_position(file_path, at)
 	layout.save(Time.get_datetime_string_from_system(true))
 
 

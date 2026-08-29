@@ -81,12 +81,21 @@ func _init() -> void:
 	# THE POINTER SAYS THE ROWS ARE ACTIONABLE. A Tree draws the OS arrow, so this pane -- where
 	# every row can be clicked, dragged and dropped on -- read exactly like a static listing.
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	# FP-07: THE ROW UNDER THE CURSOR LIGHTS UP. Godot's Tree paints its own drop highlight when a
+	# drop mode is set and `_can_drop_data` says yes -- so a drag across this pane showed nothing
+	# at all until the mouse came up, and the only way to learn where a file would land was to
+	# drop it and read the toast.
+	drop_mode_flags = Tree.DROP_MODE_ON_ITEM
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 	item_collapsed.connect(_on_item_collapsed)
 	item_selected.connect(_on_item_selected)
 	item_activated.connect(_on_item_activated)
 	item_mouse_selected.connect(_on_item_mouse_selected)
+
+
+## A drop this pane will not take, and the reason -- which the forbidden cursor cannot carry.
+signal refile_refused(reason: String)
 
 
 ## A module row is draggable: onto the canvas to place it, onto another folder row to move it.
@@ -115,10 +124,61 @@ func _get_drag_data(at_position: Vector2) -> Variant:
 
 ## Only a FOLDER row takes a drop, and never one onto itself or into its own subtree.
 func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
-	return not _drop_target(at_position, data).is_empty()
+	var target := _drop_target(at_position, data)
+	if not target.is_empty():
+		_refused_over = null
+		return true
+	# WHY NOT, ONCE. Godot never calls `_drop_data` for a refused drop, so the specific message --
+	# "a folder cannot go inside itself", "it is already there" -- had no route to the user at all:
+	# the forbidden cursor said no and nothing said why. Emitted on the row TRANSITION rather than
+	# on every motion event, because `_can_drop_data` runs per frame while the mouse is still.
+	var item := get_item_at_position(at_position)
+	if item != null and item != _refused_over:
+		_refused_over = item
+		var reason := _refusal_for(data, item)
+		if not reason.is_empty():
+			refile_refused.emit(reason)
+	return false
+
+
+## The row a refusal has already been reported for, so it is reported once and not per frame.
+var _refused_over: TreeItem = null
+
+
+## Why `data` cannot land on `item`, or "" when there is nothing worth saying.
+func _refusal_for(data: Variant, item: TreeItem) -> String:
+	if item == null:
+		return ""
+	var meta: Variant = item.get_metadata(0)
+	var into := str((meta as Dictionary)["folder"]) if meta is Dictionary \
+		and (meta as Dictionary).has("folder") else str(meta).get_base_dir()
+	return _refusal_into(data, into)
+
+
+## THE RULE ALONE, with the row lookup taken out of it -- the same split `_drop_target_for` makes,
+## and for the same reason: the message a refusal carries can then be asked for without a
+## laid-out Tree to hit-test against.
+func _refusal_into(data: Variant, into: String) -> String:
+	if not (data is Dictionary):
+		return ""
+	var spec := data as Dictionary
+	var source := str(spec.get("source", ""))
+	var dragged := str(spec.get("path", ""))
+	if dragged.is_empty() or into.is_empty():
+		return ""
+	if source == "folder":
+		if Paths.same(dragged, into) or Paths.is_under(into, dragged):
+			return "Can't move %s inside itself." % dragged.get_file()
+		if Paths.same(into, dragged.get_base_dir()):
+			return "%s is already in %s." % [dragged.get_file(), into.get_file()]
+		return ""
+	if source == "module" and Paths.same(dragged.get_base_dir(), into):
+		return "%s is already in %s." % [dragged.get_file(), into.get_file()]
+	return ""
 
 
 func _drop_data(at_position: Vector2, data: Variant) -> void:
+	_refused_over = null
 	var into := _drop_target(at_position, data)
 	if into.is_empty():
 		return
@@ -132,9 +192,14 @@ func _drop_target(at_position: Vector2, data: Variant) -> String:
 	if item == null:
 		return ""
 	var meta: Variant = item.get_metadata(0)
-	if not (meta is Dictionary) or not (meta as Dictionary).has("folder"):
-		return ""
-	return _drop_target_for(data, str((meta as Dictionary)["folder"]))
+	if meta is Dictionary and (meta as Dictionary).has("folder"):
+		return _drop_target_for(data, str((meta as Dictionary)["folder"]))
+	# A FILE ROW STANDS FOR ITS OWN FOLDER. Refusing it meant dropping a module "beside its
+	# neighbours" -- which is how anyone reading a file list thinks about where a file goes --
+	# was refused, and the user had to find the folder ROW, which in a deep tree can be scrolled
+	# off the top. The already-there guard inside `_drop_target_for` still declines a no-op.
+	var path := str(meta)
+	return "" if path.is_empty() else _drop_target_for(data, path.get_base_dir())
 
 
 ## THE RULE ALONE, with the row lookup taken out of it: whether `data` may land in `into`.
@@ -270,6 +335,10 @@ func _ensure_folder(parent: TreeItem, folders: Dictionary, path: String, label: 
 	# A FOLDER carries its path as a Dictionary, a module as a plain String. The two are told
 	# apart by TYPE rather than by a second lookup, so no caller can read one as the other.
 	item.set_metadata(0, { "folder": path })
+	# THE FULL PATH, which the label cannot carry: a nested pane shows leaves, and two folders
+	# called `components` under different parents are indistinguishable by their text alone.
+	item.set_tooltip_text(0, "%s\n\nDrag a module here to move it. Drag this folder onto another"
+		% path + " to move the whole folder.")
 	# FOLDING SURVIVES THE REBUILD. `rebuild()` runs on every model change -- every keystroke that
 	# reaches the funnel -- and `Tree.clear()` frees every item, so a folded folder sprang open on
 	# the next character typed.
