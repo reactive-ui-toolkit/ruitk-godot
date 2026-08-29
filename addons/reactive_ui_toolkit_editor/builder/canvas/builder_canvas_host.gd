@@ -106,6 +106,10 @@ var _pan_from := Vector2.ZERO
 ## A card being dragged: which one, and where in the card the pointer took hold, so it does not
 ## jump to have its corner under the cursor.
 var _moving := -1
+
+## Whether the press this motion belongs to was delivered to THIS control. A drag that began in
+## another pane must not pan the canvas it happens to cross.
+var _press_seen := false
 var _grab_offset := Vector2.ZERO
 ## Where the left button went down, to tell a click from the start of a drag.
 var _pressed_at := Vector2.ZERO
@@ -565,6 +569,16 @@ func _fit_cards() -> bool:
 
 
 func _notification(what: int) -> void:
+	# THE DRAG PROTOCOL'S OWN BOOKENDS. A drop consumes the mouse release, so a control that only
+	# resets on release keeps whatever it was doing forever. These fire whether or not the drag
+	# ends over this canvas.
+	if what == NOTIFICATION_DRAG_BEGIN or what == NOTIFICATION_DRAG_END:
+		_panning = false
+		_moving = -1
+		_press_seen = false
+		_press_index = -1
+		if what == NOTIFICATION_DRAG_END:
+			_clear_drop_hint()
 	if what == NOTIFICATION_RESIZED and _root != null:
 		# The viewport is what the cull measures against, so a resize is a re-render -- otherwise
 		# cards that just came into view stay culled until something else moves.
@@ -707,6 +721,9 @@ func _handle_button(event: InputEventMouseButton) -> void:
 		MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				_pressed_at = event.position
+				# THIS CANVAS SAW THE PRESS. Without it, a motion arriving mid-drag from another
+				# control is indistinguishable from a press on empty canvas.
+				_press_seen = true
 				_press_index = card_at(event.position)
 				# WHETHER THE PRESS LANDED ON THE TITLE BAR decides whether a later drag moves the
 				# card or pans the canvas. Recorded at press rather than asked at motion, because
@@ -736,6 +753,7 @@ func _handle_button(event: InputEventMouseButton) -> void:
 					card_moved.emit(_moving, Vector2(graph.cards[_moving].x, graph.cards[_moving].y))
 				_moving = -1
 				_panning = false
+				_press_seen = false
 				_press_index = -1
 				camera_changed.emit(camera, zoom)
 			accept_event()
@@ -852,6 +870,27 @@ func _handle_motion(motion: InputEventMouseMotion) -> void:
 	if _drop_at.x >= 0.0 and not (motion.button_mask & MOUSE_BUTTON_MASK_LEFT):
 		_clear_drop_hint()
 	_track_hover(motion.position)
+
+	# NOT OUR PRESS, AND NOT OUR DRAG.
+	#
+	# Two ways a motion with the button held reaches this canvas without it having been pressed:
+	# a library entry dragged onto it (the press was in the LIBRARY pane), and any other Godot
+	# drag-and-drop passing over. `_press_index` is then whatever the last press left behind --
+	# -1 after a release -- so the arming below read "pressed on empty canvas" and started
+	# PANNING under a drag aimed somewhere else entirely: dragging a new component out of the
+	# library scrolled the canvas out from under the drop.
+	if get_viewport() != null and get_viewport().gui_is_dragging():
+		# AND THE PAN IS CANCELLED, not merely skipped. `_panning` is cleared on the LEFT RELEASE
+		# -- which Godot CONSUMES to complete a drop, so the canvas never sees it and the flag
+		# latched TRUE FOREVER. After one library drag every motion panned the canvas, including
+		# the ones meant to move a card. That is one gesture breaking every gesture after it.
+		_panning = false
+		_moving = -1
+		_press_seen = false
+		_press_index = -1
+		return
+	if not _press_seen:
+		return
 
 	if _panning:
 		camera += motion.position - _pan_from

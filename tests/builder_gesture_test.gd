@@ -34,7 +34,7 @@ const CHILD := """export Child(n: int = 0) -> RuitkVNode {
 }
 """
 
-const ASSERTION_FLOOR := 36
+const ASSERTION_FLOOR := 43
 
 var _fails := 0
 var _passes := 0
@@ -53,6 +53,8 @@ func _run() -> void:
 	await _test_the_builder_fills_the_window_it_is_in()
 	await _test_an_attribute_run_gets_room_to_be_seen()
 	await _test_a_card_drags_inside_a_real_window()
+	await _test_a_pan_cannot_latch_on()
+	await _test_a_foreign_drag_does_not_pan_the_canvas()
 
 	print("")
 	if _passes < ASSERTION_FLOOR:
@@ -533,3 +535,62 @@ func _window_with(source: String) -> BuilderWindow:
 	w.reproject()
 	w.select_module(ROOT.path_join("app.guitkx"))
 	return w
+
+
+## A PAN CANNOT SURVIVE THE GESTURE THAT STARTED IT.
+##
+## `_panning` was cleared on the LEFT RELEASE -- and Godot CONSUMES that release to complete a
+## drop, so a canvas crossed by any drag never saw it and the flag stayed true FOREVER. From then
+## on every mouse motion panned the canvas, including the ones meant to move a card: one gesture
+## breaking every gesture after it, which is exactly what it looked like from the outside.
+func _test_a_pan_cannot_latch_on() -> void:
+	var w := _window()
+	await _settle(w)
+	var canvas = w.canvas()
+
+	# Put it in the state a consumed release leaves behind.
+	canvas._panning = true
+	canvas._press_seen = true
+	canvas._pan_from = Vector2(10, 10)
+	canvas.notification(Control.NOTIFICATION_DRAG_END)
+	_ok(not canvas._panning, "a drag ending anywhere cancels a pan the canvas was left holding")
+
+	canvas._panning = true
+	canvas.notification(Control.NOTIFICATION_DRAG_BEGIN)
+	_ok(not canvas._panning, "and a drag beginning cancels it too")
+	_ok(canvas._moving < 0, "with no card left half-moved")
+	_ok(not canvas._press_seen, "and no press remembered from before the drag")
+
+	w.queue_free()
+	await process_frame
+
+
+## A DRAG THAT BEGAN SOMEWHERE ELSE DOES NOT PAN THE CANVAS IT CROSSES.
+##
+## Dragging a library entry onto the canvas delivered motion with the button held and a
+## `_press_index` of -1 left over from the last release -- which the arming read as "pressed on
+## empty canvas". The canvas scrolled out from under the drop the user was aiming.
+func _test_a_foreign_drag_does_not_pan_the_canvas() -> void:
+	var w := _window()
+	await _settle(w)
+	var canvas = w.canvas()
+	var before: Vector2 = canvas.camera
+
+	# No press was ever delivered here: this is what a drag from the library looks like.
+	canvas._press_seen = false
+	canvas._press_index = -1
+	for i in range(1, 10):
+		canvas._handle_motion(_mm(Vector2(200 + i * 12, 150 + i * 6), MOUSE_BUTTON_MASK_LEFT))
+	_ok(canvas.camera.is_equal_approx(before),
+		"the camera did not move under a drag the canvas never started (%s -> %s)"
+			% [before, canvas.camera])
+	_ok(not canvas._panning, "and no pan was armed")
+
+	# A press the canvas DID see, on empty space, still pans -- that is how you move around.
+	var empty: Vector2 = canvas.get_global_rect().position + canvas.size - Vector2(12, 12)
+	await _drag(empty, empty - Vector2(90, 50))
+	_ok(not canvas.camera.is_equal_approx(before),
+		"but a drag on empty canvas the canvas DID see still pans it")
+
+	w.queue_free()
+	await process_frame
