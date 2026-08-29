@@ -605,8 +605,6 @@ func _get_cursor_shape(at_position := Vector2.ZERO) -> CursorShape:
 	var lod := Metrics.lod_of(zoom)
 	var world := Metrics.screen_to_world(at_position, camera, zoom)
 	var width := Metrics.card_width_for(lod)
-	if Metrics.on_kind_badge(graph.cards[index], world, width, lod):
-		return Control.CURSOR_POINTING_HAND   # the module's own handle
 	if Metrics.on_title_bar(graph.cards[index], world, width, lod):
 		return Control.CURSOR_MOVE            # drag the card
 	if bool(row_at(index, at_position).get("found", false)):
@@ -746,22 +744,17 @@ func _get_drag_data(at_position: Vector2) -> Variant:
 		return null
 	var card_here := graph.cards[index]
 	var lod := Metrics.lod_of(zoom)
-	# THE KIND CHIP IS THE MODULE'S OWN HANDLE. Dragging a card by its title bar MOVES it on the
-	# canvas; dragging it by its kind chip carries the MODULE -- to a folder row, onto another
-	# card, wherever a module payload is accepted. Without it a module could only be re-filed from
-	# the folder pane, and the card, which is the thing the user is looking at, was inert.
-	if Metrics.on_kind_badge(card_here, Metrics.screen_to_world(at_position, camera, zoom),
-			Metrics.card_width_for(lod), lod):
-		var chip := Label.new()
-		chip.text = card_here.title
-		set_drag_preview(chip)
-		return {
-			"source": "module",
-			"path": card_here.file_path,
-			"card_id": card_here.module_id,
-		}
-	# THE TITLE BAR MOVES THE CARD. Declining here leaves the press to `_handle_motion`, which
-	# owns the live move.
+	# THE TITLE BAR MOVES THE CARD, AND NOTHING SHARES IT.
+	#
+	# The kind chip was a drag source for the MODULE, which is what the reference does -- and it
+	# is a divergence worth taking, because here it broke the primary gesture. The chip occupies
+	# the left quarter of the title bar, INCLUDING the name, which is exactly where a person grabs
+	# a card: pressing there handed Godot a module payload, Godot took the gesture over, and the
+	# card did not move. A reference feature that costs the gesture the whole surface is built on
+	# is not worth having, and a module is still draggable from the folder pane and the library,
+	# which is where a file lives.
+	#
+	# Declining here leaves the press to `_handle_motion`, which owns the live move.
 	if Metrics.on_title_bar(card_here, Metrics.screen_to_world(at_position, camera, zoom),
 			Metrics.card_width_for(lod), lod):
 		return null

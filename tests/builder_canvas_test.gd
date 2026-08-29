@@ -57,7 +57,7 @@ func _run() -> void:
 	await _test_a_pan_does_not_rebuild()
 	_test_no_two_cards_overlap()
 	_test_the_zoom_is_in_the_layout()
-	_test_kind_badge_band()
+	_test_title_bar_is_the_only_card_handle()
 	_test_restored_zoom_is_clamped()
 	await _test_cursor_says_what_a_press_does()
 	_test_lod_bands()
@@ -401,26 +401,26 @@ func _test_section_caps() -> void:
 	_check(deep.y > near_top.y, "and rows above the cap still anchor in order")
 
 
-## THE KIND CHIP IS A BAND, like the title bar is.
+## THE TITLE BAR IS THE CARD'S HANDLE, AND NOTHING SHARES IT.
 ##
-## Model-based because the drawn badge is a `Label` inside an IGNORE-filtered `PanelContainer`:
-## Godot will never report a press on it, so a hit-test that waited for one would wait forever.
-func _test_kind_badge_band() -> void:
-	_section("the kind chip is the module's own drag handle")
+## The kind chip used to be a drag source for the module, as the reference has it -- and it broke
+## the primary gesture: the chip covers the left quarter of the title bar INCLUDING the name,
+## which is exactly where a person grabs a card, so pressing there handed Godot a module payload
+## and the card did not move. The divergence is deliberate; a module is still draggable from the
+## folder pane and the library.
+func _test_title_bar_is_the_only_card_handle() -> void:
+	_section("the whole title bar moves the card")
 	var card := Graph.Card.new()
 	card.title = "Panelled"
 	card.kind = Module.Kind.COMPONENT
 	card.x = 100.0
 	card.y = 200.0
 	var width := Metrics.card_width_for(Metrics.Lod.FULL)
-	_check(Metrics.on_kind_badge(card, Vector2(card.x + 10.0, card.y + 8.0), width),
-		"a point at the head of the title bar is on the chip")
-	_check(not Metrics.on_kind_badge(card, Vector2(card.x + width - 10.0, card.y + 8.0), width),
-		"a point at the far end of the same bar is not")
-	_check(not Metrics.on_kind_badge(card, Vector2(card.x + 10.0, card.y + 300.0), width),
-		"and neither is a point below the title bar -- the chip is not the whole left column")
-	_check(Metrics.on_title_bar(card, Vector2(card.x + 10.0, card.y + 8.0), width),
-		"the chip is INSIDE the title bar, so dragging the card still works around it")
+	for offset in [4.0, 30.0, 90.0, width * 0.5, width - 6.0]:
+		_check(Metrics.on_title_bar(card, Vector2(card.x + offset, card.y + 8.0), width),
+			"x+%d on the title bar is a grab point" % int(offset))
+	_check(not Metrics.on_title_bar(card, Vector2(card.x + 30.0, card.y + 300.0), width),
+		"and a point below the title bar is not")
 
 
 ## A RESTORED ZOOM IS A ZOOM. A layout file is on disk, so an older build, a hand edit or a moved
@@ -808,10 +808,12 @@ func _test_cursor_says_what_a_press_does() -> void:
 	var title := Metrics.world_to_screen(Vector2(card.x + width * 0.6, card.y + 8.0),
 		host.camera, host.zoom)
 	_eq(host._get_cursor_shape(title), Control.CURSOR_MOVE, "a title bar moves the card")
+	# THE WHOLE TITLE BAR IS THE HANDLE. The kind chip was a second, competing claim on the left
+	# quarter of it -- including the name -- and it took the gesture the card move needs.
 	var chip := Metrics.world_to_screen(Vector2(card.x + 8.0, card.y + 8.0),
 		host.camera, host.zoom)
-	_eq(host._get_cursor_shape(chip), Control.CURSOR_POINTING_HAND,
-		"and the kind chip carries the module, which is a different gesture")
+	_eq(host._get_cursor_shape(chip), Control.CURSOR_MOVE,
+		"including its left end, where the name is and where a card is grabbed")
 
 	host.queue_free()
 	await process_frame

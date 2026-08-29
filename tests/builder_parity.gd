@@ -127,7 +127,6 @@ const PARITY := [
 	["DotColor(kind) -- an anchor dot is its import's kind", "func edge_tint"],
 	["the lattice coarsens instead of vanishing", "doublings"],
 	["UB-23: every card section is capped and scrolls", "func section_cap"],
-	["the kind chip is a drag handle for the MODULE", "func on_kind_badge"],
 	["double-click a component row to go to its module", "func _navigate_to_component"],
 	["double-click a card to frame it", "signal card_activated"],
 	["a drop reports its own outcome", "func _drop_refused"],

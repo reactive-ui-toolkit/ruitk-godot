@@ -912,7 +912,7 @@ func _wire() -> void:
 		# screen, and on a fresh session at the window's top-left corner.
 		_menu_at = _canvas.get_local_mouse_position()
 		_open_card_menu(graph.cards[index].file_path,
-			_screen_at(_canvas.position + _canvas.get_local_mouse_position())))
+			_canvas_at(_canvas.get_local_mouse_position())))
 	_canvas.canvas_context_requested.connect(func(world: Vector2):
 		_menu_world = world
 		_menu_at = _canvas.get_local_mouse_position()
@@ -920,8 +920,7 @@ func _wire() -> void:
 		# set, it still names whichever card was right-clicked last, and the module is born inside
 		# a component the user is not even pointing at.
 		_menu_target = ""
-		_canvas_menu.position = Vector2i(
-			_screen_at(_canvas.position + _canvas.get_local_mouse_position()))
+		_canvas_menu.position = Vector2i(_canvas_at(_canvas.get_local_mouse_position()))
 		_canvas_menu.popup())
 
 	# CLICKING an entry inserts it into the selected card, which is the keyboard-and-trackpad
@@ -1745,8 +1744,28 @@ func _drop_refused(reason: String) -> Dictionary:
 func _screen_at(local: Vector2) -> Vector2:
 	var viewport := get_viewport()
 	if viewport != null and viewport.gui_embed_subwindows:
-		return local
+		return get_global_position() + local
 	return get_screen_position() + local
+
+
+## A point in CANVAS-LOCAL coordinates, placed where a popup will actually appear.
+##
+## THE CANVAS IS NOT AT THE BUILDER'S ORIGIN. It sits inside two splitters, so `_canvas.position`
+## is its offset within its IMMEDIATE PARENT -- (0, 0) -- while the canvas itself is a couple of
+## hundred pixels right and a few down. Every canvas menu was placed at
+## `builder_screen + _canvas.position + at`, which is `builder_screen + at`: the row menu, the
+## card menu and the canvas menu all opened that far up and to the left of the click, over the
+## library pane or off the window entirely. The menus were opening; they were not opening where
+## anyone was looking, which is indistinguishable from not opening.
+##
+## Asked of the CANVAS's own global/screen position, so the nesting cannot drift again.
+func _canvas_at(canvas_local: Vector2) -> Vector2:
+	if _canvas == null:
+		return _screen_at(canvas_local)
+	var viewport := get_viewport()
+	if viewport != null and viewport.gui_embed_subwindows:
+		return _canvas.get_global_position() + canvas_local
+	return _canvas.get_screen_position() + canvas_local
 
 
 func _show_row_menu(at: Vector2) -> void:
@@ -1754,7 +1773,7 @@ func _show_row_menu(at: Vector2) -> void:
 	# every row menu in the builder recursed until the stack gave out and no menu ever opened --
 	# the suites went green because they read the PopupMenu items directly rather than through the
 	# gesture that shows it.
-	_row_menu.position = Vector2i(_screen_at(_canvas.position + at))
+	_row_menu.position = Vector2i(_canvas_at(at))
 	_row_menu.reset_size()
 	_row_menu.popup()
 
@@ -1898,7 +1917,7 @@ func _on_row_context(card_index: int, section: int, row_index: int, at: Vector2)
 			_row_menu.add_separator()
 			_row_menu.add_item("Delete element", RowMenuId.DELETE_ROW)
 
-	_row_menu.position = Vector2i(_screen_at(_canvas.position + at))
+	_row_menu.position = Vector2i(_canvas_at(at))
 	_row_menu.reset_size()
 	_row_menu.popup()
 
@@ -2244,7 +2263,7 @@ func _attribute_items(row) -> Array:
 
 ## Where a menu opened from the last row gesture belongs, in screen coordinates.
 func _menu_screen_at() -> Vector2:
-	return _canvas.get_screen_position() + _menu_at
+	return _canvas_at(_menu_at)
 
 
 ## Every tag the library offers, as menu items -- the same vocabulary, because two lists of legal
