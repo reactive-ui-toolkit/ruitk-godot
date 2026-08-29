@@ -26,7 +26,7 @@ const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/docum
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 289
+const ASSERTION_FLOOR := 301
 
 var _fails := 0
 var _passes := 0
@@ -59,6 +59,8 @@ func _initialize() -> void:
 	_test_indent_is_read_from_the_file()
 	_test_row_bands()
 	_test_drag_survives_a_rerender()
+	_test_orphaned_directive()
+	_test_templates_invent_nothing()
 
 	print("")
 	# A FLOOR ON THE COUNT. A suite that stops at a broken dependency prints ALL PASS on however
@@ -124,6 +126,15 @@ func _card(source: String) -> Graph.Card:
 	card.file_path = "res://tests/__edits/app.guitkx"
 	Service.populate_card(card, source)
 	return card
+
+
+## A row of an ALREADY-PROJECTED card, by tag. `_row` re-projects from its source, which is the
+## wrong question when the test is about two rows of the SAME card.
+func _row_in(card: Graph.Card, tag: String) -> Graph.Line:
+	for row in card.markup:
+		if row.name == tag:
+			return row
+	return null
 
 
 func _row(source: String, tag: String) -> Graph.Line:
@@ -1143,3 +1154,54 @@ func _test_island() -> void:
 	_check(messy.contains("	var deep = 1"), "one unit of this file's indent, not the source's")
 	_check(messy.contains("	var also = 2"), "for every line, relative to the block")
 	_check(bool(Compiler.compile(messy, "App")["ok"]), "and it compiles")
+
+
+## A DIRECTIVE BODY CANNOT BE EMPTY (GUITKX0303), so the directive goes with its last child.
+##
+## The reference's delete rule takes them together for the same reason. Here the directive is a
+## row of its own rather than a property of the element row, so the question is asked by
+## containment -- and only for a single-clause construct, because removing the head of an `@if`
+## that has an `@else` would leave `} @else {` behind, which is a worse file than an empty body.
+func _test_orphaned_directive() -> void:
+	_section("deleting the only child of a directive takes the directive too")
+	var source := "export App() -> RuitkVNode {\n" \
+		+ "\treturn (\n" \
+		+ "\t\t<VBoxContainer>\n" \
+		+ "\t\t\t@if (ready) {\n" \
+		+ "\t\t\t\treturn ( <Label /> )\n" \
+		+ "\t\t\t}\n" \
+		+ "\t\t</VBoxContainer>\n" \
+		+ "\t)\n}\n"
+	var card := _card(source)
+	var label := _row_in(card, "Label")
+	_check(label != null, "the fixture has a Label inside an @if")
+	if label != null:
+		var orphan = Edits.orphaned_directive(card, label)
+		_check(orphan != null, "and deleting it would leave the @if holding nothing")
+		if orphan != null:
+			var after := Edits.remove(source, orphan)
+			_check(not after.contains("@if"), "so the @if goes with it")
+			_check(not after.contains("Label"), "and the child with the @if")
+			_compiles(after, "and what is left still compiles")
+
+	# A row whose parent is an ELEMENT orphans nothing: the element stays either way.
+	var plain := _card(source)
+	var box := _row_in(plain, "VBoxContainer")
+	if box != null:
+		_check(Edits.orphaned_directive(plain, box) == null,
+			"a row directly under the return root orphans no directive")
+
+
+## A NEW MODULE HOLDS WHAT THE USER ASKED FOR AND NOTHING ELSE.
+func _test_templates_invent_nothing() -> void:
+	_section("a template seeds a declaration, not content")
+	var style := Edits.template_for(Module.Kind.STYLE, "card_style")
+	_check(style.contains("export card_style := {"), "a style module declares its export")
+	_check(not style.contains("bg_color"),
+		"and invents no background nobody asked for -- the reference reversed this by name")
+	var hook := Edits.template_for(Module.Kind.HOOK, "use_counter")
+	_check(hook.contains("export use_counter("),
+		"a hook FILE is named use_x, so the template does not prefix it again")
+	_check(not hook.contains("use_use_"), "which is what it emitted before")
+	_compiles(hook, "and the hook template compiles")
+	_compiles(style, "and so does the empty style export")

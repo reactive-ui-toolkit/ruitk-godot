@@ -19,6 +19,8 @@ extends Control
 ## EditorWindow cannot own a submenu without the child killing its parent -- none of which
 ## applies here, and inventing a menu system to match would be a cost with no return.
 
+const DocTree = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_tree.gd")
+const Naming = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_naming.gd")
 const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_workspace.gd")
 const Module = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_module.gd")
 const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_paths.gd")
@@ -808,10 +810,16 @@ func _wire() -> void:
 		if graph == null or index < 0 or index >= graph.cards.size():
 			return
 		_menu_world = world
+		# WHERE THIS GESTURE WAS. `_menu_at` was set by the ROW context handler alone, so a rename
+		# prompt opened from a card menu, or a create prompt opened from the canvas menu, appeared
+		# wherever the last row right-click had been -- possibly on another card, possibly off
+		# screen, and on a fresh session at the window's top-left corner.
+		_menu_at = _canvas.get_local_mouse_position()
 		_open_card_menu(graph.cards[index].file_path,
 			_screen_at(_canvas.position + _canvas.get_local_mouse_position())))
 	_canvas.canvas_context_requested.connect(func(world: Vector2):
 		_menu_world = world
+		_menu_at = _canvas.get_local_mouse_position()
 		# CLEARED: this menu was opened over empty canvas, so "new" means "at the tree root". Left
 		# set, it still names whichever card was right-clicked last, and the module is born inside
 		# a component the user is not even pointing at.
@@ -916,10 +924,26 @@ func open_tree(focus_path: String) -> void:
 		var module := workspace.try_get(path)
 		return module.id if module != null else ""
 	_focus_path = Paths.canon(focus_path)
+	_validate_tree("after loading %s" % focus_path.get_file())
 	reproject()
 	select_module(_focus_path)
 	if graph != null:
 		_canvas.select_card(graph.index_of(_focus_path))
+
+
+## Reports any broken tree invariant to the editor's error log.
+##
+## `BuilderTree.validate()` was written, covered and called by nothing but its own test -- so the
+## two moments that can actually break an invariant, a load and a journal restore, checked
+## nothing. It reports rather than refuses: a tree with a duplicate id is still a tree the user
+## has work in, and taking it away from them is worse than telling them it is odd.
+func _validate_tree(where: String) -> bool:
+	if workspace == null:
+		return true
+	var problems: Array = workspace.tree().validate()
+	for problem in problems:
+		push_error("[builder] tree invariant broken %s: %s" % [where, str(problem)])
+	return problems.is_empty()
 
 
 ## Rebuilds the canvas model from the workspace and re-applies the saved layout.
@@ -1633,14 +1657,29 @@ func _on_row_menu(id: int) -> void:
 
 	match id:
 		RowMenuId.DELETE_ROW:
-			after = Edits.remove(before, row)
-			what = "Delete %s" % row.text.strip_edges()
+			# THE DIRECTIVE GOES WITH ITS LAST CHILD. A directive body cannot be empty here
+			# (GUITKX0303), so deleting the only thing inside an `@if` left a file that does not
+			# compile -- and the preview then showed the last good render while the source was
+			# broken, which reads as the delete having done nothing.
+			var orphan := Edits.orphaned_directive(card, row)
+			if orphan != null:
+				after = Edits.remove(before, orphan)
+				what = "Delete %s and the %s that held it" % [
+					row.text.strip_edges(), orphan.badge_text]
+			else:
+				after = Edits.remove(before, row)
+				what = "Delete %s" % row.text.strip_edges()
 		RowMenuId.ADD_ELSE:
 			after = Edits.add_if_clause(before, row, false)
 			what = "Add @else"
 		RowMenuId.ADD_ELSE_IF:
 			after = Edits.add_if_clause(before, row, true)
 			what = "Add @elif"
+			# AND THE HEADER OPENS. The builder just wrote `@elif (true)` on the user's behalf;
+			# leaving it closed means they have to find the new clause to say what it tests, and
+			# means Escape has nothing to take back. The wrap branch already does this -- the
+			# machinery for it was written and only one of its two callers used it.
+			_seed_header_edit = ELIF_SEED
 		RowMenuId.OPEN_IMPORT:
 			var target := _import_target(card, _menu_row_index)
 			if not target.is_empty():
@@ -1907,6 +1946,12 @@ func _component_named(tag: String):
 		if card.kind == Module.Kind.COMPONENT and tag in card.exports:
 			return card
 	return null
+
+
+## What "Add @elif" writes, and what its header editor opens on. Named because the seeding and
+## the editor that opens over it have to be the same string -- an editor opened on different text
+## from what was written is an edit whose Escape puts back something the user never saw.
+const ELIF_SEED := "@elif (true)"
 
 
 ## A choice from the search menu. Dispatched by what the menu was opened FOR.
@@ -2459,7 +2504,10 @@ func _validate_name(kind: int, name: String) -> String:
 	if folder.is_empty():
 		return "no folder to create in"
 	
-	if workspace.try_get(folder.path_join(name + Module.suffix_for(kind))) != null:
+	# ASKED OF `is_path_available`, which is the question SAVE will ask. `try_get` sees the tree
+	# alone -- so a name whose file already sits on disk but was never loaded passed the prompt and
+	# then collided at the write, which is the worst possible moment to find out.
+	if not workspace.is_path_available(folder.path_join(name + Module.suffix_for(kind))):
 		return "%s already exists" % name
 	if kind == Module.Kind.COMPONENT:
 		for module in workspace.modules():
@@ -2475,14 +2523,13 @@ func _validate_name(kind: int, name: String) -> String:
 func tree_root() -> String:
 	if workspace == null:
 		return Workspace.UNSAVED_ROOT
-	var best := ""
-	for module in workspace.modules():
-		var folder: String = module.folder
-		if folder.is_empty():
-			continue
-		if best.is_empty() or folder.length() < best.length():
-			best = folder
-	return best if not best.is_empty() else Workspace.UNSAVED_ROOT
+	# THE MODEL'S OWN ORACLE, not a fourth definition. This picked the folder with the shortest
+	# STRING, which is not the shallowest folder: `res://ui/verylongname` beats `res://ui/a/b` on
+	# length while being one level up on neither count. `BuilderTree.resolve_root_from` is the
+	# walk the loader and the graph service already use, so the builder now has ONE answer to a
+	# question three parts of it were asking separately.
+	var root: String = DocTree.resolve_root_from(workspace.modules(), _focus_path)
+	return root if not root.is_empty() else Workspace.UNSAVED_ROOT
 
 
 ## Where a module is born when the gesture named no parent -- an empty canvas, or the library.
@@ -2503,24 +2550,40 @@ func _birth_folder(kind: int, name: String) -> String:
 		return root.path_join("components").path_join(name) if not name.is_empty() 			else root.path_join("components")
 	# A COMPANION NAMED AFTER A COMPONENT JOINS IT, wherever that component lives -- the family
 	# rule, kept as the fallback now that creating FROM a card states the parent outright.
-	var family := _family_owner(name)
+	var family := family_owner_for(kind, name)
 	return family if not family.is_empty() else root
 
 
 ## The folder of the COMPONENT a companion of this name belongs to, or "".
 ##
-## Nearest to the focus wins when more than one carries the family name, and an exact tie falls to
-## the ordinally-smallest path so the answer does not depend on the order the tree was loaded in.
-func _family_owner(name: String) -> String:
-	if workspace == null or name.is_empty():
+## THROUGH THE FAMILY RULE, which `builder_naming.gd` implements and nothing called. This matched
+## on exact name equality, so `use_card.hooks.guitkx` did not recognise `card.guitkx` as its
+## family -- the `use_` strip is the whole point of `family_of` -- and a hook created beside a
+## component landed at the tree root instead of beside it.
+##
+## Nearest to the FOCUS wins when more than one component carries the family name, measured in
+## shared path SEGMENTS: `res://ui/card` and `res://ui/cardigan` share one folder and not two,
+## which a character count gets wrong in the direction that hands the module to the wrong parent.
+## An exact tie falls to the ordinally-smallest path, so the answer does not depend on the order
+## the tree happened to load in.
+##
+## A UTIL has no family: it is a helper, not a companion, and it belongs where it was asked for.
+func family_owner_for(kind: int, name: String) -> String:
+	if workspace == null or name.is_empty() or kind == Module.Kind.UTIL:
 		return ""
+	var here := _focus_path.get_base_dir()
 	var best := ""
+	var best_score := -1
 	for module in workspace.modules():
-		if module.kind != Module.Kind.COMPONENT or module.name.to_lower() != name.to_lower():
+		if module.kind != Module.Kind.COMPONENT:
+			continue
+		if not Naming.same_family(kind, name, Module.Kind.COMPONENT, module.name):
 			continue
 		var folder: String = module.folder
-		if best.is_empty() or folder < best:
+		var score := Naming.shared_prefix_length(here, folder)
+		if score > best_score or (score == best_score and folder < best):
 			best = folder
+			best_score = score
 	return best
 
 
@@ -2585,10 +2648,33 @@ func _create_named(kind: int, name: String) -> String:
 	if module == null:
 		return ""
 	ledger.record_creation(path)
+	# WHERE THE GESTURE POINTED. `_menu_world` was recorded by both canvas context handlers and
+	# read by nothing, so a module created from a right-click on empty canvas appeared at whatever
+	# slot the projection happened to give it -- often off screen, and never where the user was
+	# pointing when they asked for it.
+	place_new_card(path, _menu_world)
 	reproject()
 	select_module(path)
+	# AND FRAMED. Creating something and then having to go find it is the same as not being told
+	# where it went.
+	if graph != null:
+		var index := graph.index_of(path)
+		if index >= 0:
+			_canvas.frame_card(index)
+	toast("Created %s in %s — applies on Save" % [path.get_file(), folder.get_file()])
 	preview.request_refresh()
 	return path
+
+
+## Puts a brand-new card at a world point, so it opens where the gesture that made it pointed.
+##
+## A zero point means "no gesture said" -- the library's "+ new", the empty state's button -- and
+## there the projection's own slot is the honest answer.
+func place_new_card(file_path: String, world: Vector2) -> void:
+	if layout == null or file_path.is_empty() or world == Vector2.ZERO:
+		return
+	layout.set_position(file_path, world)
+	layout.save(Time.get_datetime_string_from_system(true))
 
 
 ## Renames the module the card menu was opened on.
@@ -2705,6 +2791,7 @@ func _rename_to(name: String) -> void:
 	select_module(destination)
 	_source.refresh_from_model()
 	preview.request_refresh()
+	toast("Renamed to %s — applies on Save" % destination.get_file())
 
 
 func create_module(kind: int) -> String:
@@ -2788,6 +2875,9 @@ func save() -> int:
 	_source.refresh_from_model()
 	_folders.rebuild()
 	_refresh_status()
+	# EVERY MUTATION SAYS WHAT IT DID. Save was silent, which on a tree with nothing dirty is
+	# indistinguishable from the shortcut not having been received at all.
+	toast("Saved %d file(s)" % written if written > 0 else "Nothing to save — the tree is clean")
 	return written
 
 
@@ -2966,7 +3056,10 @@ func abort() -> int:
 	ledger.clear()
 	Journal.clear()
 	reproject()
+	_rebind_focus_if_missing()
 	_source.refresh_from_model()
+	toast("Reverted %d file(s) to what is on disk" % reverted if reverted > 0 \
+		else "Nothing to revert — the tree matches disk")
 	return reverted
 
 

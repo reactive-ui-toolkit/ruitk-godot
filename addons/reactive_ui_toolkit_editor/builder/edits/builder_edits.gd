@@ -87,6 +87,31 @@ static func parent_of(card: Graph.Card, row: Graph.Line) -> Graph.Line:
 	return best
 
 
+## The DIRECTIVE that deleting `row` would leave empty, or null.
+##
+## A directive body cannot be empty in this language -- GUITKX0303 -- so deleting the only child
+## of an `@if` leaves a file that does not compile. The reference's delete rule takes the
+## directive with its last child for exactly this reason; here the directive is a row of its own
+## rather than a property of the element row, so the question is asked by containment.
+##
+## Only for a SINGLE-CLAUSE construct. Removing the head of an `@if` that has an `@else` would
+## take the head's span and leave `} @else {` behind, which is a worse file than an empty body.
+static func orphaned_directive(card: Graph.Card, row: Graph.Line) -> Graph.Line:
+	if card == null or row == null or row.kind == Graph.LineKind.DIRECTIVE:
+		return null
+	var parent := parent_of(card, row)
+	if parent == null or parent.kind != Graph.LineKind.DIRECTIVE:
+		return null
+	if not is_single_clause(card, parent):
+		return null
+	for other in card.markup:
+		if other == row or other == parent:
+			continue
+		if parent_of(card, other) == parent:
+			return null   # the body has something else in it
+	return parent
+
+
 ## Inserts `markup` relative to `row`.
 ##
 ## INSIDE a self-closing element re-opens it: `<Label />` becomes `<Label>…</Label>`. A tag that
@@ -1269,9 +1294,16 @@ static func _indent_of_line(line: String) -> String:
 static func template_for(kind: int, name: String) -> String:
 	match kind:
 		Module.Kind.HOOK:
-			return "export use_%s() -> Variant {\n%sreturn null\n}\n" % [name, _default_unit()]
+			# THE NAME AS GIVEN. A hook file is named `use_something` -- the prompt's validator
+			# requires it and the default name already carries it -- so prefixing again produced
+			# `export use_use_new_hook()`, which is what the file said the first time anyone made one.
+			return "export %s() -> Variant {\n%sreturn null\n}\n" % [name, _default_unit()]
 		Module.Kind.STYLE, Module.Kind.VALUE:
-			return "export %s := {\n%s\"bg_color\": Color(0.2, 0.2, 0.24),\n}\n" % [name, _default_unit()]
+			# EMPTY. This seeded a `"bg_color": Color(0.2, 0.2, 0.24)` entry nobody asked for, so
+			# every style module in the tree began by claiming a background it did not want -- and
+			# the reference reversed exactly this decision (UB-112). The export itself stays,
+			# because a style module IS an export and an empty .guitkx does not compile.
+			return "export %s := {\n}\n" % name
 		Module.Kind.UTIL:
 			return "export %s() -> Variant {\n%sreturn null\n}\n" % [name, _default_unit()]
 		_:
