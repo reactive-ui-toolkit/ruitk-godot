@@ -15,6 +15,8 @@ const Workspace = preload("res://addons/reactive_ui_toolkit_editor/builder/docum
 const Preview = preload("res://addons/reactive_ui_toolkit_editor/builder/preview/builder_preview.gd")
 const Paths = preload("res://addons/reactive_ui_toolkit_editor/builder/document/builder_paths.gd")
 const Codegen = preload("res://addons/reactive_ui_toolkit/guitkx/guitkx_codegen.gd")
+const Pane = preload("res://addons/reactive_ui_toolkit_editor/builder/chrome/builder_preview_pane.gd")
+const Service = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph_service.gd")
 
 const ROOT := "res://tests/__builder_preview_tmp/ui"
 
@@ -23,7 +25,7 @@ const ROOT := "res://tests/__builder_preview_tmp/ui"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 98
+const ASSERTION_FLOOR := 104
 
 var _fails := 0
 var _passes := 0
@@ -51,6 +53,7 @@ func _run() -> void:
 	await _test_last_error_is_askable()
 	await _test_only_components_mount()
 	await _test_teardown_leaves_nothing()
+	await _test_the_pane_itself()
 
 	print("")
 	# A FLOOR ON THE COUNT. A suite that stops at a broken dependency prints ALL PASS on however
@@ -625,3 +628,58 @@ func _rm_rf(path: String) -> void:
 	for sub in d.get_directories():
 		_rm_rf(path.path_join(sub))
 	DirAccess.remove_absolute(path)
+
+
+## THE PANE, not only the pipeline.
+##
+## 530 lines drove `builder_preview.gd` thoroughly and never touched
+## `builder_preview_pane.gd` -- so every defect in the surface the user actually looks at sat
+## behind a green run: the knobs, the three status states, the state panel and the origin line
+## were all unasserted.
+func _test_the_pane_itself() -> void:
+	_section("the pane renders the focus, with knobs for its props")
+	var preview := _fresh()
+	preview.compile_dirty(_focus())
+	var pane := Pane.new()
+	pane.preview = preview
+	pane.graph = Service.project(preview.workspace.modules(), _focus())
+	root.add_child(pane)
+	await process_frame
+	pane.show_module(_focus())
+	await process_frame
+
+	_check(pane.rendered_path() == _focus(), "the pane names what it is showing")
+	_check(pane._slot.get_child_count() > 0, "and something is on the stage")
+
+	_section("a knob exists for every declared prop, and its value survives a re-show")
+	# `Parent` takes none; `Child(n: int = 0)` is the one with a prop, and a component previewed
+	# with its declared defaults is previewed with the least interesting value it ever takes.
+	var child := ROOT.path_join("child.guitkx")
+	pane.show_module(child)
+	await process_frame
+	var knob_count := pane._knobs.get_child_count()
+	_check(knob_count > 0, "a declared prop produced a knob (%d)" % knob_count)
+	var before := pane._props.duplicate()
+	pane.show_module(child)
+	await process_frame
+	_eq(pane._props.size(), before.size(),
+		"re-showing the same module keeps its knob values -- they are what the preview is FOR")
+
+	_section("a module with no render is not a failure")
+	# A hook, style or util module has nothing to put on a stage, and "select a component" under
+	# an empty box reads as the pane being broken.
+	pane.show_module(ROOT.path_join("s.style.guitkx"))
+	await process_frame
+	_check(not pane._note.text.to_lower().contains("did not build"),
+		"a style module is not reported as a build failure (%s)" % pane._note.text)
+
+	_section("a module that failed to build says why")
+	preview.workspace.apply_edit(_focus(), "export Parent() -> RuitkVNode { this is not markup }")
+	preview.compile_dirty(_focus())
+	pane.show_module(_focus())
+	await process_frame
+	_check(not pane._note.text.is_empty(), "the pane says something about the failure")
+
+	pane.queue_free()
+	preview.teardown()
+	await process_frame

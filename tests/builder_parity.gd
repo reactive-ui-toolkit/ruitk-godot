@@ -187,6 +187,7 @@ const PARITY := [
 	["an enum offers its own constants", "func values_for"],
 	["an import of a real file outside the tree is pulled in", "func _pull_in_reachable_files"],
 	["a host-tag drift warning", "func _warn_on_tag_drift"],
+	["CollectStateNames", "func _state_names"],
 	["a scrollable section eats the plain wheel; Ctrl+wheel is still the zoom", "func _input"],
 	["UB-78: the signature is two runs, cut at the paren", "func signature_head"],
 	# The preview

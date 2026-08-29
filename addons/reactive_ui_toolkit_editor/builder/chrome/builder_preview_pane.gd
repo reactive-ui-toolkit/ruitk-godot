@@ -470,7 +470,16 @@ func _refresh_state() -> void:
 	if preview == null:
 		return
 	var fiber = preview.mounted_root_fiber()
+	# NAMED FROM THE SOURCE. `fiber.type` is "" for every non-HOST fiber (the reconciler sets it
+	# only for host elements), so every row read "\u0020#0" -- a blank label and an index. The names
+	# the user knows are the ones they wrote: `var count = useState(0)` binds `count`, and the
+	# setup block makes that as scannable here as the reference's C# does.
+	var named := _state_names()
 	var slots := _collect_state(fiber, [])
+	for i in range(slots.size()):
+		var spec := slots[i] as Dictionary
+		if i < named.size():
+			spec["label"] = str(named[i])
 	if slots.is_empty():
 		return
 	_state_panel.add_child(Parts.section_heading("state"))
@@ -492,6 +501,28 @@ func _refresh_state() -> void:
 		_state_panel.add_child(row)
 
 
+## The names the MOUNTED module's own source binds to its state hooks, in call order.
+##
+## A `useState` slot is the Nth state hook of the render, and the Nth `use*(` call in the source
+## is the one that made it -- which is the mapping the reference's CollectStateNames uses and the
+## only one available without the runtime recording names it has no reason to keep.
+func _state_names() -> PackedStringArray:
+	var out := PackedStringArray()
+	# THE PREVIEW HOLDS THE WORKSPACE. The pane does not have one of its own -- it is a view over
+	# what the pipeline is building -- so the buffer comes from there.
+	if preview == null or preview.workspace == null or _rendered_path.is_empty():
+		return out
+	var module = preview.workspace.try_get(_rendered_path)
+	if module == null:
+		return out
+	# `var name = useState(...)` and `var name := use_thing(...)`, in the order they appear.
+	var re := RegEx.create_from_string(
+		"\\bvar\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*:?=\\s*(?:[A-Za-z_][A-Za-z0-9_.]*\\.)?(use[A-Za-z_][A-Za-z0-9_]*)\\s*\\(")
+	for m in re.search_all(module.buffer_text):
+		out.append(m.get_string(1))
+	return out
+
+
 ## Walks the committed tree and collects every state slot it finds, depth first.
 func _collect_state(fiber, out: Array) -> Array:
 	if fiber == null or out.size() >= STATE_LIMIT:
@@ -505,7 +536,9 @@ func _collect_state(fiber, out: Array) -> Array:
 				if not (slot is Dictionary) or str((slot as Dictionary).get("kind", "")) != "state":
 					continue
 				out.append({
-					"label": "%s #%d" % [str(fiber.get("type")), i],
+					# The fallback when the source scan cannot name it: an index is still better
+					# than a blank, and a blank is what `fiber.type` gives for a component.
+					"label": "state #%d" % i,
 					"value": var_to_str((slot as Dictionary).get("value")),
 				})
 	_collect_state(fiber.get("child"), out)
