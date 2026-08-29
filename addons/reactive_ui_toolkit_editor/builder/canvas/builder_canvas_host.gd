@@ -166,7 +166,6 @@ func show_graph(new_graph: Graph) -> void:
 	# Correct, and wrong for us: the card then keeps showing the rows it had, so adding a hook put
 	# a line in the source pane and nothing on the card until some unrelated change forced a
 	# render. The revision is the one prop that is never the same twice.
-	_revision += 1
 	_render()
 
 
@@ -347,6 +346,19 @@ func _near_signature() -> String:
 func _render() -> void:
 	if graph == null:
 		return
+	# THE REVISION MOVES ON EVERY RENDER, not only when the graph is replaced.
+	#
+	# The card layer is a reconciled tree, and the reconciler BAILS OUT when every prop compares
+	# equal to last time -- correctly. But `graph` is mutated IN PLACE: dragging a card writes
+	# `card.x`/`card.y` on the object the last render already saw, so every prop was identical and
+	# the bailout decided there was nothing to do. The card moved in the MODEL and never once
+	# redrew -- which is a drag that works perfectly and is invisible.
+	#
+	# `show_graph` bumped this and said why ("the revision is the one prop that is never the same
+	# twice"), and then every OTHER caller of `_render` -- the card drag, the pan, the selection,
+	# the hover -- went without it. Nothing calls `_render` unless something it draws has changed,
+	# so the bump belongs here, once, rather than at each call site that has to remember.
+	_revision += 1
 	_near_seen = _near_signature()
 	_apply_camera()
 	var props := {
@@ -681,7 +693,6 @@ func _get_cursor_shape(at_position := Vector2.ZERO) -> CursorShape:
 
 
 func _gui_input(event: InputEvent) -> void:
-	_trace_input(event)
 	if event is InputEventMouseButton:
 		_handle_button(event as InputEventMouseButton)
 	elif event is InputEventMouseMotion:
@@ -722,7 +733,6 @@ func _handle_button(event: InputEventMouseButton) -> void:
 		MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				_pressed_at = event.position
-				_drag_trace_left = 12
 				# THIS CANVAS SAW THE PRESS. Without it, a motion arriving mid-drag from another
 				# control is indistinguishable from a press on empty canvas.
 				_press_seen = true
@@ -801,49 +811,6 @@ func _drop_data(at_position: Vector2, data: Variant) -> void:
 
 
 ## A markup ROW is draggable, which is how a subtree is re-parented.
-## TEMPORARY INSTRUMENTATION. Prints the drag state for the first few motions after a press, so
-## a single attempt in a real editor says where the gesture dies. Remove once the report is in.
-var _drag_trace_left := 0
-
-
-## Prints the FIRST events this control receives at all. If nothing appears, `_gui_input` is not
-## being called and the problem is routing into the canvas, not anything inside it.
-func _trace_input(event: InputEvent) -> void:
-	if _input_trace_left <= 0:
-		return
-	if not (event is InputEventMouseButton or event is InputEventMouseMotion):
-		return
-	_input_trace_left -= 1
-	var kind := "BUTTON" if event is InputEventMouseButton else "motion"
-	var extra := ""
-	if event is InputEventMouseButton:
-		var b := event as InputEventMouseButton
-		extra = " button=%d pressed=%s" % [b.button_index, b.pressed]
-	print("[RUITK input] ", kind, " at=", (event as InputEventMouse).position, extra,
-		" | rect=", get_global_rect(), " filter=", mouse_filter,
-		" cards=", (graph.cards.size() if graph != null else -1),
-		" zoom=", zoom, " measured_zoom=", _measured_zoom)
-
-
-var _input_trace_left := 24
-
-
-func _trace_drag(motion: InputEventMouseMotion) -> void:
-	if _drag_trace_left <= 0:
-		return
-	_drag_trace_left -= 1
-	var dragging := get_viewport() != null and get_viewport().gui_is_dragging()
-	var travelled := _pressed_at.distance_to(motion.position)
-	print("[RUITK drag] at=", motion.position, " mask=", motion.button_mask,
-		" travelled=", snappedf(travelled, 0.1),
-		" | press_seen=", _press_seen, " press_index=", _press_index,
-		" on_title=", _press_on_title, " moving=", _moving, " panning=", _panning,
-		" gui_dragging=", dragging,
-		" would_drag_row=", _would_drag_a_row(_press_index, _pressed_at),
-		" card_at=", card_at(motion.position), " zoom=", zoom,
-		" measured_zoom=", _measured_zoom)
-
-
 ## Whether a press here would hand Godot a ROW to carry, rather than move the card.
 ##
 ## ONE definition, asked by `_get_drag_data` AND by the motion handler. They used to decide
@@ -920,7 +887,6 @@ func _get_drag_data(at_position: Vector2) -> Variant:
 ## cannot be moved at all, is a diagram rather than a canvas -- and the layout store, the
 ## per-tree persistence and the fit-to-view were all written for positions nobody could change.
 func _handle_motion(motion: InputEventMouseMotion) -> void:
-	_trace_drag(motion)
 	if _moving >= 0:
 		var world := Metrics.screen_to_world(motion.position, camera, zoom)
 		var card := graph.cards[_moving]

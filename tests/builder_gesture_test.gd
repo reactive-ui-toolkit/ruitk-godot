@@ -35,7 +35,7 @@ const CHILD := """export Child(n: int = 0) -> RuitkVNode {
 }
 """
 
-const ASSERTION_FLOOR := 57
+const ASSERTION_FLOOR := 62
 
 var _fails := 0
 var _passes := 0
@@ -51,6 +51,7 @@ func _run() -> void:
 	await _test_a_row_menu_opens_where_the_click_was()
 	await _test_adding_an_attribute_reaches_the_buffer()
 	await _test_a_moved_card_stays_moved()
+	await _test_the_drawn_card_actually_moves()
 	await _test_the_header_band_is_what_is_drawn()
 	await _test_the_builder_fills_the_window_it_is_in()
 	await _test_an_attribute_run_gets_room_to_be_seen()
@@ -710,3 +711,45 @@ func _test_the_recovery_offer_can_be_built() -> void:
 		"with something to show (%d path(s), %d module(s))"
 			% [listed.size(), int(pending.get("modules", 0))])
 	Journal.clear()
+
+
+## THE CARD ON SCREEN MOVES, not just the number in the model.
+##
+## Every drag check in this file asserted `card.x` -- the MODEL -- and the model was never the
+## problem: the log from a real editor showed `moving=0` and the position updating on every
+## motion. The card layer is a RECONCILED tree, `graph` is mutated in place, and with an unchanged
+## revision every prop compared equal, so the reconciler correctly bailed out and the card never
+## redrew. A drag that works perfectly and is invisible looks exactly like a drag that does
+## nothing, and only the rendered node can tell them apart.
+func _test_the_drawn_card_actually_moves() -> void:
+	var w := _window()
+	await _settle(w)
+	var canvas = w.canvas()
+	var card = w.graph.cards[0]
+	var width := Metrics.card_width_for(Metrics.lod_of(canvas.zoom))
+	canvas.set_camera(Vector2(200, 140) - Vector2(card.x, card.y) * canvas.zoom, canvas.zoom)
+	await _settle(w)
+
+	var node := canvas._find_named(canvas._cards, "card-0")
+	_ok(node != null, "the card is a node on the canvas")
+	if node == null:
+		w.queue_free()
+		return
+	var drawn_before: Vector2 = node.get_global_rect().position
+	var model_before := Vector2(card.x, card.y)
+
+	var at := _global_of(canvas, Vector2(card.x + width * 0.5, card.y + 8.0))
+	_ok(canvas.get_global_rect().has_point(at), "the probe is on the canvas")
+	await _drag(at, at + Vector2(100, 60))
+	await _settle(w)
+
+	_ok(not model_before.is_equal_approx(Vector2(card.x, card.y)), "the model moved")
+	var after := canvas._find_named(canvas._cards, "card-0")
+	_ok(after != null, "the card is still a node afterwards")
+	if after != null:
+		_ok(not drawn_before.is_equal_approx(after.get_global_rect().position),
+			"AND THE DRAWN CARD MOVED WITH IT (%s -> %s)"
+				% [drawn_before, after.get_global_rect().position])
+
+	w.queue_free()
+	await process_frame
