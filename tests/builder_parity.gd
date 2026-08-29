@@ -130,6 +130,8 @@ const PARITY := [
 	["the render anchor is not the focus", "func rendered_path"],
 	["OnPreviewComponentPicked", "signal component_picked"],
 	["state panel", "func _refresh_state"],
+	["OnRecompiled (one hand-off per round)", "signal round_finished"],
+	["the pane can ask why a module failed", "func last_error_for"],
 	# Chrome
 	["Toast", "func toast"],
 	["ToggleHelp", "func show_help"],

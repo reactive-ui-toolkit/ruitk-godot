@@ -46,6 +46,16 @@ const SCRATCH_ROOT := "res://__ruitk_builder_preview__~"
 ## Emitted per module the round decided about: (path, ok, error).
 signal compile_finished(path: String, ok: bool, error: String)
 
+## THE ROUND IS OVER. Emitted once, after every module it decided.
+##
+## `compile_finished` fires INSIDE the build loop, once per module, and the window re-showed the
+## preview pane on every one of them -- so a round that rebuilt a style plus three components
+## produced four full remounts in a single frame, each tearing down a fiber tree and building it
+## again, three of them for a script the pane does not render. It is a per-module DIAGNOSTIC feed;
+## it was never an end-of-round hand-off, and using it as one meant the pane re-mounted for files
+## it has nothing to do with.
+signal round_finished(summary: Variant)
+
 ## What the pipeline did, for the diagnostics console. Nothing about a round is silent.
 signal trace(message: String)
 
@@ -94,6 +104,9 @@ var now_msec := Callable()
 
 # The buffer each module was last COMPILED from. Absent means "never built".
 var _compiled_from := {}
+
+## The last error reported per module, by path key.
+var _last_error := {}
 # The buffer each module was last MIRRORED from, so an unchanged module is not rewritten.
 var _mirrored := {}
 # The generated script each module was last successfully built into.
@@ -231,6 +244,7 @@ func compile_dirty(focus_path: String) -> Summary:
 		summary.rebuilt.append(path)
 		if bool(result["ok"]):
 			_compiled_from[key] = module.buffer_text
+			_last_error.erase(key)
 		elif bool(result.get("env_error", false)):
 			# THE LAST GOOD BUILD KEEPS SERVING. `_compiled_from` is left alone so the next round
 			# tries this module again, `_built` is left alone so the mount still has a script, and
@@ -241,6 +255,7 @@ func compile_dirty(focus_path: String) -> Summary:
 			_compiled_from.erase(key)
 			_built.erase(key)
 			failed_roots[key] = path
+			_last_error[key] = str(result["error"])
 			summary.failures.append({ "path": path, "error": str(result["error"]) })
 		compile_finished.emit(path, bool(result["ok"]), str(result.get("error", "")))
 		if Paths.key(path) == Paths.key(focus):
@@ -255,6 +270,7 @@ func compile_dirty(focus_path: String) -> Summary:
 	trace.emit("preview: %d built, %d failed, %d skipped, of %d considered"
 		% [summary.rebuilt.size(), summary.failures.size(), summary.skipped.size(),
 			summary.considered.size()])
+	round_finished.emit(summary)
 	return summary
 
 
@@ -264,6 +280,15 @@ func compile_dirty(focus_path: String) -> Summary:
 ## it. Writing alone is not enough: `load` answers from the resource cache, so a second round
 ## hands back the FIRST round's script and the preview goes on rendering an edit ago -- and it
 ## sticks, because nothing later comes along to correct it.
+## The error the last round reported for a module, or "".
+##
+## Kept because the pane had no way to ask: it inferred a failure from an empty stage, which is a
+## different question and answers "yes" for a module nobody has compiled yet.
+func last_error_for(path: String) -> String:
+	var key := Paths.key(path)
+	return str(_last_error[key]) if _last_error.has(key) else ""
+
+
 func _build(module: Module) -> Dictionary:
 	var path := module.file_path()
 	var mirrored := scratch_path_of(path)

@@ -175,21 +175,58 @@ func show_module(file_path: String) -> void:
 		_refresh_state()
 		return
 
+	# THE THREE OUTCOMES ARE TOLD APART BY WHAT IS TRUE, not by whether the stage happens to have
+	# children left on it. Ordered on child count, "not a component", "did not build" and "not
+	# built yet" all collapsed into whichever branch the leftover mount happened to select -- so a
+	# style companion could report "the current edit does not build yet" about a file with nothing
+	# wrong with it.
+	var script := preview.built_script(_path)
+
+	# NOT A COMPONENT is not a failure. A hook, style or util module has nothing to put on a
+	# stage, and saying "select a component" under an empty box reads as the pane being broken.
+	if script != null and not Preview.has_render(script):
+		var info := _module_note(_path)
+		_note.text = info if not info.is_empty() else "this module has no component to render"
+		_origin.text = "showing %s" % _rendered_path.get_file() \
+			if not _rendered_path.is_empty() else ""
+		return
+
+	# IT BUILT AND WOULD NOT MOUNT, or it failed this round: name the file and the reason.
+	var failure := _round_error(_path)
+	if not failure.is_empty():
+		_note.text = "%s did not build — %s" % [_path.get_file(), failure]
+		_origin.text = "the last good render is still on the stage" \
+			if _slot.get_child_count() > 0 else ""
+		preview.request_refresh()
+		return
+
 	# NOT BUILT YET is the common case, not an error: selecting a module the last round had no
 	# reason to compile arrives here before its script exists. Ask for a round -- the window
 	# re-shows this pane when one finishes, so the mount lands a beat later instead of never.
 	preview.request_refresh()
 	if _slot.get_child_count() > 0:
-		_note.text = "last good render — the current edit does not build yet"
+		_note.text = "last good render — a round is queued for this module"
 		return
-	# NOT A COMPONENT is not a failure. A hook or a util module has nothing to put on a stage,
-	# and saying "select a component" under an empty box reads as the pane being broken.
-	var info := _module_note(_path)
-	if not info.is_empty():
-		_note.text = info
+	var note := _module_note(_path)
+	if not note.is_empty():
+		_note.text = note
 		_origin.text = "this module has no component to render"
 		return
 	_show_idle()
+
+
+## What the last round said about this module, or "" when it said nothing.
+##
+## The pane used to have no access to a failure at all -- it inferred one from an empty stage,
+## which is a different question and answers "yes" for a module nobody has compiled yet.
+func _round_error(path: String) -> String:
+	if preview == null:
+		return ""
+	var reported: String = preview.last_error_for(path)
+	if reported.is_empty():
+		return ""
+	# Truncated: a compiler error can be a paragraph, and the pane is one line under a stage.
+	return reported if reported.length() <= 120 else reported.substr(0, 117) + "..."
 
 
 ## Drops the mount. Called when the tree closes, so a preview never outlives the tree it came from.

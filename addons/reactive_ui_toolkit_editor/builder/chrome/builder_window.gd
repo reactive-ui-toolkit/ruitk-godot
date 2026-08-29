@@ -835,12 +835,13 @@ func _wire() -> void:
 	preview.compile_finished.connect(func(_p: String, ok: bool, _e: String):
 		if not ok and _console != null:
 			_console.visible = true)
-	preview.compile_finished.connect(func(_p: String, _ok: bool, _e: String):
+	# ONCE PER ROUND, not once per module. The preview re-renders on the BUILD rather than on the
+	# keystroke -- but hung off `compile_finished` it re-mounted for every module the round
+	# touched, including the ones the pane does not render.
+	preview.round_finished.connect(func(_summary: Variant):
 		_refresh_status()
-		# The preview re-renders on the BUILD, not on the keystroke: mounting a script that has not
-		# recompiled yet just re-mounts the one already showing.
 		if _preview_pane != null and not _preview_pane.path().is_empty():
-			_preview_pane.show_module(_preview_pane.path()))
+			_preview_pane.show_module(_preview_pane.rendered_path()))
 	_history_menu.id_pressed.connect(run_command)
 
 

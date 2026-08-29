@@ -23,7 +23,7 @@ const ROOT := "res://tests/__builder_preview_tmp/ui"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 86
+const ASSERTION_FLOOR := 93
 
 var _fails := 0
 var _passes := 0
@@ -47,6 +47,8 @@ func _run() -> void:
 	await _test_budget()
 	await _test_degenerate_input()
 	await _test_scratch_hygiene()
+	await _test_round_hands_off_once()
+	await _test_last_error_is_askable()
 	await _test_only_components_mount()
 	await _test_teardown_leaves_nothing()
 
@@ -493,6 +495,63 @@ func _test_scratch_hygiene() -> void:
 ## Selecting a style companion -- half of what a tree contains -- asked the reconciler to call a
 ## `render` that a module of plain statics does not have, so merely clicking one logged an engine
 ## error.
+## A ROUND HANDS OFF ONCE, at its end.
+##
+## `compile_finished` fires INSIDE the build loop, once per module, and the window re-showed the
+## preview pane on every one -- so a round rebuilding a style plus three components produced four
+## full remounts in a single frame, each tearing down a fiber tree and building it again, three of
+## them for a script the pane does not render.
+func _test_round_hands_off_once() -> void:
+	_section("one round, one hand-off")
+	var preview := _fresh()
+	var rounds: Array = []
+	var per_module: Array = []
+	preview.round_finished.connect(func(_s: Variant): rounds.append(1))
+	preview.compile_finished.connect(func(_p: String, _ok: bool, _e: String): per_module.append(1))
+
+	var summary = preview.compile_dirty(_focus())
+	_check(summary != null, "the round did work")
+	_eq(rounds.size(), 1, "and announced itself exactly once")
+	_check(per_module.size() > 1,
+		"while the per-module feed fired %d times -- which is why it is not the hand-off"
+			% per_module.size())
+
+	_section("a round that does nothing announces nothing")
+	# The no-op early return must not emit, or the caller re-renders on every idle tick.
+	var again = preview.compile_dirty(_focus())
+	if again == null:
+		_eq(rounds.size(), 1, "no second hand-off for a round with nothing to do")
+
+	preview.teardown()
+
+
+## THE PANE CAN ASK WHY A MODULE DID NOT BUILD.
+##
+## It used to infer a failure from an EMPTY STAGE, which is a different question -- and answers
+## "yes" for a module nobody has compiled yet.
+func _test_last_error_is_askable() -> void:
+	_section("a clean module reports nothing")
+	var preview := _fresh()
+	preview.compile_dirty(_focus())
+	_eq(preview.last_error_for(_focus()), "", "nothing wrong, nothing reported")
+
+	_section("a broken one reports why, and recovers when fixed")
+	var path := _focus()
+	var good: String = preview.workspace.try_get(path).buffer_text
+	preview.workspace.apply_edit(path, good + "
+this is not guitkx <<<
+")
+	preview.compile_dirty(path)
+	_check(not preview.last_error_for(path).is_empty(),
+		"the failure is askable (%s)" % preview.last_error_for(path))
+
+	preview.workspace.apply_edit(path, good)
+	preview.compile_dirty(path)
+	_eq(preview.last_error_for(path), "", "and clears when the module builds again")
+
+	preview.teardown()
+
+
 func _test_only_components_mount() -> void:
 	_section("a component's script has a render; a style module's does not")
 	var preview := _fresh()
