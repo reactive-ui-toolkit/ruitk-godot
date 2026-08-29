@@ -69,7 +69,7 @@ static func CanvasCard(props: Dictionary, children: Array) -> RuitkVNode:
 			var __cf1 = null
 			if M.shows_sections(lod):
 				for __cf1_once in 1:
-					__cf1 = V.fc(CanvasCardSections, { "card": card, "lod": lod, "index": index, "on_add": on_add, "zoom": zoom, "revision": revision, "sel_section": sel_section, "sel_row": sel_row, "highlight_names": highlight_names })
+					__cf1 = V.fc(CanvasCardSections, { "card": card, "lod": lod, "index": index, "on_add": on_add, "revision": revision, "sel_section": sel_section, "sel_row": sel_row, "highlight_names": highlight_names })
 					continue
 			__cf0 = V.PanelContainer({ "name": "card-%d" % index, "position": at, "scale": Vector2(zoom, zoom), "custom_minimum_size": Vector2(card_w, 0), "size": Vector2(card_w, 0), "clip_contents": true, "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.card_box_selected() if is_selected else P.card_box() }, [V.VBoxContainer({ "style": {"separation": 4}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.fc(CanvasCardHeader, { "card": card, "lod": lod }), __cf1])])
 			continue
@@ -102,7 +102,6 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 	var lod = props.get("lod", 1)
 	var index = props.get("index", -1)
 	var on_add = props.get("on_add", null)
-	var zoom = props.get("zoom", 1.0)
 	var revision = props.get("revision", 0)
 	var sel_section = props.get("sel_section", -1)
 	var sel_row = props.get("sel_row", -1)
@@ -117,7 +116,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 	var __cf0 = null
 	if M.has_signature_section(card):
 		for __cf0_once in 1:
-			__cf0 = V.Label({ "text": card.signature, "style": P.signature(), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS })
+			__cf0 = V.HBoxContainer({ "style": {"separation": 0}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.Label({ "text": M.signature_head(card.signature), "style": P.signature_name() }), V.Label({ "text": M.signature_tail(card.signature), "style": P.signature(), "autowrap_mode": TextServer.AUTOWRAP_WORD, "size_flags_horizontal": Control.SIZE_EXPAND_FILL })])
 			continue
 	var __cf1 = null
 	if not card.imports.is_empty():
@@ -145,7 +144,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 			var __cf6: Array = []
 			for i in range(card.markup.size()):
 				var row = card.markup[i]
-				__cf6.append(V.PanelContainer({ "name": "row-3-%d" % i, "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.row_selected() if (sel_section == 3 and sel_row == i) else (P.row_highlighted() if M.row_mentions(row, highlight_names) else P.row_plain()) }, [V.fc(CanvasMarkupRow, { "row": row, "zoom": zoom })], str(row.at)))
+				__cf6.append(V.PanelContainer({ "name": "row-3-%d" % i, "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.row_selected() if (sel_section == 3 and sel_row == i) else (P.row_highlighted() if M.row_mentions(row, highlight_names) else P.row_plain()) }, [V.fc(CanvasMarkupRow, { "row": row, "lod": lod })], str(row.at)))
 				continue
 			__cf5 = V.fc(CanvasCardSection, { "heading": "RETURN — MARKUP" }, [__cf6])
 			continue
@@ -153,7 +152,7 @@ static func CanvasCardSections(props: Dictionary, children: Array) -> RuitkVNode
 	if draws_exports and M.has_exports_section(card):
 		for __cf7_once in 1:
 			var __cf8: Array = []
-			for i in range(card.export_detail.size()):
+			for i in M.drawn_export_rows(card, lod):
 				var row = card.export_detail[i]
 				__cf8.append(V.PanelContainer({ "name": "row-4-%d" % i, "mouse_filter": Control.MOUSE_FILTER_IGNORE, "style": P.row_selected() if (sel_section == 4 and sel_row == i) else P.row_plain() }, [V.Label({ "text": "  ".repeat(row.depth) + row.text, "style": P.export_row(), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS })], str(row.at) + row.text))
 				continue
@@ -179,7 +178,7 @@ static func CanvasCardSection(props: Dictionary, children: Array) -> RuitkVNode:
 # component CanvasMarkupRow
 static func CanvasMarkupRow(props: Dictionary, children: Array) -> RuitkVNode:
 	var row = props.get("row", null)
-	var zoom = props.get("zoom", 1.0)
+	var lod = props.get("lod", 1)
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var Model = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
@@ -190,11 +189,16 @@ static func CanvasMarkupRow(props: Dictionary, children: Array) -> RuitkVNode:
 	elif row.kind == LineKind.DIRECTIVE:
 		style = P.directive_row()
 	var __cf0 = null
-	if row.attrs_text != "" and M.shows_attributes(zoom):
+	if row.badge_text != "" and M.shows_detail(lod):
 		for __cf0_once in 1:
-			__cf0 = V.Label({ "text": row.attrs_text, "style": P.attrs(), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS, "size_flags_horizontal": Control.SIZE_SHRINK_END })
+			__cf0 = V.PanelContainer({ "style": P.directive_badge(row.badge), "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.Label({ "text": row.badge_text, "style": P.directive_badge_text(row.badge) })])
 			continue
-	return V.HBoxContainer({ "style": {"separation": 6}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [V.Label({ "text": "    ".repeat(row.depth) + row.text, "style": style, "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS, "size_flags_horizontal": Control.SIZE_EXPAND_FILL }), __cf0])
+	var __cf1 = null
+	if row.attrs_text != "" and M.shows_attributes(lod):
+		for __cf1_once in 1:
+			__cf1 = V.Label({ "text": row.attrs_text, "style": P.attrs(), "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS, "size_flags_horizontal": Control.SIZE_SHRINK_END })
+			continue
+	return V.HBoxContainer({ "style": {"separation": 6}, "mouse_filter": Control.MOUSE_FILTER_IGNORE }, [__cf0, V.Label({ "text": "    ".repeat(row.depth) + row.text, "style": style, "clip_text": true, "text_overrun_behavior": TextServer.OVERRUN_TRIM_ELLIPSIS, "size_flags_horizontal": Control.SIZE_EXPAND_FILL }), __cf1])
 
 # component CanvasAddChip
 static func CanvasAddChip(props: Dictionary, children: Array) -> RuitkVNode:

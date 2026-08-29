@@ -123,6 +123,12 @@ const PARITY := [
 	["hook stubs that are legal GDScript", "func hook_stub"],
 	["card dragging", "signal card_moved"],
 	["the bottom band's first-child rule", "Placement.FIRST_CHILD"],
+	["DrawCardShadow", "shadow_size"],
+	["directive badges on the row (BadgeColor/BadgeBg)", "func directive_badge"],
+	["detailVisible: export heads at Layer 2, entries at Layer 3", "func draws_export_row"],
+	["DotColor(kind) -- an anchor dot is its import's kind", "func edge_tint"],
+	["the lattice coarsens instead of vanishing", "doublings"],
+	["UB-78: the signature is two runs, cut at the paren", "func signature_head"],
 	# The preview
 	["UsageFor", "func _usage_note"],
 	["ModuleInfoFor", "func _module_note"],

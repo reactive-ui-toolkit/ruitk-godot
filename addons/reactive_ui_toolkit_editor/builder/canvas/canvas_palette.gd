@@ -43,6 +43,14 @@ static func _code(style: Dictionary) -> Dictionary:
 	return style
 
 
+## A card's box, WITH ITS SHADOW.
+##
+## The reference composites sixteen rings to fake one, because UITK has no box-shadow and four
+## stacked rects read as four flat plateaus. StyleBoxFlat has the real thing, so the port is three
+## keys -- and it is worth having: without it a card sits flat on the ground with a 1px hairline
+## between it and the lattice, and at the Cards layer a screen of them reads as a wallpaper rather
+## than as objects you can pick up. The numbers are Unity's: an 18px falloff offset 6px down at
+## 0.35 alpha.
 static func card_box() -> Dictionary:
 	return {
 		"bg_color": Color(0.137, 0.137, 0.161),
@@ -50,6 +58,9 @@ static func card_box() -> Dictionary:
 		"border_width_all": 1,
 		"border_color": Color(0.30, 0.30, 0.36),
 		"content_margin_all": 10,
+		"shadow_size": 14,
+		"shadow_offset": Vector2(0, 6),
+		"shadow_color": Color(0.0, 0.0, 0.0, 0.35),
 	}
 
 
@@ -60,6 +71,11 @@ static func card_box_selected() -> Dictionary:
 		"border_width_all": 2,
 		"border_color": Color(0.361, 0.588, 0.965),
 		"content_margin_all": 10,
+		# LIFTED FURTHER. The selected card is the one being worked on; a shade more depth than its
+		# neighbours is the cheapest way to say so without a second border colour.
+		"shadow_size": 18,
+		"shadow_offset": Vector2(0, 7),
+		"shadow_color": Color(0.0, 0.0, 0.0, 0.45),
 	}
 
 
@@ -80,8 +96,19 @@ static func pill_title() -> Dictionary:
 	return { "font_size": 26, "font_color": Color(0.898, 0.898, 0.937) }
 
 
+## The PARAMETER LIST of a declaration's signature.
+##
+## Dimmer than the name and wrapped rather than clipped. The reference makes the same two moves
+## for the same reason: emitted raw, the whole line inherited the section's flat grey while the
+## code islands beside it were coloured, and clipping a long parameter list at the card's edge
+## takes the argument that made the reader look.
 static func signature() -> Dictionary:
 	return _code({ "font_size": 11, "font_color": Color(0.588, 0.588, 0.647) })
+
+
+## The declaration NAME at the head of a signature -- the half a reader is scanning for.
+static func signature_name() -> Dictionary:
+	return _code({ "font_size": 11, "font_color": Color(0.847, 0.867, 0.933) })
 
 
 static func section_head() -> Dictionary:
@@ -160,6 +187,61 @@ static func edge_component() -> Color:
 
 static func edge_style() -> Color:
 	return Color(0.86, 0.60, 0.98, 0.95)
+
+
+## A HOOK import's edge. The third relationship, and the one that was drawn as the first: a hook
+## import puts STATE in a component, which is neither an element in its tree nor a look on one.
+static func edge_hook() -> Color:
+	return Color(0.44, 0.86, 0.68, 0.95)
+
+
+## The edge tint for a target module's kind. `RuitkBuilderModule.Kind` ordinals, like `kind_tint`,
+## and an unknown kind gets an answer rather than an out-of-bounds.
+static func edge_tint(kind: int) -> Color:
+	match kind:
+		1:
+			return edge_hook()
+		2:
+			return edge_style()
+		_:
+			return edge_component()
+
+
+## A DIRECTIVE BADGE's tint, by `RuitkBuilderGraph.Badge` ordinal.
+##
+## Three families, because that is what the eye needs to sort a markup tree at a glance: a branch,
+## a loop, and a match. Naming each of the eight separately would be a colour code nobody learns.
+static func badge_tint(badge: int) -> Color:
+	match badge:
+		1, 2, 3:
+			return Color(0.482, 0.667, 0.976)   # @if / @elif / @else
+		4, 5:
+			return Color(0.541, 0.831, 0.678)   # @for / @while
+		6, 7, 8:
+			return Color(0.925, 0.706, 0.416)   # @match / its cases / @default
+		_:
+			return Color(0.549, 0.549, 0.600)
+
+
+## The badge chip on a directive row: a filled pill in the family's tint.
+##
+## Small, because it rides IN a row rather than beside it -- the reference's is 10px bold at
+## radius 7 with 6px of side padding, and the point of it is that a reader can tell a branch from
+## a loop without reading the word.
+static func directive_badge(badge: int) -> Dictionary:
+	var tint := badge_tint(badge)
+	return {
+		"bg_color": Color(tint, 0.24),
+		"corner_radius_all": 7,
+		"content_margin_left": 6,
+		"content_margin_right": 6,
+		"content_margin_top": 0,
+		"content_margin_bottom": 0,
+	}
+
+
+static func directive_badge_text(badge: int) -> Dictionary:
+	return { "font_size": 10, "font_color": badge_tint(badge) }
 
 
 

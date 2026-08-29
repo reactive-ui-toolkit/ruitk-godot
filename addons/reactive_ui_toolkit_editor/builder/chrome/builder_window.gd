@@ -715,7 +715,11 @@ func _build_toolbar() -> HBoxContainer:
 	legend.add_child(Parts.legend_entry("component", Palette.kind_tint(Module.Kind.COMPONENT)))
 	legend.add_child(Parts.legend_entry("hook module", Palette.kind_tint(Module.Kind.HOOK)))
 	legend.add_child(Parts.legend_entry("style module", Palette.kind_tint(Module.Kind.STYLE)))
+	# ALL THREE EDGE KINDS. The canvas draws a hook import in its own colour now, and a key that
+	# names two of three colours is a key you have to check against the picture.
 	legend.add_child(Parts.legend_entry("usage edge", Palette.edge_component()))
+	legend.add_child(Parts.legend_entry("hook edge", Palette.edge_hook()))
+	legend.add_child(Parts.legend_entry("style edge", Palette.edge_style()))
 	_toolbar.add_child(legend)
 	return _toolbar
 

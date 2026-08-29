@@ -99,7 +99,7 @@ export CanvasCard(card = null, lod: int = 1, is_selected: bool = false,
 						@if (M.shows_sections(lod)) {
 							return (
 								<CanvasCardSections card={ card } lod={ lod } index={ index } on_add={ on_add }
-				zoom={ zoom } revision={ revision } sel_section={ sel_section } sel_row={ sel_row }
+				revision={ revision } sel_section={ sel_section } sel_row={ sel_row }
 				highlight_names={ highlight_names } />
 							)
 						}
@@ -161,7 +161,7 @@ export CanvasCardHeader(card = null, lod: int = 1) -> RuitkVNode {
 ## export, carrying which dictionary it adds to, and a second card-level one would be a button
 ## that has to guess which. "+ style" adds a whole new export and has nothing to guess about.
 export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = null,
-		zoom: float = 1.0, revision: int = 0, sel_section: int = -1,
+		revision: int = 0, sel_section: int = -1,
 		sel_row: int = -1, highlight_names = null) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
@@ -175,8 +175,12 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 		<VBoxContainer style={ {"separation": 4} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
 			@if (M.has_signature_section(card)) {
 				return (
-					<Label text={ card.signature } style={ P.signature() } clip_text={ true }
-						text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS } />
+					<HBoxContainer style={ {"separation": 0} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+						<Label text={ M.signature_head(card.signature) } style={ P.signature_name() } />
+						<Label text={ M.signature_tail(card.signature) } style={ P.signature() }
+							autowrap_mode={ TextServer.AUTOWRAP_WORD }
+							size_flags_horizontal={ Control.SIZE_EXPAND_FILL } />
+					</HBoxContainer>
 				)
 			}
 			@if (not card.imports.is_empty()) {
@@ -223,7 +227,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 							return (
 								<PanelContainer key={ str(row.at) } name={ "row-3-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
 										style={ P.row_selected() if (sel_section == 3 and sel_row == i) else (P.row_highlighted() if M.row_mentions(row, highlight_names) else P.row_plain()) }>
-									<CanvasMarkupRow row={ row } zoom={ zoom } />
+									<CanvasMarkupRow row={ row } lod={ lod } />
 								</PanelContainer>
 							)
 						}
@@ -233,7 +237,7 @@ export CanvasCardSections(card = null, lod: int = 1, index: int = -1, on_add = n
 			@if (draws_exports and M.has_exports_section(card)) {
 				return (
 					<CanvasCardSection heading="EXPORTS">
-						@for (i in range(card.export_detail.size())) {
+						@for (i in M.drawn_export_rows(card, lod)) {
 							var row = card.export_detail[i]
 							return (
 								<PanelContainer key={ str(row.at) + row.text } name={ "row-4-%d" % i } mouse_filter={ Control.MOUSE_FILTER_IGNORE }
@@ -288,7 +292,7 @@ export CanvasCardSection(heading: String = "") -> RuitkVNode {
 
 ## One row of the markup tree: indented to its depth, coloured by what it is, with its attribute
 ## run beside it.
-export CanvasMarkupRow(row = null, zoom: float = 1.0) -> RuitkVNode {
+export CanvasMarkupRow(row = null, lod: int = 1) -> RuitkVNode {
 	var P = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/canvas_palette.gd")
 	var M = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_canvas_metrics.gd")
 	var Model = preload("res://addons/reactive_ui_toolkit_editor/builder/canvas/builder_graph.gd")
@@ -301,10 +305,17 @@ export CanvasMarkupRow(row = null, zoom: float = 1.0) -> RuitkVNode {
 
 	return (
 		<HBoxContainer style={ {"separation": 6} } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+			@if (row.badge_text != "" and M.shows_detail(lod)) {
+				return (
+					<PanelContainer style={ P.directive_badge(row.badge) } mouse_filter={ Control.MOUSE_FILTER_IGNORE }>
+						<Label text={ row.badge_text } style={ P.directive_badge_text(row.badge) } />
+					</PanelContainer>
+				)
+			}
 			<Label text={ "    ".repeat(row.depth) + row.text } style={ style } clip_text={ true }
 				text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS }
 				size_flags_horizontal={ Control.SIZE_EXPAND_FILL } />
-			@if (row.attrs_text != "" and M.shows_attributes(zoom)) {
+			@if (row.attrs_text != "" and M.shows_attributes(lod)) {
 				return (
 					<Label text={ row.attrs_text } style={ P.attrs() } clip_text={ true }
 						text_overrun_behavior={ TextServer.OVERRUN_TRIM_ELLIPSIS }

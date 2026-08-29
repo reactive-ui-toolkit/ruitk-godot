@@ -169,12 +169,20 @@ func _draw_anchors(card: Graph.Card, index: int, card_width: float) -> void:
 	# One dot per import row, down the card's left column -- so a card with four imports shows
 	# four distinct arrival points rather than four lines converging on one.
 	var incoming := graph.edges_to(index).size()
+	# COLOURED BY WHAT THE EDGE IS. Every dot used to be one flat blue while the curve it
+	# terminates was already tinted by kind -- so the line said "style module" and the dot it grew
+	# out of said nothing. Each gets a halo at a quarter alpha, which is what makes a 3px dot
+	# findable against a card border of the same weight.
+	var mine := Palette.edge_tint(int(card.kind))
 	# ONE dot where the edges arrive, at the card's top-left corner. A COLUMN of arrival dots was
 	# drawn here before, one per incoming edge, spaced down the left border -- but every edge now
 	# arrives at the same corner, so all but the first marked a point no line touched.
 	if incoming > 0:
 		var arrival := Metrics.world_to_screen(Metrics.edge_target_anchor(card), camera, zoom)
-		draw_circle(arrival, ANCHOR_RADIUS, ANCHOR_COLOR)
+		# THIS CARD'S kind: an arrival dot says what is being used, and the edges reaching it can
+		# come from anywhere.
+		draw_circle(arrival, ANCHOR_RADIUS * 2.2, Color(mine, 0.25))
+		draw_circle(arrival, ANCHOR_RADIUS, mine)
 
 	# AND ONE PER OUTGOING EDGE, ON THE ROW THAT OWNS IT -- a column down the card's right border.
 	# Only the arrival side had dots, so a parent card showed four edges leaving its right edge with
@@ -183,7 +191,10 @@ func _draw_anchors(card: Graph.Card, index: int, card_width: float) -> void:
 	for edge in graph.edges_from(index):
 		var source := Metrics.edge_source_anchor(card, edge.from_row, card_width,
 			Metrics.lod_of(zoom), edge.from_section)
-		draw_circle(Metrics.world_to_screen(source, camera, zoom), ANCHOR_RADIUS, ANCHOR_COLOR)
+		var tint := Palette.edge_tint(int(edge.target_kind))
+		var at := Metrics.world_to_screen(source, camera, zoom)
+		draw_circle(at, ANCHOR_RADIUS * 2.2, Color(tint, 0.25))
+		draw_circle(at, ANCHOR_RADIUS, tint)
 
 
 func _draw_edge(edge: Graph.Edge, _ordinal: int, card_width: float) -> void:
@@ -213,8 +224,9 @@ func _draw_edge(edge: Graph.Edge, _ordinal: int, card_width: float) -> void:
 	var to_style := int(to_card.kind) == int(Module.Kind.STYLE)
 	# ONE COLOUR PER KIND, and selection is shown by WEIGHT. Tinting the selected card's edges a
 	# different colour put three colours on a canvas whose legend names two, so the key stopped
-	# mapping onto what was drawn.
-	var color := Palette.edge_style() if to_style else Palette.edge_component()
+	# mapping onto what was drawn. THREE kinds now, and the legend names all three: a hook import
+	# puts state in a component, which is neither an element in its tree nor a look on one.
+	var color := Palette.edge_tint(int(to_card.kind))
 	# AND EVERY OTHER EDGE DIMS. Node editors do not route around nodes -- they make crossings
 	# cheap instead, and dimming is the part of that this canvas can do without an auto-layout:
 	# with one card selected, the lines that touch it are the only bright ones, so a crossing is

@@ -33,7 +33,7 @@ const VIEWPORT := Vector2(1280, 720)
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 179
+const ASSERTION_FLOOR := 195
 
 var _fails := 0
 var _passes := 0
@@ -244,12 +244,74 @@ func _test_hit_test_matches_what_is_drawn() -> void:
 		"markup at Layer 2")
 	_check(not Metrics.draws_section(int(Metrics.Section.ISLAND), Metrics.Lod.SECTIONS),
 		"but the code island waits for Layer 3")
-	_check(not Metrics.draws_section(int(Metrics.Section.EXPORTS), Metrics.Lod.SECTIONS),
-		"and so do style entry lines")
+	# EXPORTS IS GRADED, not withheld. A style module is ALL exports, so hiding the section outright
+	# left a style card at Layer 2 as a header over nothing -- no way to see what it offers, and no
+	# "+ entry" to add to it. Heads and affordances draw at Layer 2; the entry LINES wait for Layer 3.
+	_check(Metrics.draws_section(int(Metrics.Section.EXPORTS), Metrics.Lod.SECTIONS),
+		"the exports section itself is part of the Cards layer")
+	var head := Graph.Line.new()
+	head.badge = Graph.Badge.STYLE_HEADER
+	var entry := Graph.Line.new()
+	var add := Graph.Line.new()
+	add.badge = Graph.Badge.ADD_ENTRY
+	_check(Metrics.draws_export_row(head, Metrics.Lod.SECTIONS), "an export HEAD draws at Layer 2")
+	_check(Metrics.draws_export_row(add, Metrics.Lod.SECTIONS),
+		"and so does the + entry affordance beside it")
+	_check(not Metrics.draws_export_row(entry, Metrics.Lod.SECTIONS),
+		"but a style ENTRY line waits for Layer 3")
+	_check(Metrics.draws_export_row(entry, Metrics.Lod.FULL), "which draws it")
+	_check(not Metrics.draws_export_row(head, Metrics.Lod.PILL), "a pill draws none of them")
+
+	# AND THE HIT-TEST ADDRESSES THE MODEL, not the picture. The second row a reader sees at
+	# Layer 2 is not `export_detail[1]`, and every consumer downstream -- the row menu, the drop,
+	# the source-pane jump -- indexes the model.
+	# BUILT HERE rather than fetched: `_card` looks a module up in the fixture graph, and this one
+	# is about the grading rule, not about any file in it.
+	var graded := Graph.Card.new()
+	graded.title = "Graded"
+	graded.kind = Module.Kind.STYLE
+	var g_head := Graph.Line.new()
+	g_head.badge = Graph.Badge.STYLE_HEADER
+	g_head.text = "panel"
+	var g_e1 := Graph.Line.new()
+	g_e1.text = "\"bg_color\": RED"
+	var g_e2 := Graph.Line.new()
+	g_e2.text = "\"corner_radius_all\": 6"
+	var g_add := Graph.Line.new()
+	g_add.badge = Graph.Badge.ADD_ENTRY
+	g_add.text = "+ entry"
+	graded.export_detail = [g_head, g_e1, g_e2, g_add]
+	var visible: Array = Metrics.drawn_export_rows(graded, Metrics.Lod.SECTIONS)
+	_eq(visible.size(), 2, "two of the four export rows draw at Layer 2")
+	_eq(int(visible[0]), 0, "the head")
+	_eq(int(visible[1]), 3, "and the add row, which is index THREE in the model")
+	_eq(Metrics.drawn_export_rows(graded, Metrics.Lod.FULL).size(), 4,
+		"Layer 3 draws all four")
+	var stack_l2: Array = Metrics.section_stack(graded, Metrics.Lod.SECTIONS)
+	var exports_l2 := {}
+	for row in stack_l2:
+		if int((row as Dictionary)["section"]) == int(Metrics.Section.EXPORTS):
+			exports_l2 = row as Dictionary
+	_eq(int(exports_l2.get("rows", -1)), 2,
+		"and the height model counts what is drawn, not what exists")
 	_check(Metrics.draws_section(int(Metrics.Section.ISLAND), Metrics.Lod.FULL),
 		"which draws both")
 	_check(not Metrics.draws_section(int(Metrics.Section.MARKUP), Metrics.Lod.PILL),
 		"a pill draws no rows at all")
+
+	# ATTRIBUTES ARE A LAYER 3 ELEMENT, not a fourth threshold. This tested `zoom >= 1.2`, which is
+	# neither `lod_of` nor anything the capability reference names -- so across the whole window
+	# [0.80, 1.20) the toolbar read "Layer 3 -- Edit" and the cards carried no attributes.
+	_check(Metrics.shows_attributes(Metrics.Lod.FULL), "attributes are drawn at the Edit layer")
+	_check(not Metrics.shows_attributes(Metrics.Lod.SECTIONS), "and not before it")
+
+	# A SIGNATURE IS TWO RUNS, cut at the paren and not before it: a name that stops one character
+	# short of its own parenthesis reads as a typo.
+	_eq(Metrics.signature_head("Card(title: String = \"\")"), "Card(", "the name half keeps the paren")
+	_eq(Metrics.signature_tail("Card(title: String = \"\")"), "title: String = \"\")",
+		"and the parameter half is the rest")
+	_eq(Metrics.signature_head("bare"), "bare", "a signature with no paren is all name")
+	_eq(Metrics.signature_tail("bare"), "", "and has no parameter run")
 
 	_section("a taller layer is a taller card")
 	_check(Metrics.drawn_height(card, Metrics.Lod.FULL)

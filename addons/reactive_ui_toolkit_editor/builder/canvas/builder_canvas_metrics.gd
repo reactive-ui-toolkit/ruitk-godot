@@ -106,18 +106,15 @@ static func shows_sections(lod: Lod) -> bool:
 	return lod != Lod.PILL
 
 
-## Whether a card shows its markup tree and code island at this LOD.
 ## Whether the markup rows carry their attribute runs.
 ##
-## A LEVEL BEYOND `shows_detail`. Showing every attribute the moment the markup appears makes the
-## edit layer and the zoomed layer carry identical information, and sets the card's width from its
-## longest attribute run -- which is what pushed the tree wider than the canvas.
-static func shows_attributes(zoom: float) -> bool:
-	return zoom >= ATTRIBUTE_ZOOM
-
-
-## The zoom at which a markup row starts carrying its attributes.
-const ATTRIBUTE_ZOOM := 1.2
+## LAYER 3, like every other Layer 3 element. This used to test `zoom >= 1.2` -- a fourth
+## threshold that is neither `lod_of` nor anything the capability reference names, so across the
+## whole window [0.80, 1.20) the toolbar read "Layer 3 — Edit" and the cards carried no
+## attributes. The reason it was raised (a long attribute run setting the card's width) is answered
+## where it belongs: the run clips and the card is width-solved.
+static func shows_attributes(lod: Lod) -> bool:
+	return shows_detail(lod)
 
 
 static func shows_detail(lod: Lod) -> bool:
@@ -150,7 +147,23 @@ static func has_body_section(card: Graph.Card) -> bool:
 		return false
 	# A component or a hook has one even when it is empty -- the card offers to add the first hook
 	# there, and an affordance the card declines to show cannot be clicked.
-	return not card.body.is_empty() 		or card.kind == Module.Kind.COMPONENT or card.kind == Module.Kind.HOOK
+	return not card.body.is_empty() \
+		or card.kind == Module.Kind.COMPONENT or card.kind == Module.Kind.HOOK
+
+
+## A signature's NAME half -- everything up to and including its opening paren.
+##
+## Split at the paren and not before it, deliberately: the reference makes the same cut, because
+## a name that stops one character short of its own parenthesis reads as a typo.
+static func signature_head(signature: String) -> String:
+	var open := signature.find("(")
+	return signature if open == -1 else signature.substr(0, open + 1)
+
+
+## The rest of it -- the parameter list, which is the half that wraps.
+static func signature_tail(signature: String) -> String:
+	var open := signature.find("(")
+	return "" if open == -1 else signature.substr(open + 1)
 
 
 ## Whether a card shows a SIGNATURE row.
@@ -170,9 +183,43 @@ static func has_exports_section(card: Graph.Card) -> bool:
 static func draws_section(section: int, lod: Lod) -> bool:
 	if lod == Lod.PILL:
 		return false
-	if section == int(Section.EXPORTS) or section == int(Section.ISLAND):
+	if section == int(Section.ISLAND):
 		return shows_detail(lod)
+	# EXPORTS IS GRADED, NOT WITHHELD. Below Layer 3 it draws its export heads and its add
+	# affordances and holds back the entry lines -- which is the reference's rule, and the reason
+	# for it is that a style module is ALL exports: hiding the section outright left a style card
+	# at the Cards layer as a header over nothing, with no way to see what it offers or add to it.
+	# `draws_export_row` is the row-level half; they are read together.
 	return true
+
+
+## Whether one EXPORTS row is drawn at this LOD.
+##
+## Heads and affordances at every layer that draws sections; entry lines at Layer 3 only. Badge
+## ordinals are `RuitkBuilderGraph.Badge`: STYLE_HEADER / UTIL_BODY are heads, ADD_ENTRY /
+## ADD_STYLE / ADD_EXPORT are affordances.
+static func draws_export_row(row, lod: Lod) -> bool:
+	if lod == Lod.PILL:
+		return false
+	if shows_detail(lod) or row == null:
+		return true
+	var badge := int(row.badge)
+	return badge == 17 or badge == 16 or badge == 13 or badge == 14 or badge == 15
+
+
+## The TRUE indices of the EXPORTS rows drawn at this LOD, in order.
+##
+## What lets the hit-test address a graded section: the Nth thing a reader sees at Layer 2 is not
+## the Nth entry of `export_detail`, and a hit-test that assumed it was would report the row four
+## places above the one under the cursor.
+static func drawn_export_rows(card: Graph.Card, lod: Lod) -> Array:
+	var out: Array = []
+	if card == null:
+		return out
+	for i in range(card.export_detail.size()):
+		if draws_export_row(card.export_detail[i], lod):
+			out.append(i)
+	return out
 
 
 # ── Camera ───────────────────────────────────────────────────────────────────────────
@@ -229,7 +276,7 @@ static func drawn_height(card: Graph.Card, lod: Lod) -> float:
 		# hit-test cannot help with, because a pill has no rows to measure.
 		return PILL_H
 	var height := HEADER_H
-	for entry in section_stack(card):
+	for entry in section_stack(card, lod):
 		var section := entry as Dictionary
 		if not draws_section(int(section["section"]), lod):
 			continue
@@ -251,7 +298,11 @@ enum Section { SIGNATURE, IMPORTS, BODY, MARKUP, EXPORTS, ISLAND }
 ##
 ## Measured at the SECTIONS layout whatever the LOD, because that is what the saved layout is
 ## keyed on: a card that changed height with the zoom would reflow the whole canvas on a scroll.
-static func section_stack(card: Graph.Card) -> Array:
+##
+## `lod` grades the ONE section that is graded -- EXPORTS, whose entry lines wait for Layer 3
+## while its heads and add rows do not. It defaults to FULL, which is the whole card: the LAYOUT
+## reads it that way on purpose, so a card's slot does not change size when the zoom does.
+static func section_stack(card: Graph.Card, lod := Lod.FULL) -> Array:
 	var out: Array = []
 	if card == null:
 		return out
@@ -275,9 +326,10 @@ static func section_stack(card: Graph.Card) -> Array:
 			card.markup.size(), MARKUP_ROW_H))
 		top += SECTION_OVERHEAD_H + card.markup.size() * MARKUP_ROW_H
 	if has_exports_section(card):
-		out.append(_section_row(Section.EXPORTS, top, SECTION_OVERHEAD_H,
-			card.export_detail.size(), MARKUP_ROW_H))
-		top += SECTION_OVERHEAD_H + card.export_detail.size() * MARKUP_ROW_H
+		var exports := card.export_detail.size() if shows_detail(lod) \
+			else drawn_export_rows(card, lod).size()
+		out.append(_section_row(Section.EXPORTS, top, SECTION_OVERHEAD_H, exports, MARKUP_ROW_H))
+		top += SECTION_OVERHEAD_H + exports * MARKUP_ROW_H
 	if not card.island_lines.is_empty():
 		out.append(_section_row(Section.ISLAND, top, SECTION_OVERHEAD_H,
 			card.island_lines.size(), ISLAND_ROW_H))
@@ -567,7 +619,7 @@ static func row_hit(card: Graph.Card, card_local: Vector2, lod := Lod.FULL) -> D
 	# higher on screen, and hit-testing against the full-card tops would report the row above or
 	# below the one under the cursor.
 	var top_at := HEADER_H
-	for entry in section_stack(card):
+	for entry in section_stack(card, lod):
 		var e := entry as Dictionary
 		if not draws_section(int(e["section"]), lod):
 			continue
@@ -583,6 +635,14 @@ static func row_hit(card: Graph.Card, card_local: Vector2, lod := Lod.FULL) -> D
 		var index := int(into / row_height)
 		if index >= int(e["rows"]):
 			return miss
+		# BACK TO THE TRUE INDEX. In a graded EXPORTS section the Nth row a reader sees is not the
+		# Nth entry of `export_detail`, and every consumer downstream -- the menu, the drop, the
+		# source-pane jump -- addresses the model, not the picture.
+		if int(e["section"]) == int(Section.EXPORTS) and not shows_detail(lod):
+			var visible := drawn_export_rows(card, lod)
+			if index >= visible.size():
+				return miss
+			index = int(visible[index])
 		var fraction := fmod(into, row_height) / row_height
 		var band := 1
 		if fraction < BAND_EDGE:

@@ -34,7 +34,7 @@ const ROOT := "res://tests/__builder_chrome_tmp/app"
 ## Left slack, this guard does not work: a script error aborted one test mid-run and the suite
 ## still printed ALL PASS, because the count it reached was comfortably above a floor set several
 ## additions ago. The floor only catches a truncated run while it sits AT the real count.
-const ASSERTION_FLOOR := 350
+const ASSERTION_FLOOR := 351
 
 var _fails := 0
 var _passes := 0

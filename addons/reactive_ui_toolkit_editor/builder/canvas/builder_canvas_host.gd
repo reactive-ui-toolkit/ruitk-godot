@@ -448,10 +448,23 @@ func _notification(what: int) -> void:
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Palette.bg()["bg_color"])
 
-	var spacing := GRID_SPACING * zoom
+	# THE LATTICE COARSENS, IT DOES NOT VANISH. Below zoom 0.219 the dots used to stop entirely and
+	# were already faint at the Architecture layer's 0.30 preset -- so the one layer you PAN in had
+	# no ground reference, and a drag of an empty region moved nothing the eye could follow. The
+	# world tile doubles until its screen spacing is legible again, which is what the Unreal leg
+	# does; the loop is bounded so a pathological zoom cannot spin it.
+	var world := GRID_SPACING
+	var spacing := world * zoom
+	var doublings := 0
+	while spacing < GRID_MIN_SCREEN_SPACING and doublings < 24:
+		world *= 2.0
+		spacing = world * zoom
+		doublings += 1
 	if spacing < GRID_MIN_SCREEN_SPACING:
 		return
-	var alpha: float = clampf((spacing - GRID_MIN_SCREEN_SPACING) / GRID_MIN_SCREEN_SPACING, 0.0, 1.0)
+	# RAMPED, NEVER TO NOTHING. The old ramp reached zero exactly at the threshold, so the grid
+	# faded out just as the doubling brought it back.
+	var alpha: float = clampf(spacing / (GRID_MIN_SCREEN_SPACING * 2.0), 0.45, 1.0)
 	var tint := Color(GRID_COLOR, GRID_COLOR.a * alpha)
 	var first := Vector2(fposmod(camera.x, spacing), fposmod(camera.y, spacing))
 	var y := first.y
